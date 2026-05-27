@@ -1,0 +1,69 @@
+group 'com.vnu.inmapz'
+version '1.0'
+
+buildscript {
+    ext.kotlin_version = '2.3.21'
+
+    repositories {
+        google()
+        mavenCentral()
+    }
+
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.7.3'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+    }
+}
+
+rootProject.allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+
+    configurations.all{
+        resolutionStrategy{
+            force "com.google.android.gms:play-services-location:21.0.1"
+        }
+    }
+}
+
+
+
+apply plugin: 'com.android.library'
+
+apply from: "../../inmapz/android/inmapz.sdk.gradle"
+
+android {
+    compileSdkVersion 34
+    if (project.android.hasProperty("namespace")) {
+        namespace 'com.inmapz.inmapz'
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    defaultConfig {
+        minSdkVersion 26
+    }
+
+    buildTypes {
+        debug {
+            // TODO: Add your own signing config for the release build.
+            // Signing with the debug keys for now, so `flutter run --release` works.
+            signingConfig signingConfigs.debug
+//            minifyEnabled  false
+
+            consumerProguardFiles  'inmapz-proguard-rules.pro'
+        }
+        release {
+            // TODO: Add your own signing config for the release build.
+            // Signing with the debug keys for now, so `flutter run --release` works.
+            signingConfig signingConfigs.debug
+//            minifyEnabled  true
+
+            consumerProguardFiles  'inmapz-proguard-rules.pro'
+        }
+    }
+}

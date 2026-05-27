@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"name": "one_vnu_appstore",
+			"path": "one_vnu_appstore"
+		},
+		{
+			"name": "vnu_noi_tru",
+			"path": "vnu_noi_tru"
+		},
+		{
+			"name": "vnu_core",
+			"path": "vnu_core"
+		}
+	],
+	"settings": {}
+}

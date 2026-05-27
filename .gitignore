@@ -1,0 +1,159 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.buildlog/
+.history
+.svn/
+
+# IntelliJ / Android Studio
+*.iml
+*.ipr
+*.iws
+.idea/
+.gradle/
+
+# VS Code
+.vscode/
+
+# Flutter / Dart / Pub
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+
+
+
+# Flutter generated
+.flutter-plugins
+.flutter-plugins-dependencies
+.fvm/
+.fvmrc
+
+# Dart
+.dart_tool/
+.packages
+.pub/
+.pub-cache/
+
+# Build outputs
+build/
+dist/
+out/
+
+# Android
+android/captures/
+android/**/build/
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# iOS
+ios/Flutter/App.framework
+ios/Flutter/Flutter.framework
+ios/Flutter/engine/
+DerivedData/
+
+# Xcode
+xcuserdata/
+*.xcuserstate
+
+# Crash / temp
+*.lock
+*.tmp
+tmp/
+
+# Archive / binaries
+*.zip
+*.rar
+*.7z
+*.tar
+*.gz
+
+# Logs
+logs/
+*.log
+# Generated files
+*.g.dart
+*.freezed.dart
+*.mocks.dart
+*.config.dart
+
+# Coverage
+coverage/
+
+# Android
+android/.gradle/
+android/app/build/
+android/build/
+android/local.properties
+android/key.properties
+android/app/*.jks
+android/app/*.keystore
+
+# iOS
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Flutter/Generated.xcconfig
+ios/Flutter/ephemeral/
+ios/build/
+ios/Runner.xcworkspace/
+ios/Podfile.lock
+
+# macOS
+macos/Pods/
+macos/.symlinks/
+macos/Flutter/ephemeral/
+macos/build/
+macos/Runner.xcworkspace/
+macos/Podfile.lock
+
+# Web
+web/.dart_tool/
+
+# Windows
+windows/flutter/ephemeral/
+windows/build/
+
+# Linux
+linux/flutter/ephemeral/
+linux/build/
+
+# Firebase / secrets
+firebase_options.dart
+.env
+.env.*
+*.pem
+*.p12
+*.key
+*.mobileprovision
+
+
+
+# indoor sdk cache
+**/cache.tar.gz
+temp_aar_check/
+inmapz_backup/
+CODE_BUNDLE.txt
+
+# xcframework cache
+*.xcframework/**/cache.tar.gz
+
+# build cache
+DerivedData/
+
+# aar temp
+*.aar
+
+
+inmapz_backup/
+temp_aar_check/

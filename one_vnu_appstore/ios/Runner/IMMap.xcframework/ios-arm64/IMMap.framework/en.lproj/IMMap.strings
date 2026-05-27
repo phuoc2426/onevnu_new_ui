@@ -1,0 +1,41 @@
+
+/* Class = "UILabel"; text = "From"; ObjectID = "7g9-E1-CUv"; */
+"7g9-E1-CUv.text" = "From";
+
+/* Class = "UILabel"; text = "Locate"; ObjectID = "DRG-Zv-mfr"; */
+"DRG-Zv-mfr.text" = "Locate";
+
+/* Class = "UILabel"; text = "AIRPORT LIST"; ObjectID = "QS2-hW-7jl"; */
+"QS2-hW-7jl.text" = "BUILDING LIST";
+
+/* Class = "UILabel"; text = "Info"; ObjectID = "R34-Sv-HmO"; */
+"R34-Sv-HmO.text" = "Info";
+
+/* Class = "UILabel"; text = "View"; ObjectID = "ZeR-5r-EXR"; */
+"ZeR-5r-EXR.text" = "View";
+
+/* Class = "UIButton"; normalTitle = "Direction to Here"; ObjectID = "h0N-ud-1I4"; */
+"h0N-ud-1I4.normalTitle" = "Direction to Here";
+
+/* Class = "UILabel"; text = "InMapz"; ObjectID = "iDO-oh-Lcf"; */
+"iDO-oh-Lcf.text" = "InMapz";
+
+/* Class = "UILabel"; text = "To"; ObjectID = "jMg-JN-NAm"; */
+"jMg-JN-NAm.text" = "To";
+
+/* Class = "UIButton"; normalTitle = "Direction from Here"; ObjectID = "ll4-ss-2qe"; */
+"ll4-ss-2qe.normalTitle" = "Direction from Here";
+
+/* Class = "UIButton"; normalTitle = "OK"; ObjectID = "nI8-Ug-MtE"; */
+"nI8-Ug-MtE.normalTitle" = "OK";
+
+/* Class = "UILabel"; text = "Change airport"; ObjectID = "tzb-ks-kVK"; */
+"tzb-ks-kVK.text" = "Change venue";
+
+/* Class = "UIButton"; normalTitle = "Cancel"; ObjectID = "wr2-d9-XOP"; */
+"wr2-d9-XOP.normalTitle" = "Cancel";
+
+/* Class = "UILabel"; text = "Room's infomation"; ObjectID = "vID-DP-DHC"; */
+"vID-DP-DHC.text" = "Room's infomation";
+
+// route map

@@ -1,0 +1,11 @@
+framework module IMMap {
+  umbrella header "IMMap.h"
+  export *
+
+  module * { export * }
+}
+
+module IMMap.Swift {
+  header "IMMap-Swift.h"
+  requires objc
+}

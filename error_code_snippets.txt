@@ -1,0 +1,313 @@
+================================================================================
+TỔNG HỢP MÃ NGUỒN CẦN SỬA SAU KHI NÂNG CẤP THƯ VIỆN & SDK
+================================================================================
+
+Dưới đây là chi tiết mã nguồn cũ (Gốc) đang bị lỗi biên dịch và mã nguồn mới đã sửa đổi
+để tương thích hoàn toàn với các phiên bản package mới nhất (flutter_local_notifications 21.0.0, 
+local_auth 3.0.1, dropdown_button2 3.1.0, file_picker 11.0.2).
+
+--------------------------------------------------------------------------------
+1. FILE: one_vnu_appstore/lib/main.dart
+--------------------------------------------------------------------------------
+Đường dẫn: one_vnu_appstore/lib/main.dart
+
+[MÃ NGUỒN CŨ - LỖI DÒNG 163 - 179 & 249]:
+----------------------------------------
+  void _initializationLocalPushNotificationPlugin() {
+    var initializationSettingsAndroid =
+        const AndroidInitializationSettings('app_icon');
+    var initializationSettingsIOS = DarwinInitializationSettings(
+      onDidReceiveLocalNotification: (id, title, body, payload) {
+        //TODO: handle notify
+      },
+    );
+    var initializationSettings = InitializationSettings(
+        android: initializationSettingsAndroid, iOS: initializationSettingsIOS);
+    flutterLocalNotificationsPlugin.initialize(
+      initializationSettings,
+      onDidReceiveNotificationResponse: (details) {
+        if (details.payload == null) return;
+        try {
+          final Map<String, dynamic> payload = jsonDecode(details.payload!);
+          _handleNotificationTapped(context, payload);
+        } catch (e) {}
+      },
+    );
+  }
+
+  void _showLocalPushNotification(RemoteMessage message) async {
+    ...
+    await flutterLocalNotificationsPlugin.show(
+        Random().nextInt(10000),
+        message.notification?.title ?? "",
+        message.notification?.body ?? "",
+        platformChannelSpecifics,
+        payload: jsonEncode(message.data));
+    logSuccess("flutterLocalNotificationsPlugin show push");
+  }
+
+
+[MÃ NGUỒN MỚI - ĐÃ SỬA]:
+----------------------------------------
+  void _initializationLocalPushNotificationPlugin() {
+    var initializationSettingsAndroid =
+        const AndroidInitializationSettings('app_icon');
+    // DarwinInitializationSettings không còn nhận onDidReceiveLocalNotification ở phiên bản mới
+    var initializationSettingsIOS = const DarwinInitializationSettings();
+    var initializationSettings = InitializationSettings(
+        android: initializationSettingsAndroid, iOS: initializationSettingsIOS);
+    // initialize chuyển sang sử dụng named parameter 'settings'
+    flutterLocalNotificationsPlugin.initialize(
+      settings: initializationSettings,
+      onDidReceiveNotificationResponse: (details) {
+        if (details.payload == null) return;
+        try {
+          final Map<String, dynamic> payload = jsonDecode(details.payload!);
+          _handleNotificationTapped(context, payload);
+        } catch (e) {}
+      },
+    );
+  }
+
+  void _showLocalPushNotification(RemoteMessage message) async {
+    if (Platform.isIOS) {
+      return;
+    }
+    var androidPlatformChannelSpecifics = const AndroidNotificationDetails(
+        'OneVNU', 'OneVNU',
+        channelDescription: 'OneVNU Notification');
+    var iOSPlatformChannelSpecifics = const DarwinNotificationDetails(
+      presentAlert: true,
+      presentSound: true,
+      presentBadge: true,
+    );
+    var platformChannelSpecifics = NotificationDetails(
+        android: androidPlatformChannelSpecifics,
+        iOS: iOSPlatformChannelSpecifics);
+    // Lệnh .show chuyển toàn bộ các tham số bắt buộc/tùy chọn thành named parameters
+    await flutterLocalNotificationsPlugin.show(
+        id: Random().nextInt(10000),
+        title: message.notification?.title ?? "",
+        body: message.notification?.body ?? "",
+        notificationDetails: platformChannelSpecifics,
+        payload: jsonEncode(message.data));
+    logSuccess("flutterLocalNotificationsPlugin show push");
+  }
+
+
+--------------------------------------------------------------------------------
+2. FILE: vnu_core/lib/modules/profile/views/vcore_profile_setup_bio_view.dart
+--------------------------------------------------------------------------------
+Đường dẫn: vnu_core/lib/modules/profile/views/vcore_profile_setup_bio_view.dart
+
+[MÃ NGUỒN CŨ - LỖI DÒNG 91 - 98]:
+----------------------------------------
+  _changeLogin(bool active) async {
+    var response = await auth.authenticate(
+      localizedReason:
+          'Scan your fingerprint (or face or whatever) to authenticate',
+      options: const AuthenticationOptions(
+        stickyAuth: true,
+        biometricOnly: true,
+      ),
+    );
+    ...
+
+
+[MÃ NGUỒN MỚI - ĐÃ SỬA]:
+----------------------------------------
+  _changeLogin(bool active) async {
+    // local_auth 3.0.x đã đưa các tham số options lên trực tiếp phương thức authenticate
+    // stickyAuth được đổi tên thành persistAcrossBackgrounding
+    var response = await auth.authenticate(
+      localizedReason:
+          'Scan your fingerprint (or face or whatever) to authenticate',
+      biometricOnly: true,
+      persistAcrossBackgrounding: true,
+    );
+    ...
+
+
+--------------------------------------------------------------------------------
+3. FILE: vnu_core/lib/modules/exam_schedule/views/vcore_dropdown_select_widget.dart
+--------------------------------------------------------------------------------
+Đường dẫn: vnu_core/lib/modules/exam_schedule/views/vcore_dropdown_select_widget.dart
+
+[MÃ NGUỒN CŨ - LỖI DÒNG 45 - 86 & 144 - 186]:
+----------------------------------------
+// Cả 2 Widget VcoreDropdownSelectWidget và VcoreDropdown2SelectWidget đều dùng
+// thuộc tính 'value' và 'height: 40' trong MenuItemStyleData vốn đã bị xóa bỏ ở bản 3.x
+
+
+[MÃ NGUỒN MỚI - ĐÃ SỬA]:
+----------------------------------------
+// Sử dụng ValueNotifier để thay thế 'value' bằng 'valueListenable'
+// Chuyển cấu hình height của item vào trực tiếp DropdownMenuItem
+
+class _VcoreDropdownSelectWidgetState extends State<VcoreDropdownSelectWidget> {
+  late final ValueNotifier<String?> selectedValueNotifier;
+
+  @override
+  void initState() {
+    super.initState();
+    selectedValueNotifier = ValueNotifier(widget.value);
+  }
+
+  @override
+  void dispose() {
+    selectedValueNotifier.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    selectedValueNotifier.value = widget.value;
+
+    return DropdownButtonHideUnderline(
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xff879ABF))),
+        child: DropdownButton2<String>(
+          isExpanded: true,
+          hint: Text(
+            widget.hint,
+            style:
+                TextStyles.regular.copyWith(color: Theme.of(context).hintColor),
+          ),
+          underline: Divider(
+            color: Theme.of(context).hintColor,
+          ),
+          dropdownStyleData: const DropdownStyleData(
+              maxHeight: 300, padding: EdgeInsets.symmetric(vertical: 6)),
+          items: widget.items
+              .map((String item) => DropdownMenuItem<String>(
+                    value: item,
+                    height: 40, // Đặt height trực tiếp ở đây
+                    child: Text(
+                      item,
+                      style: TextStyles.regular,
+                      maxLines: 3,
+                    ),
+                  ))
+              .toList(),
+          valueListenable: selectedValueNotifier, // Dùng valueListenable thay vì value
+          onChanged: (String? value) {
+            if (widget.onSelected != null) {
+              widget.onSelected!(value ?? '');
+            }
+            selectedValueNotifier.value = value;
+          },
+          buttonStyleData: const ButtonStyleData(
+            padding: EdgeInsets.symmetric(horizontal: 12),
+            height: 40,
+            width: 140,
+          ),
+          menuItemStyleData: const MenuItemStyleData(), // Bỏ tham số height ở đây
+          iconStyleData:
+              IconStyleData(icon: svgAsset('assets/images/ic_dropdown.svg')),
+        ),
+      ),
+    );
+  }
+}
+
+class _VcoreDropdown2SelectWidgetState
+    extends State<VcoreDropdown2SelectWidget> {
+  late final ValueNotifier<VcoreDropdownModel?> selectedValueNotifier;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.items
+        .firstWhereOrNull((item) => item.guid == widget.selectedGuid);
+    selectedValueNotifier = ValueNotifier(initial);
+  }
+
+  @override
+  void dispose() {
+    selectedValueNotifier.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final current = widget.items
+        .firstWhereOrNull((item) => item.guid == widget.selectedGuid);
+    selectedValueNotifier.value = current;
+
+    return DropdownButtonHideUnderline(
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xff879ABF))),
+        child: DropdownButton2<VcoreDropdownModel>(
+          isExpanded: true,
+          hint: Text(
+            widget.hint,
+            style:
+                TextStyles.regular.copyWith(color: Theme.of(context).hintColor),
+          ),
+          underline: Divider(
+            color: Theme.of(context).hintColor,
+          ),
+          dropdownStyleData: const DropdownStyleData(
+              maxHeight: 300, padding: EdgeInsets.symmetric(vertical: 6)),
+          items: widget.items
+              .map((VcoreDropdownModel item) =>
+                  DropdownMenuItem<VcoreDropdownModel>(
+                    value: item,
+                    height: 40, // Đặt height trực tiếp ở đây
+                    child: Text(
+                      item.text,
+                      style: TextStyles.regular,
+                      maxLines: 3,
+                    ),
+                  ))
+              .toList(),
+          valueListenable: selectedValueNotifier, // Dùng valueListenable thay vì value
+          onChanged: (VcoreDropdownModel? value) {
+            if (widget.onSelected != null && value != null) {
+              widget.onSelected!(value);
+            }
+            selectedValueNotifier.value = value;
+          },
+          buttonStyleData: const ButtonStyleData(
+            padding: EdgeInsets.symmetric(horizontal: 12),
+            height: 40,
+            width: 140,
+          ),
+          menuItemStyleData: const MenuItemStyleData(), // Bỏ tham số height ở đây
+          iconStyleData:
+              IconStyleData(icon: svgAsset('assets/images/ic_dropdown.svg')),
+        ),
+      ),
+    );
+  }
+}
+
+
+--------------------------------------------------------------------------------
+4. FILE: vnu_core/lib/modules/question/controllers/vcore_question_create_controller.dart
+--------------------------------------------------------------------------------
+Đường dẫn: vnu_core/lib/modules/question/controllers/vcore_question_create_controller.dart
+
+[MÃ NGUỒN CŨ - LỖI DÒNG 83]:
+----------------------------------------
+    FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowMultiple: false,
+        allowedExtensions: allowedExtensions);
+
+
+[MÃ NGUỒN MỚI - ĐÃ SỬA]:
+----------------------------------------
+    // file_picker 11.x đã chuyển phương thức pickFiles thành phương thức static trực tiếp trên FilePicker
+    FilePickerResult? result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowMultiple: false,
+        allowedExtensions: allowedExtensions);

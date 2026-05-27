@@ -1,0 +1,39 @@
+
+
+/* Class = "UILabel"; text = "From"; ObjectID = "7g9-E1-CUv"; */
+"7g9-E1-CUv.text" = "Từ";
+
+/* Class = "UILabel"; text = "Locate"; ObjectID = "DRG-Zv-mfr"; */
+"DRG-Zv-mfr.text" = "Vị trí";
+
+/* Class = "UILabel"; text = "AIRPORT LIST"; ObjectID = "QS2-hW-7jl"; */
+"QS2-hW-7jl.text" = "DANH SÁCH BẢN ĐỒ";
+
+/* Class = "UILabel"; text = "Info"; ObjectID = "R34-Sv-HmO"; */
+"R34-Sv-HmO.text" = "Thông tin";
+
+/* Class = "UILabel"; text = "View"; ObjectID = "ZeR-5r-EXR"; */
+"ZeR-5r-EXR.text" = "Xem";
+
+/* Class = "UIButton"; normalTitle = "Direction to Here"; ObjectID = "h0N-ud-1I4"; */
+"h0N-ud-1I4.normalTitle" = "Chỉ đường đến đây";
+
+/* Class = "UILabel"; text = "To"; ObjectID = "jMg-JN-NAm"; */
+"jMg-JN-NAm.text" = "Đến";
+
+/* Class = "UIButton"; normalTitle = "Direction from Here"; ObjectID = "ll4-ss-2qe"; */
+"ll4-ss-2qe.normalTitle" = "Chỉ đường từ đây";
+
+/* Class = "UIButton"; normalTitle = "Ok"; ObjectID = "nI8-Ug-MtE"; */
+"nI8-Ug-MtE.normalTitle" = "Đồng ý";
+
+/* Class = "UILabel"; text = "Change airport"; ObjectID = "tzb-ks-kVK"; */
+"tzb-ks-kVK.text" = "Đổi địa điểm";
+
+/* Class = "UIButton"; normalTitle = "Cancel"; ObjectID = "wr2-d9-XOP"; */
+"wr2-d9-XOP.normalTitle" = "Huỷ";
+
+/* Class = "UILabel"; text = "Room's infomation"; ObjectID = "vID-DP-DHC"; */
+"vID-DP-DHC.text" = "Thông tin phòng";
+
+/* route map */

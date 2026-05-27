@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "143823151965",
+    "project_id": "onevnu-fcm",
+    "storage_bucket": "onevnu-fcm.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:143823151965:android:8aff04a80a1d3449e1beb4",
+        "android_client_info": {
+          "package_name": "com.vnu.students"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBY8z-0pv0dh79-ALo-wiSiHzIjq3EQ4sE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
