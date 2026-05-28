@@ -181,7 +181,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
   List<String> _pinnedFunctionLabels = [
     'Lịch học & thi',
     'Điểm',
-    'Đăng ký môn',
+    'Học bổng',
     'Việc làm',
   ];
 
@@ -196,6 +196,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
     _FunctionItem('Học bổng', Colors.purple),
     _FunctionItem('Phản ánh', Colors.orange),
     _FunctionItem('Nội trú', Colors.purple),
+    _FunctionItem('Phòng trọ', Colors.teal),
     _FunctionItem('Thủ tục', Colors.green),
     _FunctionItem('Thư viện', Colors.amber),
     _FunctionItem('Bản đồ', Colors.blue),
@@ -231,6 +232,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
         'Thư viện',
         'Bản đồ',
         'Việc làm',
+        'Phòng trọ',
         'Khác',
       ].contains(e.label),
     )
@@ -332,6 +334,9 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
         Get.to(() => const VcorePahtView());
         break;
       case 'Nội trú':
+        snackBarWarning('Chức năng đang hoàn thiện');
+        break;
+      case 'Phòng trọ':
         Get.to(() => const VcoreMotelView());
         break;
       case 'Thủ tục':
@@ -377,6 +382,8 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
         return Icons.rate_review_rounded;
       case 'Nội trú':
         return Icons.home_work_rounded;
+      case 'Phòng trọ':
+        return Icons.home_outlined;
       case 'Thủ tục':
         return Icons.assignment_turned_in_rounded;
       case 'Thư viện':
