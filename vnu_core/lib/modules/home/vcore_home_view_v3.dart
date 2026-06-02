@@ -185,6 +185,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
     'Lịch học & thi',
     'Điểm',
     'Học bổng',
+    'Học bổng',
     'Việc làm',
     // 'Đồng bộ' tạm ẩn
   ];
@@ -201,6 +202,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
     _FunctionItem('Học bổng', Colors.purple),
     _FunctionItem('Phản ánh', Colors.orange),
     _FunctionItem('Nội trú', Colors.purple),
+    _FunctionItem('Phòng trọ', Colors.teal),
     _FunctionItem('Phòng trọ', Colors.teal),
     _FunctionItem('Thủ tục', Colors.green),
     _FunctionItem('Thư viện', Colors.amber),
@@ -392,6 +394,8 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
         return Icons.rate_review_rounded;
       case 'Nội trú':
         return Icons.home_work_rounded;
+      case 'Phòng trọ':
+        return Icons.home_outlined;
       case 'Phòng trọ':
         return Icons.home_outlined;
       case 'Thủ tục':
