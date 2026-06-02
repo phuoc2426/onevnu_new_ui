@@ -157,3 +157,8 @@ DerivedData/
 
 inmapz_backup/
 temp_aar_check/
+
+
+**/.kotlin/
+build/
+.dart_tool/
