@@ -3,18 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
 import 'package:uuid/uuid.dart';
-import 'package:vnu_core/common/app_color.dart';
 import 'package:vnu_core/common/app_text_styles.dart';
-import 'package:vnu_core/common/space_widget.dart';
 import 'package:vnu_core/common/utils.dart';
 import 'package:vnu_core/common/datetime_utils.dart';
 import 'package:vnu_core/constants/datetime_const.dart';
 import 'package:vnu_core/constants/config.dart';
-import 'package:vnu_core/constants/constant.dart';
 import 'package:vnu_core/globals.dart';
 import 'package:vnu_core/models/model.dart';
 import 'package:vnu_core/modules/news/controllers/vcore_jobs_controller_v2.dart';
-import 'package:vnu_core/modules/notify/views/vcore_notify_detail_view_v3.dart';
+import 'package:vnu_core/modules/news/views/vcore_news_detail_view.dart';
 import 'package:vnu_core/services/services_url.dart';
 import 'package:vnu_core/widgets/container_dissmis.dart';
 import 'package:vnu_core/widgets/progress_hub_widget.dart';
@@ -47,7 +44,8 @@ class VcoreJobsViewV2 extends GetView<VcoreJobsControllerV2> {
                   Container(
                     height: 64,
                     color: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 10),
                     child: Center(
                       child: Container(
                         width: double.infinity,
@@ -60,23 +58,25 @@ class VcoreJobsViewV2 extends GetView<VcoreJobsControllerV2> {
                         child: Row(
                           children: [
                             const SizedBox(width: 14),
-                            Icon(Icons.search_rounded, color: Colors.grey.shade500, size: 20),
+                            Icon(Icons.search_rounded,
+                                color: Colors.grey.shade500, size: 20),
                             const SizedBox(width: 8),
                             Expanded(
                               child: TextField(
                                 controller: controller.textEditingController,
                                 style: TextStyles.regular.copyWith(
-                                  fontSize: 14,
+                                  fontSize: AppFontSizes.medium,
                                   color: Colors.black87,
                                 ),
                                 decoration: InputDecoration(
                                   border: InputBorder.none,
                                   isDense: true,
                                   contentPadding: EdgeInsets.zero,
-                                  hintText: 'Tìm kiếm tin tuyển dụng, việc làm...',
+                                  hintText:
+                                      'Tìm kiếm tin tuyển dụng, việc làm...',
                                   hintStyle: TextStyles.regular.copyWith(
                                     color: Colors.grey.shade400,
-                                    fontSize: 13,
+                                    fontSize: AppFontSizes.mediumSmall,
                                   ),
                                 ),
                                 onSubmitted: (value) {
@@ -84,7 +84,8 @@ class VcoreJobsViewV2 extends GetView<VcoreJobsControllerV2> {
                                 },
                               ),
                             ),
-                            if (controller.textEditingController.text.isNotEmpty)
+                            if (controller
+                                .textEditingController.text.isNotEmpty)
                               IconButton(
                                 icon: const Icon(Icons.clear_rounded, size: 18),
                                 onPressed: () {
@@ -116,7 +117,8 @@ class VcoreJobsViewV2 extends GetView<VcoreJobsControllerV2> {
                         child: ListView.separated(
                           padding: const EdgeInsets.all(16),
                           itemCount: controller.listJobs.length,
-                          separatorBuilder: (context, index) => const SizedBox(height: 12),
+                          separatorBuilder: (context, index) =>
+                              const SizedBox(height: 12),
                           itemBuilder: (context, index) {
                             final item = controller.listJobs[index];
                             return _buildJobCard(context, item);
@@ -144,16 +146,13 @@ class VcoreJobsViewV2 extends GetView<VcoreJobsControllerV2> {
     return InkWell(
       onTap: () {
         Utils.hideKeyboard();
-        Get.to(() => VcoreNotifyDetailViewV3(
-          title: item.tieuDe ?? 'Tuyển dụng',
-          htmlContent: item.htmlNoiDungTinBai ?? '',
-          sender: item.donViXuatBan ?? 'Đơn vị liên kết',
-          date: item.thoiGianTao ?? DateTime.now(),
-          category: 'Việc làm',
-          fileGuids: item.guidFileDinhKems,
-          fileNames: item.tenFileDinhKem != null ? [item.tenFileDinhKem!] : null,
-          showMetadata: true,
-        ));
+        Get.to(
+          () => VcoreNewsDetailView(
+            tinTucModel: item,
+            screenTitle: 'Chi tiết việc làm',
+            relatedTitle: 'VIỆC LÀM LIÊN QUAN',
+          ),
+        );
       },
       borderRadius: BorderRadius.circular(16),
       child: Container(
@@ -164,7 +163,7 @@ class VcoreJobsViewV2 extends GetView<VcoreJobsControllerV2> {
           border: Border.all(color: Colors.grey.shade100),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.02),
+              color: Colors.black.withValues(alpha: 0.02),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -184,7 +183,8 @@ class VcoreJobsViewV2 extends GetView<VcoreJobsControllerV2> {
                   imageUrl: '$imageUrl$kParamThumbImage',
                   cacheKey: imageUrl,
                   httpHeaders: Globals().headerToken(),
-                  errorWidget: (context, error, stackTrace) => _buildFallbackJobIcon(),
+                  errorWidget: (context, error, stackTrace) =>
+                      _buildFallbackJobIcon(),
                 ),
               )
             else
@@ -202,7 +202,7 @@ class VcoreJobsViewV2 extends GetView<VcoreJobsControllerV2> {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontSize: 14,
+                      fontSize: AppFontSizes.medium,
                       fontWeight: FontWeight.w700,
                       color: Colors.black87,
                       height: 1.3,
@@ -215,7 +215,7 @@ class VcoreJobsViewV2 extends GetView<VcoreJobsControllerV2> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: AppFontSizes.small,
                       fontWeight: FontWeight.w500,
                       color: Colors.grey.shade600,
                     ),
@@ -223,14 +223,16 @@ class VcoreJobsViewV2 extends GetView<VcoreJobsControllerV2> {
                   const SizedBox(height: 6),
                   Row(
                     children: [
-                      Icon(Icons.calendar_today_rounded, size: 10, color: Colors.grey.shade400),
+                      Icon(Icons.calendar_today_rounded,
+                          size: 10, color: Colors.grey.shade400),
                       const SizedBox(width: 4),
                       Text(
                         item.thoiGianTao != null
-                            ? DateTimeUtils.stringFromDateTime(item.thoiGianTao, DateTimeConst.DATE_FORMAT)
+                            ? DateTimeUtils.stringFromDateTime(
+                                item.thoiGianTao, DateTimeConst.DATE_FORMAT)
                             : '',
                         style: TextStyle(
-                          fontSize: 10,
+                          fontSize: AppFontSizes.extraSmall,
                           color: Colors.grey.shade400,
                         ),
                       ),
@@ -242,7 +244,8 @@ class VcoreJobsViewV2 extends GetView<VcoreJobsControllerV2> {
             const SizedBox(width: 4),
             const Align(
               alignment: Alignment.center,
-              child: Icon(Icons.chevron_right_rounded, color: Colors.grey, size: 20),
+              child: Icon(Icons.chevron_right_rounded,
+                  color: Colors.grey, size: 20),
             ),
           ],
         ),
@@ -283,7 +286,7 @@ class VcoreJobsViewV2 extends GetView<VcoreJobsControllerV2> {
             'Chưa có tin tuyển dụng nào được đăng tải',
             style: TextStyles.regular.copyWith(
               color: Colors.grey.shade400,
-              fontSize: 14,
+              fontSize: AppFontSizes.medium,
             ),
           ),
         ],

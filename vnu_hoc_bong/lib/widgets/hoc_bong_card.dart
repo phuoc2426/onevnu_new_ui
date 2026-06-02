@@ -5,6 +5,7 @@ import '../common/hoc_bong_date_utils.dart';
 import '../common/hoc_bong_status.dart';
 import '../models/hoc_bong_models.dart';
 import 'hoc_bong_status_chip.dart';
+import 'package:vnu_core/common/app_text_styles.dart';
 
 class HocBongCard extends StatelessWidget {
   final HocBongModel item;
@@ -32,7 +33,7 @@ class HocBongCard extends StatelessWidget {
                   Expanded(
                     child: Text(
                       item.tenHocBong ?? 'Học bổng',
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                      style: const TextStyle(fontSize: AppFontSizes.large, fontWeight: FontWeight.w700),
                     ),
                   ),
                 ],
@@ -87,7 +88,7 @@ class _Info extends StatelessWidget {
       children: [
         Icon(icon, size: 15, color: AppColors.primary),
         const SizedBox(width: 4),
-        Text(text, style: const TextStyle(fontSize: 12.5)),
+        Text(text, style: const TextStyle(fontSize: AppFontSizes.font12_5)),
       ],
     );
   }

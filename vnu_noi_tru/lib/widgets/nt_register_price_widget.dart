@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:vnu_core/themes/app_theme.dart';
 import 'package:vnu_core/extensions/extension_string.dart';
 import '../models/model.dart';
+import 'package:vnu_core/common/app_text_styles.dart';
 
 class NTRegisterPriceWidget extends StatefulWidget {
   final List<DanhSachLoaiPhi> danhSachLoaiPhi;
@@ -38,7 +39,7 @@ class _NTRegisterPriceWidgetState extends State<NTRegisterPriceWidget> {
               child: Text(
                 chiphi.tenLoaiPhi ?? '',
                 style: AppTheme.body2.copyWith(
-                    fontSize: 15,
+                    fontSize: AppFontSizes.mediumLarge,
                     fontWeight:
                         font == true ? FontWeight.bold : FontWeight.normal),
               )),
@@ -49,7 +50,7 @@ class _NTRegisterPriceWidgetState extends State<NTRegisterPriceWidget> {
                 child: Text(
                   chiphi.soTien?.formNum() ?? '',
                   style: AppTheme.body2
-                      .copyWith(fontSize: 14, fontWeight: FontWeight.w600),
+                      .copyWith(fontSize: AppFontSizes.medium, fontWeight: FontWeight.w600),
                 ),
               )),
         ],

@@ -23,9 +23,10 @@ import 'package:vnu_core/modules/motel/views/vcore_motel_view.dart';
 import 'package:vnu_core/modules/one_door/views/vcore_one_door_view.dart';
 import 'package:vnu_core/modules/paht/views/vcore_paht_view.dart';
 import 'package:vnu_core/modules/question/views/vcore_question_view.dart';
+import 'package:vnu_core/modules/sync/views/vcore_sync_view.dart';
 import 'package:vnu_core/modules/time_schedule/views/vcore_time_schedule_view.dart';
 import 'package:vnu_core/repository/app_repository.dart';
-import 'package:vnu_noi_tru/modules/boarding/views/nt_boarding_view.dart';
+import 'package:vnu_noi_tru/vnu_noi_tru.dart';
 
 const _kCacheKeyListDichVu = 'listDichVu.json';
 
@@ -67,10 +68,16 @@ class _VcoreSidebarWidgetState extends State<VcoreSidebarWidget> {
   static const _navItems = <SidebarNavItem>[
     SidebarNavItem(icon: Icons.home_rounded, label: 'Trang chủ', tabIndex: 0),
     SidebarNavItem(
-        icon: Icons.campaign_rounded, label: 'Tin hệ thống', tabIndex: 1),
+      icon: Icons.campaign_rounded,
+      label: 'Tin hệ thống',
+      tabIndex: 1,
+    ),
     SidebarNavItem(icon: Icons.article_rounded, label: 'Tin tức', tabIndex: 2),
     SidebarNavItem(
-        icon: Icons.notifications_rounded, label: 'Thông báo', tabIndex: 3),
+      icon: Icons.notifications_rounded,
+      label: 'Thông báo',
+      tabIndex: 3,
+    ),
     SidebarNavItem(icon: Icons.person_rounded, label: 'Cá nhân', tabIndex: 4),
   ];
 
@@ -82,11 +89,7 @@ class _VcoreSidebarWidgetState extends State<VcoreSidebarWidget> {
   }
 
   void _sortServices(List<BoxServiceModel> services) {
-    List<String> priority = [
-      "XemThoiKhoaBieu",
-      "DiemMonHoc",
-      "TheSinhVien",
-    ];
+    List<String> priority = ["XemThoiKhoaBieu", "DiemMonHoc", "TheSinhVien"];
     services.sort((a, b) {
       int aIndex = priority.indexOf(a.loaiBoxDichVuEnum ?? '');
       int bIndex = priority.indexOf(b.loaiBoxDichVuEnum ?? '');
@@ -113,7 +116,8 @@ class _VcoreSidebarWidgetState extends State<VcoreSidebarWidget> {
               model = BoxServiceModel.fromJson(element.toStringDynamic());
             }
             if (model != null) {
-              if (model.loaiBoxDichVuEnum?.mapTypeBoxService() != HomeService.XemLichThi) {
+              if (model.loaiBoxDichVuEnum?.mapTypeBoxService() !=
+                  HomeService.XemLichThi) {
                 listObj.add(model);
               }
             }
@@ -137,7 +141,13 @@ class _VcoreSidebarWidgetState extends State<VcoreSidebarWidget> {
   Future<void> _loadService() async {
     try {
       var response = await ApiRepository().getBoxServices();
-      response = response.where((element) => element.loaiBoxDichVuEnum?.mapTypeBoxService() != HomeService.XemLichThi).toList();
+      response = response
+          .where(
+            (element) =>
+                element.loaiBoxDichVuEnum?.mapTypeBoxService() !=
+                HomeService.XemLichThi,
+          )
+          .toList();
       _sortServices(response);
       if (mounted) {
         setState(() {
@@ -232,39 +242,32 @@ class _VcoreSidebarWidgetState extends State<VcoreSidebarWidget> {
             height: 48,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(
-                color: AppColors.sidebarAccent,
-                width: 2,
-              ),
+              border: Border.all(color: AppColors.sidebarAccent, width: 2),
               color: AppColors.sidebarCardBg,
             ),
             child: ClipOval(
-              child: Obx(
-                () {
-                  final guid = Globals()
-                          .currentUserModel
-                          .value
-                          ?.guidFileAnhDaiDien
-                          ?.toString() ??
-                      '';
-                  if (guid.isNotEmpty) {
-                    return CachedNetworkImage(
-                      imageUrl: '${ServicesUrl().baseUrlFileDownload}$guid',
-                      fit: BoxFit.cover,
-                      errorWidget: (_, __, ___) => const Icon(
-                        Icons.person,
-                        color: AppColors.sidebarAccent,
-                        size: 28,
-                      ),
-                    );
-                  }
-                  return const Icon(
-                    Icons.person,
-                    color: AppColors.sidebarAccent,
-                    size: 28,
+              child: Obx(() {
+                final guid =
+                    Globals().currentUserModel.value?.guidFileAnhDaiDien
+                        ?.toString() ??
+                    '';
+                if (guid.isNotEmpty) {
+                  return CachedNetworkImage(
+                    imageUrl: '${ServicesUrl().baseUrlFileDownload}$guid',
+                    fit: BoxFit.cover,
+                    errorWidget: (_, __, ___) => const Icon(
+                      Icons.person,
+                      color: AppColors.sidebarAccent,
+                      size: 28,
+                    ),
                   );
-                },
-              ),
+                }
+                return const Icon(
+                  Icons.person,
+                  color: AppColors.sidebarAccent,
+                  size: 28,
+                );
+              }),
             ),
           ),
           spaceWidth(12),
@@ -277,7 +280,7 @@ class _VcoreSidebarWidgetState extends State<VcoreSidebarWidget> {
                   Text(
                     Globals().thongTinSinhVienModel.value?.hoVaTen ?? 'OneVNU',
                     style: TextStyles.bold.copyWith(
-                      fontSize: 15,
+                      fontSize: AppFontSizes.mediumLarge,
                       color: AppColors.sidebarText,
                     ),
                     maxLines: 1,
@@ -287,7 +290,7 @@ class _VcoreSidebarWidgetState extends State<VcoreSidebarWidget> {
                   Text(
                     Globals().thongTinSinhVienModel.value?.maSinhVien ?? '',
                     style: TextStyles.regular.copyWith(
-                      fontSize: 12,
+                      fontSize: AppFontSizes.small,
                       color: AppColors.sidebarTextDim,
                     ),
                   ),
@@ -315,7 +318,7 @@ class _VcoreSidebarWidgetState extends State<VcoreSidebarWidget> {
       child: Text(
         title.toUpperCase(),
         style: TextStyles.bold.copyWith(
-          fontSize: 11,
+          fontSize: AppFontSizes.font11,
           color: AppColors.sidebarAccent,
           letterSpacing: 1.5,
         ),
@@ -399,7 +402,7 @@ class _VcoreSidebarWidgetState extends State<VcoreSidebarWidget> {
                 child: Text(
                   service?.title ?? serviceModel.tenBoxDichVu ?? '',
                   style: TextStyles.regular.copyWith(
-                    fontSize: 14,
+                    fontSize: AppFontSizes.medium,
                     color: AppColors.sidebarText,
                   ),
                   maxLines: 1,
@@ -449,10 +452,7 @@ class _VcoreSidebarWidgetState extends State<VcoreSidebarWidget> {
               ? BoxDecoration(
                   color: AppColors.sidebarAccent.withOpacity(0.12),
                   border: Border(
-                    left: BorderSide(
-                      color: AppColors.sidebarAccent,
-                      width: 3,
-                    ),
+                    left: BorderSide(color: AppColors.sidebarAccent, width: 3),
                   ),
                 )
               : null,
@@ -469,7 +469,7 @@ class _VcoreSidebarWidgetState extends State<VcoreSidebarWidget> {
               Text(
                 item.label,
                 style: TextStyles.regular.copyWith(
-                  fontSize: 14,
+                  fontSize: AppFontSizes.medium,
                   fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
                   color: isActive
                       ? AppColors.sidebarAccent
@@ -486,7 +486,9 @@ class _VcoreSidebarWidgetState extends State<VcoreSidebarWidget> {
                     if (count <= 0) return const SizedBox.shrink();
                     return Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 2),
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.red,
                         borderRadius: BorderRadius.circular(12),
@@ -494,7 +496,7 @@ class _VcoreSidebarWidgetState extends State<VcoreSidebarWidget> {
                       child: Text(
                         '${count > 99 ? '99+' : count}',
                         style: const TextStyle(
-                          fontSize: 10,
+                          fontSize: AppFontSizes.extraSmall,
                           fontWeight: FontWeight.w600,
                           color: Colors.white,
                         ),
@@ -524,7 +526,7 @@ class _VcoreSidebarWidgetState extends State<VcoreSidebarWidget> {
           Text(
             'OneVNU',
             style: TextStyles.regular.copyWith(
-              fontSize: 12,
+              fontSize: AppFontSizes.small,
               color: AppColors.sidebarTextDim,
             ),
           ),
@@ -542,7 +544,7 @@ class _VcoreSidebarWidgetState extends State<VcoreSidebarWidget> {
         Get.to(() => const VcoreCamNangView());
         break;
       case HomeService.DangKyNoiTru:
-        Get.to(() => const NtBoardingView());
+        Get.to(() => const DRMyRegistrationScreen());
         break;
       case HomeService.DiemMonHoc:
         Get.to(() => const VcoreCoursePointsView());
@@ -567,6 +569,9 @@ class _VcoreSidebarWidgetState extends State<VcoreSidebarWidget> {
         break;
       case HomeService.PhanAnhHienTruong:
         Get.to(() => const VcorePahtView());
+        break;
+      case HomeService.DongBo:
+        Get.to(() => const VcoreSyncView());
         break;
       default:
         break;

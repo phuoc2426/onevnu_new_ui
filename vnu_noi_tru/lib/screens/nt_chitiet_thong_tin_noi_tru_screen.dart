@@ -13,6 +13,7 @@ import 'package:vnu_noi_tru/nt_globals.dart';
 import 'package:vnu_noi_tru/repository/noitru_repository.dart';
 
 import '../models/model.dart';
+import 'package:vnu_core/common/app_text_styles.dart';
 
 class NTChiTietThongTinNoiTruScreen extends StatefulWidget {
   final NtTinTucModel? tinTucModel;
@@ -90,7 +91,7 @@ class _NTChiTietThongTinNoiTruScreenState
                 Text(
                   tinTucModel?.tieuDe ?? '',
                   style: AppTheme.body1.copyWith(
-                      fontSize: 20,
+                      fontSize: AppFontSizes.extraExtraLarge,
                       color: Color(0xff00803D),
                       fontWeight: FontWeight.w600),
                 ),
@@ -100,7 +101,7 @@ class _NTChiTietThongTinNoiTruScreenState
                 Text(
                   tinTucModel?.thoiGianXuatBan ?? '',
                   style: AppTheme.body1
-                      .copyWith(fontSize: 13, color: Color(0xff637392)),
+                      .copyWith(fontSize: AppFontSizes.mediumSmall, color: Color(0xff637392)),
                 ),
                 const SizedBox(
                   height: 8,
@@ -123,7 +124,7 @@ class _NTChiTietThongTinNoiTruScreenState
                             width: 164,
                             child: Center(
                               child: CircularProgressIndicator(
-                                color: Colors.blue,
+                                color: AppTheme.colorMain,
                               ),
                             ),
                           ),

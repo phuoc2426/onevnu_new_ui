@@ -83,7 +83,7 @@ class _VcorePathCreateFileViewState extends State<VcorePathCreateFileView> {
                         'Tải lên ${widget.fileUploadModel.processing.value}%',
                         style: TextStyles.regular.copyWith(
                             color: Colors.white,
-                            fontSize: 12,
+                            fontSize: AppFontSizes.small,
                             shadows: [BoxShadow(color: Colors.black)]),
                       )
                     ],
@@ -108,7 +108,7 @@ class _VcorePathCreateFileViewState extends State<VcorePathCreateFileView> {
                         textAlign: TextAlign.center,
                         style: TextStyles.regular.copyWith(
                             color: Colors.white,
-                            fontSize: 12,
+                            fontSize: AppFontSizes.small,
                             shadows: [BoxShadow(color: Colors.black)]),
                       ),
                     ],
@@ -136,7 +136,7 @@ class _VcorePathCreateFileViewState extends State<VcorePathCreateFileView> {
                           textAlign: TextAlign.center,
                           style: TextStyles.regular.copyWith(
                               color: Colors.white,
-                              fontSize: 12,
+                              fontSize: AppFontSizes.small,
                               shadows: [BoxShadow(color: Colors.black)]),
                         ),
                       ],

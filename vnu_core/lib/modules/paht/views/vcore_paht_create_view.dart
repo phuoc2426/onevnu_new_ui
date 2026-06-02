@@ -94,7 +94,7 @@ class VcorePahtCreateView extends GetView<VcorePahtCreateController> {
                               child: Text(
                                 'Vị trí được chọn:\n    Kinh độ: ${controller.locationPoint.value?.longitude} \n    Vĩ độ: ${controller.locationPoint.value?.latitude}',
                                 style: TextStyles.regular.copyWith(
-                                  fontSize: 13,
+                                  fontSize: AppFontSizes.mediumSmall,
                                 ),
                               ),
                             ),
@@ -123,7 +123,7 @@ class VcorePahtCreateView extends GetView<VcorePahtCreateController> {
                                 Text(
                                   'Chọn địa điểm từ bản đồ',
                                   style: TextStyles.semiBold.copyWith(
-                                      fontSize: 13,
+                                      fontSize: AppFontSizes.mediumSmall,
                                       color: AppTheme.backgroundBlueColor),
                                 )
                               ],
@@ -168,7 +168,7 @@ class VcorePahtCreateView extends GetView<VcorePahtCreateController> {
                                 Text(
                                   'Ảnh/Video          ',
                                   style: TextStyles.regular.copyWith(
-                                    fontSize: 13,
+                                    fontSize: AppFontSizes.mediumSmall,
                                   ),
                                 ),
                                 svgAction('assets/images/ic_attach_file.svg',
@@ -235,12 +235,12 @@ class VcorePahtCreateView extends GetView<VcorePahtCreateController> {
             Text(
               title,
               style: TextStyles.regular
-                  .copyWith(fontSize: 13, color: Colors.black),
+                  .copyWith(fontSize: AppFontSizes.mediumSmall, color: Colors.black),
             ),
             Text(
               isRequired ? ' *' : '',
               style:
-                  TextStyles.regular.copyWith(fontSize: 13, color: Colors.red),
+                  TextStyles.regular.copyWith(fontSize: AppFontSizes.mediumSmall, color: Colors.red),
             )
           ],
         ),

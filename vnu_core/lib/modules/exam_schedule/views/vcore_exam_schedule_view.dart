@@ -108,7 +108,7 @@ class VcoreExamScheduleView extends StatelessWidget {
             child: Text(
               'Đang xem: $school • $year • $sem',
               style: TextStyles.medium.copyWith(
-                  fontSize: 12, color: Colors.grey.shade600),
+                  fontSize: AppFontSizes.small, color: Colors.grey.shade600),
             ),
           ),
         ],
@@ -146,7 +146,7 @@ class VcoreExamScheduleView extends StatelessWidget {
               formatButtonVisible: false,
               titleCentered: true,
               titleTextStyle: TextStyle(
-                fontSize: 16,
+                fontSize: AppFontSizes.large,
                 fontWeight: FontWeight.bold,
                 color: Colors.black87,
               ),
@@ -157,16 +157,16 @@ class VcoreExamScheduleView extends StatelessWidget {
             ),
             daysOfWeekStyle: DaysOfWeekStyle(
               weekdayStyle: TextStyles.medium.copyWith(
-                  fontSize: 12, color: Colors.grey.shade800),
+                  fontSize: AppFontSizes.small, color: Colors.grey.shade800),
               weekendStyle: TextStyles.medium.copyWith(
-                  fontSize: 12, color: Colors.red.shade700),
+                  fontSize: AppFontSizes.small, color: Colors.red.shade700),
             ),
             calendarStyle: CalendarStyle(
               outsideDaysVisible: false,
               defaultTextStyle: TextStyles.regular.copyWith(
-                  fontSize: 14, color: Colors.black87),
+                  fontSize: AppFontSizes.medium, color: Colors.black87),
               weekendTextStyle: TextStyles.regular.copyWith(
-                  fontSize: 14, color: Colors.red.shade700),
+                  fontSize: AppFontSizes.medium, color: Colors.red.shade700),
             ),
             onDaySelected: (selectedDay, focusedDay) {
               controller.selectedDay.value = selectedDay;
@@ -235,7 +235,7 @@ class VcoreExamScheduleView extends StatelessWidget {
                   child: Text(
                     '${date.day}',
                     style: TextStyles.bold.copyWith(
-                        color: Colors.white, fontSize: 14),
+                        color: Colors.white, fontSize: AppFontSizes.medium),
                   ),
                 );
               },
@@ -250,7 +250,7 @@ class VcoreExamScheduleView extends StatelessWidget {
                   child: Text(
                     '${date.day}',
                     style: TextStyles.bold.copyWith(
-                        color: AppColors.blueAccent, fontSize: 14),
+                        color: AppColors.blueAccent, fontSize: AppFontSizes.medium),
                   ),
                 );
               },
@@ -295,7 +295,7 @@ class VcoreExamScheduleView extends StatelessWidget {
         Text(
           text,
           style: TextStyles.medium.copyWith(
-              fontSize: 12, color: Colors.grey.shade600),
+              fontSize: AppFontSizes.small, color: Colors.grey.shade600),
         ),
       ],
     );
@@ -317,7 +317,7 @@ class VcoreExamScheduleView extends StatelessWidget {
             child: Text(
               displayDate,
               style: TextStyles.bold.copyWith(
-                  fontSize: 14, color: AppColors.greenAccent),
+                  fontSize: AppFontSizes.medium, color: AppColors.greenAccent),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -343,7 +343,7 @@ class VcoreExamScheduleView extends StatelessWidget {
                   Text(
                     'Xem lịch khác',
                     style: TextStyles.semiBold.copyWith(
-                      fontSize: 12,
+                      fontSize: AppFontSizes.small,
                       color: AppColors.greenAccent,
                     ),
                   ),
@@ -401,7 +401,7 @@ class VcoreExamScheduleView extends StatelessWidget {
               Text(
                 'Không có lịch học & lịch thi',
                 style: TextStyles.regular.copyWith(
-                  fontSize: 14,
+                  fontSize: AppFontSizes.medium,
                   color: Colors.grey.shade500,
                 ),
               ),
@@ -445,14 +445,14 @@ class VcoreExamScheduleView extends StatelessWidget {
                 Text(
                   start,
                   style: TextStyles.bold.copyWith(
-                      fontSize: 13, color: Colors.grey.shade700),
+                      fontSize: AppFontSizes.mediumSmall, color: Colors.grey.shade700),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 2),
                 Text(
                   end,
                   style: TextStyles.regular.copyWith(
-                      fontSize: 11, color: Colors.grey.shade500),
+                      fontSize: AppFontSizes.font11, color: Colors.grey.shade500),
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -563,7 +563,7 @@ class VcoreExamScheduleView extends StatelessWidget {
                   Text(
                     event.title,
                     style: TextStyles.bold.copyWith(
-                      fontSize: 14,
+                      fontSize: AppFontSizes.medium,
                       color: Colors.black87,
                     ),
                     maxLines: 2,
@@ -582,7 +582,7 @@ class VcoreExamScheduleView extends StatelessWidget {
                               ? event.location
                               : 'Học trực tuyến / Chưa có phòng',
                           style: TextStyles.regular.copyWith(
-                            fontSize: 12,
+                            fontSize: AppFontSizes.small,
                             color: Colors.grey.shade600,
                           ),
                           maxLines: 1,
@@ -611,7 +611,7 @@ class VcoreExamScheduleView extends StatelessWidget {
                               : (event.teacher.startsWith('SBD:') ? event
                               .teacher : 'Hình thức: ${event.teacher}'),
                           style: TextStyles.regular.copyWith(
-                            fontSize: 12,
+                            fontSize: AppFontSizes.small,
                             color: Colors.grey.shade600,
                           ),
                           maxLines: 1,
@@ -684,7 +684,7 @@ class VcoreExamScheduleView extends StatelessWidget {
           const SizedBox(width: 4),
           Text(
             text,
-            style: TextStyles.semiBold.copyWith(fontSize: 10, color: color),
+            style: TextStyles.semiBold.copyWith(fontSize: AppFontSizes.extraSmall, color: color),
           ),
         ],
       ),
@@ -772,7 +772,7 @@ class VcoreExamScheduleView extends StatelessWidget {
                   Text(
                     'Chọn thời gian hiển thị',
                     style: TextStyles.bold.copyWith(
-                        fontSize: 16, color: Colors.black87),
+                        fontSize: AppFontSizes.large, color: Colors.black87),
                   ),
                   IconButton(
                     onPressed: () => Get.back(),
@@ -786,7 +786,7 @@ class VcoreExamScheduleView extends StatelessWidget {
                 Text(
                   'Cơ sở đào tạo',
                   style: TextStyles.bold.copyWith(
-                      fontSize: 13, color: Colors.grey.shade700),
+                      fontSize: AppFontSizes.mediumSmall, color: Colors.grey.shade700),
                 ),
                 const SizedBox(height: 8),
                 Container(
@@ -810,7 +810,7 @@ class VcoreExamScheduleView extends StatelessWidget {
                             value: kt,
                             child: Text(
                               kt.toDisplayName(),
-                              style: TextStyles.medium.copyWith(fontSize: 14),
+                              style: TextStyles.medium.copyWith(fontSize: AppFontSizes.medium),
                             ),
                           );
                         }).toList(),
@@ -831,7 +831,7 @@ class VcoreExamScheduleView extends StatelessWidget {
               Text(
                 'Năm học',
                 style: TextStyles.bold.copyWith(
-                    fontSize: 13, color: Colors.grey.shade700),
+                    fontSize: AppFontSizes.mediumSmall, color: Colors.grey.shade700),
               ),
               const SizedBox(height: 8),
               SizedBox(
@@ -873,7 +873,7 @@ class VcoreExamScheduleView extends StatelessWidget {
               Text(
                 'Học kỳ',
                 style: TextStyles.bold.copyWith(
-                    fontSize: 13, color: Colors.grey.shade700),
+                    fontSize: AppFontSizes.mediumSmall, color: Colors.grey.shade700),
               ),
               const SizedBox(height: 8),
               SizedBox(
@@ -931,7 +931,7 @@ class VcoreExamScheduleView extends StatelessWidget {
                   onPressed: () => Get.back(),
                   child: Text(
                     'Xác nhận',
-                    style: TextStyles.bold.copyWith(fontSize: 15,color: Colors.white),
+                    style: TextStyles.bold.copyWith(fontSize: AppFontSizes.mediumLarge,color: Colors.white),
                   ),
                 ),
               ),
@@ -981,7 +981,7 @@ class VcoreExamScheduleView extends StatelessWidget {
           child: Text(
             label,
             style: TextStyles.semiBold.copyWith(
-              fontSize: 13,
+              fontSize: AppFontSizes.mediumSmall,
               color: isSelected ? Colors.white : Colors.grey.shade700,
             ),
           ),
@@ -1039,7 +1039,7 @@ class VcoreExamScheduleView extends StatelessWidget {
                     child: Text(
                       isClass ? 'LỊCH HỌC' : 'LỊCH THI',
                       style: TextStyles.bold.copyWith(
-                        fontSize: 10,
+                        fontSize: AppFontSizes.extraSmall,
                         color: accentColor,
                         letterSpacing: 1.1,
                       ),
@@ -1055,7 +1055,7 @@ class VcoreExamScheduleView extends StatelessWidget {
               Text(
                 event.title,
                 style: TextStyles.bold.copyWith(
-                  fontSize: 18,
+                  fontSize: AppFontSizes.extraLarge,
                   color: AppColors.textTitle,
                 ),
               ),
@@ -1064,7 +1064,7 @@ class VcoreExamScheduleView extends StatelessWidget {
                 Text(
                   'Mã học phần: ${event.hocPhanCode}',
                   style: TextStyles.medium.copyWith(
-                    fontSize: 13,
+                    fontSize: AppFontSizes.mediumSmall,
                     color: AppColors.textSecondary,
                   ),
                 ),
@@ -1155,7 +1155,7 @@ class VcoreExamScheduleView extends StatelessWidget {
                   onPressed: () => Get.back(),
                   child: Text(
                     'Đóng',
-                    style: TextStyles.bold.copyWith(fontSize: 15,color: Colors.white),
+                    style: TextStyles.bold.copyWith(fontSize: AppFontSizes.mediumLarge,color: Colors.white),
                   ),
                 ),
               ),
@@ -1192,7 +1192,7 @@ class VcoreExamScheduleView extends StatelessWidget {
               Text(
                 title,
                 style: TextStyles.medium.copyWith(
-                  fontSize: 12,
+                  fontSize: AppFontSizes.small,
                   color: AppColors.textSecondary,
                 ),
               ),
@@ -1200,7 +1200,7 @@ class VcoreExamScheduleView extends StatelessWidget {
               Text(
                 value,
                 style: TextStyles.semiBold.copyWith(
-                  fontSize: 14,
+                  fontSize: AppFontSizes.medium,
                   color: AppColors.textTitle,
                 ),
               ),

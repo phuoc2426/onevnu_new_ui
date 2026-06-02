@@ -57,9 +57,9 @@ class _VcoreNotifyItemWidgetState extends State<VcoreNotifyItemWidget> {
                   widget.thongBaoModel.tieuDe ?? '',
                   style: isReaded
                       ? TextStyles.regular
-                          .copyWith(fontSize: 15, color: Colors.black)
+                          .copyWith(fontSize: AppFontSizes.mediumLarge, color: Colors.black)
                       : TextStyles.semiBold
-                          .copyWith(fontSize: 15, color: Colors.black),
+                          .copyWith(fontSize: AppFontSizes.mediumLarge, color: Colors.black),
                 ),
                 spaceHeight(10),
                 Text(
@@ -68,9 +68,9 @@ class _VcoreNotifyItemWidgetState extends State<VcoreNotifyItemWidget> {
                   overflow: TextOverflow.ellipsis,
                   style: isReaded
                       ? TextStyles.regular.copyWith(
-                          fontSize: 14, color: AppTheme.textColor)
+                          fontSize: AppFontSizes.medium, color: AppTheme.textColor)
                       : TextStyles.semiBold.copyWith(
-                          fontSize: 14, color: AppTheme.textColor),
+                          fontSize: AppFontSizes.medium, color: AppTheme.textColor),
                 ),
                 spaceHeight(10),
                 Row(
@@ -79,9 +79,9 @@ class _VcoreNotifyItemWidgetState extends State<VcoreNotifyItemWidget> {
                       widget.thongBaoModel.tenNguoiGui ?? '',
                       style: isReaded
                           ? TextStyles.regular.copyWith(
-                              fontSize: 12, color: AppColors.darkBlueAccent)
+                              fontSize: AppFontSizes.small, color: AppColors.darkBlueAccent)
                           : TextStyles.semiBold.copyWith(
-                              fontSize: 12, color: AppColors.darkBlueAccent),
+                              fontSize: AppFontSizes.small, color: AppColors.darkBlueAccent),
                     ),
                     const Spacer(),
                     Text(
@@ -90,9 +90,9 @@ class _VcoreNotifyItemWidgetState extends State<VcoreNotifyItemWidget> {
                           DateTimeConst.U_SECOND_FORMAT),
                       style: isReaded
                           ? TextStyles.regular.copyWith(
-                              fontSize: 12, color: AppColors.slateText)
+                              fontSize: AppFontSizes.small, color: AppColors.slateText)
                           : TextStyles.semiBold.copyWith(
-                              fontSize: 12, color: AppColors.slateText),
+                              fontSize: AppFontSizes.small, color: AppColors.slateText),
                     )
                   ],
                 )

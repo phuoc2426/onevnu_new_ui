@@ -72,8 +72,8 @@ class _VcoreHomeNotifyTabWidgetV2State extends State<VcoreHomeNotifyTabWidgetV2>
             indicatorPadding: const EdgeInsets.all(4),
             labelColor: Colors.white,
             unselectedLabelColor: const Color(0xff637392),
-            labelStyle: TextStyles.medium.copyWith(fontSize: 13),
-            unselectedLabelStyle: TextStyles.regular.copyWith(fontSize: 13),
+            labelStyle: TextStyles.medium.copyWith(fontSize: AppFontSizes.mediumSmall),
+            unselectedLabelStyle: TextStyles.regular.copyWith(fontSize: AppFontSizes.mediumSmall),
             dividerColor: Colors.transparent,
             tabs: const [
               Tab(text: 'TB Đào tạo'),
@@ -251,7 +251,7 @@ class _VcoreHomeNotifyTabWidgetV2State extends State<VcoreHomeNotifyTabWidgetV2>
             child: Text(
               title,
               style: TextStyles.regular.copyWith(
-                fontSize: 13,
+                fontSize: AppFontSizes.mediumSmall,
                 color: const Color(0xff2A3556),
               ),
               maxLines: 2,

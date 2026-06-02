@@ -1,5 +1,9 @@
 library vnu_noi_tru;
 
+export 'screens/dormitory_registration/dr_my_registration_screen.dart';
+export 'screens/dormitory_registration/dr_wizard_flow.dart';
+
+
 import 'package:vnu_core/common/log.dart';
 
 /// A Calculator.

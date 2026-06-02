@@ -73,7 +73,7 @@ class _VcoreHomeSourceNewsWidgetState extends State<VcoreHomeSourceNewsWidget> {
                       Text(
                         nguonTinModel.tieuDe ?? '',
                         textAlign: TextAlign.center,
-                        style: TextStyles.regular.copyWith(fontSize: 13),
+                        style: TextStyles.regular.copyWith(fontSize: AppFontSizes.mediumSmall),
                         maxLines: 2,
                       )
                     ],

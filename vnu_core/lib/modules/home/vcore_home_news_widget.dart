@@ -163,7 +163,7 @@ class _VcoreHomeNewsWidgetState extends State<VcoreHomeNewsWidget> {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: TextStyles.regular.copyWith(
-                  fontSize: 13, color: const Color(0xff2A3556)),
+                  fontSize: AppFontSizes.mediumSmall, color: const Color(0xff2A3556)),
             ),
           ],
         ),

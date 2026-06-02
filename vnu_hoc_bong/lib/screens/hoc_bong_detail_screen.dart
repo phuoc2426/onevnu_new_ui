@@ -17,6 +17,7 @@ import '../widgets/hoc_bong_screen_shell.dart';
 import '../widgets/hoc_bong_status_chip.dart';
 import 'hoc_bong_application_detail_screen.dart';
 import 'hoc_bong_register_form_screen.dart';
+import 'package:vnu_core/common/app_text_styles.dart';
 
 class HocBongDetailScreen extends StatefulWidget {
   final int hocBongId;
@@ -87,7 +88,7 @@ class _HocBongDetailScreenState extends State<HocBongDetailScreen> {
                           children: [
                             Text(
                               hb.tenHocBong ?? 'Học bổng',
-                              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+                              style: const TextStyle(fontSize: AppFontSizes.extraExtraLarge, fontWeight: FontWeight.w800),
                             ),
                             const SizedBox(height: 10),
                             Wrap(
@@ -128,15 +129,15 @@ class _HocBongDetailScreenState extends State<HocBongDetailScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             if (hb.moTaNgan != null && hb.moTaNgan!.trim().isNotEmpty) ...[
-                              const Text('Mô tả ngắn', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                              const Text('Mô tả ngắn', style: TextStyle(fontSize: AppFontSizes.large, fontWeight: FontWeight.w700)),
                               const SizedBox(height: 8),
                               Text(
                                 hb.moTaNgan!,
-                                style: TextStyle(color: Colors.grey.shade700, fontSize: 14, height: 1.4),
+                                style: TextStyle(color: Colors.grey.shade700, fontSize: AppFontSizes.medium, height: 1.4),
                               ),
                               const Divider(height: 24),
                             ],
-                            const Text('Nội dung chi tiết', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                            const Text('Nội dung chi tiết', style: TextStyle(fontSize: AppFontSizes.large, fontWeight: FontWeight.w700)),
                             const SizedBox(height: 8),
                             if (hb.noiDung != null && hb.noiDung!.trim().isNotEmpty)
                               Html(
@@ -148,7 +149,7 @@ class _HocBongDetailScreenState extends State<HocBongDetailScreen> {
                                 },
                               )
                             else
-                              const Text('Chưa có nội dung chi tiết', style: TextStyle(color: Colors.grey, fontSize: 14)),
+                              const Text('Chưa có nội dung chi tiết', style: TextStyle(color: Colors.grey, fontSize: AppFontSizes.medium)),
                           ],
                         ),
                       ),
@@ -166,7 +167,7 @@ class _HocBongDetailScreenState extends State<HocBongDetailScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Quyết định & Thể lệ học bổng', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                              const Text('Quyết định & Thể lệ học bổng', style: TextStyle(fontSize: AppFontSizes.large, fontWeight: FontWeight.w700)),
                               const SizedBox(height: 12),
                               ...state.detail!.files.map(
                                 (file) => Padding(
@@ -204,13 +205,13 @@ class _HocBongDetailScreenState extends State<HocBongDetailScreen> {
                                               children: [
                                                 Text(
                                                   file.tenFileHienThi ?? 'Tài liệu đính kèm',
-                                                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                                                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: AppFontSizes.medium),
                                                 ),
                                                 if (file.loaiMinhChung != null && file.loaiMinhChung!.trim().isNotEmpty) ...[
                                                   const SizedBox(height: 2),
                                                   Text(
                                                     _getLoaiFileText(file.loaiMinhChung),
-                                                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                                    style: TextStyle(fontSize: AppFontSizes.small, color: Colors.grey.shade600),
                                                   ),
                                                 ],
                                               ],
@@ -240,7 +241,7 @@ class _HocBongDetailScreenState extends State<HocBongDetailScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Thông tin/minh chứng cần nộp', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                              const Text('Thông tin/minh chứng cần nộp', style: TextStyle(fontSize: AppFontSizes.large, fontWeight: FontWeight.w700)),
                               const SizedBox(height: 8),
                               ...state.detail!.formFields.map(
                                 (f) => Padding(
@@ -256,12 +257,12 @@ class _HocBongDetailScreenState extends State<HocBongDetailScreen> {
                                           children: [
                                             Text(
                                               f.displayLabel,
-                                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: AppFontSizes.medium),
                                             ),
                                             const SizedBox(height: 2),
                                             Text(
                                               _formFieldMeta(f),
-                                              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                              style: TextStyle(fontSize: AppFontSizes.small, color: Colors.grey.shade600),
                                             ),
                                           ],
                                         ),

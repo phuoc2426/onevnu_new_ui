@@ -9,6 +9,7 @@ import '../themes/app_theme.dart';
 import '../widgets/buttons_widget.dart';
 import '../extensions/color_ext.dart';
 import 'app_colors.dart';
+import 'package:vnu_core/common/app_text_styles.dart';
 
 snackBarError(String? message) {
   if (message !=
@@ -340,7 +341,7 @@ class VcoreCustomDialog extends StatelessWidget {
             Text(
               title,
               style: const TextStyle(
-                fontSize: 18,
+                fontSize: AppFontSizes.extraLarge,
                 fontWeight: FontWeight.w800,
                 color: Color(0xFF111B3D),
               ),
@@ -349,7 +350,7 @@ class VcoreCustomDialog extends StatelessWidget {
             Text(
               content,
               style: const TextStyle(
-                fontSize: 14.5,
+                fontSize: AppFontSizes.font14_5,
                 color: Colors.black87,
                 height: 1.45,
               ),

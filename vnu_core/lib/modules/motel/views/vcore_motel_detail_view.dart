@@ -124,7 +124,7 @@ class _VcoreMotelDetailViewState extends State<VcoreMotelDetailView> {
                                 child: Text(
                                   '${currentIndex + 1}/${photos.length}',
                                   style: TextStyles.semiBold.copyWith(
-                                      fontSize: 15, color: Colors.white),
+                                      fontSize: AppFontSizes.mediumLarge, color: Colors.white),
                                 ),
                               ),
                             )
@@ -143,7 +143,7 @@ class _VcoreMotelDetailViewState extends State<VcoreMotelDetailView> {
                         Text(
                           'Chủ trọ: ${widget.phongTroModel.tenChuTro}',
                           style: TextStyles.bold.copyWith(
-                              fontSize: 15, color: const Color(0xff118A40)),
+                              fontSize: AppFontSizes.mediumLarge, color: const Color(0xff118A40)),
                         ),
                         spaceHeight(10),
                         textBlock('Giá phòng:',
@@ -183,7 +183,7 @@ class _VcoreMotelDetailViewState extends State<VcoreMotelDetailView> {
                         Text(
                           'Mô tả chi tiết',
                           style: TextStyles.bold.copyWith(
-                              fontSize: 15, color: const Color(0xff181E39)),
+                              fontSize: AppFontSizes.mediumLarge, color: const Color(0xff181E39)),
                         ),
                         spaceHeight(12),
                         Visibility(
@@ -234,12 +234,12 @@ class _VcoreMotelDetailViewState extends State<VcoreMotelDetailView> {
                       Text(
                         'Gọi: ',
                         style: TextStyles.bold
-                            .copyWith(color: Colors.white, fontSize: 15),
+                            .copyWith(color: Colors.white, fontSize: AppFontSizes.mediumLarge),
                       ),
                       Text(
                         widget.phongTroModel.soDienThoai ?? '',
                         style: TextStyles.regular
-                            .copyWith(color: Colors.white, fontSize: 15),
+                            .copyWith(color: Colors.white, fontSize: AppFontSizes.mediumLarge),
                       )
                     ],
                   ),

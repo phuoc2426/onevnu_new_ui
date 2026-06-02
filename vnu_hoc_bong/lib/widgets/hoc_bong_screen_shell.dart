@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:vnu_core/common/app_colors.dart';
 import 'package:vnu_core/widgets/vcore_module_scaffold.dart';
+import 'package:vnu_core/common/app_text_styles.dart';
 
 /// Khung màn hình học bổng thống nhất với các module vnu_core (lịch thi, …).
 class HocBongScreenShell extends StatelessWidget {
@@ -58,7 +59,7 @@ class HocBongFilterChip extends StatelessWidget {
         child: Text(
           label,
           style: TextStyle(
-            fontSize: 13,
+            fontSize: AppFontSizes.mediumSmall,
             fontWeight: FontWeight.w600,
             color: selected ? Colors.white : Colors.grey.shade700,
           ),

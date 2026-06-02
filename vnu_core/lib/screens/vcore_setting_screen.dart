@@ -4,6 +4,7 @@ import 'package:vnu_core/constants/config.dart';
 import 'package:vnu_core/globals.dart';
 import 'package:vnu_core/themes/app_theme.dart';
 import 'package:vnu_core/widgets/navi_widget.dart';
+import 'package:vnu_core/common/app_text_styles.dart';
 
 class VCoreSettingScreen extends StatefulWidget {
   const VCoreSettingScreen({super.key});
@@ -38,7 +39,7 @@ class _VCoreSettingScreenState extends State<VCoreSettingScreen> {
                 padding: const EdgeInsets.all(10.0),
                 child: Text(
                   "Khu vực học tập",
-                  style: AppTheme.headline6.copyWith(fontSize: 20),
+                  style: AppTheme.headline6.copyWith(fontSize: AppFontSizes.extraExtraLarge),
                 ),
               ),
               Row(

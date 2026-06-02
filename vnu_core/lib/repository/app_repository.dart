@@ -45,8 +45,27 @@ class ApiRepository {
 
   // --  New API
   Future<SigninResponse> signin(
-      String username, String password, String deviceToken) {
-    return _apiClient.signin(username, password, deviceToken);
+      String username, String password, String deviceToken) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/api/auth/signin',
+      data: {
+        'username': username,
+        'password': password,
+        if (deviceToken.isNotEmpty) 'deviceToken': deviceToken,
+      },
+      options: Options(
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      ),
+    );
+
+    final result = SigninResponse.fromJson(response.data ?? {});
+    if ((result.accessToken ?? '').isEmpty) {
+      logError('Signin response does not contain access token: ${response.data}');
+    }
+    return result;
   }
 
   Future<SigninResponse> refreshToken(

@@ -76,7 +76,7 @@ class _VcoreMotelItemWidgetState extends State<VcoreMotelItemWidget> {
                         Text(
                           'Giá phòng : ${widget.phongTroModel.giaThueFromString()} - ${widget.phongTroModel.giaThueToString()}',
                           style: TextStyles.regular.copyWith(
-                              fontSize: 13, color: const Color(0xffFB8500)),
+                              fontSize: AppFontSizes.mediumSmall, color: const Color(0xffFB8500)),
                         )
                       ],
                     ),
@@ -87,7 +87,7 @@ class _VcoreMotelItemWidgetState extends State<VcoreMotelItemWidget> {
                         Text(
                           'Diện tích: ${widget.phongTroModel.dienTichFrom ?? ''} - ${widget.phongTroModel.dienTichTo ?? ''} m2',
                           style: TextStyles.regular
-                              .copyWith(fontSize: 13, color: Color(0xffFB8500)),
+                              .copyWith(fontSize: AppFontSizes.mediumSmall, color: Color(0xffFB8500)),
                         )
                       ],
                     )
@@ -107,7 +107,7 @@ class _VcoreMotelItemWidgetState extends State<VcoreMotelItemWidget> {
                 child: Text(
                   widget.phongTroModel.diaChi ?? '',
                   style: TextStyles.regular
-                      .copyWith(fontSize: 13, color: const Color(0xff2A3556)),
+                      .copyWith(fontSize: AppFontSizes.mediumSmall, color: const Color(0xff2A3556)),
                 ),
               )
             ],
@@ -122,7 +122,7 @@ class _VcoreMotelItemWidgetState extends State<VcoreMotelItemWidget> {
                 child: Text(
                   'Ngày đăng:  ${widget.phongTroModel.ngayDangString()}',
                   style: TextStyles.regular
-                      .copyWith(fontSize: 13, color: const Color(0xff2A3556)),
+                      .copyWith(fontSize: AppFontSizes.mediumSmall, color: const Color(0xff2A3556)),
                 ),
               )
             ],

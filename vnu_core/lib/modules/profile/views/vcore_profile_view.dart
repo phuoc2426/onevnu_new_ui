@@ -16,6 +16,7 @@ import 'package:vnu_core/vnu_core.dart';
 import '../controllers/vcore_profile_controller.dart';
 import 'vcore_profile_change_pass_view.dart';
 import 'vcore_profile_photos_view.dart';
+import 'package:flutter/foundation.dart';
 
 class VcoreProfileView extends GetView<VcoreProfileController> {
   const VcoreProfileView({super.key});
@@ -47,7 +48,7 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
                                 Text(
                                   Globals().thongTinSinhVienModel.value?.hoVaTen ?? '',
                                   style: const TextStyle(
-                                    fontSize: 18,
+                                    fontSize: AppFontSizes.large,
                                     fontWeight: FontWeight.bold,
                                     color: Color(0xff1e293b),
                                   ),
@@ -58,14 +59,14 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
                                     const Text(
                                       "MSV: ",
                                       style: TextStyle(
-                                        fontSize: 13,
+                                        fontSize: AppFontSizes.mediumSmall,
                                         color: Color(0xff64748b),
                                       ),
                                     ),
                                     Text(
                                       Globals().thongTinSinhVienModel.value?.maSinhVien ?? '',
                                       style: const TextStyle(
-                                        fontSize: 13,
+                                        fontSize: AppFontSizes.mediumSmall,
                                         fontWeight: FontWeight.w600,
                                         color: Color(0xff334155),
                                       ),
@@ -79,7 +80,7 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
                                     const Text(
                                       "Lớp: ",
                                       style: TextStyle(
-                                        fontSize: 13,
+                                        fontSize: AppFontSizes.mediumSmall,
                                         color: Color(0xff64748b),
                                       ),
                                     ),
@@ -87,7 +88,7 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
                                       child: Text(
                                         Globals().lopDaoTaoModel.value?.ten ?? '',
                                         style: const TextStyle(
-                                          fontSize: 13,
+                                          fontSize: AppFontSizes.mediumSmall,
                                           fontWeight: FontWeight.w600,
                                           color: Color(0xff334155),
                                         ),
@@ -226,7 +227,9 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
                         title: "Phiên bản: ${snapshot.data ?? '1.0.0'}",
                         icon: 'assets/images/logo-vnu.png',
                         action: () {
-                          controller.countVersionOpenLog(context);
+                          if (kDebugMode) {
+                            controller.countVersionOpenLog(context);
+                          }
                         },
                       );
                     },
@@ -277,13 +280,13 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
               style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
-                  fontSize: 16),
+                  fontSize: AppFontSizes.large),
             ),
           ],
         ),
         Text(
           title,
-          style: const TextStyle(color: Color(0xFFDCFCE7), fontSize: 12),
+          style: const TextStyle(color: Color(0xFFDCFCE7), fontSize: AppFontSizes.small),
         )
       ],
     );
@@ -333,7 +336,7 @@ class VcoreProfileItemWidget extends StatelessWidget {
               child: Text(
                 title,
                 style: const TextStyle(
-                  fontSize: 14,
+                  fontSize: AppFontSizes.medium,
                   fontWeight: FontWeight.w600,
                   color: Color(0xFF374151),
                   fontFamily: 'OpenSans',

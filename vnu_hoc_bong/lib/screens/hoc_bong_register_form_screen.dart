@@ -11,6 +11,7 @@ import '../repository/hoc_bong_repository.dart';
 import '../widgets/hoc_bong_dynamic_form_field.dart';
 import '../widgets/hoc_bong_empty_state.dart';
 import '../widgets/hoc_bong_screen_shell.dart';
+import 'package:vnu_core/common/app_text_styles.dart';
 
 class HocBongRegisterFormScreen extends StatefulWidget {
   final int hocBongId;
@@ -100,14 +101,14 @@ class _HocBongRegisterFormScreenState extends State<HocBongRegisterFormScreen> w
                             children: [
                               Text(
                                 detail.hocBong.tenHocBong ?? 'Học bổng',
-                                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                                style: const TextStyle(fontSize: AppFontSizes.extraLarge, fontWeight: FontWeight.w800),
                               ),
                               const SizedBox(height: 6),
                               Text(
                                 state.dirty
                                     ? 'Đã lưu nháp trên thiết bị'
                                     : 'Bản nháp đã được lưu trên thiết bị',
-                                style: TextStyle(color: Colors.green.shade700, fontSize: 13, fontWeight: FontWeight.w500),
+                                style: TextStyle(color: Colors.green.shade700, fontSize: AppFontSizes.mediumSmall, fontWeight: FontWeight.w500),
                               ),
                             ],
                           ),
@@ -168,7 +169,7 @@ class _HocBongRegisterFormScreenState extends State<HocBongRegisterFormScreen> w
                         child: Text(
                           state.submitting ? 'Đang gửi hồ sơ...' : 'Gửi hồ sơ',
                           style: const TextStyle(
-                            fontSize: 16,
+                            fontSize: AppFontSizes.large,
                             fontWeight: FontWeight.bold,
                           ),
                         ),

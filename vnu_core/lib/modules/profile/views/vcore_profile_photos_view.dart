@@ -114,7 +114,7 @@ class _VcoreProfilePhotsSectionWidgetState
       children: [
         Text(
           '09/05/2024',
-          style: TextStyles.semiBold.copyWith(fontSize: 16),
+          style: TextStyles.semiBold.copyWith(fontSize: AppFontSizes.large),
         ),
         spaceHeight(8),
         GridView.builder(

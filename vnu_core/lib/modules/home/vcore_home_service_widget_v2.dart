@@ -17,6 +17,7 @@ import 'package:vnu_core/modules/inmapz/vcore_immap_view.dart';
 import 'package:vnu_core/modules/motel/views/vcore_motel_view.dart';
 import 'package:vnu_core/modules/paht/views/vcore_paht_view.dart';
 import 'package:vnu_core/modules/student_card/views/vcore_student_card_view.dart';
+import 'package:vnu_core/modules/sync/views/vcore_sync_view.dart';
 import 'package:vnu_core/modules/time_schedule/views/vcore_time_schedule_view.dart';
 import 'package:vnu_core/repository/app_repository.dart';
 
@@ -26,6 +27,7 @@ import '../exam_schedule/views/vcore_exam_schedule_view.dart';
 import '../hdsd/views/vcore_hdsd_view.dart';
 import '../one_door/views/vcore_one_door_view.dart';
 import '../question/views/vcore_question_view.dart';
+import 'package:vnu_noi_tru/vnu_noi_tru.dart';
 
 const kCacheKeyListDichVu = 'listDichVu.json';
 
@@ -80,11 +82,7 @@ class _VcoreHomeServiceWidgetV2State extends State<VcoreHomeServiceWidgetV2>
   }
 
   void _sortServices(List<BoxServiceModel> services) {
-    List<String> priority = [
-      "XemThoiKhoaBieu",
-      "DiemMonHoc",
-      "TheSinhVien",
-    ];
+    List<String> priority = ["XemThoiKhoaBieu", "DiemMonHoc", "TheSinhVien"];
 
     services.sort((a, b) {
       int aIndex = priority.indexOf(a.loaiBoxDichVuEnum ?? '');
@@ -99,49 +97,54 @@ class _VcoreHomeServiceWidgetV2State extends State<VcoreHomeServiceWidgetV2>
   }
 
   void _loadCacheService() {
-    VnuCacheFileManager().getCacheFile(kCacheKeyListDichVu).then(
-      (data) {
-        try {
-          var dataString = data ?? '';
-          if (dataString.isEmpty) return;
+    VnuCacheFileManager().getCacheFile(kCacheKeyListDichVu).then((data) {
+      try {
+        var dataString = data ?? '';
+        if (dataString.isEmpty) return;
 
-          var dataJson = jsonDecode(dataString) as List;
-          List<BoxServiceModel> listObj = [];
-          for (var element in dataJson) {
-            try {
-              BoxServiceModel? model;
-              if (element is Map<String, dynamic>) {
-                model = BoxServiceModel.fromJson(element);
-              } else if (element is Map<dynamic, dynamic>) {
-                model = BoxServiceModel.fromJson(element.toStringDynamic());
-              }
-              if (model != null) {
-                if (model.loaiBoxDichVuEnum?.mapTypeBoxService() != HomeService.XemLichThi) {
-                  listObj.add(model);
-                }
-              }
-            } catch (e) {
-              logError(e.toString());
+        var dataJson = jsonDecode(dataString) as List;
+        List<BoxServiceModel> listObj = [];
+        for (var element in dataJson) {
+          try {
+            BoxServiceModel? model;
+            if (element is Map<String, dynamic>) {
+              model = BoxServiceModel.fromJson(element);
+            } else if (element is Map<dynamic, dynamic>) {
+              model = BoxServiceModel.fromJson(element.toStringDynamic());
             }
+            if (model != null) {
+              if (model.loaiBoxDichVuEnum?.mapTypeBoxService() !=
+                  HomeService.XemLichThi) {
+                listObj.add(model);
+              }
+            }
+          } catch (e) {
+            logError(e.toString());
           }
-          _sortServices(listObj);
-          if (_services.isEmpty && mounted) {
-            setState(() {
-              _services = listObj;
-              _isLoading = false;
-            });
-          }
-        } catch (e) {
-          logError(e.toString());
         }
-      },
-    );
+        _sortServices(listObj);
+        if (_services.isEmpty && mounted) {
+          setState(() {
+            _services = listObj;
+            _isLoading = false;
+          });
+        }
+      } catch (e) {
+        logError(e.toString());
+      }
+    });
   }
 
   Future<void> _loadService() async {
     try {
       var response = await ApiRepository().getBoxServices();
-      response = response.where((element) => element.loaiBoxDichVuEnum?.mapTypeBoxService() != HomeService.XemLichThi).toList();
+      response = response
+          .where(
+            (element) =>
+                element.loaiBoxDichVuEnum?.mapTypeBoxService() !=
+                HomeService.XemLichThi,
+          )
+          .toList();
       _sortServices(response);
       if (mounted) {
         setState(() {
@@ -153,8 +156,10 @@ class _VcoreHomeServiceWidgetV2State extends State<VcoreHomeServiceWidgetV2>
       if (response.isNotEmpty) {
         try {
           var data = response.map((e) => e.toJson()).toList();
-          VnuCacheFileManager()
-              .saveCacheFile(kCacheKeyListDichVu, jsonEncode(data));
+          VnuCacheFileManager().saveCacheFile(
+            kCacheKeyListDichVu,
+            jsonEncode(data),
+          );
         } catch (e) {
           logError(e.toString());
         }
@@ -224,8 +229,8 @@ class _VcoreHomeServiceWidgetV2State extends State<VcoreHomeServiceWidgetV2>
                     separatorBuilder: (_, __) => spaceWidth(8),
                     itemBuilder: (context, index) {
                       final serviceModel = _services[index];
-                      final service =
-                          serviceModel.loaiBoxDichVuEnum?.mapTypeBoxService();
+                      final service = serviceModel.loaiBoxDichVuEnum
+                          ?.mapTypeBoxService();
                       return _buildServiceItem(serviceModel, service);
                     },
                   ),
@@ -236,7 +241,8 @@ class _VcoreHomeServiceWidgetV2State extends State<VcoreHomeServiceWidgetV2>
             ),
             onNotification: (notification) {
               if (_scrollController.position.maxScrollExtent > 0) {
-                double newMargin = (notification.metrics.pixels /
+                double newMargin =
+                    (notification.metrics.pixels /
                         _scrollController.position.maxScrollExtent) *
                     (2.0 / 3.0) *
                     30.0;
@@ -291,8 +297,8 @@ class _VcoreHomeServiceWidgetV2State extends State<VcoreHomeServiceWidgetV2>
               }
 
               final serviceModel = _services[index];
-              final service =
-                  serviceModel.loaiBoxDichVuEnum?.mapTypeBoxService();
+              final service = serviceModel.loaiBoxDichVuEnum
+                  ?.mapTypeBoxService();
               return _buildServiceItem(serviceModel, service);
             },
           ),
@@ -332,9 +338,8 @@ class _VcoreHomeServiceWidgetV2State extends State<VcoreHomeServiceWidgetV2>
                   child: serviceModel.icon?.isNotEmpty == true
                       ? CachedNetworkImage(
                           imageUrl: serviceModel.icon!,
-                          errorWidget: (_, __, ___) => svgAsset(
-                            'assets/images/${service?.icon}',
-                          ),
+                          errorWidget: (_, __, ___) =>
+                              svgAsset('assets/images/${service?.icon}'),
                         )
                       : svgAsset('assets/images/${service?.icon}'),
                 ),
@@ -345,7 +350,7 @@ class _VcoreHomeServiceWidgetV2State extends State<VcoreHomeServiceWidgetV2>
               child: Text(
                 service?.title ?? serviceModel.tenBoxDichVu ?? '',
                 style: TextStyles.regular.copyWith(
-                  fontSize: 11,
+                  fontSize: AppFontSizes.font11,
                   color: const Color(0xff374151),
                 ),
                 textAlign: TextAlign.center,
@@ -393,7 +398,7 @@ class _VcoreHomeServiceWidgetV2State extends State<VcoreHomeServiceWidgetV2>
             Text(
               'Xem thêm',
               style: TextStyles.regular.copyWith(
-                fontSize: 11,
+                fontSize: AppFontSizes.font11,
                 color: const Color(0xff6B7280),
               ),
               textAlign: TextAlign.center,
@@ -435,7 +440,7 @@ class _VcoreHomeServiceWidgetV2State extends State<VcoreHomeServiceWidgetV2>
           Text(
             'Thu gọn',
             style: TextStyles.regular.copyWith(
-              fontSize: 11,
+              fontSize: AppFontSizes.font11,
               color: const Color(0xff637392),
             ),
             textAlign: TextAlign.center,
@@ -484,7 +489,7 @@ class _VcoreHomeServiceWidgetV2State extends State<VcoreHomeServiceWidgetV2>
         Get.to(() => const VcoreCamNangView());
         break;
       case HomeService.DangKyNoiTru:
-        snackBarWarning('Chức năng đang hoàn thiện');
+        Get.to(() => const DRMyRegistrationScreen());
         break;
       case HomeService.DiemMonHoc:
         Get.to(() => const VcoreCoursePointsView());
@@ -509,6 +514,9 @@ class _VcoreHomeServiceWidgetV2State extends State<VcoreHomeServiceWidgetV2>
         break;
       case HomeService.PhanAnhHienTruong:
         Get.to(() => const VcorePahtView());
+        break;
+      case HomeService.DongBo:
+        Get.to(() => const VcoreSyncView());
         break;
       default:
         break;

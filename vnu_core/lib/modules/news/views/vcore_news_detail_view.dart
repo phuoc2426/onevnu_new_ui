@@ -4,7 +4,6 @@ import 'package:flutter_html/flutter_html.dart';
 import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
-import 'package:vnu_core/common/app_color.dart';
 import 'package:vnu_core/common/app_colors.dart';
 import 'package:vnu_core/common/app_text_styles.dart';
 import 'package:vnu_core/common/datetime_utils.dart';
@@ -19,8 +18,15 @@ import 'package:vnu_core/widgets/progress_hub_widget.dart';
 
 class VcoreNewsDetailView extends HookWidget {
   final TinTucModel tinTucModel;
+  final String screenTitle;
+  final String relatedTitle;
 
-  const VcoreNewsDetailView({super.key, required this.tinTucModel});
+  const VcoreNewsDetailView({
+    super.key,
+    required this.tinTucModel,
+    this.screenTitle = 'Xem chi tiết tin tức',
+    this.relatedTitle = 'TIN CÙNG CHUYÊN MỤC',
+  });
 
   VcoreNewsDetailController get controller =>
       GetInstance().find<VcoreNewsDetailController>();
@@ -42,7 +48,7 @@ class VcoreNewsDetailView extends HookWidget {
         tag: const Uuid().v4(),
         builder: (controller) {
           return VcoreModuleScaffold(
-            title: 'Xem chi tiết tin tức',
+            title: screenTitle,
             body: ProgressHubWidget(
               contextComplete: (hubContext) {
                 controller.context = hubContext;
@@ -62,8 +68,9 @@ class VcoreNewsDetailView extends HookWidget {
                           children: [
                             Text(
                               controller.tintuc.value?.tieuDe ?? '',
-                              style: TextStyles.bold
-                                  .copyWith(fontSize: 20, color: Colors.black),
+                              style: TextStyles.bold.copyWith(
+                                  fontSize: AppFontSizes.extraExtraLarge,
+                                  color: Colors.black),
                             ),
                             spaceHeight(10),
                             Row(
@@ -71,7 +78,7 @@ class VcoreNewsDetailView extends HookWidget {
                                 Text(
                                   controller.tintuc.value?.tenChuyenMuc ?? '',
                                   style: TextStyles.regular.copyWith(
-                                      fontSize: 13,
+                                      fontSize: AppFontSizes.mediumSmall,
                                       color: AppColors.darkBlueAccent),
                                 ),
                                 const Spacer(),
@@ -80,7 +87,7 @@ class VcoreNewsDetailView extends HookWidget {
                                       controller.tintuc.value?.thoiGianTao,
                                       DateTimeConst.DATE_FORMAT),
                                   style: TextStyles.regular.copyWith(
-                                      fontSize: 13,
+                                      fontSize: AppFontSizes.mediumSmall,
                                       color: AppColors.textMuted),
                                 ),
                               ],
@@ -89,7 +96,8 @@ class VcoreNewsDetailView extends HookWidget {
                             Text(
                               controller.tintuc.value?.donViXuatBan ?? '',
                               style: TextStyles.regular.copyWith(
-                                  fontSize: 13, color: AppColors.publishGreen),
+                                  fontSize: AppFontSizes.mediumSmall,
+                                  color: AppColors.publishGreen),
                             ),
                             spaceHeight(16),
                             //                   Text(
@@ -134,6 +142,8 @@ class VcoreNewsDetailView extends HookWidget {
   }
 
   Widget _buildFileAttach(VcoreNewsDetailController controller) {
+    final currentNews = controller.tintuc.value ?? tinTucModel;
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -141,21 +151,23 @@ class VcoreNewsDetailView extends HookWidget {
           flex: 4,
           child: Text(
             'Tệp đính kèm:',
-            style: TextStyles.regular
-                .copyWith(fontSize: 15, color: AppColors.darkBlueAccent),
+            style: TextStyles.regular.copyWith(
+                fontSize: AppFontSizes.mediumLarge,
+                color: AppColors.darkBlueAccent),
           ),
         ),
         Expanded(
           flex: 6,
           child: InkWell(
             onTap: () {
-              controller.downloadAndShare(tinTucModel.guidFileDinhKems?.first,
-                  tinTucModel.tenFileDinhKem ?? '');
+              controller.downloadAndShare(currentNews.guidFileDinhKems?.first,
+                  currentNews.tenFileDinhKem ?? '');
             },
             child: Text(
-              tinTucModel.tenFileDinhKem ?? '',
-              style: TextStyles.regular
-                  .copyWith(fontSize: 15, color: AppColors.slateText),
+              currentNews.tenFileDinhKem ?? '',
+              style: TextStyles.regular.copyWith(
+                  fontSize: AppFontSizes.mediumLarge,
+                  color: AppColors.slateText),
             ),
           ),
         ),
@@ -177,9 +189,9 @@ class VcoreNewsDetailView extends HookWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'TIN CÙNG CHUYÊN MỤC',
-            style:
-                TextStyles.semiBold.copyWith(fontSize: 16, color: Colors.black),
+            relatedTitle,
+            style: TextStyles.semiBold
+                .copyWith(fontSize: AppFontSizes.large, color: Colors.black),
           ),
           ListView.separated(
               shrinkWrap: true,

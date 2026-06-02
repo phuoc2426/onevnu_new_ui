@@ -1,3 +1,4 @@
+import 'package:vnu_core/common/app_text_styles.dart';
 // import 'package:badges/badges.dart' as BadgeLib;
 // import 'package:flutter/material.dart';
 // import 'package:vnu_core/common/events.dart';
@@ -72,7 +73,7 @@
 //                   : Text(
 //                       '${snapshot.data}',
 //                       style: AppTheme.body2.copyWith(
-//                           fontSize: 10,
+//                           fontSize: AppFontSizes.extraSmall,
 //                           fontWeight: FontWeight.normal,
 //                           color: Colors.white),
 //                     ),
@@ -96,7 +97,7 @@
 //               badgeContent: Text(
 //                 '${snapshot.data}',
 //                 style: AppTheme.body2.copyWith(
-//                     fontSize: 10,
+//                     fontSize: AppFontSizes.extraSmall,
 //                     fontWeight: FontWeight.normal,
 //                     color: Colors.white),
 //               ),

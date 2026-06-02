@@ -31,7 +31,7 @@ class LoadingOverlay extends StatefulWidget {
     required this.child,
     this.opacity = 1.0,
     this.progressIndicator = const CupertinoActivityIndicator(
-      color: AppTheme.backgroundBlueColor,
+      color: AppTheme.colorMain,
     ),
     this.color,
   });

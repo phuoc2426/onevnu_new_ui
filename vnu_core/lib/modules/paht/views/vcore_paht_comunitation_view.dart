@@ -68,7 +68,7 @@ class VcorePahtComunitationView
                               child: Text(
                                 khuVuc.tenKhuVucBanDo ?? '',
                                 style: TextStyles.regular.copyWith(
-                                  fontSize: 13,
+                                  fontSize: AppFontSizes.mediumSmall,
                                   color: isSelected
                                       ? Colors.white
                                       : const Color(0xff637392),

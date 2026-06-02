@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vnu_core/common/app_text_styles.dart';
 
 class AppTheme {
   AppTheme._();
@@ -55,7 +56,7 @@ class AppTheme {
   static const TextStyle display1 = TextStyle(
     fontFamily: fontName,
     fontWeight: FontWeight.bold,
-    fontSize: 36,
+    fontSize: AppFontSizes.font36,
     letterSpacing: 0.4,
     height: 1.35,
     color: textColor,
@@ -63,7 +64,7 @@ class AppTheme {
 
   static const TextStyle headline1 = TextStyle(
     fontFamily: fontName,
-    fontSize: 96,
+    fontSize: AppFontSizes.font96,
     fontWeight: FontWeight.w300,
     letterSpacing: -1.5,
     height: 1.35,
@@ -71,7 +72,7 @@ class AppTheme {
 
   static const TextStyle headline2 = TextStyle(
     fontFamily: fontName,
-    fontSize: 60,
+    fontSize: AppFontSizes.font60,
     fontWeight: FontWeight.w300,
     letterSpacing: -0.5,
     height: 1.35,
@@ -79,14 +80,14 @@ class AppTheme {
 
   static const TextStyle headline3 = TextStyle(
     fontFamily: fontName,
-    fontSize: 48,
+    fontSize: AppFontSizes.font48,
     fontWeight: FontWeight.w400,
     height: 1.35,
   );
 
   static const TextStyle headline4 = TextStyle(
     fontFamily: fontName,
-    fontSize: 34,
+    fontSize: AppFontSizes.font34,
     fontWeight: FontWeight.w400,
     letterSpacing: 0.25,
     height: 1.35,
@@ -94,7 +95,7 @@ class AppTheme {
 
   static const TextStyle headline5 = TextStyle(
     fontFamily: fontName,
-    fontSize: 24,
+    fontSize: AppFontSizes.font24,
     fontWeight: FontWeight.w400,
     height: 1.35,
   );
@@ -102,7 +103,7 @@ class AppTheme {
   static const TextStyle headline6 = TextStyle(
     fontFamily: fontName,
     fontWeight: FontWeight.w500,
-    fontSize: 24,
+    fontSize: AppFontSizes.font24,
     letterSpacing: 0.27,
     color: textColor,
     height: 1.35,
@@ -111,7 +112,7 @@ class AppTheme {
   static const TextStyle subtitle1 = TextStyle(
     fontFamily: fontName,
     fontWeight: FontWeight.normal,
-    fontSize: 16,
+    fontSize: AppFontSizes.large,
     letterSpacing: 0.15,
     color: textColor,
     height: 1.35,
@@ -120,7 +121,7 @@ class AppTheme {
   static const TextStyle subtitle2 = TextStyle(
     fontFamily: fontName,
     fontWeight: FontWeight.w500,
-    fontSize: 14,
+    fontSize: AppFontSizes.medium,
     letterSpacing: 0.1,
     color: textColor,
     height: 1.35,
@@ -129,7 +130,7 @@ class AppTheme {
   static const TextStyle body1 = TextStyle(
     fontFamily: fontName,
     fontWeight: FontWeight.normal,
-    fontSize: 16,
+    fontSize: AppFontSizes.large,
     letterSpacing: 0.5,
     color: textColor,
     height: 1.35,
@@ -138,7 +139,7 @@ class AppTheme {
   static const TextStyle body2 = TextStyle(
     fontFamily: fontName,
     fontWeight: FontWeight.normal,
-    fontSize: 14,
+    fontSize: AppFontSizes.medium,
     letterSpacing: 0.25,
     color: textColor,
     height: 1.35,
@@ -147,7 +148,7 @@ class AppTheme {
   static const TextStyle button = TextStyle(
     fontFamily: fontName,
     fontWeight: FontWeight.w500,
-    fontSize: 14,
+    fontSize: AppFontSizes.medium,
     letterSpacing: 1.25,
     color: textColor, // was lightText
     height: 1.35,
@@ -156,7 +157,7 @@ class AppTheme {
   static const TextStyle caption = TextStyle(
     fontFamily: fontName,
     fontWeight: FontWeight.normal,
-    fontSize: 12,
+    fontSize: AppFontSizes.small,
     letterSpacing: 0.4,
     color: textColor, // was lightText
     height: 1.35,
@@ -164,7 +165,7 @@ class AppTheme {
   static const TextStyle common = TextStyle(
     fontFamily: fontName,
     fontWeight: FontWeight.normal,
-    fontSize: 14,
+    fontSize: AppFontSizes.medium,
     color: Colors.black,
     height: 1.35,
   );

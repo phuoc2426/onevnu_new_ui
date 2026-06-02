@@ -44,7 +44,7 @@ class VcoreSystemNewsDetailView extends StatelessWidget {
                         Text(
                           tinTucModel.tieuDe ?? '',
                           style: TextStyles.bold
-                              .copyWith(fontSize: 20, color: Colors.black),
+                              .copyWith(fontSize: AppFontSizes.extraExtraLarge, color: Colors.black),
                         ),
                         spaceHeight(10),
                         Row(
@@ -52,7 +52,7 @@ class VcoreSystemNewsDetailView extends StatelessWidget {
                             Text(
                               tinTucModel.nguonTin ?? '',
                               style: TextStyles.regular.copyWith(
-                                  fontSize: 13, color: AppColors.darkBlueAccent),
+                                  fontSize: AppFontSizes.mediumSmall, color: AppColors.darkBlueAccent),
                             ),
                             const Spacer(),
                             Text(
@@ -60,7 +60,7 @@ class VcoreSystemNewsDetailView extends StatelessWidget {
                                   tinTucModel.thoiGian,
                                   DateTimeConst.DATE_FORMAT),
                               style: TextStyles.regular.copyWith(
-                                  fontSize: 13, color: AppColors.textMuted),
+                                  fontSize: AppFontSizes.mediumSmall, color: AppColors.textMuted),
                             ),
                           ],
                         ),
@@ -68,7 +68,7 @@ class VcoreSystemNewsDetailView extends StatelessWidget {
                         // Text(
                         //   controller.tintuc.value?.donViXuatBan ?? '',
                         //   style: TextStyles.regular.copyWith(
-                        //       fontSize: 13, color: const Color(0xff118A40)),
+                        //       fontSize: AppFontSizes.mediumSmall, color: const Color(0xff118A40)),
                         // ),
                         spaceHeight(16),
                         //                   Text(
@@ -140,7 +140,7 @@ class VcoreSystemNewsDetailView extends StatelessWidget {
           child: Text(
             'Tệp đính kèm:',
             style: TextStyles.regular
-                .copyWith(fontSize: 15, color: AppColors.darkBlueAccent),
+                .copyWith(fontSize: AppFontSizes.mediumLarge, color: AppColors.darkBlueAccent),
           ),
         ),
         Expanded(
@@ -153,7 +153,7 @@ class VcoreSystemNewsDetailView extends StatelessWidget {
             child: Text(
               '${tinTucModel.tenFileDinhKems?.first}',
               style: TextStyles.regular
-                  .copyWith(fontSize: 15, color: AppColors.slateText),
+                  .copyWith(fontSize: AppFontSizes.mediumLarge, color: AppColors.slateText),
             ),
           ),
         ),

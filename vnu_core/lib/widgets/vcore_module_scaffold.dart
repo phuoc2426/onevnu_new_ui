@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:vnu_core/common/app_text_styles.dart';
 
 /// CẤU HÌNH BACKGROUND TẠI ĐÂY:
 /// Bạn có thể thay đổi mã màu ở dưới để điều chỉnh màu nền cho toàn bộ các trang chức năng.
@@ -53,7 +54,7 @@ class VcoreModuleScaffold extends StatelessWidget {
           title,
           style: const TextStyle(
             color: Colors.black87,
-            fontSize: 16,
+            fontSize: AppFontSizes.large,
             fontWeight: FontWeight.bold,
           ),
         ),

@@ -40,7 +40,7 @@ class _VcoreProfileSetupBioViewState extends State<VcoreProfileSetupBioView> {
               isBioByFaceId
                   ? 'Đăng nhập bằng khuôn mặt'
                   : 'Đăng nhập bằng vân tay',
-              style: TextStyles.medium.copyWith(fontSize: 16),
+              style: TextStyles.medium.copyWith(fontSize: AppFontSizes.large),
             ),
             const Spacer(),
             Switch(

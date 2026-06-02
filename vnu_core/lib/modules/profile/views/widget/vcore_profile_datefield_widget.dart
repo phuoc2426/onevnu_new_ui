@@ -41,12 +41,12 @@ class _VcoreProfileDatefieldWidgetState
             Text(
               widget.title,
               style: TextStyles.regular
-                  .copyWith(fontSize: 13, color: Colors.black),
+                  .copyWith(fontSize: AppFontSizes.mediumSmall, color: Colors.black),
             ),
             Text(
               widget.isRequired ? ' *' : '',
               style:
-                  TextStyles.regular.copyWith(fontSize: 13, color: Colors.red),
+                  TextStyles.regular.copyWith(fontSize: AppFontSizes.mediumSmall, color: Colors.red),
             )
           ],
         ),

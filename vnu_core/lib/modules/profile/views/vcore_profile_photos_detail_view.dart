@@ -52,7 +52,7 @@ class VcoreProfilePhotosDetailView
                             Text(
                               '', //ngay thang nam
                               style: TextStyles.semiBold
-                                  .copyWith(color: Colors.white, fontSize: 17),
+                                  .copyWith(color: Colors.white, fontSize: AppFontSizes.font17),
                             )
                           ],
                         )),

@@ -179,13 +179,13 @@ class NtBoardingDetailView extends GetView<NtBoardingDetailController> {
         Text(
           title,
           style: TextStyles.regular
-              .copyWith(fontSize: 13, color: const Color(0xff637392)),
+              .copyWith(fontSize: AppFontSizes.mediumSmall, color: const Color(0xff637392)),
         ),
         spaceWidth(10),
         Flexible(
           child: Text(
             content,
-            style: TextStyles.regular.copyWith(fontSize: 13),
+            style: TextStyles.regular.copyWith(fontSize: AppFontSizes.mediumSmall),
           ),
         )
       ],
@@ -201,14 +201,14 @@ class NtBoardingDetailView extends GetView<NtBoardingDetailController> {
           child: Text(
             title,
             style: TextStyles.regular
-                .copyWith(fontSize: 12, color: const Color(0xff637392)),
+                .copyWith(fontSize: AppFontSizes.small, color: const Color(0xff637392)),
           ),
         ),
         spaceWidth(10),
         Flexible(
           child: Text(
             content,
-            style: TextStyles.semiBold.copyWith(fontSize: 13),
+            style: TextStyles.semiBold.copyWith(fontSize: AppFontSizes.mediumSmall),
           ),
         )
       ],

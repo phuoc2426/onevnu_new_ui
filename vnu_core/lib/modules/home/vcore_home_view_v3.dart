@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:math';
 import 'dart:ui';
 import 'package:vnu_hoc_bong/vnu_hoc_bong.dart';
+import 'package:vnu_noi_tru/modules/boarding/views/nt_boading_register_view.dart';
+import 'package:vnu_noi_tru/vnu_noi_tru.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -29,17 +31,19 @@ import 'package:vnu_core/modules/notify/views/vcore_notify_detail_view_v3.dart';
 import 'package:vnu_core/modules/notify/views/vcore_notify_view_v3.dart';
 import 'package:vnu_core/modules/one_door/views/vcore_one_door_view.dart';
 import 'package:vnu_core/modules/paht/views/vcore_paht_view.dart';
+import 'package:vnu_core/modules/sync/views/vcore_sync_view.dart';
 import 'package:vnu_core/services/services_url.dart';
 import 'package:vnu_core/widgets/progress_hub_widget.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:vnu_core/common/app_text_styles.dart';
 /* -------------------------------------------------------------------------- */
 /*                       LOCAL NOTIFICATION SERVICE                           */
 /* -------------------------------------------------------------------------- */
 
 class _LocalNotificationService {
   static final FlutterLocalNotificationsPlugin _plugin =
-  FlutterLocalNotificationsPlugin();
+      FlutterLocalNotificationsPlugin();
 
   static bool _initialized = false;
 
@@ -77,7 +81,8 @@ class _LocalNotificationService {
 
     await _plugin
         .resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>()
+          AndroidFlutterLocalNotificationsPlugin
+        >()
         ?.requestNotificationsPermission();
 
     _initialized = true;
@@ -151,9 +156,7 @@ class VcoreHomeViewV3 extends StatelessWidget {
 class _HomeWireframeBody extends StatefulWidget {
   final VcoreHomeController controller;
 
-  const _HomeWireframeBody({
-    required this.controller,
-  });
+  const _HomeWireframeBody({required this.controller});
 
   @override
   State<_HomeWireframeBody> createState() => _HomeWireframeBodyState();
@@ -181,8 +184,9 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
   List<String> _pinnedFunctionLabels = [
     'Lịch học & thi',
     'Điểm',
-    'Đăng ký môn',
+    'Học bổng',
     'Việc làm',
+    // 'Đồng bộ' tạm ẩn
   ];
 
   static final List<_FunctionItem> _allAvailableFunctions = [
@@ -190,12 +194,14 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
     _FunctionItem('Điểm', Colors.purple),
     _FunctionItem('Đăng ký môn', Colors.orange),
     _FunctionItem('Việc làm', Colors.green),
+    _FunctionItem('Đồng bộ', Colors.indigo),
     _FunctionItem('Học phí', Colors.teal),
     _FunctionItem('Tài liệu', Colors.blue),
     _FunctionItem('Điểm danh', Colors.green),
     _FunctionItem('Học bổng', Colors.purple),
     _FunctionItem('Phản ánh', Colors.orange),
     _FunctionItem('Nội trú', Colors.purple),
+    _FunctionItem('Phòng trọ', Colors.teal),
     _FunctionItem('Thủ tục', Colors.green),
     _FunctionItem('Thư viện', Colors.amber),
     _FunctionItem('Bản đồ', Colors.blue),
@@ -206,34 +212,36 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
     'Học tập': _allAvailableFunctions
         .where(
           (e) => [
-        'Lịch học & thi',
-        'Điểm',
-        'Đăng ký môn',
-        'Điểm danh',
-      ].contains(e.label),
-    )
+            'Lịch học & thi',
+            'Điểm',
+            'Đăng ký môn',
+            'Điểm danh',
+          ].contains(e.label),
+        )
         .toList(),
     'Dịch vụ': _allAvailableFunctions
         .where(
           (e) => [
-        'Học phí',
-        'Học bổng',
-        'Thủ tục',
-        'Nội trú',
-        'Phản ánh',
-      ].contains(e.label),
-    )
+            'Học phí',
+            'Học bổng',
+            'Thủ tục',
+            'Nội trú',
+            'Phản ánh',
+            'Đồng bộ',
+          ].contains(e.label),
+        )
         .toList(),
     'Tiện ích': _allAvailableFunctions
         .where(
           (e) => [
-        'Tài liệu',
-        'Thư viện',
-        'Bản đồ',
-        'Việc làm',
-        'Khác',
-      ].contains(e.label),
-    )
+            'Tài liệu',
+            'Thư viện',
+            'Bản đồ',
+            'Việc làm',
+            'Phòng trọ',
+            'Khác',
+          ].contains(e.label),
+        )
         .toList(),
   };
 
@@ -256,22 +264,19 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
   void _startNewsAutoScroll() {
     newsAutoScrollTimer?.cancel();
 
-    newsAutoScrollTimer = Timer.periodic(
-      const Duration(seconds: 4),
-          (_) {
-        if (!mounted || !newsPageController.hasClients) {
-          return;
-        }
+    newsAutoScrollTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (!mounted || !newsPageController.hasClients) {
+        return;
+      }
 
-        final currentPage = newsPageController.page ?? 0;
+      final currentPage = newsPageController.page ?? 0;
 
-        newsPageController.animateToPage(
-          currentPage.round() + 1,
-          duration: const Duration(milliseconds: 650),
-          curve: Curves.easeInOutCubic,
-        );
-      },
-    );
+      newsPageController.animateToPage(
+        currentPage.round() + 1,
+        duration: const Duration(milliseconds: 650),
+        curve: Curves.easeInOutCubic,
+      );
+    });
   }
 
   Future<void> _loadPinnedFunctions() async {
@@ -332,6 +337,10 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
         Get.to(() => const VcorePahtView());
         break;
       case 'Nội trú':
+        // snackBarWarning('Chức năng đang hoàn thiện');
+        Get.to(() => const DRMyRegistrationScreen());
+        break;
+      case 'Phòng trọ':
         Get.to(() => const VcoreMotelView());
         break;
       case 'Thủ tục':
@@ -349,6 +358,10 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
       case 'Việc làm':
         Get.to(() => const VcoreJobsViewV2());
         break;
+      case 'Đồng bộ':
+        // snackBarWarning('Chức năng đang hoàn thiện');
+        Get.to(() => VcoreSyncView());
+        break;
       default:
         snackBarWarning('Chức năng đang hoàn thiện');
         break;
@@ -365,6 +378,8 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
         return Icons.border_color_rounded;
       case 'Việc làm':
         return Icons.work_outline_rounded;
+      case 'Đồng bộ':
+        return Icons.sync_rounded;
       case 'Học phí':
         return Icons.account_balance_wallet_rounded;
       case 'Tài liệu':
@@ -377,6 +392,8 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
         return Icons.rate_review_rounded;
       case 'Nội trú':
         return Icons.home_work_rounded;
+      case 'Phòng trọ':
+        return Icons.home_outlined;
       case 'Thủ tục':
         return Icons.assignment_turned_in_rounded;
       case 'Thư viện':
@@ -402,7 +419,9 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
           final selectedTimeText =
               '${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}';
 
-          final selectedDateText = DateFormat('dd/MM/yyyy').format(selectedDate);
+          final selectedDateText = DateFormat(
+            'dd/MM/yyyy',
+          ).format(selectedDate);
 
           return Container(
             padding: EdgeInsets.only(
@@ -413,9 +432,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
             ),
             decoration: const BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.vertical(
-                top: Radius.circular(24),
-              ),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
             ),
             child: SafeArea(
               top: false,
@@ -460,7 +477,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                               Text(
                                 'Tạo lời nhắc',
                                 style: TextStyle(
-                                  fontSize: 18,
+                                  fontSize: AppFontSizes.extraLarge,
                                   fontWeight: FontWeight.w900,
                                   color: AppColors.homeTextTitle,
                                 ),
@@ -469,7 +486,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                               Text(
                                 'Chọn ngày trên lịch, chọn giờ và nhập nội dung.',
                                 style: TextStyle(
-                                  fontSize: 12.5,
+                                  fontSize: AppFontSizes.font12_5,
                                   color: AppColors.homeTextSub,
                                 ),
                               ),
@@ -485,9 +502,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                       decoration: BoxDecoration(
                         color: AppColors.homeCardBg,
                         borderRadius: BorderRadius.circular(18),
-                        border: Border.all(
-                          color: AppColors.homeCardBorder,
-                        ),
+                        border: Border.all(color: AppColors.homeCardBorder),
                       ),
                       child: TableCalendar(
                         locale: 'vi_VN',
@@ -519,7 +534,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                           formatButtonVisible: false,
                           titleCentered: true,
                           titleTextStyle: TextStyle(
-                            fontSize: 15,
+                            fontSize: AppFontSizes.mediumLarge,
                             fontWeight: FontWeight.w900,
                             color: AppColors.homeTextTitle,
                           ),
@@ -534,12 +549,12 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                         ),
                         daysOfWeekStyle: const DaysOfWeekStyle(
                           weekdayStyle: TextStyle(
-                            fontSize: 11,
+                            fontSize: AppFontSizes.font11,
                             fontWeight: FontWeight.w700,
                             color: AppColors.homeTextSub,
                           ),
                           weekendStyle: TextStyle(
-                            fontSize: 11,
+                            fontSize: AppFontSizes.font11,
                             fontWeight: FontWeight.w700,
                             color: AppColors.homeRedWeekend,
                           ),
@@ -677,9 +692,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                         ),
                         child: const Text(
                           'Tạo lời nhắc',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                          ),
+                          style: TextStyle(fontWeight: FontWeight.w800),
                         ),
                       ),
                     ),
@@ -711,9 +724,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
         decoration: BoxDecoration(
           color: AppColors.homeCardBg,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: AppColors.homeCardBorder,
-          ),
+          border: Border.all(color: AppColors.homeCardBorder),
         ),
         child: Row(
           children: [
@@ -724,11 +735,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                 color: AppColors.brandGreen.withOpacity(0.10),
                 borderRadius: BorderRadius.circular(11),
               ),
-              child: Icon(
-                icon,
-                color: AppColors.brandGreen,
-                size: 18,
-              ),
+              child: Icon(icon, color: AppColors.brandGreen, size: 18),
             ),
             const SizedBox(width: 9),
             Expanded(
@@ -738,7 +745,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                   Text(
                     title,
                     style: const TextStyle(
-                      fontSize: 11,
+                      fontSize: AppFontSizes.font11,
                       color: AppColors.homeTextSub,
                     ),
                   ),
@@ -748,7 +755,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontSize: 12.5,
+                      fontSize: AppFontSizes.font12_5,
                       fontWeight: FontWeight.w800,
                       color: AppColors.homeTextTitle,
                     ),
@@ -790,7 +797,9 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
 
       snackBarSuccess('Đã tạo lời nhắc lúc $timeText');
     } catch (e) {
-      snackBarWarning('Không thể tạo lời nhắc. Vui lòng kiểm tra quyền thông báo');
+      snackBarWarning(
+        'Không thể tạo lời nhắc. Vui lòng kiểm tra quyền thông báo',
+      );
     }
   }
 
@@ -851,12 +860,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
     return Positioned.fill(
       child: Stack(
         fit: StackFit.expand,
-        children: [
-          Image.asset(
-            'assets/images/bg2.png',
-            fit: BoxFit.cover,
-          ),
-        ],
+        children: [Image.asset('assets/images/bg2.png', fit: BoxFit.cover)],
       ),
     );
   }
@@ -864,7 +868,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
   Widget _buildHeader() {
     final student = Globals().thongTinSinhVienModel.value;
     final className = Globals().lopDaoTaoModel.value?.ten;
-    
+
     final nienKhoa = Globals().nienKhoaDaoTaoModel.value;
     String khoaHocText = '';
     if (nienKhoa != null) {
@@ -891,7 +895,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   color: Colors.black,
-                  fontSize: 13,
+                  fontSize: AppFontSizes.mediumSmall,
                   fontWeight: FontWeight.w900,
                 ),
               ),
@@ -902,7 +906,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   color: Colors.black54,
-                  fontSize: 12.5,
+                  fontSize: AppFontSizes.font12_5,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -913,7 +917,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   color: Colors.black54,
-                  fontSize: 12,
+                  fontSize: AppFontSizes.small,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -928,8 +932,13 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
           },
           child: _headerButton(
             Icons.notifications_none_rounded,
-            badge: (widget.controller.unreadSystemCount.value + widget.controller.unreadTrainingCount.value) > 0
-                ? (widget.controller.unreadSystemCount.value + widget.controller.unreadTrainingCount.value).toString()
+            badge:
+                (widget.controller.unreadSystemCount.value +
+                        widget.controller.unreadTrainingCount.value) >
+                    0
+                ? (widget.controller.unreadSystemCount.value +
+                          widget.controller.unreadTrainingCount.value)
+                      .toString()
                 : null,
           ),
         ),
@@ -961,11 +970,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
               ),
             ],
           ),
-          child: Icon(
-            icon,
-            color: AppColors.brandGreen,
-            size: 22,
-          ),
+          child: Icon(icon, color: AppColors.brandGreen, size: 22),
         ),
         if (badge != null)
           Positioned(
@@ -983,7 +988,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                 badge,
                 style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 10,
+                  fontSize: AppFontSizes.extraSmall,
                   fontWeight: FontWeight.w900,
                 ),
               ),
@@ -998,9 +1003,9 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
       final todayCount = widget.controller.getTodayTotalSubjects().toString();
       final examCount = widget.controller.getUpcomingExamCount().toString();
       final notifyCount =
-      (widget.controller.unreadSystemCount.value +
-          widget.controller.unreadTrainingCount.value)
-          .toString();
+          (widget.controller.unreadSystemCount.value +
+                  widget.controller.unreadTrainingCount.value)
+              .toString();
 
       String getVietnameseWeekday() {
         final weekday = DateTime.now().weekday;
@@ -1053,22 +1058,23 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                   border: index == items.length - 1
                       ? null
                       : Border(
-                    right: BorderSide(
-                      color: Colors.grey.withOpacity(0.18),
-                    ),
-                  ),
+                          right: BorderSide(
+                            color: Colors.grey.withOpacity(0.18),
+                          ),
+                        ),
                 ),
                 child: GestureDetector(
                   onTap: () {
                     if (index == 0) {
                       // Tiết học hôm nay → mở lịch học & thi, scroll đến hôm nay
-                      Get.to(() => VcoreExamScheduleView(
-                        initialDate: DateTime.now(),
-                      ));
+                      Get.to(
+                        () =>
+                            VcoreExamScheduleView(initialDate: DateTime.now()),
+                      );
                     } else if (index == 1) {
                       // Lịch thi sắp tới → scroll đến ngày thi gần nhất
-                      final upcomingExams =
-                          widget.controller.getUpcomingExams();
+                      final upcomingExams = widget.controller
+                          .getUpcomingExams();
                       DateTime? targetDate;
                       if (upcomingExams.isNotEmpty) {
                         final ngayThi = upcomingExams.first.ngayThi;
@@ -1085,9 +1091,11 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                           } catch (_) {}
                         }
                       }
-                      Get.to(() => VcoreExamScheduleView(
-                        initialDate: targetDate ?? DateTime.now(),
-                      ));
+                      Get.to(
+                        () => VcoreExamScheduleView(
+                          initialDate: targetDate ?? DateTime.now(),
+                        ),
+                      );
                     } else if (index == 2) {
                       Get.to(() => const VcoreNotifyViewV3())?.then((_) {
                         widget.controller.updateUnreadCounts();
@@ -1110,11 +1118,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                               color: item.color.withOpacity(0.10),
                               borderRadius: BorderRadius.circular(10),
                             ),
-                            child: Icon(
-                              item.icon,
-                              color: item.color,
-                              size: 16,
-                            ),
+                            child: Icon(item.icon, color: item.color, size: 16),
                           ),
                           const SizedBox(width: 5),
                           Flexible(
@@ -1123,7 +1127,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
-                                fontSize: 15.5,
+                                fontSize: AppFontSizes.font15_5,
                                 fontWeight: FontWeight.w900,
                                 color: AppColors.homeTextTitle,
                               ),
@@ -1138,7 +1142,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          fontSize: 10.5,
+                          fontSize: AppFontSizes.font10_5,
                           height: 1.15,
                           color: AppColors.homeTextBody,
                           fontWeight: FontWeight.w600,
@@ -1174,8 +1178,9 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                 children: [
                   Padding(
                     padding: const EdgeInsets.only(right: 10),
-                    child:
-                    isStudyTab ? _buildNextStudyCard() : _buildNextExamCard(),
+                    child: isStudyTab
+                        ? _buildNextStudyCard()
+                        : _buildNextExamCard(),
                   ),
                   Padding(
                     padding: const EdgeInsets.only(right: 10),
@@ -1217,14 +1222,17 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
   }
 
   Widget _buildNextStudyCard() {
-    final todaySchedule = widget.controller.getTodayClassSchedule();
+    final todaySchedule = widget.controller.getUpcomingClassSchedule();
 
     if (todaySchedule.isEmpty) {
       return _schedulePanel(
         child: const Center(
           child: Text(
             'Hôm nay không có lịch học',
-            style: TextStyle(color: Colors.grey, fontSize: 13),
+            style: TextStyle(
+              color: Colors.grey,
+              fontSize: AppFontSizes.mediumSmall,
+            ),
           ),
         ),
       );
@@ -1249,7 +1257,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               color: AppColors.darkNavy,
-              fontSize: 16,
+              fontSize: AppFontSizes.large,
               fontWeight: FontWeight.w900,
               height: 1.25,
             ),
@@ -1266,14 +1274,17 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
   }
 
   Widget _buildNextExamCard() {
-    final upcomingExams = widget.controller.getUpcomingExams();
+    final upcomingExams = widget.controller.getUpcomingExamSchedule();
 
     if (upcomingExams.isEmpty) {
       return _schedulePanel(
         child: const Center(
           child: Text(
             'Không có lịch thi sắp tới',
-            style: TextStyle(color: Colors.grey, fontSize: 13),
+            style: TextStyle(
+              color: Colors.grey,
+              fontSize: AppFontSizes.mediumSmall,
+            ),
           ),
         ),
       );
@@ -1287,10 +1298,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
         children: [
           _panelTitle('Ca thi tiếp theo'),
           const SizedBox(height: 12),
-          _timeBadge(
-            nextExam.gioBatDauThi ?? '--:--',
-            const Color(0xFF2563EB),
-          ),
+          _timeBadge(nextExam.gioBatDauThi ?? '--:--', const Color(0xFF2563EB)),
           const SizedBox(height: 10),
           Text(
             nextExam.tenHocPhan ?? 'Môn thi',
@@ -1298,7 +1306,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               color: AppColors.darkNavy,
-              fontSize: 16,
+              fontSize: AppFontSizes.large,
               fontWeight: FontWeight.w900,
               height: 1.25,
             ),
@@ -1315,42 +1323,45 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
   }
 
   Widget _buildTodayStudyTimeline() {
-    final todaySchedule = widget.controller.getTodayClassSchedule();
+    final todaySchedule = widget.controller.getUpcomingClassSchedule();
 
     return _schedulePanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _panelTitle('Lịch học hôm nay', hasArrow: true),
+          _panelTitle('Lịch học sắp tới', hasArrow: true),
           const SizedBox(height: 12),
           Expanded(
             child: todaySchedule.isEmpty
                 ? const Center(
-              child: Text(
-                'Không có lịch học hôm nay',
-                style: TextStyle(color: Colors.grey, fontSize: 12),
-              ),
-            )
+                    child: Text(
+                      'Không có lịch học sắp tới',
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontSize: AppFontSizes.small,
+                      ),
+                    ),
+                  )
                 : ListView.builder(
-              itemCount: min(todaySchedule.length, 3),
-              padding: EdgeInsets.zero,
-              physics: const NeverScrollableScrollPhysics(),
-              itemBuilder: (context, index) {
-                final item = todaySchedule[index];
+                    itemCount: min(todaySchedule.length, 3),
+                    padding: EdgeInsets.zero,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemBuilder: (context, index) {
+                      final item = todaySchedule[index];
 
-                return _timelineItem(
-                  time: 'Tiết ${item.tietBatDau ?? '--'}',
-                  title: item.tenHocPhan ?? '',
-                  room: item.tenPhong ?? '--',
-                  color: index == 0
-                      ? const Color(0xFF059669)
-                      : index == 1
-                      ? const Color(0xFF3B82F6)
-                      : const Color(0xFFF59E0B),
-                  isLast: index == min(todaySchedule.length, 3) - 1,
-                );
-              },
-            ),
+                      return _timelineItem(
+                        time: 'Tiết ${item.tietBatDau ?? '--'}',
+                        title: item.tenHocPhan ?? '',
+                        room: item.tenPhong ?? '--',
+                        color: index == 0
+                            ? const Color(0xFF059669)
+                            : index == 1
+                            ? const Color(0xFF3B82F6)
+                            : const Color(0xFFF59E0B),
+                        isLast: index == min(todaySchedule.length, 3) - 1,
+                      );
+                    },
+                  ),
           ),
         ],
       ),
@@ -1358,42 +1369,45 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
   }
 
   Widget _buildTodayExamTimeline() {
-    final todayExams = widget.controller.getTodayExamSchedule();
+    final todayExams = widget.controller.getUpcomingExamSchedule();
 
     return _schedulePanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _panelTitle('Lịch thi hôm nay', hasArrow: true),
+          _panelTitle('Lịch thi sắp tới', hasArrow: true),
           const SizedBox(height: 12),
           Expanded(
             child: todayExams.isEmpty
                 ? const Center(
-              child: Text(
-                'Không có lịch thi hôm nay',
-                style: TextStyle(color: Colors.grey, fontSize: 12),
-              ),
-            )
+                    child: Text(
+                      'Không có lịch thi sắp tới',
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontSize: AppFontSizes.small,
+                      ),
+                    ),
+                  )
                 : ListView.builder(
-              itemCount: min(todayExams.length, 3),
-              padding: EdgeInsets.zero,
-              physics: const NeverScrollableScrollPhysics(),
-              itemBuilder: (context, index) {
-                final item = todayExams[index];
+                    itemCount: min(todayExams.length, 3),
+                    padding: EdgeInsets.zero,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemBuilder: (context, index) {
+                      final item = todayExams[index];
 
-                return _timelineItem(
-                  time: item.gioBatDauThi ?? '--:--',
-                  title: item.tenHocPhan ?? '',
-                  room: item.phongThi ?? '--',
-                  color: index == 0
-                      ? const Color(0xFF2563EB)
-                      : index == 1
-                      ? const Color(0xFF7C3AED)
-                      : const Color(0xFFF97316),
-                  isLast: index == min(todayExams.length, 3) - 1,
-                );
-              },
-            ),
+                      return _timelineItem(
+                        time: item.gioBatDauThi ?? '--:--',
+                        title: item.tenHocPhan ?? '',
+                        room: item.phongThi ?? '--',
+                        color: index == 0
+                            ? const Color(0xFF2563EB)
+                            : index == 1
+                            ? const Color(0xFF7C3AED)
+                            : const Color(0xFFF97316),
+                        isLast: index == min(todayExams.length, 3) - 1,
+                      );
+                    },
+                  ),
           ),
         ],
       ),
@@ -1421,35 +1435,34 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _sectionHeader(
-            'Truy cập nhanh',
-            'Ghim',
-            onTap: _showPinDialog,
-          ),
+          _sectionHeader('Truy cập nhanh', 'Ghim', onTap: _showPinDialog),
           const SizedBox(height: 14),
           orderedPinned.isEmpty
               ? const Center(
-            child: Padding(
-              padding: EdgeInsets.symmetric(vertical: 20),
-              child: Text(
-                'Chưa có chức năng nào được ghim.\nNhấn "Ghim" để thêm.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey, fontSize: 13),
-              ),
-            ),
-          )
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 20),
+                    child: Text(
+                      'Chưa có chức năng nào được ghim.\nNhấn "Ghim" để thêm.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontSize: AppFontSizes.mediumSmall,
+                      ),
+                    ),
+                  ),
+                )
               : SizedBox(
-            height: 98,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: orderedPinned.length,
-              padding: EdgeInsets.zero,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
-              itemBuilder: (context, index) {
-                return _functionItem(orderedPinned[index]);
-              },
-            ),
-          ),
+                  height: 98,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: orderedPinned.length,
+                    padding: EdgeInsets.zero,
+                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    itemBuilder: (context, index) {
+                      return _functionItem(orderedPinned[index]);
+                    },
+                  ),
+                ),
         ],
       ),
     );
@@ -1485,7 +1498,10 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                 child: Center(
                   child: Text(
                     'Chưa có thông báo đào tạo',
-                    style: TextStyle(color: Colors.grey, fontSize: 13),
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontSize: AppFontSizes.mediumSmall,
+                    ),
                   ),
                 ),
               );
@@ -1572,7 +1588,9 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
           Obx(() {
             final schoolItems = widget.controller.listTinTuc2;
             final vnuItems = widget.controller.listTinTuc;
-            final count = isSchoolNewsTab ? schoolItems.length : vnuItems.length;
+            final count = isSchoolNewsTab
+                ? schoolItems.length
+                : vnuItems.length;
 
             if (count == 0) {
               return const SizedBox(
@@ -1580,7 +1598,10 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                 child: Center(
                   child: Text(
                     'Chưa có tin tức',
-                    style: TextStyle(color: Colors.grey, fontSize: 13),
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontSize: AppFontSizes.mediumSmall,
+                    ),
                   ),
                 ),
               );
@@ -1615,7 +1636,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                         accentColor: const Color(0xFF059669),
                         onTap: () {
                           Get.to(
-                                () => VcoreNewsDetailView(tinTucModel: tinTuc),
+                            () => VcoreNewsDetailView(tinTucModel: tinTuc),
                           );
                         },
                       ),
@@ -1662,19 +1683,19 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
           borderRadius: BorderRadius.circular(99),
           boxShadow: active
               ? [
-            BoxShadow(
-              color: AppColors.brandGreen.withOpacity(0.12),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ]
+                  BoxShadow(
+                    color: AppColors.brandGreen.withOpacity(0.12),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
               : [],
         ),
         child: Text(
           title,
           style: TextStyle(
             color: active ? AppColors.brandGreen : Colors.grey.shade700,
-            fontSize: 11.5,
+            fontSize: AppFontSizes.font11_5,
             fontWeight: FontWeight.w800,
           ),
         ),
@@ -1701,7 +1722,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               color: AppColors.brandGreen,
-              fontSize: 12,
+              fontSize: AppFontSizes.small,
               fontWeight: FontWeight.w900,
             ),
           ),
@@ -1727,7 +1748,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
         text,
         style: TextStyle(
           color: color,
-          fontSize: 17,
+          fontSize: AppFontSizes.font17,
           fontWeight: FontWeight.w900,
         ),
       ),
@@ -1741,7 +1762,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
           '○',
           style: TextStyle(
             color: AppColors.homeTextSub,
-            fontSize: 12,
+            fontSize: AppFontSizes.small,
           ),
         ),
         const SizedBox(width: 8),
@@ -1752,7 +1773,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               color: AppColors.homeTextSub,
-              fontSize: 12,
+              fontSize: AppFontSizes.small,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -1773,7 +1794,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
         text,
         style: TextStyle(
           color: color,
-          fontSize: 12,
+          fontSize: AppFontSizes.small,
           fontWeight: FontWeight.w800,
         ),
       ),
@@ -1831,7 +1852,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 color: AppColors.homeTextSub,
-                fontSize: 11,
+                fontSize: AppFontSizes.font11,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -1846,7 +1867,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: AppColors.darkNavy,
-                    fontSize: 12,
+                    fontSize: AppFontSizes.small,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -1857,7 +1878,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: AppColors.homeTextSub,
-                    fontSize: 11,
+                    fontSize: AppFontSizes.font11,
                   ),
                 ),
               ],
@@ -1868,11 +1889,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
     );
   }
 
-  Widget _sectionHeader(
-      String title,
-      String action, {
-        VoidCallback? onTap,
-      }) {
+  Widget _sectionHeader(String title, String action, {VoidCallback? onTap}) {
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
@@ -1885,7 +1902,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 color: AppColors.brandGreen,
-                fontSize: 13,
+                fontSize: AppFontSizes.mediumSmall,
                 fontWeight: FontWeight.w900,
               ),
             ),
@@ -1894,7 +1911,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
             action,
             style: const TextStyle(
               color: AppColors.brandGreen,
-              fontSize: 11,
+              fontSize: AppFontSizes.font11,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -1958,7 +1975,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 color: AppColors.darkNavy,
-                fontSize: 11.5,
+                fontSize: AppFontSizes.font11_5,
                 fontWeight: FontWeight.w600,
                 height: 1.25,
               ),
@@ -1983,9 +2000,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
         height: 50,
         decoration: BoxDecoration(
           border: Border(
-            bottom: BorderSide(
-              color: Colors.grey.withOpacity(0.12),
-            ),
+            bottom: BorderSide(color: Colors.grey.withOpacity(0.12)),
           ),
         ),
         child: Row(
@@ -1997,20 +2012,13 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                 color: color.withOpacity(0.10),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(
-                Icons.campaign_rounded,
-                color: color,
-                size: 18,
-              ),
+              child: Icon(Icons.campaign_rounded, color: color, size: 18),
             ),
             const SizedBox(width: 8),
             Container(
               width: 7,
               height: 7,
-              decoration: BoxDecoration(
-                color: color,
-                shape: BoxShape.circle,
-              ),
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -2024,7 +2032,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: AppColors.darkNavy,
-                      fontSize: 11.5,
+                      fontSize: AppFontSizes.font11_5,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
@@ -2035,7 +2043,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: AppColors.homeTextSub,
-                      fontSize: 10.5,
+                      fontSize: AppFontSizes.font10_5,
                     ),
                   ),
                 ],
@@ -2046,14 +2054,10 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
               time,
               style: const TextStyle(
                 color: AppColors.homeTextSub,
-                fontSize: 10.5,
+                fontSize: AppFontSizes.font10_5,
               ),
             ),
-            const Icon(
-              Icons.chevron_right,
-              size: 16,
-              color: Colors.grey,
-            ),
+            const Icon(Icons.chevron_right, size: 16, color: Colors.grey),
           ],
         ),
       ),
@@ -2082,28 +2086,27 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                 ),
                 child: imageUrl.isNotEmpty
                     ? CachedNetworkImage(
-                  imageUrl: imageUrl,
-                  cacheKey: cacheKey,
-                  fit: BoxFit.cover,
-                  httpHeaders: Globals().headerToken(),
-                  placeholder: (_, __) => Container(
-                    color: Colors.grey.shade200,
-                  ),
-                  errorWidget: (_, __, ___) => Container(
-                    color: const Color(0xFFD9E5E2),
-                    child: const Icon(
-                      Icons.article_outlined,
-                      color: Colors.grey,
-                    ),
-                  ),
-                )
+                        imageUrl: imageUrl,
+                        cacheKey: cacheKey,
+                        fit: BoxFit.cover,
+                        httpHeaders: Globals().headerToken(),
+                        placeholder: (_, __) =>
+                            Container(color: Colors.grey.shade200),
+                        errorWidget: (_, __, ___) => Container(
+                          color: const Color(0xFFD9E5E2),
+                          child: const Icon(
+                            Icons.article_outlined,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      )
                     : Container(
-                  color: const Color(0xFFD9E5E2),
-                  child: const Icon(
-                    Icons.article_outlined,
-                    color: Colors.grey,
-                  ),
-                ),
+                        color: const Color(0xFFD9E5E2),
+                        child: const Icon(
+                          Icons.article_outlined,
+                          color: Colors.grey,
+                        ),
+                      ),
               ),
             ),
             Padding(
@@ -2117,7 +2120,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: AppColors.darkNavy,
-                      fontSize: 10.5,
+                      fontSize: AppFontSizes.font10_5,
                       fontWeight: FontWeight.bold,
                       height: 1.2,
                     ),
@@ -2178,9 +2181,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
         decoration: const BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.vertical(
-            top: Radius.circular(24),
-          ),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
         child: SafeArea(
           top: false,
@@ -2221,7 +2222,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                         Text(
                           'Chọn giờ nhắc',
                           style: TextStyle(
-                            fontSize: 17,
+                            fontSize: AppFontSizes.font17,
                             fontWeight: FontWeight.w900,
                             color: AppColors.homeTextTitle,
                           ),
@@ -2230,7 +2231,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                         Text(
                           'Cuộn để chọn giờ và phút.',
                           style: TextStyle(
-                            fontSize: 12.5,
+                            fontSize: AppFontSizes.font12_5,
                             color: AppColors.homeTextSub,
                           ),
                         ),
@@ -2247,9 +2248,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                 decoration: BoxDecoration(
                   color: AppColors.homeCardBg,
                   borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: AppColors.homeCardBorder,
-                  ),
+                  border: Border.all(color: AppColors.homeCardBorder),
                 ),
                 child: CupertinoDatePicker(
                   mode: CupertinoDatePickerMode.time,
@@ -2271,9 +2270,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                       onPressed: () => Get.back(),
                       style: OutlinedButton.styleFrom(
                         minimumSize: const Size.fromHeight(46),
-                        side: const BorderSide(
-                          color: AppColors.homeCardBorder,
-                        ),
+                        side: const BorderSide(color: AppColors.homeCardBorder),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
                         ),
@@ -2309,9 +2306,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                       ),
                       child: const Text(
                         'Chọn giờ',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                        ),
+                        style: TextStyle(fontWeight: FontWeight.w800),
                       ),
                     ),
                   ),
@@ -2331,13 +2326,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
 /*                            WHITE BOX CHUNG                                 */
 /* -------------------------------------------------------------------------- */
 
-enum _BoxVariant {
-  card,
-  panel,
-  chip,
-  icon,
-  newsCard,
-}
+enum _BoxVariant { card, panel, chip, icon, newsCard }
 
 class _WhiteBox extends StatelessWidget {
   const _WhiteBox({
@@ -2462,22 +2451,14 @@ class _OverviewItem {
   final String label;
   final Color color;
 
-  _OverviewItem(
-      this.icon,
-      this.value,
-      this.label,
-      this.color,
-      );
+  _OverviewItem(this.icon, this.value, this.label, this.color);
 }
 
 class _FunctionItem {
   final String label;
   final Color color;
 
-  _FunctionItem(
-      this.label,
-      this.color,
-      );
+  _FunctionItem(this.label, this.color);
 }
 
 class _RadialPinOverlay extends StatefulWidget {
@@ -2522,8 +2503,9 @@ class _RadialPinOverlayState extends State<_RadialPinOverlay>
 
   @override
   Widget build(BuildContext context) {
-    final activeCategoryName =
-    widget.groupedFunctions.keys.elementAt(activeCategoryIndex);
+    final activeCategoryName = widget.groupedFunctions.keys.elementAt(
+      activeCategoryIndex,
+    );
     final items = widget.groupedFunctions[activeCategoryName] ?? [];
 
     return AnimatedBuilder(
@@ -2552,9 +2534,9 @@ class _RadialPinOverlayState extends State<_RadialPinOverlay>
                             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                             children: List.generate(
                               widget.groupedFunctions.length,
-                                  (idx) {
-                                final catName =
-                                widget.groupedFunctions.keys.elementAt(idx);
+                              (idx) {
+                                final catName = widget.groupedFunctions.keys
+                                    .elementAt(idx);
                                 final isActive = activeCategoryIndex == idx;
 
                                 return GestureDetector(
@@ -2586,7 +2568,7 @@ class _RadialPinOverlayState extends State<_RadialPinOverlay>
                                       catName,
                                       style: TextStyle(
                                         color: Colors.white,
-                                        fontSize: 13,
+                                        fontSize: AppFontSizes.mediumSmall,
                                         fontWeight: isActive
                                             ? FontWeight.w800
                                             : FontWeight.w600,
@@ -2654,7 +2636,7 @@ class _RadialPinOverlayState extends State<_RadialPinOverlay>
                                       height: 90,
                                       child: Column(
                                         mainAxisAlignment:
-                                        MainAxisAlignment.center,
+                                            MainAxisAlignment.center,
                                         children: [
                                           Stack(
                                             clipBehavior: Clip.none,
@@ -2668,26 +2650,31 @@ class _RadialPinOverlayState extends State<_RadialPinOverlay>
                                                 decoration: BoxDecoration(
                                                   shape: BoxShape.circle,
                                                   color: isPinned
-                                                      ? item.color
-                                                      .withOpacity(0.2)
+                                                      ? item.color.withOpacity(
+                                                          0.2,
+                                                        )
                                                       : Colors.white
-                                                      .withOpacity(0.12),
+                                                            .withOpacity(0.12),
                                                   border: Border.all(
                                                     color: isPinned
                                                         ? item.color
                                                         : Colors.white
-                                                        .withOpacity(0.25),
+                                                              .withOpacity(
+                                                                0.25,
+                                                              ),
                                                     width: isPinned ? 2.5 : 1.5,
                                                   ),
                                                   boxShadow: isPinned
                                                       ? [
-                                                    BoxShadow(
-                                                      color: item.color
-                                                          .withOpacity(0.4),
-                                                      blurRadius: 12,
-                                                      spreadRadius: 1,
-                                                    )
-                                                  ]
+                                                          BoxShadow(
+                                                            color: item.color
+                                                                .withOpacity(
+                                                                  0.4,
+                                                                ),
+                                                            blurRadius: 12,
+                                                            spreadRadius: 1,
+                                                          ),
+                                                        ]
                                                       : [],
                                                 ),
                                                 child: Center(
@@ -2698,7 +2685,7 @@ class _RadialPinOverlayState extends State<_RadialPinOverlay>
                                                     color: isPinned
                                                         ? item.color
                                                         : Colors.white
-                                                        .withOpacity(0.9),
+                                                              .withOpacity(0.9),
                                                     size: 24,
                                                   ),
                                                 ),
@@ -2711,10 +2698,13 @@ class _RadialPinOverlayState extends State<_RadialPinOverlay>
                                                     width: 18,
                                                     height: 18,
                                                     decoration:
-                                                    const BoxDecoration(
-                                                      color: Color(0xFF07964B),
-                                                      shape: BoxShape.circle,
-                                                    ),
+                                                        const BoxDecoration(
+                                                          color: Color(
+                                                            0xFF07964B,
+                                                          ),
+                                                          shape:
+                                                              BoxShape.circle,
+                                                        ),
                                                     child: const Icon(
                                                       Icons.check,
                                                       color: Colors.white,
@@ -2733,8 +2723,10 @@ class _RadialPinOverlayState extends State<_RadialPinOverlay>
                                             style: TextStyle(
                                               color: isPinned
                                                   ? Colors.white
-                                                  : Colors.white.withOpacity(0.85),
-                                              fontSize: 11,
+                                                  : Colors.white.withOpacity(
+                                                      0.85,
+                                                    ),
+                                              fontSize: AppFontSizes.font11,
                                               fontWeight: isPinned
                                                   ? FontWeight.bold
                                                   : FontWeight.w600,
@@ -2743,7 +2735,7 @@ class _RadialPinOverlayState extends State<_RadialPinOverlay>
                                                   color: Colors.black45,
                                                   offset: Offset(1, 1),
                                                   blurRadius: 2,
-                                                )
+                                                ),
                                               ],
                                             ),
                                           ),
@@ -2790,4 +2782,3 @@ class _RadialPinOverlayState extends State<_RadialPinOverlay>
     );
   }
 }
-

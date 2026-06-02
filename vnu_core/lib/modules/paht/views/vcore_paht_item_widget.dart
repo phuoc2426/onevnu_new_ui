@@ -75,14 +75,14 @@ class _VcorePahtItemWidgetState extends State<VcorePahtItemWidget> {
                   children: [
                     Text(
                       widget.phanAnhHienTruongModel.tieuDePhanAnh ?? '',
-                      style: TextStyles.semiBold.copyWith(fontSize: 15),
+                      style: TextStyles.semiBold.copyWith(fontSize: AppFontSizes.mediumLarge),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
                     spaceHeight(10),
                     Text(
                       widget.phanAnhHienTruongModel.diaDiemPhanAnh ?? '',
-                      style: TextStyles.regular.copyWith(fontSize: 13),
+                      style: TextStyles.regular.copyWith(fontSize: AppFontSizes.mediumSmall),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -91,7 +91,7 @@ class _VcorePahtItemWidgetState extends State<VcorePahtItemWidget> {
                       DateTimeUtils.stringFromDateTime(
                           widget.phanAnhHienTruongModel.thoiGianGui,
                           DateTimeConst.U_MINUTE_AFTER_FORMAT),
-                      style: TextStyles.regular.copyWith(fontSize: 13),
+                      style: TextStyles.regular.copyWith(fontSize: AppFontSizes.mediumSmall),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     )

@@ -23,6 +23,7 @@ import 'package:vnu_core/widgets/buttons_widget.dart';
 import 'package:vnu_core/widgets/progress_hub_widget.dart';
 
 import '../constants/config.dart';
+import 'package:vnu_core/common/app_text_styles.dart';
 
 class VCoreLoginScreenV3 extends StatefulWidget {
   static const int serialTaps = 10;
@@ -431,7 +432,7 @@ class _HeaderText extends StatelessWidget {
           textAlign: TextAlign.center,
           style: TextStyle(
             color: _VCoreLoginScreenV3State.textDark,
-            fontSize: 28,
+            fontSize: AppFontSizes.font28,
             height: 1.15,
             fontWeight: FontWeight.w800,
             letterSpacing: -0.6,
@@ -444,7 +445,7 @@ class _HeaderText extends StatelessWidget {
           textAlign: TextAlign.center,
           style: TextStyle(
             color: _VCoreLoginScreenV3State.textMuted,
-            fontSize: 11,
+            fontSize: AppFontSizes.font11,
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -578,7 +579,7 @@ class _InputField extends StatelessWidget {
         obscureText: obscureText,
         style: const TextStyle(
           color: _VCoreLoginScreenV3State.textDark,
-          fontSize: 15,
+          fontSize: AppFontSizes.mediumLarge,
           fontWeight: FontWeight.w500,
         ),
         decoration: InputDecoration(
@@ -586,7 +587,7 @@ class _InputField extends StatelessWidget {
           hintText: hintText,
           hintStyle: const TextStyle(
             color: _VCoreLoginScreenV3State.hint,
-            fontSize: 15,
+            fontSize: AppFontSizes.mediumLarge,
             fontWeight: FontWeight.w500,
           ),
           prefixIcon: Icon(
@@ -667,7 +668,7 @@ class _LoginOptionsRow extends StatelessWidget {
             'Ghi nhớ đăng nhập',
             style: TextStyle(
               color: _VCoreLoginScreenV3State.textMuted,
-              fontSize: 12,
+              fontSize: AppFontSizes.small,
               height: 1.3,
               fontWeight: FontWeight.w500,
             ),
@@ -678,7 +679,7 @@ class _LoginOptionsRow extends StatelessWidget {
           'Quên mật khẩu?',
           style: TextStyle(
             color: _VCoreLoginScreenV3State.green,
-            fontSize: 13,
+            fontSize: AppFontSizes.mediumSmall,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -727,7 +728,7 @@ class _MainLoginButton extends StatelessWidget {
               'Đăng nhập',
               style: TextStyle(
                 color: Colors.white,
-                fontSize: 16,
+                fontSize: AppFontSizes.large,
                 fontWeight: FontWeight.w800,
               ),
             ),
@@ -805,7 +806,7 @@ class _DividerText extends StatelessWidget {
             'Các tiện ích khác',
             style: TextStyle(
               color: _VCoreLoginScreenV3State.textMuted,
-              fontSize: 13,
+              fontSize: AppFontSizes.mediumSmall,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -901,7 +902,7 @@ class _UtilityButton extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   color: _VCoreLoginScreenV3State.textDark,
-                  fontSize: 12,
+                  fontSize: AppFontSizes.small,
                   fontWeight: FontWeight.w700,
                 ),
               ),

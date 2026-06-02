@@ -476,14 +476,14 @@ class _VCoreLoginScreenState extends State<VCoreLoginScreen> {
       children: [
         const Text(
           'Tài khoản',
-          style: TextStyle(fontSize: 14, color: Color(0xff2A3556)),
+          style: TextStyle(fontSize: AppFontSizes.medium, color: Color(0xff2A3556)),
         ),
         Container(
           margin: const EdgeInsets.only(top: 6),
           decoration: BoxDecoration(
               color: Colors.white, borderRadius: BorderRadius.circular(8)),
           child: TextField(
-            style: const TextStyle(fontSize: 14, color: Color(0xff2A3556)),
+            style: const TextStyle(fontSize: AppFontSizes.medium, color: Color(0xff2A3556)),
             controller: _emailController,
             decoration: const InputDecoration(
               hintText: 'Nhập tài khoản',
@@ -506,14 +506,14 @@ class _VCoreLoginScreenState extends State<VCoreLoginScreen> {
         children: [
           const Text(
             'Mật khẩu',
-            style: TextStyle(fontSize: 14, color: Color(0xff2A3556)),
+            style: TextStyle(fontSize: AppFontSizes.medium, color: Color(0xff2A3556)),
           ),
           Container(
             margin: const EdgeInsets.only(top: 6),
             decoration: BoxDecoration(
                 color: Colors.white, borderRadius: BorderRadius.circular(8)),
             child: TextField(
-              style: const TextStyle(fontSize: 14, color: Color(0xff2A3556)),
+              style: const TextStyle(fontSize: AppFontSizes.medium, color: Color(0xff2A3556)),
               controller: _paswordController,
               obscureText: true,
               decoration: const InputDecoration(

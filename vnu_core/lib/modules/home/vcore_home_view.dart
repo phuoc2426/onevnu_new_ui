@@ -147,7 +147,7 @@ class VcoreHomeView extends GetView<VcoreHomeController> {
                 Text(
                     Globals().thongTinSinhVienModel.value?.hoVaTen ?? '',
                     style: TextStyles.bold
-                        .copyWith(fontSize: 15, color: const Color(0xff181E39))
+                        .copyWith(fontSize: AppFontSizes.mediumLarge, color: const Color(0xff181E39))
                 ),
                 spaceHeight(8),
                 Row(
@@ -156,13 +156,13 @@ class VcoreHomeView extends GetView<VcoreHomeController> {
                     Text(
                       "MSV:",
                       style: TextStyles.regular.copyWith(
-                          color: const Color(0xff637392), fontSize: 13),
+                          color: const Color(0xff637392), fontSize: AppFontSizes.mediumSmall),
                     ),
                     const SizedBox(width: 2),
                     Text(
                         Globals().thongTinSinhVienModel.value?.maSinhVien ?? '',
                         style: TextStyles.regular.copyWith(
-                            color: const Color(0xff2A3556), fontSize: 13)),
+                            color: const Color(0xff2A3556), fontSize: AppFontSizes.mediumSmall)),
                   ],
                 ),
                 spaceHeight(4),
@@ -171,11 +171,11 @@ class VcoreHomeView extends GetView<VcoreHomeController> {
                   children: [
                     Text("Lớp:",
                         style: TextStyles.regular.copyWith(
-                            color: const Color(0xff637392), fontSize: 13)),
+                            color: const Color(0xff637392), fontSize: AppFontSizes.mediumSmall)),
                     const SizedBox(width: 2),
                     Text(Globals().lopDaoTaoModel.value?.ten ?? '',
                         style: TextStyles.regular.copyWith(
-                            color: const Color(0xff2A3556), fontSize: 13)),
+                            color: const Color(0xff2A3556), fontSize: AppFontSizes.mediumSmall)),
                   ],
                 ),
               ],
@@ -390,7 +390,7 @@ class VcoreHomeView extends GetView<VcoreHomeController> {
             child: Text(
               title,
               style: TextStyles.bold.copyWith(
-                fontSize: 15,
+                fontSize: AppFontSizes.mediumLarge,
                 color: const Color(0xff181E39),
               ),
               softWrap: true, // Cho phép xuống dòng
@@ -404,7 +404,7 @@ class VcoreHomeView extends GetView<VcoreHomeController> {
             child: Text(
               'Xem thêm',
               style: TextStyles.regular.copyWith(
-                fontSize: 12,
+                fontSize: AppFontSizes.small,
                 color: const Color(0xff466FFF),
               ),
             ),

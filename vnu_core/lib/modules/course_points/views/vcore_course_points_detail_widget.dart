@@ -65,13 +65,13 @@ class _VcoreCoursePointsDetailWidgetState
           Text(
             'Thông tin điểm môn học',
             style: TextStyles.semiBold
-                .copyWith(fontSize: 18, color: AppColors.darkBlueAccent),
+                .copyWith(fontSize: AppFontSizes.extraLarge, color: AppColors.darkBlueAccent),
           ),
           spaceHeight(30),
           Text(
             widget.diemThiHocKyModel.tenHocPhan ?? '',
             style:
-                TextStyles.semiBold.copyWith(fontSize: 18, color: Colors.black),
+                TextStyles.semiBold.copyWith(fontSize: AppFontSizes.extraLarge, color: Colors.black),
           ),
           spaceHeight(30),
 
@@ -104,7 +104,7 @@ class _VcoreCoursePointsDetailWidgetState
               child: Text(
                 'Đóng',
                 style: TextStyles.semiBold
-                    .copyWith(fontSize: 16, color: AppColors.darkBlueAccent),
+                    .copyWith(fontSize: AppFontSizes.large, color: AppColors.darkBlueAccent),
               ),
             ),
           )
@@ -125,7 +125,7 @@ class _VcoreCoursePointsDetailWidgetState
           Text(
             'Tổng điểm:',
             style:
-                TextStyles.regular.copyWith(fontSize: 18, color: Colors.black),
+                TextStyles.regular.copyWith(fontSize: AppFontSizes.extraLarge, color: Colors.black),
           ),
           const Spacer(),
           Container(
@@ -138,7 +138,7 @@ class _VcoreCoursePointsDetailWidgetState
             child: Center(
               child: Text(widget.diemThiHocKyModel.diemHe10 ?? '',
                   style: TextStyles.regular
-                      .copyWith(fontSize: 15, color: Colors.orange)),
+                      .copyWith(fontSize: AppFontSizes.mediumLarge, color: Colors.orange)),
             ),
           )
         ],
@@ -160,7 +160,7 @@ class _VcoreCoursePointsDetailWidgetState
               Text(
                 diemHocPhan.loaiDiemHocPhan ?? '',
                 style: TextStyles.semiBold
-                    .copyWith(fontSize: 15, color: Colors.black),
+                    .copyWith(fontSize: AppFontSizes.mediumLarge, color: Colors.black),
               ),
             ],
           ),
@@ -187,7 +187,7 @@ class _VcoreCoursePointsDetailWidgetState
           //     Text(
           //       'Ghi chú:',
           //       style: TextStyles.regular
-          //           .copyWith(fontSize: 15, color: const Color(0xff637392)),
+          //           .copyWith(fontSize: AppFontSizes.mediumLarge, color: const Color(0xff637392)),
           //     ),
           //     spaceWidth(20),
           //     const Expanded(
@@ -206,13 +206,13 @@ class _VcoreCoursePointsDetailWidgetState
         Text(
           title,
           style: TextStyles.regular
-              .copyWith(fontSize: 15, color: AppColors.slateText),
+              .copyWith(fontSize: AppFontSizes.mediumLarge, color: AppColors.slateText),
         ),
         spaceWidth(2),
         Text(
           content,
           style: TextStyles.regular
-              .copyWith(color: AppColors.darkBlueAccent, fontSize: 16),
+              .copyWith(color: AppColors.darkBlueAccent, fontSize: AppFontSizes.large),
         ),
       ],
     );

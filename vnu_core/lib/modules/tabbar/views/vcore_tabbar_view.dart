@@ -14,6 +14,7 @@ import '../../home/vcore_home_view_v3.dart';
 import '../../news/views/vcore_news_view_v3.dart';
 import '../../profile/views/vcore_profile_view.dart';
 import '../../system_news/views/vcore_system_news_view.dart';
+import 'package:vnu_core/common/app_text_styles.dart';
 
 class VcoreTabbarView extends StatefulWidget {
   const VcoreTabbarView({super.key});
@@ -189,7 +190,7 @@ class _VcoreTabbarViewState extends State<VcoreTabbarView> {
               icon: const Icon(Icons.home_rounded, size: 22),
               title: const Text(
                 "Trang chủ",
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                style: TextStyle(fontSize: AppFontSizes.small, fontWeight: FontWeight.bold),
               ),
               selectedColor: const Color(0xFF16A34A),
             ),
@@ -198,7 +199,7 @@ class _VcoreTabbarViewState extends State<VcoreTabbarView> {
               icon: const Icon(Icons.newspaper, size: 22),
               title: const Text(
                 "Tin tức",
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                style: TextStyle(fontSize: AppFontSizes.small, fontWeight: FontWeight.bold),
               ),
               selectedColor: const Color(0xFFEA580C),
             ),
@@ -206,7 +207,7 @@ class _VcoreTabbarViewState extends State<VcoreTabbarView> {
               icon: const Icon(Icons.campaign, size: 22),
               title: const Text(
                 "Tin hệ thống",
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                style: TextStyle(fontSize: AppFontSizes.small, fontWeight: FontWeight.bold),
               ),
               selectedColor: const Color(0xFF0284C7),
             ),
@@ -214,7 +215,7 @@ class _VcoreTabbarViewState extends State<VcoreTabbarView> {
               icon: const Icon(Icons.person_outline_rounded, size: 22),
               title: const Text(
                 "Cá nhân",
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                style: TextStyle(fontSize: AppFontSizes.small, fontWeight: FontWeight.bold),
               ),
               selectedColor: const Color(0xFF7C3AED),
             ),

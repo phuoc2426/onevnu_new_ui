@@ -81,14 +81,14 @@ class _VcoreBookmarkItemWidgetState extends State<VcoreBookmarkItemWidget> {
                     widget.lienKetDanhDauModel.tenLienKet ?? '',
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyles.regular.copyWith(fontSize: 14),
+                    style: TextStyles.regular.copyWith(fontSize: AppFontSizes.medium),
                   ),
                   Text(
                     url,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyles.regular
-                        .copyWith(fontSize: 14, color: const Color(0xff003392)),
+                        .copyWith(fontSize: AppFontSizes.medium, color: const Color(0xff003392)),
                   )
                 ],
               ),

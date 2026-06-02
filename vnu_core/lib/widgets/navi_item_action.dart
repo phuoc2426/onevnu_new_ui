@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:vnu_core/themes/app_theme.dart';
+import 'package:vnu_core/common/app_text_styles.dart';
 
 class NaviItemAction extends StatelessWidget {
   final Widget icon;
@@ -35,7 +36,7 @@ class NaviItemAction extends StatelessWidget {
                           countInt < 100 ? countInt.toString() : '99+',
                           textAlign: TextAlign.center,
                           style: AppTheme.body2.copyWith(
-                              fontSize: 10,
+                              fontSize: AppFontSizes.extraSmall,
                               fontWeight: FontWeight.normal,
                               color: Colors.white),
                         ),

@@ -204,7 +204,7 @@ class _VcoreHomeNewsTabWidgetV2State extends State<VcoreHomeNewsTabWidgetV2>
               Text(
                 'Tin tức',
                 style: TextStyles.semiBold.copyWith(
-                  fontSize: 16,
+                  fontSize: AppFontSizes.large,
                   color: AppColors.textPrimary,
                   letterSpacing: 0.2,
                 ),
@@ -265,7 +265,7 @@ class _VcoreHomeNewsTabWidgetV2State extends State<VcoreHomeNewsTabWidgetV2>
               'Chưa có tin tức',
               style: TextStyles.regular.copyWith(
                 color: AppColors.textSecondary.withOpacity(0.6),
-                fontSize: 13,
+                fontSize: AppFontSizes.mediumSmall,
               ),
             ),
           ],
@@ -328,11 +328,11 @@ class _RiotTabBar extends StatelessWidget {
                     duration: const Duration(milliseconds: 200),
                     style: active
                         ? TextStyles.semiBold.copyWith(
-                            fontSize: 13,
+                            fontSize: AppFontSizes.mediumSmall,
                             color: Colors.white,
                           )
                         : TextStyles.regular.copyWith(
-                            fontSize: 13,
+                            fontSize: AppFontSizes.mediumSmall,
                             color: AppColors.textSecondary,
                           ),
                     child: Center(
@@ -575,7 +575,7 @@ class _NewsCard extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyles.semiBold.copyWith(
-                    fontSize: 12.8,
+                    fontSize: AppFontSizes.font12_8,
                     color: palette.textPrimary,
                     height: 1.35,
                   ),
@@ -742,7 +742,7 @@ class VcoreHomeViewV2 extends GetView<VcoreHomeController> {
                     Text(
                       Globals().thongTinSinhVienModel.value?.hoVaTen ?? '',
                       style: TextStyles.bold.copyWith(
-                        fontSize: 16,
+                        fontSize: AppFontSizes.large,
                         color: palette.textPrimary,
                       ),
                       maxLines: 1,
@@ -800,7 +800,7 @@ class VcoreHomeViewV2 extends GetView<VcoreHomeController> {
           '$label: ',
           style: TextStyles.regular.copyWith(
             color: p.textSecondary,
-            fontSize: 12,
+            fontSize: AppFontSizes.small,
           ),
         ),
         Flexible(
@@ -808,7 +808,7 @@ class VcoreHomeViewV2 extends GetView<VcoreHomeController> {
             value,
             style: TextStyles.semiBold.copyWith(
               color: p.textPrimary,
-              fontSize: 12,
+              fontSize: AppFontSizes.small,
             ),
             overflow: TextOverflow.ellipsis,
           ),
@@ -919,7 +919,7 @@ class VcoreHomeViewV2 extends GetView<VcoreHomeController> {
             child: Text(
               title,
               style: TextStyles.bold.copyWith(
-                fontSize: 15,
+                fontSize: AppFontSizes.mediumLarge,
                 color: AppColors.textTitle,
               ),
               softWrap: true,
@@ -933,7 +933,7 @@ class VcoreHomeViewV2 extends GetView<VcoreHomeController> {
                   child: Text(
                     'Xem thêm',
                     style: TextStyles.regular.copyWith(
-                      fontSize: 12,
+                      fontSize: AppFontSizes.small,
                       color: AppColors.secondary,
                     ),
                   ),
@@ -1043,7 +1043,7 @@ class _HomeScheduleCardsState extends State<_HomeScheduleCards> {
                         Text(
                           'Lịch học',
                           style: TextStyles.bold.copyWith(
-                            fontSize: 13,
+                            fontSize: AppFontSizes.mediumSmall,
                             color: classPalette.textPrimary,
                           ),
                         ),
@@ -1085,7 +1085,7 @@ class _HomeScheduleCardsState extends State<_HomeScheduleCards> {
                         Text(
                           'Lịch thi',
                           style: TextStyles.bold.copyWith(
-                            fontSize: 13,
+                            fontSize: AppFontSizes.mediumSmall,
                             color: examPalette.textPrimary,
                           ),
                         ),
@@ -1111,7 +1111,7 @@ class _HomeScheduleCardsState extends State<_HomeScheduleCards> {
         Text(
           label,
           style: TextStyles.medium.copyWith(
-            fontSize: 11,
+            fontSize: AppFontSizes.font11,
             color: p.textSecondary,
           ),
         ),
@@ -1120,7 +1120,7 @@ class _HomeScheduleCardsState extends State<_HomeScheduleCards> {
           Text(
             classList.first.tenHocPhan ?? '',
             style: TextStyles.semiBold.copyWith(
-              fontSize: 12.5,
+              fontSize: AppFontSizes.font12_5,
               color: p.textPrimary,
             ),
             maxLines: 1,
@@ -1130,7 +1130,7 @@ class _HomeScheduleCardsState extends State<_HomeScheduleCards> {
           Text(
             'Tiết ${classList.first.tietBatDau ?? ''}-${classList.first.tietKetThuc ?? ''} | ${classList.first.tenPhong ?? ''}',
             style: TextStyles.regular.copyWith(
-              fontSize: 10.5,
+              fontSize: AppFontSizes.font10_5,
               color: p.textSecondary,
             ),
             maxLines: 1,
@@ -1140,7 +1140,7 @@ class _HomeScheduleCardsState extends State<_HomeScheduleCards> {
           Text(
             '${classList.length} môn',
             style: TextStyles.bold.copyWith(
-              fontSize: 11,
+              fontSize: AppFontSizes.font11,
               color: p.textPrimary,
             ),
           ),
@@ -1150,7 +1150,7 @@ class _HomeScheduleCardsState extends State<_HomeScheduleCards> {
               child: Text(
                 'Không có lịch',
                 style: TextStyles.regular.copyWith(
-                  fontSize: 11,
+                  fontSize: AppFontSizes.font11,
                   color: p.textSecondary,
                 ),
               ),
@@ -1168,7 +1168,7 @@ class _HomeScheduleCardsState extends State<_HomeScheduleCards> {
           Text(
             exams.first.tenHocPhan ?? '',
             style: TextStyles.semiBold.copyWith(
-              fontSize: 12.5,
+              fontSize: AppFontSizes.font12_5,
               color: p.textPrimary,
             ),
             maxLines: 1,
@@ -1178,7 +1178,7 @@ class _HomeScheduleCardsState extends State<_HomeScheduleCards> {
           Text(
             '${exams.first.ngayThi ?? ''} | ${exams.first.gioBatDauThi ?? ''}',
             style: TextStyles.regular.copyWith(
-              fontSize: 10.5,
+              fontSize: AppFontSizes.font10_5,
               color: p.textSecondary,
             ),
             maxLines: 1,
@@ -1188,7 +1188,7 @@ class _HomeScheduleCardsState extends State<_HomeScheduleCards> {
           Text(
             exams.first.phongThi ?? '',
             style: TextStyles.regular.copyWith(
-              fontSize: 10.5,
+              fontSize: AppFontSizes.font10_5,
               color: p.textSecondary,
             ),
             maxLines: 1,
@@ -1198,7 +1198,7 @@ class _HomeScheduleCardsState extends State<_HomeScheduleCards> {
           Text(
             '${exams.length} môn sắp thi',
             style: TextStyles.bold.copyWith(
-              fontSize: 11,
+              fontSize: AppFontSizes.font11,
               color: p.textPrimary,
             ),
           ),
@@ -1208,7 +1208,7 @@ class _HomeScheduleCardsState extends State<_HomeScheduleCards> {
               child: Text(
                 'Không có lịch thi',
                 style: TextStyles.regular.copyWith(
-                  fontSize: 11,
+                  fontSize: AppFontSizes.font11,
                   color: p.textSecondary,
                 ),
               ),
@@ -1303,7 +1303,7 @@ class _DayScheduleDetailSheet extends StatelessWidget {
                 Text(
                   'Lịch $dayLabel',
                   style: TextStyles.bold.copyWith(
-                    fontSize: 18,
+                    fontSize: AppFontSizes.extraLarge,
                     color: AppColors.textTitle,
                   ),
                 ),
@@ -1318,7 +1318,7 @@ class _DayScheduleDetailSheet extends StatelessWidget {
                   child: Text(
                     '$totalCount môn',
                     style: TextStyles.medium.copyWith(
-                      fontSize: 12,
+                      fontSize: AppFontSizes.small,
                       color: AppColors.primaryDark,
                     ),
                   ),
@@ -1341,7 +1341,7 @@ class _DayScheduleDetailSheet extends StatelessWidget {
                           Text(
                             'Không có lịch $dayLabel',
                             style: TextStyles.regular.copyWith(
-                              fontSize: 14,
+                              fontSize: AppFontSizes.medium,
                               color: AppColors.textSecondary,
                             ),
                           ),
@@ -1382,7 +1382,7 @@ class _DayScheduleDetailSheet extends StatelessWidget {
           Text(
             title,
             style: TextStyles.bold.copyWith(
-              fontSize: 14,
+              fontSize: AppFontSizes.medium,
               color: color,
             ),
           ),
@@ -1406,7 +1406,7 @@ class _DayScheduleDetailSheet extends StatelessWidget {
           Text(
             exam.tenHocPhan ?? '',
             style: TextStyles.medium.copyWith(
-              fontSize: 13,
+              fontSize: AppFontSizes.mediumSmall,
               color: AppColors.textTitle,
             ),
           ),
@@ -1419,7 +1419,7 @@ class _DayScheduleDetailSheet extends StatelessWidget {
               Text(
                 '${exam.ngayThi ?? ''} | ${exam.gioBatDauThi ?? ''} | ${exam.thoiLuong ?? ''} phút',
                 style: TextStyles.regular.copyWith(
-                  fontSize: 11,
+                  fontSize: AppFontSizes.font11,
                   color: AppColors.textSecondary,
                 ),
               ),
@@ -1434,7 +1434,7 @@ class _DayScheduleDetailSheet extends StatelessWidget {
                 child: Text(
                   '${exam.phongThi ?? ''} - ${exam.diaChi ?? ''}',
                   style: TextStyles.regular.copyWith(
-                    fontSize: 11,
+                    fontSize: AppFontSizes.font11,
                     color: AppColors.textSecondary,
                   ),
                   overflow: TextOverflow.ellipsis,
@@ -1452,7 +1452,7 @@ class _DayScheduleDetailSheet extends StatelessWidget {
                 Text(
                   exam.hinhThucThi!,
                   style: TextStyles.regular.copyWith(
-                    fontSize: 11,
+                    fontSize: AppFontSizes.font11,
                     color: AppColors.textSecondary,
                   ),
                 ),
@@ -1479,7 +1479,7 @@ class _DayScheduleDetailSheet extends StatelessWidget {
           Text(
             cls.tenHocPhan ?? '',
             style: TextStyles.medium.copyWith(
-              fontSize: 13,
+              fontSize: AppFontSizes.mediumSmall,
               color: AppColors.textTitle,
             ),
           ),
@@ -1491,7 +1491,7 @@ class _DayScheduleDetailSheet extends StatelessWidget {
               Text(
                 'Tiết ${cls.tietBatDau ?? ''} - ${cls.tietKetThuc ?? ''}',
                 style: TextStyles.regular.copyWith(
-                  fontSize: 11,
+                  fontSize: AppFontSizes.font11,
                   color: AppColors.textSecondary,
                 ),
               ),
@@ -1506,7 +1506,7 @@ class _DayScheduleDetailSheet extends StatelessWidget {
                 child: Text(
                   '${cls.tenPhong ?? ''} - ${cls.diaChi ?? ''}',
                   style: TextStyles.regular.copyWith(
-                    fontSize: 11,
+                    fontSize: AppFontSizes.font11,
                     color: AppColors.textSecondary,
                   ),
                   overflow: TextOverflow.ellipsis,
@@ -1524,7 +1524,7 @@ class _DayScheduleDetailSheet extends StatelessWidget {
                   child: Text(
                     cls.giangVien1!,
                     style: TextStyles.regular.copyWith(
-                      fontSize: 11,
+                      fontSize: AppFontSizes.font11,
                       color: AppColors.textSecondary,
                     ),
                     overflow: TextOverflow.ellipsis,

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../common/hoc_bong_date_utils.dart';
 import '../common/hoc_bong_status.dart';
 import '../models/hoc_bong_models.dart';
+import 'package:vnu_core/common/app_text_styles.dart';
 
 class HocBongApplicationTimeline extends StatelessWidget {
   final List<HocBongHistoryModel> history;
@@ -28,7 +29,7 @@ class HocBongApplicationTimeline extends StatelessWidget {
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(item.hanhDong ?? HocBongStatusText.application(item.trangThaiMoi), style: const TextStyle(fontWeight: FontWeight.w700)),
                   if ((item.noiDung ?? '').isNotEmpty) Text(item.noiDung!),
-                  Text(HocBongDateUtils.formatDateTime(item.created), style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                  Text(HocBongDateUtils.formatDateTime(item.created), style: TextStyle(color: Colors.grey.shade600, fontSize: AppFontSizes.small)),
                 ]),
               ),
             ],

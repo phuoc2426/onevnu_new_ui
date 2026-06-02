@@ -143,7 +143,7 @@ class _VcoreNotifyDetailViewV3State extends State<VcoreNotifyDetailViewV3> {
                             'THÔNG BÁO',
                             style: TextStyle(
                               color: AppColors.primary,
-                              fontSize: 11,
+                              fontSize: AppFontSizes.font11,
                               fontWeight: FontWeight.bold,
                               letterSpacing: 1.5,
                             ),
@@ -154,7 +154,7 @@ class _VcoreNotifyDetailViewV3State extends State<VcoreNotifyDetailViewV3> {
                           widget.title,
                           textAlign: TextAlign.center,
                           style: TextStyles.semiBold.copyWith(
-                            fontSize: 18,
+                            fontSize: AppFontSizes.extraLarge,
                             color: AppColors.darkNavy,
                             height: 1.35,
                           ),
@@ -193,7 +193,7 @@ class _VcoreNotifyDetailViewV3State extends State<VcoreNotifyDetailViewV3> {
                                     widget.date!.toLocal(),
                                     DateTimeConst.U_SECOND_FORMAT,
                                   ),
-                                  style: const TextStyle(fontSize: 12, color: Color(0xff4A5568)),
+                                  style: const TextStyle(fontSize: AppFontSizes.small, color: Color(0xff4A5568)),
                                 ),
                               ],
                             ),
@@ -206,7 +206,7 @@ class _VcoreNotifyDetailViewV3State extends State<VcoreNotifyDetailViewV3> {
                                 Flexible(
                                   child: Text(
                                     widget.sender!,
-                                    style: const TextStyle(fontSize: 12, color: Color(0xff4A5568)),
+                                    style: const TextStyle(fontSize: AppFontSizes.small, color: Color(0xff4A5568)),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
@@ -221,7 +221,7 @@ class _VcoreNotifyDetailViewV3State extends State<VcoreNotifyDetailViewV3> {
                                 spaceWidth(6),
                                 Text(
                                   widget.category!,
-                                  style: const TextStyle(fontSize: 12, color: Color(0xff4A5568)),
+                                  style: const TextStyle(fontSize: AppFontSizes.small, color: Color(0xff4A5568)),
                                 ),
                               ],
                             ),
@@ -303,7 +303,7 @@ class _VcoreNotifyDetailViewV3State extends State<VcoreNotifyDetailViewV3> {
                         const Text(
                           'Tài liệu đính kèm:',
                           style: TextStyle(
-                            fontSize: 13,
+                            fontSize: AppFontSizes.mediumSmall,
                             fontWeight: FontWeight.bold,
                             color: Color(0xff4A5568),
                           ),
@@ -334,7 +334,7 @@ class _VcoreNotifyDetailViewV3State extends State<VcoreNotifyDetailViewV3> {
                                       child: Text(
                                         fileName,
                                         style: const TextStyle(
-                                          fontSize: 13,
+                                          fontSize: AppFontSizes.mediumSmall,
                                           fontWeight: FontWeight.w600,
                                           color: Color(0xff003392),
                                         ),
@@ -390,7 +390,7 @@ class _VcoreNotifyDetailViewV3State extends State<VcoreNotifyDetailViewV3> {
                                     style: TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.bold,
-                                      fontSize: 14.5,
+                                      fontSize: AppFontSizes.font14_5,
                                     ),
                                   ),
                                 ],

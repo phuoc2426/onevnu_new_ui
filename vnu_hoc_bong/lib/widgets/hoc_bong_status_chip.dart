@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../common/hoc_bong_status.dart';
+import 'package:vnu_core/common/app_text_styles.dart';
 
 class HocBongStatusChip extends StatelessWidget {
   final String? status;
@@ -31,7 +32,7 @@ class HocBongStatusChip extends StatelessWidget {
           const SizedBox(width: 4),
           Text(
             label,
-            style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600),
+            style: TextStyle(color: color, fontSize: AppFontSizes.small, fontWeight: FontWeight.w600),
           ),
         ],
       ),

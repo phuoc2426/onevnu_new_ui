@@ -160,7 +160,7 @@ class VcoreOneDoorView extends GetView<VcoreOneDoorController> {
           Text(
             thutuc.tenThuTuc ?? '',
             style: TextStyles.regular
-                .copyWith(fontSize: 16, color: const Color(0xff003392)),
+                .copyWith(fontSize: AppFontSizes.large, color: const Color(0xff003392)),
           ),
         ],
       ),

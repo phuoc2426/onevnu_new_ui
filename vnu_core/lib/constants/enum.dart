@@ -29,7 +29,8 @@ enum HomeService {
   DiemMonHoc,
   HuongDanSuDung,
   PhanAnhHienTruong,
-  TheSinhVien
+  TheSinhVien,
+  DongBo,
 }
 
 extension HomeServiceExtension on HomeService {
@@ -59,6 +60,8 @@ extension HomeServiceExtension on HomeService {
         return 'PhanAnhHienTruong';
       case HomeService.TheSinhVien:
         return 'TheSinhVien';
+      case HomeService.DongBo:
+        return 'DongBo';
     }
   }
 
@@ -88,6 +91,8 @@ extension HomeServiceExtension on HomeService {
         return 'Phản ánh hiện trường';
       case HomeService.TheSinhVien:
         return 'Thẻ sinh viên';
+      case HomeService.DongBo:
+        return 'Đồng bộ';
     }
   }
 
@@ -117,6 +122,8 @@ extension HomeServiceExtension on HomeService {
         return 'ic_paht.svg';
       case HomeService.TheSinhVien:
         return 'ic_the_sinh_vien.svg';
+      case HomeService.DongBo:
+        return 'ic_menu_cloud.svg';
     }
   }
 }
@@ -133,7 +140,7 @@ enum LoaiThongBao {
   PhongTro,
   HuongDanSuDung,
   ThuTucHanhChinh,
-  TraLoiPhanAnh
+  TraLoiPhanAnh,
 }
 
 // extension LoaiThongBaoExtension on LoaiThongBao {

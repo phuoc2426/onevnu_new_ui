@@ -67,8 +67,8 @@ class _VcoreNotifyViewV3State extends State<VcoreNotifyViewV3>
                     indicatorPadding: const EdgeInsets.all(3),
                     labelColor: Colors.white,
                     unselectedLabelColor: const Color(0xff637392),
-                    labelStyle: TextStyles.semiBold.copyWith(fontSize: 13),
-                    unselectedLabelStyle: TextStyles.regular.copyWith(fontSize: 13),
+                    labelStyle: TextStyles.semiBold.copyWith(fontSize: AppFontSizes.mediumSmall),
+                    unselectedLabelStyle: TextStyles.regular.copyWith(fontSize: AppFontSizes.mediumSmall),
                     dividerColor: Colors.transparent,
                     tabs: [
                       Tab(text: sysTabLabel),
@@ -179,7 +179,7 @@ class _VcoreNotifyViewV3State extends State<VcoreNotifyViewV3>
             message,
             style: TextStyles.regular.copyWith(
               color: const Color(0xff879ABF),
-              fontSize: 14,
+              fontSize: AppFontSizes.medium,
             ),
           ),
         ],

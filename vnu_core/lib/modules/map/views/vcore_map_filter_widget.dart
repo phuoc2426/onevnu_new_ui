@@ -47,7 +47,7 @@ class _VcoreMapFilterWidgetState extends State<VcoreMapFilterWidget> {
             child: Text(
               'Lọc theo khu vực',
               style: TextStyles.bold
-                  .copyWith(color: const Color(0xff003392), fontSize: 15),
+                  .copyWith(color: const Color(0xff003392), fontSize: AppFontSizes.mediumLarge),
             ),
           ),
           spaceHeight(20),
@@ -61,7 +61,7 @@ class _VcoreMapFilterWidgetState extends State<VcoreMapFilterWidget> {
                   Text(
                     'Tìm kiếm theo khu vực khác',
                     style: TextStyles.semiBold
-                        .copyWith(color: const Color(0xff181E39), fontSize: 15),
+                        .copyWith(color: const Color(0xff181E39), fontSize: AppFontSizes.mediumLarge),
                   ),
                   spaceHeight(20),
                   ListView.separated(
@@ -100,7 +100,7 @@ class _VcoreMapFilterWidgetState extends State<VcoreMapFilterWidget> {
                           Text(
                             'Thay đổi khu vực hiển thị mặc định',
                             style: TextStyles.semiBold.copyWith(
-                                color: const Color(0xff181E39), fontSize: 15),
+                                color: const Color(0xff181E39), fontSize: AppFontSizes.mediumLarge),
                           ),
                           spaceHeight(20),
                           ListView.separated(

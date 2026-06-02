@@ -2,54 +2,164 @@ from pathlib import Path
 from datetime import datetime
 
 # =========================================================
-# CẤU HÌNH
+# CONFIG
 # =========================================================
 
-# Folder gốc cần quét
-ROOT_DIR = Path(r"D:\Data\App\ONEVNU\git\iworkspace_mobile_onevnu-master")
+ROOT_DIR = Path(
+    r"D:\Data\App\ONEVNU\git\iworkspace_mobile_onevnu-master"
+)
 
-# File output
 OUTPUT_FILE = Path("CODE_BUNDLE.txt")
 
-# Có đọc file trong folder con không
 RECURSIVE_SCAN = True
-
-# Giới hạn số dòng mỗi file
-# None = không giới hạn
 MAX_LINES_PER_FILE = None
 
-# Danh sách extension cần gom
-# Chỉ cần thêm/xóa extension tại đây
+WRITE_LINE_NUMBER = True
+WRITE_FULL_PATH = True
+
+# =========================================================
+# MODE
+# =========================================================
+
+# True = chỉ lấy file cố định
+FIXED_FILE_MODE = True
+
+# =========================================================
+# FILE EXTENSIONS
+# =========================================================
+
 ALLOWED_EXTENSIONS = {
-    ".php",
-    ".js",
-    ".ts",
-    ".jsx",
-    ".tsx",
     ".java",
     ".kt",
-    ".dart",
-    ".py",
-    ".cs",
-    ".cpp",
-    ".c",
-    ".h",
-    ".hpp",
+    ".ts",
     ".html",
-    ".css",
-    ".scss",
     ".json",
-    ".xml",
-    ".sql",
     ".yml",
     ".yaml",
-    ".md",
-    ".example",
-    ".template",
-    ".env"
+    ".properties",
+    ".sql",
 }
 
-# Folder bỏ qua
+# =========================================================
+# FIXED FILE NAMES
+# =========================================================
+
+# tên file exact match
+FIXED_FILE_NAMES = {
+    "pom.xml",
+    "build.gradle",
+    "settings.gradle",
+
+    "package.json",
+    "angular.json",
+    "tsconfig.json",
+
+    "application.yml",
+    "application.yaml",
+    "application.properties",
+
+    "app.module.ts",
+    "app-routing.module.ts",
+    "app.routes.ts",
+    "app.config.ts",
+    "dormitory_registration_cubit.dart",
+"dormitory_registration_state.dart",
+"nt_register_cubit.dart",
+"nt_register_state.dart",
+
+"dormitory_registration_repository.dart",
+"dormitory_registration_api.dart",
+
+"registration_payload_model.dart",
+"my_registration_model.dart",
+"uploaded_attachment_model.dart",
+"registration_period_model.dart",
+"dormitory_model.dart",
+"room_type_model.dart",
+"priority_object_model.dart",
+"registration_history_model.dart",
+
+"dr_wizard_flow.dart",
+"dr_step1_period_screen.dart",
+"dr_step2_dormitory_screen.dart",
+"dr_step3_info_screen.dart",
+"dr_step4_review_screen.dart",
+"dr_my_registration_screen.dart",
+"dr_history_bottom_sheet.dart",
+"nt_register_process_screen.dart",
+
+"nt_register_image_widget.dart",
+"nt_register_cmnd_widget.dart",
+"nt_file_da_upload_widget.dart",
+"nt_register_price_widget.dart",
+"nt_register_payment_info.dart",
+"nt_register_infrastructure_widget.dart",
+"nt_custom_dropdown.dart",
+"nt_dropbox_widget.dart",
+"nt_container_dropbox_widget.dart",
+"nt_noitru_item_widget.dart",
+
+"nt_boading_register_view.dart",
+"nt_boarding_register_controller.dart",
+"nt_boarding_controller.dart",
+
+"vnu_noi_tru.dart"
+}
+
+# =========================================================
+# FILE PATTERNS (logic architecture)
+# =========================================================
+
+# suffix/pattern match
+FIXED_FILE_PATTERNS = [
+   "dormitory_registration_cubit.dart",
+"dormitory_registration_state.dart",
+"nt_register_cubit.dart",
+"nt_register_state.dart",
+
+"dormitory_registration_repository.dart",
+"dormitory_registration_api.dart",
+
+"registration_payload_model.dart",
+"my_registration_model.dart",
+"uploaded_attachment_model.dart",
+"registration_period_model.dart",
+"dormitory_model.dart",
+"room_type_model.dart",
+"priority_object_model.dart",
+"registration_history_model.dart",
+
+"dr_wizard_flow.dart",
+"dr_step1_period_screen.dart",
+"dr_step2_dormitory_screen.dart",
+"dr_step3_info_screen.dart",
+"dr_step4_review_screen.dart",
+"dr_my_registration_screen.dart",
+"dr_history_bottom_sheet.dart",
+"nt_register_process_screen.dart",
+
+"nt_register_image_widget.dart",
+"nt_register_cmnd_widget.dart",
+"nt_file_da_upload_widget.dart",
+"nt_register_price_widget.dart",
+"nt_register_payment_info.dart",
+"nt_register_infrastructure_widget.dart",
+"nt_custom_dropdown.dart",
+"nt_dropbox_widget.dart",
+"nt_container_dropbox_widget.dart",
+"nt_noitru_item_widget.dart",
+
+"nt_boading_register_view.dart",
+"nt_boarding_register_controller.dart",
+"nt_boarding_controller.dart",
+
+"vnu_noi_tru.dart"
+]
+
+# =========================================================
+# EXCLUDE DIRS
+# =========================================================
+
 EXCLUDE_DIRS = {
     ".git",
     ".idea",
@@ -73,28 +183,40 @@ EXCLUDE_DIRS = {
     "uploads",
 }
 
-# Có ghi số dòng không
-WRITE_LINE_NUMBER = True
-
-# Có ghi path đầy đủ không
-WRITE_FULL_PATH = True
-
-
 # =========================================================
-# HÀM HỖ TRỢ
+# HELPERS
 # =========================================================
 
 def should_exclude(path: Path) -> bool:
-    """
-    Kiểm tra path có nằm trong folder cần exclude không
-    """
     return any(part in EXCLUDE_DIRS for part in path.parts)
 
 
-def read_text_safely(file_path: Path) -> list[str]:
+def is_allowed_fixed_file(path: Path) -> bool:
     """
-    Đọc file với nhiều encoding
+    chỉ lấy file logic quan trọng
     """
+
+    filename = path.name
+    filename_lower = filename.lower()
+
+    # exact file name
+    if filename in FIXED_FILE_NAMES:
+        return True
+
+    # extension check
+    if path.suffix.lower() not in ALLOWED_EXTENSIONS:
+        return False
+
+    # pattern match
+    for pattern in FIXED_FILE_PATTERNS:
+        if filename_lower.endswith(pattern.lower()):
+            return True
+
+    return False
+
+
+def read_text_safely(file_path: Path):
+
     encodings = [
         "utf-8",
         "utf-8-sig",
@@ -117,7 +239,6 @@ def read_text_safely(file_path: Path) -> list[str]:
         except Exception as e:
             return [f"[ERROR] {e}\n"]
 
-    # fallback
     try:
         with file_path.open(
             "r",
@@ -131,19 +252,18 @@ def read_text_safely(file_path: Path) -> list[str]:
 
 
 # =========================================================
-# QUÉT FILE
+# SCAN FILES
 # =========================================================
 
-def scan_files() -> list[Path]:
-    """
-    Quét toàn bộ file code
-    """
+def scan_files():
+
     files = []
 
-    if RECURSIVE_SCAN:
-        iterator = ROOT_DIR.rglob("*")
-    else:
-        iterator = ROOT_DIR.glob("*")
+    iterator = (
+        ROOT_DIR.rglob("*")
+        if RECURSIVE_SCAN
+        else ROOT_DIR.glob("*")
+    )
 
     for path in iterator:
 
@@ -153,8 +273,12 @@ def scan_files() -> list[Path]:
         if should_exclude(path):
             continue
 
-        if path.suffix.lower() not in ALLOWED_EXTENSIONS:
-            continue
+        if FIXED_FILE_MODE:
+            if not is_allowed_fixed_file(path):
+                continue
+        else:
+            if path.suffix.lower() not in ALLOWED_EXTENSIONS:
+                continue
 
         files.append(path)
 
@@ -162,10 +286,10 @@ def scan_files() -> list[Path]:
 
 
 # =========================================================
-# GHI OUTPUT
+# WRITE OUTPUT
 # =========================================================
 
-def write_bundle(files: list[Path]):
+def write_bundle(files):
 
     total_lines_written = 0
 
@@ -174,7 +298,6 @@ def write_bundle(files: list[Path]):
         encoding="utf-8"
     ) as out:
 
-        # HEADER
         out.write("=" * 120 + "\n")
         out.write("CODE BUNDLE\n")
         out.write(
@@ -185,12 +308,10 @@ def write_bundle(files: list[Path]):
         out.write(f"Total files: {len(files)}\n")
         out.write("=" * 120 + "\n\n")
 
-        # FILE CONTENT
         for index, file_path in enumerate(files, start=1):
 
             relative_path = file_path.relative_to(ROOT_DIR)
 
-            out.write("\n")
             out.write("=" * 120 + "\n")
             out.write(f"[{index}/{len(files)}]\n")
             out.write(f"FILE: {relative_path}\n")
@@ -202,44 +323,31 @@ def write_bundle(files: list[Path]):
 
             lines = read_text_safely(file_path)
 
-            original_line_count = len(lines)
-
-            # giới hạn dòng nếu cần
-            if MAX_LINES_PER_FILE is not None:
+            if MAX_LINES_PER_FILE:
                 lines = lines[:MAX_LINES_PER_FILE]
 
-            # ghi content
             for line_number, line in enumerate(lines, start=1):
 
                 if WRITE_LINE_NUMBER:
-                    out.write(f"{line_number:05d}: {line}")
+                    out.write(
+                        f"{line_number:05d}: {line}"
+                    )
                 else:
                     out.write(line)
-
-            # truncated
-            if (
-                MAX_LINES_PER_FILE is not None
-                and original_line_count > MAX_LINES_PER_FILE
-            ):
-                out.write("\n")
-                out.write("-" * 120 + "\n")
-                out.write(
-                    f"[TRUNCATED] "
-                    f"Original lines: {original_line_count}, "
-                    f"Included: {MAX_LINES_PER_FILE}\n"
-                )
-                out.write("-" * 120 + "\n")
 
             out.write("\n\n")
 
             total_lines_written += len(lines)
 
-        # SUMMARY
-        out.write("\n")
         out.write("=" * 120 + "\n")
         out.write("SUMMARY\n")
-        out.write(f"Files processed: {len(files)}\n")
-        out.write(f"Total lines written: {total_lines_written}\n")
+        out.write(
+            f"Files processed: {len(files)}\n"
+        )
+        out.write(
+            f"Total lines written: "
+            f"{total_lines_written}\n"
+        )
         out.write("=" * 120 + "\n")
 
 

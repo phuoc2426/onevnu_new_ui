@@ -110,7 +110,7 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
             Text(
               loadingText,
               style: TextStyles.bold.copyWith(
-                fontSize: 16,
+                fontSize: AppFontSizes.large,
                 color: AppColors.primaryDark,
               ),
               textAlign: TextAlign.center,
@@ -119,7 +119,7 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
             Text(
               'Hệ thống đang xử lý dữ liệu offline...',
               style: TextStyles.medium.copyWith(
-                fontSize: 13,
+                fontSize: AppFontSizes.mediumSmall,
                 color: AppColors.textSecondary,
               ),
             ),
@@ -157,7 +157,7 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
                 Text(
                   'Xem điểm khác',
                   style: TextStyles.semiBold.copyWith(
-                    fontSize: 12,
+                    fontSize: AppFontSizes.small,
                     color: AppColors.greenAccent,
                   ),
                 ),
@@ -199,7 +199,7 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
                   Text(
                     'Xem điểm khác',
                     style: TextStyles.bold.copyWith(
-                      fontSize: 16,
+                      fontSize: AppFontSizes.large,
                       color: AppColors.textTitle,
                     ),
                   ),
@@ -214,7 +214,7 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
                 Text(
                   'Đơn vị đào tạo',
                   style: TextStyles.bold.copyWith(
-                    fontSize: 13,
+                    fontSize: AppFontSizes.mediumSmall,
                     color: AppColors.textSecondary,
                   ),
                 ),
@@ -255,7 +255,7 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
                       child: Text(
                         'Xem cả các môn ngoài chương trình đào tạo',
                         style: TextStyles.semiBold.copyWith(
-                          fontSize: 13,
+                          fontSize: AppFontSizes.mediumSmall,
                           color: AppColors.textPrimary,
                         ),
                       ),
@@ -283,7 +283,7 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
                     ),
                     child: Text(
                       'Quét lại',
-                      style: TextStyles.bold.copyWith(fontSize: 14),
+                      style: TextStyles.bold.copyWith(fontSize: AppFontSizes.medium),
                     ),
                   ),
                 ),
@@ -306,7 +306,7 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
             'Phân tích chi tiết năng lực',
             style: TextStyles.extraBold.copyWith(
               color: AppColors.textTitle,
-              fontSize: 16,
+              fontSize: AppFontSizes.large,
             ),
           ),
         ),
@@ -356,7 +356,7 @@ class _AiRadarPromotionalCard extends StatelessWidget {
             'Phân tích Năng lực học tập bằng AI',
             style: TextStyles.extraBold.copyWith(
               color: AppColors.textTitle,
-              fontSize: 16,
+              fontSize: AppFontSizes.large,
             ),
             textAlign: TextAlign.center,
           ),
@@ -365,7 +365,7 @@ class _AiRadarPromotionalCard extends StatelessWidget {
             'Hệ thống AI sẽ phân tích các học phần đã tích lũy của bạn, suy luận ngành học và tự động thiết kế bộ 6-10 mũi nhọn năng lực chuẩn để đánh giá chuyên sâu.',
             style: TextStyles.regular.copyWith(
               color: AppColors.textSecondary,
-              fontSize: 12.5,
+              fontSize: AppFontSizes.font12_5,
               height: 1.4,
             ),
             textAlign: TextAlign.center,
@@ -386,7 +386,7 @@ class _AiRadarPromotionalCard extends StatelessWidget {
               ),
               child: Text(
                 'Bắt đầu phân tích',
-                style: TextStyles.bold.copyWith(fontSize: 14),
+                style: TextStyles.bold.copyWith(fontSize: AppFontSizes.medium),
               ),
             ),
           ),
@@ -573,7 +573,7 @@ class _CourseRadarPainter extends CustomPainter {
         text: '${dimensions[i].code}\n${dimensions[i].score.round()}',
         center: labelPoint,
         color: AppColors.textSecondary,
-        fontSize: 11,
+        fontSize: AppFontSizes.font11,
         fontWeight: FontWeight.w800,
       );
     }
@@ -672,7 +672,7 @@ class _CapabilityDimensionCardState extends State<_CapabilityDimensionCard> {
                   widget.dimension.code,
                   style: TextStyles.extraBold.copyWith(
                     color: AppColors.primaryDark,
-                    fontSize: 12.5,
+                    fontSize: AppFontSizes.font12_5,
                   ),
                 ),
               ),
@@ -685,7 +685,7 @@ class _CapabilityDimensionCardState extends State<_CapabilityDimensionCard> {
                       widget.dimension.nameVi,
                       style: TextStyles.bold.copyWith(
                         color: AppColors.textTitle,
-                        fontSize: 13.5,
+                        fontSize: AppFontSizes.font13_5,
                       ),
                     ),
                     const SizedBox(height: 3),
@@ -701,7 +701,7 @@ class _CapabilityDimensionCardState extends State<_CapabilityDimensionCard> {
                             widget.dimension.level.toUpperCase(),
                             style: TextStyles.bold.copyWith(
                               color: levelColor,
-                              fontSize: 9,
+                              fontSize: AppFontSizes.extraExtraSmall,
                             ),
                           ),
                         ),
@@ -711,7 +711,7 @@ class _CapabilityDimensionCardState extends State<_CapabilityDimensionCard> {
                             'Relevance: ${widget.dimension.evidenceCourses.length} môn',
                             style: TextStyles.medium.copyWith(
                               color: AppColors.textSecondary,
-                              fontSize: 11,
+                              fontSize: AppFontSizes.font11,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -726,7 +726,7 @@ class _CapabilityDimensionCardState extends State<_CapabilityDimensionCard> {
                 '${widget.dimension.score.round()}',
                 style: TextStyles.extraBold.copyWith(
                   color: AppColors.primaryDark,
-                  fontSize: 18,
+                  fontSize: AppFontSizes.extraLarge,
                 ),
               ),
             ],
@@ -742,7 +742,7 @@ class _CapabilityDimensionCardState extends State<_CapabilityDimensionCard> {
                     'Chi tiết mũi nhọn:',
                     style: TextStyles.bold.copyWith(
                       color: AppColors.textTitle,
-                      fontSize: 12.5,
+                      fontSize: AppFontSizes.font12_5,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -750,7 +750,7 @@ class _CapabilityDimensionCardState extends State<_CapabilityDimensionCard> {
                     widget.dimension.descriptionVi,
                     style: TextStyles.regular.copyWith(
                       color: AppColors.textSecondary,
-                      fontSize: 12,
+                      fontSize: AppFontSizes.small,
                       height: 1.35,
                     ),
                   ),
@@ -759,7 +759,7 @@ class _CapabilityDimensionCardState extends State<_CapabilityDimensionCard> {
                     'Lý do chấm điểm:',
                     style: TextStyles.bold.copyWith(
                       color: AppColors.textTitle,
-                      fontSize: 12.5,
+                      fontSize: AppFontSizes.font12_5,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -767,7 +767,7 @@ class _CapabilityDimensionCardState extends State<_CapabilityDimensionCard> {
                     widget.dimension.reasonVi,
                     style: TextStyles.regular.copyWith(
                       color: AppColors.textSecondary,
-                      fontSize: 12,
+                      fontSize: AppFontSizes.small,
                       height: 1.35,
                     ),
                   ),
@@ -791,7 +791,7 @@ class _CapabilityDimensionCardState extends State<_CapabilityDimensionCard> {
                               widget.dimension.missingEvidenceVi,
                               style: TextStyles.medium.copyWith(
                                 color: AppColors.warningBoxText,
-                                fontSize: 11.5,
+                                fontSize: AppFontSizes.font11_5,
                                 height: 1.35,
                               ),
                             ),
@@ -804,7 +804,7 @@ class _CapabilityDimensionCardState extends State<_CapabilityDimensionCard> {
                     'Bằng chứng học phần:',
                     style: TextStyles.bold.copyWith(
                       color: AppColors.textTitle,
-                      fontSize: 12.5,
+                      fontSize: AppFontSizes.font12_5,
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -813,7 +813,7 @@ class _CapabilityDimensionCardState extends State<_CapabilityDimensionCard> {
                       'Không tìm thấy học phần liên quan.',
                       style: TextStyles.italic.copyWith(
                         color: AppColors.textSecondary,
-                        fontSize: 11.5,
+                        fontSize: AppFontSizes.font11_5,
                       ),
                     )
                   else
@@ -886,7 +886,7 @@ class _EvidenceCourseRow extends StatelessWidget {
                         evidence.courseName,
                         style: TextStyles.bold.copyWith(
                           color: AppColors.textTitle,
-                          fontSize: 12,
+                          fontSize: AppFontSizes.small,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -897,7 +897,7 @@ class _EvidenceCourseRow extends StatelessWidget {
                       'Điểm: ${evidence.grade.toStringAsFixed(1)}',
                       style: TextStyles.bold.copyWith(
                         color: AppColors.primaryDark,
-                        fontSize: 12,
+                        fontSize: AppFontSizes.small,
                       ),
                     ),
                   ],
@@ -907,7 +907,7 @@ class _EvidenceCourseRow extends StatelessWidget {
                   evidence.reasonVi,
                   style: TextStyles.regular.copyWith(
                     color: AppColors.textSecondary,
-                    fontSize: 11,
+                    fontSize: AppFontSizes.font11,
                     height: 1.3,
                   ),
                 ),
@@ -949,7 +949,7 @@ class _GpaSummaryCard extends StatelessWidget {
             'Thông số GPA tích lũy',
             style: TextStyles.extraBold.copyWith(
               color: AppColors.textTitle,
-              fontSize: 14.5,
+              fontSize: AppFontSizes.font14_5,
             ),
           ),
           const SizedBox(height: 12),
@@ -1030,7 +1030,7 @@ class _GpaBigMetric extends StatelessWidget {
             value,
             style: TextStyles.extraBold.copyWith(
               color: AppColors.primaryDark,
-              fontSize: 28,
+              fontSize: AppFontSizes.font28,
             ),
           ),
           const SizedBox(height: 2),
@@ -1038,7 +1038,7 @@ class _GpaBigMetric extends StatelessWidget {
             label,
             style: TextStyles.semiBold.copyWith(
               color: AppColors.textSecondary,
-              fontSize: 11.5,
+              fontSize: AppFontSizes.font11_5,
             ),
           ),
         ],
@@ -1071,7 +1071,7 @@ class _SmallInfo extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: TextStyles.extraBold.copyWith(
               color: AppColors.textTitle,
-              fontSize: 16,
+              fontSize: AppFontSizes.large,
             ),
           ),
           const SizedBox(height: 3),
@@ -1081,7 +1081,7 @@ class _SmallInfo extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: TextStyles.semiBold.copyWith(
               color: AppColors.textSecondary,
-              fontSize: 11,
+              fontSize: AppFontSizes.font11,
             ),
           ),
         ],
@@ -1108,7 +1108,7 @@ class _MiniPill extends StatelessWidget {
         text,
         style: TextStyles.bold.copyWith(
           color: Colors.white,
-          fontSize: 11,
+          fontSize: AppFontSizes.font11,
         ),
       ),
     );

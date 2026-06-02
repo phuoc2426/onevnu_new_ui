@@ -10,6 +10,7 @@ import '../widgets/hoc_bong_empty_state.dart';
 import '../widgets/hoc_bong_screen_shell.dart';
 import '../widgets/hoc_bong_status_chip.dart';
 import 'hoc_bong_file_preview_screen.dart';
+import 'package:vnu_core/common/app_text_styles.dart';
 
 class HocBongApplicationDetailScreen extends StatefulWidget {
   final int hoSoId;
@@ -71,7 +72,7 @@ class _HocBongApplicationDetailScreenState extends State<HocBongApplicationDetai
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(detail.tenHocBong ?? 'Hồ sơ học bổng', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                      Text(detail.tenHocBong ?? 'Hồ sơ học bổng', style: const TextStyle(fontSize: AppFontSizes.extraLarge, fontWeight: FontWeight.w800)),
                       const SizedBox(height: 10),
                       HocBongStatusChip(
                         status: detail.trangThai,
@@ -175,7 +176,7 @@ class _Section extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            Text(title, style: const TextStyle(fontSize: AppFontSizes.large, fontWeight: FontWeight.w700)),
             const SizedBox(height: 10),
             child,
           ],

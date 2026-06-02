@@ -50,7 +50,7 @@ class _VcoreNewsFilterWidgetState extends State<VcoreNewsFilterWidget> {
         Text(
           'Tìm kiếm nâng cao',
           style: TextStyles.bold
-              .copyWith(fontSize: 18, color: const Color(0xff003392)),
+              .copyWith(fontSize: AppFontSizes.extraLarge, color: const Color(0xff003392)),
         ),
         spaceHeight(18),
         VcoreProfileDropdownfieldWidget(

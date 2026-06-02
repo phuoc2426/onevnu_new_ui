@@ -57,7 +57,7 @@ class _VcoreCamNangItemWidgetState extends State<VcoreCamNangItemWidget> {
               children: [
                 Text(
                   widget.camNangModel.tieuDe ?? '',
-                  style: TextStyles.semiBold.copyWith(fontSize: 15),
+                  style: TextStyles.semiBold.copyWith(fontSize: AppFontSizes.mediumLarge),
                 ),
                 spaceHeight(10),
                 Text(
@@ -70,7 +70,7 @@ class _VcoreCamNangItemWidgetState extends State<VcoreCamNangItemWidget> {
                     Text(
                       widget.camNangModel.tenChuyenMuc ?? '',
                       style: TextStyles.regular.copyWith(
-                          fontSize: 13, color: const Color(0xff003392)),
+                          fontSize: AppFontSizes.mediumSmall, color: const Color(0xff003392)),
                     ),
                     const Spacer(),
                     Text(
@@ -78,7 +78,7 @@ class _VcoreCamNangItemWidgetState extends State<VcoreCamNangItemWidget> {
                           widget.camNangModel.thoiGianTao,
                           DateTimeConst.DATE_FORMAT),
                       style: TextStyles.regular.copyWith(
-                          fontSize: 13, color: const Color(0xff637392)),
+                          fontSize: AppFontSizes.mediumSmall, color: const Color(0xff637392)),
                     ),
                   ],
                 ),
@@ -86,7 +86,7 @@ class _VcoreCamNangItemWidgetState extends State<VcoreCamNangItemWidget> {
                 Text(
                   widget.camNangModel.donViXuatBan ?? '',
                   style: TextStyles.regular
-                      .copyWith(fontSize: 13, color: const Color(0xff118A40)),
+                      .copyWith(fontSize: AppFontSizes.mediumSmall, color: const Color(0xff118A40)),
                 ),
               ],
             ),

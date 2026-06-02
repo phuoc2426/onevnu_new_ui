@@ -60,7 +60,7 @@ class _VcoreNewsItemWidgetState extends State<VcoreNewsItemWidget> {
                         Text(
                           widget.tinTucModel.tenChuyenMuc ?? '',
                           style: TextStyles.regular.copyWith(
-                              fontSize: 13, color: const Color(0xff003392)),
+                              fontSize: AppFontSizes.mediumSmall, color: const Color(0xff003392)),
                         ),
                         const Spacer(),
                         Text(
@@ -68,7 +68,7 @@ class _VcoreNewsItemWidgetState extends State<VcoreNewsItemWidget> {
                               widget.tinTucModel.thoiGianTao,
                               DateTimeConst.DATE_FORMAT),
                           style: TextStyles.regular.copyWith(
-                              fontSize: 13, color: const Color(0xff8E8E8E)),
+                              fontSize: AppFontSizes.mediumSmall, color: const Color(0xff8E8E8E)),
                         ),
                       ],
                     )
@@ -81,7 +81,7 @@ class _VcoreNewsItemWidgetState extends State<VcoreNewsItemWidget> {
           Text(
             widget.tinTucModel.donViXuatBan ?? '',
             style: TextStyles.regular
-                .copyWith(fontSize: 13, color: const Color(0xff118A40)),
+                .copyWith(fontSize: AppFontSizes.mediumSmall, color: const Color(0xff118A40)),
           )
         ],
       ),

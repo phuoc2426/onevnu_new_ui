@@ -12,8 +12,9 @@ import 'package:vnu_noi_tru/cubit/nt_news_cubit.dart';
 import 'package:vnu_noi_tru/models/nt_danh_sach_thong_bao_model.dart';
 import 'package:vnu_noi_tru/nt_globals.dart';
 import 'package:vnu_noi_tru/repository/noitru_repository.dart';
-import 'package:vnu_noi_tru/screens/nt_dang_ky_noi_tru_screen.dart';
+import 'package:vnu_noi_tru/screens/dormitory_registration/dr_my_registration_screen.dart';
 import 'package:vnu_noi_tru/screens/nt_register_process_screen.dart';
+import 'package:vnu_core/common/app_text_styles.dart';
 
 class NTNotifyListScreen extends StatefulWidget {
   final String type; //UNREAD - ALL
@@ -143,7 +144,7 @@ class _NTNotifyListScreenState extends State<NTNotifyListScreen> {
           Navigator.push(
               context,
               MaterialPageRoute(
-                  builder: (ctx) => const NTDangKyNoiTruScreen()));
+                  builder: (ctx) => const DRMyRegistrationScreen()));
         }
       },
       child: Container(
@@ -171,7 +172,7 @@ class _NTNotifyListScreenState extends State<NTNotifyListScreen> {
                   Text(
                     thongBao.ngayGui ?? '',
                     style: AppTheme.body2
-                        .copyWith(fontSize: 13, color: Color(0xff979AA5)),
+                        .copyWith(fontSize: AppFontSizes.mediumSmall, color: Color(0xff979AA5)),
                   ),
                 ],
               ),
@@ -207,7 +208,7 @@ class _NTNotifyListScreenState extends State<NTNotifyListScreen> {
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: AppTheme.body2.copyWith(
-                                  fontSize: 13,
+                                  fontSize: AppFontSizes.mediumSmall,
                                   fontWeight: FontWeight.w300,
                                   color: Color(0xff808080)),
                             ),
@@ -222,7 +223,7 @@ class _NTNotifyListScreenState extends State<NTNotifyListScreen> {
                     Text(
                       thongBao.tieuDe ?? '',
                       style: AppTheme.body2
-                          .copyWith(fontSize: 13, color: Colors.black),
+                          .copyWith(fontSize: AppFontSizes.mediumSmall, color: Colors.black),
                     ),
                     const SizedBox(
                       height: 8,

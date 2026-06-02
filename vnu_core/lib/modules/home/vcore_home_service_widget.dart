@@ -17,6 +17,7 @@ import 'package:vnu_core/modules/inmapz/vcore_immap_view.dart';
 import 'package:vnu_core/modules/motel/views/vcore_motel_view.dart';
 import 'package:vnu_core/modules/paht/views/vcore_paht_view.dart';
 import 'package:vnu_core/modules/student_card/views/vcore_student_card_view.dart';
+import 'package:vnu_core/modules/sync/views/vcore_sync_view.dart';
 import 'package:vnu_core/modules/time_schedule/views/vcore_time_schedule_view.dart';
 import 'package:vnu_core/repository/app_repository.dart';
 
@@ -57,11 +58,7 @@ class _VcoreHomeServiceWidgetState extends State<VcoreHomeServiceWidget> {
   //{phuoc} Thêm hàm sắp xếp lại dữ liệu theo hàng
   void sortServices(List<BoxServiceModel> services, int rows) {
     // Chỉ sắp xếp theo thứ tự ưu tiên, không cần logic phức tạp
-    List<String> priority = [
-      "XemThoiKhoaBieu",
-      "DiemMonHoc",
-      "TheSinhVien",
-    ];
+    List<String> priority = ["XemThoiKhoaBieu", "DiemMonHoc", "TheSinhVien"];
 
     services.sort((a, b) {
       int aIndex = priority.indexOf(a.loaiBoxDichVuEnum.toString());
@@ -74,55 +71,63 @@ class _VcoreHomeServiceWidgetState extends State<VcoreHomeServiceWidget> {
       return aIndex.compareTo(bIndex);
     });
   }
+
   loadCacheService() {
-    VnuCacheFileManager().getCacheFile(kCacheKeyListDichVu).then(
-      (data) {
-        try {
-          var dataString = data ?? '';
-          if (dataString.isEmpty) {
-            return;
-          }
-          var dataJson = jsonDecode(dataString) as List;
-          List<BoxServiceModel> listObj = [];
-          for (var element in dataJson) {
-            try {
-              BoxServiceModel? model;
-              if (element is Map<String, dynamic>) {
-                model = BoxServiceModel.fromJson(element);
-              } else if (element is Map<dynamic, dynamic>) {
-                model = BoxServiceModel.fromJson(element.toStringDynamic());
-              }
-              if (model != null) {
-                if (model.loaiBoxDichVuEnum?.mapTypeBoxService() != HomeService.XemLichThi) {
-                  listObj.add(model);
-                }
-              }
-            } catch (e) {
-              logError(e.toString());
-            }
-          }
-          sortServices(listObj, 3);
-          // Api gọi chưa xong thì update trước.
-          if (services.isEmpty) {
-            setState(() {
-              services = listObj;
-              isLoading = false;
-            });
-          }
-        } catch (e) {
-          logError(e.toString());
+    VnuCacheFileManager().getCacheFile(kCacheKeyListDichVu).then((data) {
+      try {
+        var dataString = data ?? '';
+        if (dataString.isEmpty) {
+          return;
         }
-      },
-    );
+        var dataJson = jsonDecode(dataString) as List;
+        List<BoxServiceModel> listObj = [];
+        for (var element in dataJson) {
+          try {
+            BoxServiceModel? model;
+            if (element is Map<String, dynamic>) {
+              model = BoxServiceModel.fromJson(element);
+            } else if (element is Map<dynamic, dynamic>) {
+              model = BoxServiceModel.fromJson(element.toStringDynamic());
+            }
+            if (model != null) {
+              if (model.loaiBoxDichVuEnum?.mapTypeBoxService() !=
+                  HomeService.XemLichThi) {
+                listObj.add(model);
+              }
+            }
+          } catch (e) {
+            logError(e.toString());
+          }
+        }
+        sortServices(listObj, 3);
+        // Api gọi chưa xong thì update trước.
+        if (services.isEmpty) {
+          setState(() {
+            services = listObj;
+            isLoading = false;
+          });
+        }
+      } catch (e) {
+        logError(e.toString());
+      }
+    });
   }
 
   loadService() async {
     try {
       var response = await ApiRepository().getBoxServices();
-      response = response.where((element) => element.loaiBoxDichVuEnum?.mapTypeBoxService() != HomeService.XemLichThi).toList();
+      response = response
+          .where(
+            (element) =>
+                element.loaiBoxDichVuEnum?.mapTypeBoxService() !=
+                HomeService.XemLichThi,
+          )
+          .toList();
       print("DEBUG: Loaded ${response.length} services");
       for (var service in response) {
-        print("DEBUG: Service - ${service.loaiBoxDichVuEnum} - ${service.tenBoxDichVu}");
+        print(
+          "DEBUG: Service - ${service.loaiBoxDichVuEnum} - ${service.tenBoxDichVu}",
+        );
       }
       sortServices(response, 3);
       setState(() {
@@ -133,8 +138,10 @@ class _VcoreHomeServiceWidgetState extends State<VcoreHomeServiceWidget> {
       if (response.isNotEmpty) {
         try {
           var data = response.map((e) => e.toJson()).toList();
-          VnuCacheFileManager()
-              .saveCacheFile(kCacheKeyListDichVu, jsonEncode(data));
+          VnuCacheFileManager().saveCacheFile(
+            kCacheKeyListDichVu,
+            jsonEncode(data),
+          );
         } catch (e) {
           logError(e.toString());
         }
@@ -168,53 +175,52 @@ class _VcoreHomeServiceWidgetState extends State<VcoreHomeServiceWidget> {
                     controller: _controller,
                     slivers: [
                       SliverGrid(
-                        delegate: SliverChildBuilderDelegate(
-                          (context, index) {
-                            final BoxServiceModel? serviceModel =
-                                services.elementAtOrNull(index);
-                            final HomeService? service = serviceModel
-                                ?.loaiBoxDichVuEnum
-                                ?.mapTypeBoxService();
-                            return InkWell(
-                              onTap: () => _handleNaviService(service),
-                              child: Column(
-                                children: [
-                                  SizedBox(
-                                    width: 52,
-                                    height: 52,
-                                    child: serviceModel?.icon?.isNotEmpty ==
-                                            true
-                                        ? CachedNetworkImage(
-                                            imageUrl: serviceModel!.icon!,
-                                          )
-                                        : svgAsset(
-                                            'assets/images/${service?.icon}'),
+                        delegate: SliverChildBuilderDelegate((context, index) {
+                          final BoxServiceModel? serviceModel = services
+                              .elementAtOrNull(index);
+                          final HomeService? service = serviceModel
+                              ?.loaiBoxDichVuEnum
+                              ?.mapTypeBoxService();
+                          return InkWell(
+                            onTap: () => _handleNaviService(service),
+                            child: Column(
+                              children: [
+                                SizedBox(
+                                  width: 52,
+                                  height: 52,
+                                  child: serviceModel?.icon?.isNotEmpty == true
+                                      ? CachedNetworkImage(
+                                          imageUrl: serviceModel!.icon!,
+                                        )
+                                      : svgAsset(
+                                          'assets/images/${service?.icon}',
+                                        ),
+                                ),
+                                spaceHeight(4),
+                                Text(
+                                  service?.title ?? '',
+                                  style: TextStyles.regular.copyWith(
+                                    fontSize: AppFontSizes.small,
                                   ),
-                                  spaceHeight(4),
-                                  Text(
-                                    service?.title ?? '',
-                                    style: TextStyles.regular
-                                        .copyWith(fontSize: 12),
-                                    textAlign: TextAlign.center,
-                                  )
-                                ],
-                              ),
-                            );
-                          },
-                          childCount: services.length,
-                        ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          );
+                        }, childCount: services.length),
                         gridDelegate:
                             const SliverGridDelegateWithFixedCrossAxisCount(
-                          //{phuoc} thay đổi số hàng của scroll view
-                          crossAxisCount: 3,
-                          mainAxisSpacing: 0,
-                          crossAxisSpacing: 12,
-                        ),
-                      )
+                              //{phuoc} thay đổi số hàng của scroll view
+                              crossAxisCount: 3,
+                              mainAxisSpacing: 0,
+                              crossAxisSpacing: 12,
+                            ),
+                      ),
                     ],
                   ),
             onNotification: (notification) {
-              double newMargin = (notification.metrics.pixels /
+              double newMargin =
+                  (notification.metrics.pixels /
                       _controller.position.maxScrollExtent) *
                   (2.0 / 3.0) *
                   30.0;
@@ -254,7 +260,7 @@ class _VcoreHomeServiceWidgetState extends State<VcoreHomeServiceWidget> {
               ],
             ),
           ),
-        )
+        ),
       ],
     );
   }
@@ -294,6 +300,9 @@ class _VcoreHomeServiceWidgetState extends State<VcoreHomeServiceWidget> {
         break;
       case HomeService.PhanAnhHienTruong:
         Get.to(() => const VcorePahtView());
+        break;
+      case HomeService.DongBo:
+        Get.to(() => const VcoreSyncView());
         break;
       // case HomeService.TheSinhVien:
       //   // snackBarWarning('Thẻ sinh viên');

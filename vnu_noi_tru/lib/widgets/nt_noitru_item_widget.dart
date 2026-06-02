@@ -4,6 +4,7 @@ import 'package:vnu_core/common/utils.dart';
 import 'package:vnu_core/themes/app_theme.dart';
 
 import '../models/nt_tin_tuc_model.dart';
+import 'package:vnu_core/common/app_text_styles.dart';
 
 class NTNoiTruItemWidget extends StatelessWidget {
   final VoidCallback? onSelected;
@@ -53,7 +54,7 @@ class NTNoiTruItemWidget extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: AppTheme.body2.copyWith(
-                        fontSize: 15,
+                        fontSize: AppFontSizes.mediumLarge,
                         fontWeight: FontWeight.w600,
                         color: const Color(0xff181E39)),
                   ),
@@ -65,7 +66,7 @@ class NTNoiTruItemWidget extends StatelessWidget {
                   //   maxLines: 1,
                   //   overflow: TextOverflow.ellipsis,
                   //   style: AppTheme.body2
-                  //       .copyWith(fontSize: 14, color: const Color(0xFF2A3556)),
+                  //       .copyWith(fontSize: AppFontSizes.medium, color: const Color(0xFF2A3556)),
                   // ),
                   const SizedBox(
                     height: 8,
@@ -74,12 +75,12 @@ class NTNoiTruItemWidget extends StatelessWidget {
                     text: TextSpan(
                       text: '',
                       style: AppTheme.body2.copyWith(
-                          fontSize: 12, color: const Color(0xff003392)),
+                          fontSize: AppFontSizes.small, color: const Color(0xff003392)),
                       children: <TextSpan>[
                         TextSpan(
                           text: tinTucModel.thoiGianXuatBan ?? '',
                           style: AppTheme.body2.copyWith(
-                              fontSize: 12, color: const Color(0xff637392)),
+                              fontSize: AppFontSizes.small, color: const Color(0xff637392)),
                         ),
                       ],
                     ),

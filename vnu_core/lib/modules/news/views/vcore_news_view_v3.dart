@@ -23,6 +23,7 @@ import 'package:vnu_core/widgets/vcore_module_scaffold.dart';
 import 'package:vnu_core/widgets/refresher_footer_widget.dart';
 
 import 'package:vnu_core/modules/news/views/vcore_news_detail_view.dart';
+import 'package:vnu_core/common/app_text_styles.dart';
 
 const kCacheKeyListTinTucBySchoolV3 = 'listTinTucBySchool.json';
 
@@ -416,7 +417,7 @@ class _VcoreNewsViewV3State extends State<VcoreNewsViewV3> {
                 hintText: 'Tìm kiếm tin tức, chủ đề, nguồn...',
                 hintStyle: TextStyle(
                   color: Colors.grey,
-                  fontSize: 14,
+                  fontSize: AppFontSizes.medium,
                   fontFamily: 'OpenSans',
                 ),
               ),
@@ -469,7 +470,7 @@ class _VcoreNewsViewV3State extends State<VcoreNewsViewV3> {
                 label,
                 style: TextStyle(
                   color: selected ? Colors.white : const Color(0xFF4D4D4F),
-                  fontSize: 13,
+                  fontSize: AppFontSizes.mediumSmall,
                   fontWeight: FontWeight.w700,
                   fontFamily: 'OpenSans',
                 ),
@@ -503,7 +504,7 @@ class _VcoreNewsViewV3State extends State<VcoreNewsViewV3> {
                 const Text(
                   'Mới nhất',
                   style: TextStyle(
-                    fontSize: 20,
+                    fontSize: AppFontSizes.extraExtraLarge,
                     fontWeight: FontWeight.w800,
                     color: Colors.black87,
                     fontFamily: 'OpenSans',
@@ -512,7 +513,7 @@ class _VcoreNewsViewV3State extends State<VcoreNewsViewV3> {
                 Text(
                   'Xem thêm',
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: AppFontSizes.mediumSmall,
                     fontWeight: FontWeight.w700,
                     color: Theme.of(context).primaryColor,
                     fontFamily: 'OpenSans',
@@ -583,7 +584,7 @@ class _VcoreNewsViewV3State extends State<VcoreNewsViewV3> {
               const Text(
                 'Tin nổi bật',
                 style: TextStyle(
-                  fontSize: 20,
+                  fontSize: AppFontSizes.extraExtraLarge,
                   fontWeight: FontWeight.w800,
                   color: Colors.black87,
                   fontFamily: 'OpenSans',
@@ -592,7 +593,7 @@ class _VcoreNewsViewV3State extends State<VcoreNewsViewV3> {
               Text(
                 'Tự trượt',
                 style: TextStyle(
-                  fontSize: 13,
+                  fontSize: AppFontSizes.mediumSmall,
                   fontWeight: FontWeight.w700,
                   color: Theme.of(context).primaryColor,
                   fontFamily: 'OpenSans',
@@ -701,7 +702,7 @@ class _VcoreNewsViewV3State extends State<VcoreNewsViewV3> {
                         child: const Text(
                           'NỔI BẬT',
                           style: TextStyle(
-                            fontSize: 10,
+                            fontSize: AppFontSizes.extraSmall,
                             fontWeight: FontWeight.w800,
                             color: Colors.redAccent,
                             letterSpacing: 0.5,
@@ -731,7 +732,7 @@ class _VcoreNewsViewV3State extends State<VcoreNewsViewV3> {
                         Text(
                           'Tin VNU',
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: AppFontSizes.font11,
                             fontWeight: FontWeight.w700,
                             color: Colors.grey.shade500,
                           ),
@@ -744,7 +745,7 @@ class _VcoreNewsViewV3State extends State<VcoreNewsViewV3> {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        fontSize: 15,
+                        fontSize: AppFontSizes.mediumLarge,
                         fontWeight: FontWeight.w800,
                         color: Colors.black87,
                         height: 1.25,
@@ -758,7 +759,7 @@ class _VcoreNewsViewV3State extends State<VcoreNewsViewV3> {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: AppFontSizes.small,
                           color: Colors.grey.shade600,
                           height: 1.3,
                           fontFamily: 'OpenSans',
@@ -847,7 +848,7 @@ class _VcoreNewsViewV3State extends State<VcoreNewsViewV3> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 10,
+                        fontSize: AppFontSizes.extraSmall,
                         fontWeight: FontWeight.w800,
                         color: Colors.grey.shade500,
                         letterSpacing: 0.3,
@@ -859,7 +860,7 @@ class _VcoreNewsViewV3State extends State<VcoreNewsViewV3> {
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        fontSize: 14,
+                        fontSize: AppFontSizes.medium,
                         fontWeight: FontWeight.w700,
                         color: Colors.black87,
                         height: 1.3,
@@ -877,7 +878,7 @@ class _VcoreNewsViewV3State extends State<VcoreNewsViewV3> {
                         child: Text(
                           item.tenChuyenMuc!,
                           style: TextStyle(
-                            fontSize: 10,
+                            fontSize: AppFontSizes.extraSmall,
                             fontWeight: FontWeight.w700,
                             color: Colors.grey.shade600,
                           ),
@@ -959,7 +960,7 @@ class _VcoreNewsViewV3State extends State<VcoreNewsViewV3> {
                     Text(
                       'TIN VNU • NỔI BẬT',
                       style: TextStyle(
-                        fontSize: 10,
+                        fontSize: AppFontSizes.extraSmall,
                         fontWeight: FontWeight.w800,
                         color: Colors.grey.shade500,
                         letterSpacing: 0.3,
@@ -971,7 +972,7 @@ class _VcoreNewsViewV3State extends State<VcoreNewsViewV3> {
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        fontSize: 14,
+                        fontSize: AppFontSizes.medium,
                         fontWeight: FontWeight.w700,
                         color: Colors.black87,
                         height: 1.3,
@@ -985,7 +986,7 @@ class _VcoreNewsViewV3State extends State<VcoreNewsViewV3> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: AppFontSizes.small,
                           color: Colors.grey.shade500,
                           fontFamily: 'OpenSans',
                         ),
@@ -1047,7 +1048,7 @@ class _VcoreNewsViewV3State extends State<VcoreNewsViewV3> {
           'Không có tin tức',
           style: TextStyle(
             color: VcoreGreenBrandV3.muted,
-            fontSize: 14,
+            fontSize: AppFontSizes.medium,
             height: 1.35,
             fontFamily: 'OpenSans',
           ),

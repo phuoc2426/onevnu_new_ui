@@ -177,7 +177,7 @@ class _VcoreNewsCategoryWidgetV2State extends State<VcoreNewsCategoryWidgetV2>
             Text(
               category.title,
               style: TextStyles.medium.copyWith(
-                fontSize: 13,
+                fontSize: AppFontSizes.mediumSmall,
                 color: textColor,
               ),
             ),
@@ -222,7 +222,7 @@ class _VcoreNewsCategoryWidgetV2State extends State<VcoreNewsCategoryWidgetV2>
           Text(
             'Bạn có thể chọn loại tin tức muốn xem',
             style: TextStyles.regular.copyWith(
-              fontSize: 12,
+              fontSize: AppFontSizes.small,
               color: const Color(0xff879ABF),
             ),
           ),

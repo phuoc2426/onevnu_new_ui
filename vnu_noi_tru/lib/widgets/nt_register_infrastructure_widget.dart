@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:vnu_core/themes/app_theme.dart';
 
 import '../models/model.dart';
+import 'package:vnu_core/common/app_text_styles.dart';
 
 class NTRegisterInfrastructureWidget extends StatefulWidget {
   final List<DanhSachLoaiCoSoVatChat> danhSachLoaiCoSoVatChat;
@@ -43,7 +44,7 @@ class _NTRegisterInfrastructureWidgetState
               child: Text(
                 chiphi.tenLoaiCsvc ?? '',
                 style: AppTheme.body2.copyWith(
-                    fontSize: 15,
+                    fontSize: AppFontSizes.mediumLarge,
                     fontWeight:
                         font == true ? FontWeight.bold : FontWeight.normal),
               )),
@@ -54,7 +55,7 @@ class _NTRegisterInfrastructureWidgetState
                 child: Text(
                   '${chiphi.soLuong}',
                   style: AppTheme.body2
-                      .copyWith(fontSize: 14, fontWeight: FontWeight.bold),
+                      .copyWith(fontSize: AppFontSizes.medium, fontWeight: FontWeight.bold),
                 ),
               )),
         ],

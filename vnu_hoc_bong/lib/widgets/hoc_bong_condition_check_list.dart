@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../common/hoc_bong_status.dart';
 import '../models/hoc_bong_models.dart';
 import 'hoc_bong_status_chip.dart';
+import 'package:vnu_core/common/app_text_styles.dart';
 
 class HocBongConditionCheckList extends StatelessWidget {
   final HocBongValidateResultModel? result;
@@ -25,7 +26,7 @@ class HocBongConditionCheckList extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Expanded(child: Text('Kết quả kiểm tra điều kiện', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700))),
+                const Expanded(child: Text('Kết quả kiểm tra điều kiện', style: TextStyle(fontSize: AppFontSizes.large, fontWeight: FontWeight.w700))),
                 HocBongStatusChip(status: r.result, label: HocBongStatusText.validate(r.result)),
               ],
             ),

@@ -41,13 +41,13 @@ class _VcoreTimeScheduleDetailWidgetState
           Text(
             'Thông tin chi tiết lịch thi',
             style: TextStyles.semiBold
-                .copyWith(fontSize: 18, color: const Color(0xff003392)),
+                .copyWith(fontSize: AppFontSizes.extraLarge, color: const Color(0xff003392)),
           ),
           spaceHeight(30),
           Text(
             soBaoDanh,
             style: TextStyles.semiBold
-                .copyWith(fontSize: 19,fontWeight: FontWeight.w800,color: Colors.black),
+                .copyWith(fontSize: AppFontSizes.font19,fontWeight: FontWeight.w800,color: Colors.black),
           ),
           Text(
             DateTimeUtils.stringFromDateTime(
@@ -55,7 +55,7 @@ class _VcoreTimeScheduleDetailWidgetState
               DateTimeConst.DATE_FORMAT_WITH_DAY,
             ),
             style: TextStyles.semiBold
-                .copyWith(fontSize: 18, color: const Color(0xff2F9E44)),
+                .copyWith(fontSize: AppFontSizes.extraLarge, color: const Color(0xff2F9E44)),
           ),
           spaceHeight(30),
 
@@ -96,7 +96,7 @@ class _VcoreTimeScheduleDetailWidgetState
               child: Text(
                 'Đóng',
                 style: TextStyles.semiBold
-                    .copyWith(fontSize: 16, color: const Color(0xff003392)),
+                    .copyWith(fontSize: AppFontSizes.large, color: const Color(0xff003392)),
               ),
             ),
           )
@@ -112,13 +112,13 @@ class _VcoreTimeScheduleDetailWidgetState
         Expanded(
             child: Text(
           title,
-          style: TextStyles.regular.copyWith(fontSize: 15, color: Colors.black),
+          style: TextStyles.regular.copyWith(fontSize: AppFontSizes.mediumLarge, color: Colors.black),
         )),
         Expanded(
             child: Text(
           content,
           style:
-              TextStyles.semiBold.copyWith(fontSize: 15, color: Colors.black),
+              TextStyles.semiBold.copyWith(fontSize: AppFontSizes.mediumLarge, color: Colors.black),
         )),
       ],
     );

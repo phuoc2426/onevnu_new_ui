@@ -2,6 +2,7 @@ import 'dart:developer';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:vnu_core/common/app_text_styles.dart';
 
 class TestDrawScreen extends StatefulWidget {
   const TestDrawScreen({super.key});
@@ -83,7 +84,7 @@ class _TestDrawScreenState extends State<TestDrawScreen> {
         text: String.fromCharCode(iconData.codePoint),
         style: TextStyle(
           letterSpacing: 0.0,
-          fontSize: 20,
+          fontSize: AppFontSizes.extraExtraLarge,
           fontFamily: iconData.fontFamily,
           color: color,
         ));

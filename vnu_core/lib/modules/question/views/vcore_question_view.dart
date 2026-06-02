@@ -27,7 +27,7 @@ class VcoreQuestionView extends GetView<VcoreQuestionController> {
               unselectedLabelColor: const Color(0xff879ABF),
               indicatorColor: const Color(0xff003392),
               indicatorSize: TabBarIndicatorSize.tab,
-              labelStyle: TextStyles.semiBold.copyWith(fontSize: 16),
+              labelStyle: TextStyles.semiBold.copyWith(fontSize: AppFontSizes.large),
               tabs: const [
                 Tab(
                   text: 'Chưa trả lời',

@@ -63,7 +63,7 @@ class HocBongDynamicFormField extends StatelessWidget {
               contentPadding: EdgeInsets.zero,
               title: Text(
                 field.goiY ?? 'Có / Không',
-                style: TextStyles.regular.copyWith(fontSize: 14, color: Colors.black87),
+                style: TextStyles.regular.copyWith(fontSize: AppFontSizes.medium, color: Colors.black87),
               ),
               value: value == true,
               activeColor: AppColors.greenAccent,
@@ -102,13 +102,13 @@ class HocBongFieldLabel extends StatelessWidget {
           Expanded(
             child: Text(
               field.displayLabel,
-              style: TextStyles.semiBold.copyWith(fontSize: 14, color: Colors.black87),
+              style: TextStyles.semiBold.copyWith(fontSize: AppFontSizes.medium, color: Colors.black87),
             ),
           ),
           if (field.batBuoc)
             Text(
               ' *',
-              style: TextStyles.bold.copyWith(fontSize: 14, color: AppColors.error),
+              style: TextStyles.bold.copyWith(fontSize: AppFontSizes.medium, color: AppColors.error),
             ),
           if (field.yeuCauCongChung) ...[
             const SizedBox(width: 6),
@@ -120,7 +120,7 @@ class HocBongFieldLabel extends StatelessWidget {
               ),
               child: Text(
                 'Công chứng',
-                style: TextStyles.medium.copyWith(fontSize: 10, color: AppColors.notifyOrange),
+                style: TextStyles.medium.copyWith(fontSize: AppFontSizes.extraSmall, color: AppColors.notifyOrange),
               ),
             ),
           ],
@@ -181,7 +181,7 @@ class _TextInputState extends State<_TextInput> {
             controller: controller,
             maxLines: widget.maxLines,
             keyboardType: widget.keyboardType,
-            style: TextStyles.regular.copyWith(fontSize: 14, color: Colors.black87),
+            style: TextStyles.regular.copyWith(fontSize: AppFontSizes.medium, color: Colors.black87),
             decoration: InputDecoration(
               hintText: widget.hint,
               hintStyle: TextStyles.regular.copyWith(color: Colors.grey.shade500),
@@ -238,7 +238,7 @@ class _SelectInput extends StatelessWidget {
               child: Text(
                 e,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 13),
+                style: const TextStyle(fontSize: AppFontSizes.mediumSmall),
               ),
             )).toList(),
             hint: Text(
@@ -325,7 +325,7 @@ class _DateInput extends StatelessWidget {
               ),
               child: Text(
                 value?.split('T').first ?? 'Chọn ngày',
-                style: TextStyles.regular.copyWith(fontSize: 14, color: Colors.black87),
+                style: TextStyles.regular.copyWith(fontSize: AppFontSizes.medium, color: Colors.black87),
               ),
             ),
           ),
@@ -364,7 +364,7 @@ class _FileInput extends StatelessWidget {
         children: [
           HocBongFieldLabel(field: field),
           if (hint != null) ...[
-            Text(hint!, style: TextStyles.regular.copyWith(fontSize: 12, color: Colors.grey.shade600)),
+            Text(hint!, style: TextStyles.regular.copyWith(fontSize: AppFontSizes.small, color: Colors.grey.shade600)),
             const SizedBox(height: 8),
           ],
           Row(
@@ -374,7 +374,7 @@ class _FileInput extends StatelessWidget {
                   fileName ?? 'Chưa chọn file (PDF)',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyles.regular.copyWith(fontSize: 13, color: Colors.grey.shade700),
+                  style: TextStyles.regular.copyWith(fontSize: AppFontSizes.mediumSmall, color: Colors.grey.shade700),
                 ),
               ),
               const SizedBox(width: 8),
@@ -403,7 +403,7 @@ class _FileInput extends StatelessWidget {
                     Text(
                       'Chọn file',
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: AppFontSizes.small,
                         color: AppColors.greenAccent,
                         fontWeight: FontWeight.bold,
                       ),

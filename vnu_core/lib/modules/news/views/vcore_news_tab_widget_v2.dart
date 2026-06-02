@@ -77,8 +77,8 @@ class _VcoreNewsTabWidgetV2State extends State<VcoreNewsTabWidgetV2>
             indicatorPadding: const EdgeInsets.all(4),
             labelColor: Colors.white,
             unselectedLabelColor: const Color(0xff637392),
-            labelStyle: TextStyles.medium.copyWith(fontSize: 14),
-            unselectedLabelStyle: TextStyles.regular.copyWith(fontSize: 14),
+            labelStyle: TextStyles.medium.copyWith(fontSize: AppFontSizes.medium),
+            unselectedLabelStyle: TextStyles.regular.copyWith(fontSize: AppFontSizes.medium),
             dividerColor: Colors.transparent,
             tabs: [
               Tab(text: 'Tin ${widget.schoolName}'),
@@ -312,7 +312,7 @@ class _NewsHorizontalListState extends State<_NewsHorizontalList> {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: TextStyles.regular.copyWith(
-                fontSize: 13,
+                fontSize: AppFontSizes.mediumSmall,
                 color: const Color(0xff2A3556),
                 height: 1.3,
               ),

@@ -24,7 +24,7 @@ class _NtBoardingItemWidgetState extends State<NtBoardingItemWidget> {
           Text(
             'Đăng ký nội trú đợt II',
             style:
-                TextStyles.semiBold.copyWith(fontSize: 15, color: Colors.black),
+                TextStyles.semiBold.copyWith(fontSize: AppFontSizes.mediumLarge, color: Colors.black),
           ),
           spaceHeight(10),
           Row(
@@ -35,11 +35,11 @@ class _NtBoardingItemWidgetState extends State<NtBoardingItemWidget> {
                     Text(
                       'Ngày gửi:',
                       style: TextStyles.regular.copyWith(
-                          fontSize: 13, color: const Color(0xff637392)),
+                          fontSize: AppFontSizes.mediumSmall, color: const Color(0xff637392)),
                     ),
                     Text(
                       '15/01/2024  18:00',
-                      style: TextStyles.regular.copyWith(fontSize: 13),
+                      style: TextStyles.regular.copyWith(fontSize: AppFontSizes.mediumSmall),
                     )
                   ],
                 ),
@@ -49,7 +49,7 @@ class _NtBoardingItemWidgetState extends State<NtBoardingItemWidget> {
                 child: Text(
                   'Đang xét duyệt',
                   style: TextStyles.semiBold
-                      .copyWith(fontSize: 13, color: Color(0xffFB8500)),
+                      .copyWith(fontSize: AppFontSizes.mediumSmall, color: Color(0xffFB8500)),
                 ),
               ),
             ],
@@ -62,12 +62,12 @@ class _NtBoardingItemWidgetState extends State<NtBoardingItemWidget> {
               Text(
                 'Lý do từ chối:',
                 style: TextStyles.regular
-                    .copyWith(fontSize: 13, color: const Color(0xff637392)),
+                    .copyWith(fontSize: AppFontSizes.mediumSmall, color: const Color(0xff637392)),
               ),
               Expanded(
                 child: Text(
                   'Phòng ký túc đang sửa chữa',
-                  style: TextStyles.regular.copyWith(fontSize: 13),
+                  style: TextStyles.regular.copyWith(fontSize: AppFontSizes.mediumSmall),
                 ),
               )
             ],

@@ -73,7 +73,7 @@ class AuthCubit extends Cubit<AuthState> {
       logSuccess('Start login time --> ${DateTime.now().toIso8601String()}');
       var reponse = await ApiRepository()
           .signin(username, passsword, ServicesUrl().firebaseToken ?? '');
-      if (reponse.refreshToken != null) {
+      if ((reponse.accessToken ?? '').isNotEmpty) {
         //save login info
         DataRepository().saveSecureUserLogin(username, passsword);
 
@@ -83,8 +83,11 @@ class AuthCubit extends Cubit<AuthState> {
 
         ApiRepository().setToken(Globals().token);
         DataRepository().saveSecureKey(kLoginToken, Globals().token);
-        DataRepository()
-            .saveSecureKey(kLoginRefreshToken, reponse.refreshToken ?? '');
+        if ((reponse.refreshToken ?? '').isNotEmpty) {
+          Globals().refreshToken = reponse.refreshToken ?? '';
+          DataRepository()
+              .saveSecureKey(kLoginRefreshToken, reponse.refreshToken ?? '');
+        }
 
         // Cần bỏ để tăng tốc độ login - thời gian chờ đang hơi lâu.
         // Chuyển load async ở tabbar

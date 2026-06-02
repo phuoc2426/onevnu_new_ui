@@ -21,14 +21,13 @@ class BoxServiceModel {
     String? icon,
     int? thuTu,
     String? loaiBoxDichVuEnum,
-  }) =>
-      BoxServiceModel(
-        guid: guid ?? this.guid,
-        tenBoxDichVu: tenBoxDichVu ?? this.tenBoxDichVu,
-        icon: icon ?? this.icon,
-        loaiBoxDichVuEnum: loaiBoxDichVuEnum ?? this.loaiBoxDichVuEnum,
-        thuTu: thuTu ?? this.thuTu,
-      );
+  }) => BoxServiceModel(
+    guid: guid ?? this.guid,
+    tenBoxDichVu: tenBoxDichVu ?? this.tenBoxDichVu,
+    icon: icon ?? this.icon,
+    loaiBoxDichVuEnum: loaiBoxDichVuEnum ?? this.loaiBoxDichVuEnum,
+    thuTu: thuTu ?? this.thuTu,
+  );
 
   factory BoxServiceModel.fromJson(Map<String, dynamic> json) =>
       BoxServiceModel(
@@ -77,6 +76,12 @@ extension BoxService on String {
         return HomeService.PhanAnhHienTruong;
       case "TheSinhVien":
         return HomeService.TheSinhVien;
+      case "DongBo":
+      case "DongBoKtx":
+      case "DongBoNoiTru":
+      case "KtxSync":
+      case "SyncKtx":
+        return HomeService.DongBo;
     }
 
     return null;

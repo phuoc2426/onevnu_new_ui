@@ -3,6 +3,9 @@ import 'constant.dart';
 const kBaseUrlDormitory =
     "https://onevnu-mobile-api.vnu.edu.vn/api-dms/api/v1/";
 
+const kBaseUrlNewDormitory =
+    "https://ktx.sohatech.vn/api/dormitory/";
+
 const kPackageName = 'vnu_core';
 const kKhuVucKhac = "KHU_VUC_KHAC";
 const kHoaLac = "HOA_LAC";

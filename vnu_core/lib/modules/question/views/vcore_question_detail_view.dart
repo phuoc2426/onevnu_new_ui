@@ -53,7 +53,7 @@ class VcoreQuestionDetailView extends GetView<VcoreQuestionDetailController> {
                                 child: Text(
                                   question.cauHoi ?? '',
                                   style: TextStyles.semiBold.copyWith(
-                                      fontSize: 15,
+                                      fontSize: AppFontSizes.mediumLarge,
                                       color: const Color(0xff181E39)),
                                 ),
                               )
@@ -125,7 +125,7 @@ class VcoreQuestionDetailView extends GetView<VcoreQuestionDetailController> {
           child: Text(
             title,
             style: TextStyles.regular
-                .copyWith(fontSize: 15, color: const Color(0xff003392)),
+                .copyWith(fontSize: AppFontSizes.mediumLarge, color: const Color(0xff003392)),
           ),
         ),
         Expanded(
@@ -133,7 +133,7 @@ class VcoreQuestionDetailView extends GetView<VcoreQuestionDetailController> {
           child: Text(
             content,
             style: TextStyles.regular
-                .copyWith(fontSize: 15, color: const Color(0xff637392)),
+                .copyWith(fontSize: AppFontSizes.mediumLarge, color: const Color(0xff637392)),
           ),
         ),
       ],
@@ -175,7 +175,7 @@ class VcoreQuestionDetailView extends GetView<VcoreQuestionDetailController> {
               child: Text(
                 'Trả lời',
                 style: TextStyles.semiBold
-                    .copyWith(fontSize: 15, color: const Color(0xff181E39)),
+                    .copyWith(fontSize: AppFontSizes.mediumLarge, color: const Color(0xff181E39)),
               ),
             )
           ],
@@ -201,7 +201,7 @@ class VcoreQuestionDetailView extends GetView<VcoreQuestionDetailController> {
         spaceHeight(16),
         Text(
           cauTraLoi.traLoi ?? '',
-          style: TextStyles.regular.copyWith(fontSize: 15),
+          style: TextStyles.regular.copyWith(fontSize: AppFontSizes.mediumLarge),
         ),
         spaceHeight(16),
         Visibility(

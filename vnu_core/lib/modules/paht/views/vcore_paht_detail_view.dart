@@ -68,7 +68,7 @@ class VcorePahtDetailView extends GetView<VcorePahtDetailController> {
                                         controller.model.value?.tieuDePhanAnh ??
                                             '',
                                         style: TextStyles.semiBold.copyWith(
-                                            fontSize: 15,
+                                            fontSize: AppFontSizes.mediumLarge,
                                             color:
                                                 AppTheme.backgroundBlueColor),
                                       ),
@@ -117,7 +117,7 @@ class VcorePahtDetailView extends GetView<VcorePahtDetailController> {
                                     controller.model.value?.noiDungPhanAnh ??
                                         '',
                                     style: TextStyles.regular
-                                        .copyWith(fontSize: 15),
+                                        .copyWith(fontSize: AppFontSizes.mediumLarge),
                                   ),
                                 ),
 
@@ -207,14 +207,14 @@ class VcorePahtDetailView extends GetView<VcorePahtDetailController> {
           child: Text(
             title,
             style: TextStyles.regular
-                .copyWith(fontSize: 15, color: AppTheme.backgroundBlueColor),
+                .copyWith(fontSize: AppFontSizes.mediumLarge, color: AppTheme.backgroundBlueColor),
           ),
         ),
         Flexible(
           child: Text(
             info,
             style: TextStyles.regular.copyWith(
-                fontSize: 15, color: textColor ?? const Color(0xff637392)),
+                fontSize: AppFontSizes.mediumLarge, color: textColor ?? const Color(0xff637392)),
           ),
         )
       ],
@@ -244,7 +244,7 @@ class VcorePahtDetailView extends GetView<VcorePahtDetailController> {
           Text(
             'Tệp đính kèm: ',
             style: TextStyles.regular
-                .copyWith(fontSize: 15, color: AppTheme.backgroundBlueColor),
+                .copyWith(fontSize: AppFontSizes.mediumLarge, color: AppTheme.backgroundBlueColor),
           ),
           spaceHeight(10),
           ListView.builder(
@@ -265,7 +265,7 @@ class VcorePahtDetailView extends GetView<VcorePahtDetailController> {
                     child: Text(
                       file.name ?? '',
                       style: TextStyles.italic.copyWith(
-                          fontSize: 15, color: AppTheme.backgroundBlueColor),
+                          fontSize: AppFontSizes.mediumLarge, color: AppTheme.backgroundBlueColor),
                     ),
                   ),
                 );
@@ -355,7 +355,7 @@ class VcorePahtDetailView extends GetView<VcorePahtDetailController> {
             Text(
               'Kết quả xử lý',
               style: TextStyles.semiBold
-                  .copyWith(fontSize: 15, color: AppTheme.backgroundBlueColor),
+                  .copyWith(fontSize: AppFontSizes.mediumLarge, color: AppTheme.backgroundBlueColor),
             )
           ],
         ),
@@ -363,7 +363,7 @@ class VcorePahtDetailView extends GetView<VcorePahtDetailController> {
         // detail
         Text(
           controller.xylyModel.value?.noiDungXuLy ?? '',
-          style: TextStyles.regular.copyWith(fontSize: 15),
+          style: TextStyles.regular.copyWith(fontSize: AppFontSizes.mediumLarge),
         )
       ],
     );

@@ -62,17 +62,21 @@ class ApiInterceptor extends Interceptor {
 
     var connectivityResult =
         (await Connectivity().checkConnectivity()).firstOrNull;
-    var customError =
-        CustomDioError(requestOptions: err.requestOptions, type: err.type);
+    var customError = CustomDioError(
+      requestOptions: err.requestOptions,
+      response: err.response,
+      type: err.type,
+    );
 
     if (connectivityResult == ConnectivityResult.none) {
       customError.error =
           "Không có kết nối Internet. Vui lòng kiểm tra lại kết nối Internet.";
       customError.isNetworkConnected = false;
+    } else if (err.response?.statusCode == 413) {
+      customError.error =
+          "Tệp tải lên quá lớn. Vui lòng chọn file nhỏ hơn hoặc nén ảnh trước khi tải lên.";
     } else if (err.response != null && err.response?.data is Map) {
-      if ((err.response?.data as Map).containsKey("message")) {
-        customError.error = (err.response?.data as Map)['message'] ?? '';
-      }
+      customError.error = _formatApiError(err.response?.data as Map);
     } else {
       customError.error = "";
       if (customError.type == DioExceptionType.receiveTimeout ||
@@ -91,6 +95,59 @@ class ApiInterceptor extends Interceptor {
       }
     }
     super.onError(customError, handler);
+  }
+
+  String _formatApiError(Map data) {
+    final parts = <String>[];
+    final message = data['message']?.toString();
+    if (message != null && message.trim().isNotEmpty) {
+      parts.add(message.trim());
+    }
+
+    final errors = data['errors'];
+    if (errors is Map) {
+      errors.forEach((key, value) {
+        if (value is Iterable) {
+          for (final item in value) {
+            final text = item?.toString().trim() ?? '';
+            if (text.isNotEmpty) {
+              parts.add('$key: $text');
+            }
+          }
+        } else {
+          final text = value?.toString().trim() ?? '';
+          if (text.isNotEmpty) {
+            parts.add('$key: $text');
+          }
+        }
+      });
+    } else if (errors is Iterable) {
+      for (final item in errors) {
+        if (item is Map) {
+          final field = item['field']?.toString();
+          final errorMessage = item['message']?.toString();
+          if ((errorMessage ?? '').trim().isNotEmpty) {
+            parts.add(
+              (field ?? '').trim().isNotEmpty
+                  ? '$field: ${errorMessage!.trim()}'
+                  : errorMessage!.trim(),
+            );
+          }
+        } else {
+          final text = item?.toString().trim() ?? '';
+          if (text.isNotEmpty) {
+            parts.add(text);
+          }
+        }
+      }
+    }
+
+    final traceId = data['traceId']?.toString();
+    if (traceId != null && traceId.trim().isNotEmpty) {
+      parts.add('traceId: ${traceId.trim()}');
+    }
+
+    return parts.isEmpty ? '' : parts.join('\n');
   }
 }
 

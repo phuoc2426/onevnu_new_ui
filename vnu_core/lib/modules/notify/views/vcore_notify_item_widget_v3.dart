@@ -73,7 +73,7 @@ class VcoreNotifyItemWidgetV3 extends StatelessWidget {
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyles.semiBold.copyWith(
-                            fontSize: 14.5,
+                            fontSize: AppFontSizes.font14_5,
                             color: isRead ? const Color(0xff4A5568) : const Color(0xff1A202C),
                             fontWeight: isRead ? FontWeight.w500 : FontWeight.bold,
                           ),
@@ -86,7 +86,7 @@ class VcoreNotifyItemWidgetV3 extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyles.regular.copyWith(
-                              fontSize: 12.5,
+                              fontSize: AppFontSizes.font12_5,
                               color: const Color(0xff718096),
                             ),
                           ),
@@ -101,7 +101,7 @@ class VcoreNotifyItemWidgetV3 extends StatelessWidget {
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyles.medium.copyWith(
-                                    fontSize: 11,
+                                    fontSize: AppFontSizes.font11,
                                     color: AppColors.darkBlueAccent,
                                   ),
                                 ),
@@ -111,7 +111,7 @@ class VcoreNotifyItemWidgetV3 extends StatelessWidget {
                                 child: Text(
                                   'Phòng Đào tạo',
                                   style: TextStyle(
-                                    fontSize: 11,
+                                    fontSize: AppFontSizes.font11,
                                     color: Color(0xffFF9500),
                                     fontWeight: FontWeight.w500,
                                   ),
@@ -125,7 +125,7 @@ class VcoreNotifyItemWidgetV3 extends StatelessWidget {
                                   DateTimeConst.U_SECOND_FORMAT,
                                 ),
                                 style: TextStyles.regular.copyWith(
-                                  fontSize: 11,
+                                  fontSize: AppFontSizes.font11,
                                   color: const Color(0xffA0AEC0),
                                 ),
                               ),

@@ -96,7 +96,7 @@ class TimeScheduleItemWidget extends StatelessWidget {
         children: [
           Text(
             lichThiHocKyModel.tenHocPhan ?? '',
-            style: TextStyles.semiBold.copyWith(fontSize: 15),
+            style: TextStyles.semiBold.copyWith(fontSize: AppFontSizes.mediumLarge),
           ),
           spaceHeight(10),
           Padding(
@@ -109,7 +109,7 @@ class TimeScheduleItemWidget extends StatelessWidget {
                     child: Text(
                         'Ca: ${lichThiHocKyModel.caThi}. Bắt đầu thi: ${lichThiHocKyModel.gioBatDauThi}',
                         style: TextStyles.regular.copyWith(
-                          fontSize: 13,
+                          fontSize: AppFontSizes.mediumSmall,
                           color: const Color(0xff637392),
                         )))
               ],
@@ -130,7 +130,7 @@ class TimeScheduleItemWidget extends StatelessWidget {
           Expanded(
               child: Text('Ca: 1. Bắt đầu thi: 08:00. Thời gian thi: 90 Phút',
                   style: TextStyles.regular.copyWith(
-                    fontSize: 13,
+                    fontSize: AppFontSizes.mediumSmall,
                     color: const Color(0xff637392),
                   )))
         ],

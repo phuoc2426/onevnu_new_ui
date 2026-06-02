@@ -28,7 +28,7 @@ class _VcoreQuestionItemWidgetState extends State<VcoreQuestionItemWidget> {
           children: [
             Text(
               widget.question.cauHoi ?? '',
-              style: TextStyles.semiBold.copyWith(fontSize: 16),
+              style: TextStyles.semiBold.copyWith(fontSize: AppFontSizes.large),
               maxLines: 2,
             ),
             spaceHeight(12),

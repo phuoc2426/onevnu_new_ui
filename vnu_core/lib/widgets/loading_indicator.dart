@@ -42,7 +42,7 @@ class _LoadingIndicatorState extends State<LoadingIndicator> {
         child: _endLoading
             ? const SizedBox()
             : CupertinoActivityIndicator(
-                color: widget.color ?? AppTheme.backgroundBlueColor,
+                color: widget.color ?? AppTheme.colorMain,
                 radius: widget.radius,
               ),
       ),

@@ -382,7 +382,7 @@ class _VcoreNewsViewV2State extends State<VcoreNewsViewV2> {
             child: Text(
               'Tin mới nhất',
               style: TextStyles.bold.copyWith(
-                fontSize: 15,
+                fontSize: AppFontSizes.mediumLarge,
                 color: const Color(0xff181E39),
               ),
             ),
@@ -514,7 +514,7 @@ class _VcoreNewsViewV2State extends State<VcoreNewsViewV2> {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyles.medium.copyWith(
-                    fontSize: 14,
+                    fontSize: AppFontSizes.medium,
                     color: const Color(0xff181E39),
                     height: 1.3,
                   ),
@@ -525,7 +525,7 @@ class _VcoreNewsViewV2State extends State<VcoreNewsViewV2> {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyles.regular.copyWith(
-                    fontSize: 12,
+                    fontSize: AppFontSizes.small,
                     color: const Color(0xff637392),
                     height: 1.3,
                   ),

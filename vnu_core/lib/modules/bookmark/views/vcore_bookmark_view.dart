@@ -123,7 +123,7 @@ class VcoreBookmarkView extends GetView<VcoreBookmarkController> {
                                                         .copyWith(
                                                             color: const Color(
                                                                 0xff003392),
-                                                            fontSize: 15),
+                                                            fontSize: AppFontSizes.mediumLarge),
                                                   ),
                                                 ),
                                                 // Input content

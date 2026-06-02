@@ -43,7 +43,7 @@ class _VcoreSystemNewsItemWidgetState extends State<VcoreSystemNewsItemWidget> {
                           child: Text(
                             widget.tinTucModel.nguonTin ?? '',
                             style: TextStyles.regular.copyWith(
-                                fontSize: 13, color: const Color(0xff003392)),
+                                fontSize: AppFontSizes.mediumSmall, color: const Color(0xff003392)),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis, // nếu dài quá sẽ thành ...
                           ),
@@ -54,7 +54,7 @@ class _VcoreSystemNewsItemWidgetState extends State<VcoreSystemNewsItemWidget> {
                               widget.tinTucModel.thoiGian,
                               DateTimeConst.DATE_FORMAT),
                           style: TextStyles.regular.copyWith(
-                              fontSize: 13, color: const Color(0xff8E8E8E)),
+                              fontSize: AppFontSizes.mediumSmall, color: const Color(0xff8E8E8E)),
                         ),
                       ],
                     )
