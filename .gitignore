@@ -162,3 +162,5 @@ temp_aar_check/
 **/.kotlin/
 build/
 .dart_tool/
+.txt
+.md

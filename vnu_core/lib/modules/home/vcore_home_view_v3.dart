@@ -37,6 +37,7 @@ import 'package:vnu_core/widgets/progress_hub_widget.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:vnu_core/common/app_text_styles.dart';
+import 'package:vnu_core/modules/question/views/vcore_question_view.dart';
 /* -------------------------------------------------------------------------- */
 /*                       LOCAL NOTIFICATION SERVICE                           */
 /* -------------------------------------------------------------------------- */
@@ -185,29 +186,28 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
     'Lịch học & thi',
     'Điểm',
     'Học bổng',
-    'Học bổng',
     'Việc làm',
     // 'Đồng bộ' tạm ẩn
   ];
 
   static final List<_FunctionItem> _allAvailableFunctions = [
-    _FunctionItem('Lịch học & thi', Colors.blue),
-    _FunctionItem('Điểm', Colors.purple),
-    _FunctionItem('Đăng ký môn', Colors.orange),
-    _FunctionItem('Việc làm', Colors.green),
-    _FunctionItem('Đồng bộ', Colors.indigo),
-    _FunctionItem('Học phí', Colors.teal),
-    _FunctionItem('Tài liệu', Colors.blue),
-    _FunctionItem('Điểm danh', Colors.green),
-    _FunctionItem('Học bổng', Colors.purple),
-    _FunctionItem('Phản ánh', Colors.orange),
-    _FunctionItem('Nội trú', Colors.purple),
-    _FunctionItem('Phòng trọ', Colors.teal),
-    _FunctionItem('Phòng trọ', Colors.teal),
-    _FunctionItem('Thủ tục', Colors.green),
-    _FunctionItem('Thư viện', Colors.amber),
-    _FunctionItem('Bản đồ', Colors.blue),
-    _FunctionItem('Khác', Colors.grey),
+    _FunctionItem('Lịch học & thi', Color.fromRGBO(0, 122, 255, 1)),      // Xanh dương
+    _FunctionItem('Điểm', Color.fromRGBO(175, 82, 222, 1)),              // Tím
+    _FunctionItem('Đăng ký môn', Color.fromRGBO(255, 149, 0, 1)),        // Cam
+    _FunctionItem('Việc làm', Color.fromRGBO(48, 209, 88, 1)),           // Xanh lá
+    _FunctionItem('Đồng bộ', Color.fromRGBO(90, 200, 250, 1)),           // Xanh ngọc
+    _FunctionItem('Học phí', Color.fromRGBO(255, 45, 85, 1)),            // Hồng đỏ
+    _FunctionItem('Tài liệu', Color.fromRGBO(94, 92, 230, 1)),           // Indigo
+    _FunctionItem('Điểm danh', Color.fromRGBO(52, 199, 89, 1)),          // Emerald
+    _FunctionItem('Học bổng', Color.fromRGBO(255, 55, 95, 1)),           // Rose
+    _FunctionItem('Phản ánh', Color.fromRGBO(255, 204, 0, 1)),           // Vàng
+    _FunctionItem('Nội trú', Color.fromRGBO(191, 90, 242, 1)),           // Lavender
+    _FunctionItem('Phòng trọ', Color.fromRGBO(0, 199, 190, 1)),          // Turquoise
+    _FunctionItem('Thủ tục', Color.fromRGBO(118, 214, 78, 1)),           // Lime
+    _FunctionItem('Thư viện', Color.fromRGBO(255, 159, 10, 1)),          // Gold
+    _FunctionItem('Bản đồ', Color.fromRGBO(50, 173, 230, 1)),            // Ocean
+    _FunctionItem('Hỏi đáp', Color.fromRGBO(255, 55, 145, 1)),           // Magenta
+    _FunctionItem('Cẩm nang', Color.fromRGBO(142, 142, 147, 1)),         // Gray
   ];
 
   static final Map<String, List<_FunctionItem>> _groupedFunctions = {
@@ -230,6 +230,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
             'Nội trú',
             'Phản ánh',
             'Đồng bộ',
+            'Hỏi đáp'
           ].contains(e.label),
         )
         .toList(),
@@ -241,7 +242,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
             'Bản đồ',
             'Việc làm',
             'Phòng trọ',
-            'Khác',
+            'Cẩm nang',
           ].contains(e.label),
         )
         .toList(),
@@ -354,7 +355,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
       case 'Học bổng':
         Get.to(() => VnuHocBong.screen());
         break;
-      case 'Khác':
+      case 'Cẩm nang':
         Get.to(() => const VcoreCamNangView());
         break;
       case 'Việc làm':
@@ -363,6 +364,9 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
       case 'Đồng bộ':
         // snackBarWarning('Chức năng đang hoàn thiện');
         Get.to(() => VcoreSyncView());
+        break;
+      case 'Hỏi đáp':
+        Get.to(() =>  VcoreQuestionView());
         break;
       default:
         snackBarWarning('Chức năng đang hoàn thiện');

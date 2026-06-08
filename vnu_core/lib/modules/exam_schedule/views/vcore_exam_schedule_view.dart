@@ -13,6 +13,10 @@ import '../controllers/vcore_exam_schedule_controller.dart';
 import '../../../models/model.dart';
 
 class VcoreExamScheduleView extends StatelessWidget {
+  static const Color _classColor = AppColors.greenAccent;
+  static const Color _examColor = Color(0xFFFFB703);
+  static const Color _examLightColor = Color(0xFFFFF8E1);
+  static const Color _examBorderColor = Color(0xFFFFECB3);
   /// Optional: jump calendar to this date on open
   final DateTime? initialDate;
 
@@ -38,8 +42,8 @@ class VcoreExamScheduleView extends StatelessWidget {
           },
           child: VcoreModuleScaffold(
             title: 'Lịch học & lịch thi',
-            body: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 0),
+            body: Container(
+              color: const Color(0xFFF6F7FB),
               child: Obx(() {
                 if (controller.danhSachHocKy.isEmpty &&
                     controller.isLoading.value) {
@@ -69,9 +73,12 @@ class VcoreExamScheduleView extends StatelessWidget {
 
                       const SizedBox(height: 12),
 
-                      _buildEventsHeader(context, controller),
-
-                      _buildEventsList(context, controller),
+                      if (!controller.showIncompleteExams.value) ...[
+                        _buildEventsHeader(context, controller),
+                        _buildEventsList(context, controller),
+                      ] else ...[
+                        _buildIncompleteExamsList(controller),
+                      ],
 
                       const SizedBox(height: 40),
                     ],
@@ -169,6 +176,7 @@ class VcoreExamScheduleView extends StatelessWidget {
                   fontSize: AppFontSizes.medium, color: Colors.red.shade700),
             ),
             onDaySelected: (selectedDay, focusedDay) {
+              controller.showIncompleteExams.value = false;
               controller.selectedDay.value = selectedDay;
               controller.focusedDay.value = focusedDay;
               controller.updateSelectedEvents();
@@ -210,7 +218,7 @@ class VcoreExamScheduleView extends StatelessWidget {
                           height: 5,
                           decoration: const BoxDecoration(
                             shape: BoxShape.circle,
-                            color: AppColors.orangeAccent,
+                            color: _examColor,
                           ),
                         ),
                     ],
@@ -258,6 +266,7 @@ class VcoreExamScheduleView extends StatelessWidget {
           ),
           const Divider(height: 1, thickness: 0.5, indent: 16, endIndent: 16),
           _buildCalendarLegend(),
+          _buildModeSelector(controller),
         ],
       ),
     );
@@ -265,37 +274,62 @@ class VcoreExamScheduleView extends StatelessWidget {
 
   Widget _buildCalendarLegend() {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Wrap(
+        alignment: WrapAlignment.center,
+        runAlignment: WrapAlignment.center,
+        spacing: 14,
+        runSpacing: 8,
         children: [
           _buildLegendItem(AppColors.greenAccent, 'Có lớp học'),
-          const SizedBox(width: 24),
-          _buildLegendItem(AppColors.orangeAccent, 'Có lịch thi'),
-          const SizedBox(width: 24),
+          _buildLegendItem(_examColor, 'Có lịch thi'),
           _buildLegendItem(AppColors.blueAccent, 'Hôm nay'),
+          _buildLegendItem(
+            AppColors.blueAccent,
+            'Sắp diễn ra',
+            icon: Icons.access_time_rounded,
+          ),
+          _buildLegendItem(
+            _classColor,
+            'Đã học',
+            icon: Icons.check_circle_outline_rounded,
+          ),
+          _buildLegendItem(
+            _examColor,
+            'Đã diễn ra',
+            icon: Icons.check_circle_outline_rounded,
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildLegendItem(Color color, String text) {
+  Widget _buildLegendItem(
+      Color color,
+      String text, {
+        IconData? icon,
+      }) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-          ),
-        ),
-        const SizedBox(width: 6),
+        if (icon == null)
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+            ),
+          )
+        else
+          Icon(icon, size: 13, color: color),
+        const SizedBox(width: 5),
         Text(
           text,
           style: TextStyles.medium.copyWith(
-              fontSize: AppFontSizes.small, color: Colors.grey.shade600),
+            fontSize: AppFontSizes.font11,
+            color: Colors.grey.shade600,
+          ),
         ),
       ],
     );
@@ -425,35 +459,56 @@ class VcoreExamScheduleView extends StatelessWidget {
     );
   }
 
-  Widget _buildTimelineEventRow(BuildContext context, ScheduleEvent event, bool isFirst,
-      bool isLast) {
+  Widget _buildTimelineEventRow(
+      BuildContext context,
+      ScheduleEvent event,
+      bool isFirst,
+      bool isLast,
+      ) {
     final isClass = event.type == ScheduleType.classSession;
-    final timeRange = _mapTietToTime(event.startTime, event.endTime);
-    final parts = timeRange.split(' - ');
-    final start = parts.isNotEmpty ? parts[0] : '';
-    final end = parts.length > 1 ? parts[1] : '';
+    final clockRange = _mapTietToTime(event.startTime, event.endTime);
+    final lessonRange = _formatLessonRange(event);
+    final clockParts = clockRange.split(' - ');
+
+    final timelinePrimary = isClass
+        ? (lessonRange.isNotEmpty ? lessonRange : 'Tiết học')
+        : (clockParts.isNotEmpty ? clockParts[0] : '');
+    final timelineSecondary = isClass
+        ? clockRange
+        : (clockParts.length > 1 ? clockParts[1] : '');
 
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           SizedBox(
-            width: 45,
+            width: 75,
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Text(
-                  start,
+                  timelinePrimary,
                   style: TextStyles.bold.copyWith(
-                      fontSize: AppFontSizes.mediumSmall, color: Colors.grey.shade700),
+                    fontSize: AppFontSizes.mediumSmall,
+                    color: Colors.grey.shade700,
+                  ),
                   textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  end,
-                  style: TextStyles.regular.copyWith(
-                      fontSize: AppFontSizes.font11, color: Colors.grey.shade500),
-                  textAlign: TextAlign.center,
+                const SizedBox(height: 4),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    timelineSecondary,
+                    style: TextStyles.regular.copyWith(
+                      fontSize: AppFontSizes.font11,
+                      color: Colors.grey.shade500,
+                    ),
+                    maxLines: 1,
+                    softWrap: false,
+                  ),
                 ),
               ],
             ),
@@ -479,8 +534,10 @@ class VcoreExamScheduleView extends StatelessWidget {
     );
   }
 
+
+
   Widget _buildTimelineIndicator(bool isClass, bool isFirst, bool isLast) {
-    final accentColor = isClass ? AppColors.greenAccent : AppColors.orangeAccent;
+    final accentColor = isClass ? _classColor : _examColor;
 
     return Column(
       children: [
@@ -510,7 +567,7 @@ class VcoreExamScheduleView extends StatelessWidget {
 
   Widget _buildEventCard(ScheduleEvent event) {
     final isClass = event.type == ScheduleType.classSession;
-    final borderColor = isClass ? AppColors.calendarBorder : AppColors.calendarExamBorder;
+    final borderColor = isClass ? AppColors.calendarBorder : _examBorderColor;
 
     return Container(
       decoration: BoxDecoration(
@@ -546,12 +603,12 @@ class VcoreExamScheduleView extends StatelessWidget {
                 : Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: AppColors.orangeAccent.withOpacity(0.08),
+                color: _examLightColor,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Icon(
                 Icons.assignment_outlined,
-                color: AppColors.orangeAccent,
+                color: _examColor,
                 size: 20,
               ),
             ),
@@ -632,114 +689,162 @@ class VcoreExamScheduleView extends StatelessWidget {
   }
 
   Widget _buildStatusBadge(ScheduleEvent event) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final eventDate = DateTime(
-        event.date.year, event.date.month, event.date.day);
+    final color = _getStatusColor(event);
+    final icon = _getStatusIcon(event);
+    final text = _getStatusText(event);
 
-    bool isPast = false;
-    if (eventDate.isBefore(today)) {
-      isPast = true;
-    } else if (eventDate.isAtSameMomentAs(today)) {
-      final timeRange = _mapTietToTime(event.startTime, event.endTime);
-      final parts = timeRange.split(' - ');
-      if (parts.length > 1) {
-        final endTimeStr = parts[1];
-        final timeParts = endTimeStr.split(':');
-        if (timeParts.length == 2) {
-          final hour = int.tryParse(timeParts[0]);
-          final minute = int.tryParse(timeParts[1]);
-          if (hour != null && minute != null) {
-            final eventEndTime = DateTime(
-                now.year, now.month, now.day, hour, minute);
-            if (now.isAfter(eventEndTime)) {
-              isPast = true;
-            }
-          }
-        }
-      }
-    }
-
-    final isClass = event.type == ScheduleType.classSession;
-    final text = isPast
-        ? (isClass ? 'Đã vào học' : 'Đã diễn ra')
-        : 'Sắp diễn ra';
-    final color = isPast ? AppColors.greenAccent : (isClass ? AppColors.blueAccent : AppColors.orangeAccent);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.2), width: 0.5),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            isPast ? Icons.check_circle_outline : Icons.access_time,
-            size: 12,
-            color: color,
+    return Tooltip(
+      message: text,
+      child: Container(
+        width: 30,
+        height: 30,
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.08),
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: color.withOpacity(0.2),
+            width: 0.5,
           ),
-          const SizedBox(width: 4),
-          Text(
-            text,
-            style: TextStyles.semiBold.copyWith(fontSize: AppFontSizes.extraSmall, color: color),
-          ),
-        ],
+        ),
+        child: Icon(
+          icon,
+          size: 16,
+          color: color,
+        ),
       ),
     );
   }
 
+  bool _isEventPast(ScheduleEvent event) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final eventDate = DateTime(
+      event.date.year,
+      event.date.month,
+      event.date.day,
+    );
+
+    if (eventDate.isBefore(today)) return true;
+    if (eventDate.isAfter(today)) return false;
+
+    final timeRange = _mapTietToTime(event.startTime, event.endTime);
+    final parts = timeRange.split(' - ');
+    if (parts.length < 2) return false;
+
+    final endTimeStr = parts[1].trim();
+    final timeParts = endTimeStr.split(':');
+    if (timeParts.length != 2) return false;
+
+    final hour = int.tryParse(timeParts[0]);
+    final minute = int.tryParse(timeParts[1]);
+    if (hour == null || minute == null) return false;
+
+    final eventEndTime = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      hour,
+      minute,
+    );
+
+    return now.isAfter(eventEndTime);
+  }
+
+  String _getStatusText(ScheduleEvent event) {
+    final isClass = event.type == ScheduleType.classSession;
+    final isPast = _isEventPast(event);
+
+    if (!isPast) return 'Sắp diễn ra';
+    return isClass ? 'Đã học' : 'Đã diễn ra';
+  }
+
+  Color _getStatusColor(ScheduleEvent event) {
+    final isClass = event.type == ScheduleType.classSession;
+    final isPast = _isEventPast(event);
+
+    if (!isPast) return AppColors.blueAccent;
+    return isClass ? _classColor : _examColor;
+  }
+
+  IconData _getStatusIcon(ScheduleEvent event) {
+    final isPast = _isEventPast(event);
+
+    return isPast
+        ? Icons.check_circle_outline_rounded
+        : Icons.access_time_rounded;
+  }
+
   String _mapTietToTime(String startTime, String endTime) {
+    if (startTime.trim().isEmpty && endTime.trim().isEmpty) {
+      return 'Chưa có giờ';
+    }
+
+    // Exam API may already return a concrete time such as HH:mm.
     if (startTime.contains(':') || endTime.contains(':')) {
+      if (endTime.trim().isEmpty || endTime.contains('phút')) {
+        return startTime.trim().isEmpty ? 'Chưa có giờ' : startTime.trim();
+      }
+      return '${startTime.trim()} - ${endTime.trim()}';
+    }
+
+    final startLesson = int.tryParse(startTime.replaceAll(RegExp(r'[^0-9]'), ''));
+    final endLesson = int.tryParse(endTime.replaceAll(RegExp(r'[^0-9]'), ''));
+
+    if (startLesson == null || endLesson == null) {
       return '$startTime - $endTime';
     }
 
-    final startNum = int.tryParse(startTime.replaceAll(RegExp(r'[^0-9]'), ''));
-    final endNum = int.tryParse(endTime.replaceAll(RegExp(r'[^0-9]'), ''));
-
-    if (startNum == null || endNum == null) {
-      if (startTime.isEmpty && endTime.isEmpty) return 'Chưa có giờ';
-      return '$startTime - $endTime';
-    }
-
-    final startTimes = {
+    const lessonStartTimes = <int, String>{
       1: '07:00',
-      2: '07:55',
-      3: '08:50',
-      4: '09:55',
-      5: '10:50',
+      2: '08:00',
+      3: '09:00',
+      4: '10:00',
+      5: '11:00',
       6: '13:00',
-      7: '13:55',
-      8: '14:50',
-      9: '15:55',
-      10: '16:50',
-      11: '17:45',
-      12: '18:40',
+      7: '14:00',
+      8: '15:00',
+      9: '16:00',
+      10: '17:00',
+      11: '18:00',
+      12: '19:00',
+      13: '20:00',
     };
 
-    final endTimes = {
+    const lessonEndTimes = <int, String>{
       1: '07:50',
-      2: '08:45',
-      3: '09:40',
-      4: '10:45',
-      5: '11:40',
+      2: '08:50',
+      3: '09:50',
+      4: '10:50',
+      5: '11:50',
       6: '13:50',
-      7: '14:45',
-      8: '15:40',
-      9: '16:45',
-      10: '17:40',
-      11: '18:35',
-      12: '19:30',
+      7: '14:50',
+      8: '15:50',
+      9: '16:50',
+      10: '17:50',
+      11: '18:50',
+      12: '19:50',
+      13: '20:50',
     };
 
-    final startStr = startTimes[startNum] ?? '07:00';
-    final endStr = endTimes[endNum] ?? '11:50';
+    final startStr = lessonStartTimes[startLesson] ?? 'Tiết $startLesson';
+    final endStr = lessonEndTimes[endLesson] ?? 'Tiết $endLesson';
 
     return '$startStr - $endStr';
   }
 
+  String _formatLessonRange(ScheduleEvent event) {
+    if (event.type != ScheduleType.classSession) return '';
+
+    final startLesson = int.tryParse(
+      event.startTime.replaceAll(RegExp(r'[^0-9]'), ''),
+    );
+    final endLesson = int.tryParse(
+      event.endTime.replaceAll(RegExp(r'[^0-9]'), ''),
+    );
+
+    if (startLesson == null || endLesson == null) return '';
+    return 'Tiết $startLesson - $endLesson';
+  }
   void _showFilterBottomSheet(BuildContext context,
       VcoreExamScheduleController controller) {
     Get.bottomSheet(
@@ -992,9 +1097,9 @@ class VcoreExamScheduleView extends StatelessWidget {
 
   void _showEventDetailBottomSheet(BuildContext context, ScheduleEvent event) {
     final isClass = event.type == ScheduleType.classSession;
-    final accentColor = isClass ? AppColors.greenAccent : AppColors.orangeAccent;
-    final bgLightColor = isClass ? AppColors.classCardBg : AppColors.examCardBg;
-    final borderLightColor = isClass ? AppColors.classCardBorder : AppColors.examCardBorder;
+    final accentColor = isClass ? _classColor : _examColor;
+    final bgLightColor = isClass ? AppColors.classCardBg : _examLightColor;
+    final borderLightColor = isClass ? AppColors.classCardBorder : _examBorderColor;
 
     final rawDate = event.date;
     final dayOfWeek = _getVietnameseDayOfWeek(rawDate.weekday);
@@ -1002,6 +1107,13 @@ class VcoreExamScheduleView extends StatelessWidget {
     final displayDate = '$dayOfWeek, $dateStr';
 
     final timeRange = _mapTietToTime(event.startTime, event.endTime);
+    final lessonRange = _formatLessonRange(event);
+    final timeValue = isClass && lessonRange.isNotEmpty
+        ? '$lessonRange\n$timeRange\n$displayDate'
+        : '$timeRange\n$displayDate';
+    final sourceLabel = isClass
+        ? 'Nguồn: Thời khóa biểu học kỳ'
+        : 'Nguồn: Lịch thi học kỳ';
 
     Get.bottomSheet(
       Container(
@@ -1072,20 +1184,30 @@ class VcoreExamScheduleView extends StatelessWidget {
               const SizedBox(height: 20),
               const Divider(height: 1, thickness: 0.5),
               const SizedBox(height: 20),
-              
+
               // Time & Date row
+              Text(
+                sourceLabel,
+                style: TextStyles.medium.copyWith(
+                  fontSize: AppFontSizes.small,
+                  color: accentColor,
+                ),
+              ),
+              const SizedBox(height: 12),
+
+// Time & Date row
               _buildDetailItem(
                 icon: Icons.access_time_rounded,
-                iconColor: AppColors.blueAccent,
+                iconColor: accentColor,
                 title: 'Thời gian',
-                value: '$timeRange\n$displayDate',
+                value: timeValue,
               ),
               const SizedBox(height: 16),
 
-              // Location row
+// Location row
               _buildDetailItem(
                 icon: Icons.location_on_rounded,
-                iconColor: AppColors.error,
+                iconColor: accentColor,
                 title: 'Địa điểm / Phòng',
                 value: event.location.isNotEmpty ? event.location : 'Chưa cập nhật địa điểm',
               ),
@@ -1114,7 +1236,7 @@ class VcoreExamScheduleView extends StatelessWidget {
                 if (event.hinhThucThi != null && event.hinhThucThi!.isNotEmpty) ...[
                   _buildDetailItem(
                     icon: Icons.assignment_rounded,
-                    iconColor: AppColors.orangeAccent,
+                    iconColor: _examColor,
                     title: 'Hình thức thi',
                     value: event.hinhThucThi!,
                   ),
@@ -1123,7 +1245,7 @@ class VcoreExamScheduleView extends StatelessWidget {
                 if (event.caThi != null && event.caThi!.isNotEmpty) ...[
                   _buildDetailItem(
                     icon: Icons.calendar_today_rounded,
-                    iconColor: AppColors.blueAccent,
+                    iconColor: _examColor,
                     title: 'Ca thi',
                     value: 'Ca ${event.caThi}',
                   ),
@@ -1139,7 +1261,7 @@ class VcoreExamScheduleView extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
               ],
-              
+
               const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
@@ -1205,6 +1327,298 @@ class VcoreExamScheduleView extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildModeSelector(VcoreExamScheduleController controller) {
+    return Obx(() {
+      final count = controller.incompleteExams.length;
+      final isTheoNgay = !controller.showIncompleteExams.value;
+
+      return Container(
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        height: 52,
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF1F3F5),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final itemWidth = constraints.maxWidth / 2;
+
+            return Stack(
+              children: [
+                AnimatedAlign(
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeOutCubic,
+                  alignment:
+                  isTheoNgay ? Alignment.centerLeft : Alignment.centerRight,
+                  child: SizedBox(
+                    width: itemWidth,
+                    height: double.infinity,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(11),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.06),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildModeButton(
+                        label: 'Theo ngày',
+                        selected: isTheoNgay,
+                        onTap: () => controller.showIncompleteExams.value = false,
+                      ),
+                    ),
+                    Expanded(
+                      child: _buildModeButton(
+                        label: 'Chưa cập nhật',
+                        selected: !isTheoNgay,
+                        count: count,
+                        onTap: () => controller.showIncompleteExams.value = true,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            );
+          },
+        ),
+      );
+    });
+  }
+
+  Widget _buildModeButton({
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+    int? count,
+  }) {
+    final hasCount = count != null && count > 0;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: AnimatedDefaultTextStyle(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: selected ? FontWeight.bold : FontWeight.w500,
+          color: selected ? const Color(0xFF18A957) : Colors.grey.shade600,
+        ),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (hasCount) ...[
+                  const SizedBox(width: 5),
+                  Container(
+                    constraints: const BoxConstraints(minWidth: 22),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF8E6),
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(
+                        color: const Color(0xFFFFE8CC),
+                        width: 0.5,
+                      ),
+                    ),
+                    child: Text(
+                      '$count',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.bold,
+                        color: _examColor,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildIncompleteExamsList(VcoreExamScheduleController controller) {
+    final list = controller.incompleteExams;
+
+    if (list.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 40.0),
+        child: Center(
+          child: Column(
+            children: [
+              const Icon(Icons.check_circle_outline_rounded, size: 48, color: Color(0xFF18A957)),
+              const SizedBox(height: 12),
+              Text(
+                'Tất cả lịch thi đã được cập nhật đầy đủ',
+                style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFF8E6),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFFFE8CC), width: 1),
+          ),
+          child: const Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.info_rounded, color: _examColor, size: 18),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Các lịch thi này đã có học phần nhưng chưa được cập nhật đủ ngày, giờ, phòng thi hoặc SBD.',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: Color(0xFF8A6500),
+                    height: 1.35,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        ...list.map((exam) => _buildIncompleteExamCard(exam)),
+      ],
+    );
+  }
+
+  Widget _buildIncompleteExamCard(LichThiHocKyModel exam) {
+    final subjectName = exam.tenHocPhan ?? 'Học phần chưa cập nhật tên';
+    final subjectCode = exam.maHocPhan ?? 'Mã HP';
+    final credits = exam.soTinChi ?? '0';
+    final examType = exam.hinhThucThi ?? 'Chưa cập nhật';
+
+    final date = exam.ngayThi != null && exam.ngayThi!.isNotEmpty ? exam.ngayThi! : 'Chưa cập nhật';
+    final time = exam.gioBatDauThi != null && exam.gioBatDauThi!.isNotEmpty ? exam.gioBatDauThi! : 'Chưa cập nhật';
+    final room = exam.phongThi != null && exam.phongThi!.isNotEmpty ? exam.phongThi! : 'Chưa cập nhật';
+    final sbd = exam.sobaodanh != null && exam.sobaodanh!.isNotEmpty ? exam.sobaodanh! : 'Chưa cập nhật';
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            subjectName,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF212529),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '$subjectCode • $credits tín chỉ',
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.grey.shade600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _examLightColor,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  'Hình thức: $examType',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: _examColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Divider(height: 1, thickness: 0.5, color: Color(0xFFE5E7EB)),
+          const SizedBox(height: 12),
+          _buildInfoRow('Ngày thi', date, isWarning: date == 'Chưa cập nhật'),
+          const SizedBox(height: 6),
+          _buildInfoRow('Giờ thi', time, isWarning: time == 'Chưa cập nhật'),
+          const SizedBox(height: 6),
+          _buildInfoRow('Phòng thi', room, isWarning: room == 'Chưa cập nhật'),
+          const SizedBox(height: 6),
+          _buildInfoRow('SBD', sbd, isWarning: sbd == 'Chưa cập nhật'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value, {bool isWarning = false}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            color: Colors.grey.shade600,
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: isWarning ? FontWeight.bold : FontWeight.w600,
+            color: isWarning ? _examColor : const Color(0xFF212529),
           ),
         ),
       ],

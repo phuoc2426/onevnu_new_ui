@@ -9,7 +9,7 @@ ROOT_DIR = Path(
     r"D:\Data\App\ONEVNU\git\iworkspace_mobile_onevnu-master"
 )
 
-OUTPUT_FILE = Path("CODE_BUNDLE.txt")
+OUTPUT_FILE = Path("CODE_BUNDLE_AVATAR_PROFILE_PASSWORD.txt")
 
 RECURSIVE_SCAN = True
 MAX_LINES_PER_FILE = None
@@ -46,64 +46,159 @@ ALLOWED_EXTENSIONS = {
 
 # tên file exact match
 FIXED_FILE_NAMES = {
-    "pom.xml",
-    "build.gradle",
-    "settings.gradle",
+    # "vcore_news_view_v2.dart",
+    # "vcore_news_view_v3.dart",
+    # "vcore_news_detail_view.dart",
+    # "vcore_news_item_widget.dart",
+    # "vcore_news_tab_widget_v2.dart",
+    # "vcore_news_category_widget_v2.dart",
+    # "vcore_news_filter_widget.dart",
+    # "vcore_news_view.dart",
+    # "vcore_jobs_view_v2.dart",
 
-    "package.json",
-    "angular.json",
-    "tsconfig.json",
+    # # =====================================================
+    # # Controllers
+    # # =====================================================
+    # "vcore_news_controller.dart",
+    # "vcore_news_detail_controller.dart",
+    # "vcore_jobs_controller_v2.dart",
+    # # =====================================================
+    # # Main files
+    # # =====================================================
+    # "grade_scale_helper.dart",
 
-    "application.yml",
-    "application.yaml",
-    "application.properties",
+    # "vcore_exam_schedule_controller.dart",
+    # "vcore_exam_schedule_view.dart",
 
-    "app.module.ts",
-    "app-routing.module.ts",
-    "app.routes.ts",
-    "app.config.ts",
-    "dormitory_registration_cubit.dart",
-"dormitory_registration_state.dart",
-"nt_register_cubit.dart",
-"nt_register_state.dart",
+    # "vcore_course_points_controller.dart",
+    # "vcore_course_points_view.dart",
 
-"dormitory_registration_repository.dart",
-"dormitory_registration_api.dart",
+    # # =====================================================
+    # # Related widgets
+    # # =====================================================
+    # "vcore_dropdown_select_widget.dart",
+    # "vcore_course_points_detail_widget.dart",
 
-"registration_payload_model.dart",
-"my_registration_model.dart",
-"uploaded_attachment_model.dart",
-"registration_period_model.dart",
-"dormitory_model.dart",
-"room_type_model.dart",
-"priority_object_model.dart",
-"registration_history_model.dart",
+    # # =====================================================
+    # # Data / repository
+    # # =====================================================
+    # "gpa_cache_manager.dart",
+    # "app_repository.dart",
+    # "app_api.dart",
+    # "app_api.g.dart",
 
-"dr_wizard_flow.dart",
-"dr_step1_period_screen.dart",
-"dr_step2_dormitory_screen.dart",
-"dr_step3_info_screen.dart",
-"dr_step4_review_screen.dart",
-"dr_my_registration_screen.dart",
-"dr_history_bottom_sheet.dart",
-"nt_register_process_screen.dart",
+    # # =====================================================
+    # # Schedule models
+    # # =====================================================
+    # "hoc_ky_model.dart",
+    # "thoi_khoa_bieu_model.dart",
+    # "lich_thi_hoc_ky_model.dart",
+    # "vcore_schedule_event.dart",
 
-"nt_register_image_widget.dart",
-"nt_register_cmnd_widget.dart",
-"nt_file_da_upload_widget.dart",
-"nt_register_price_widget.dart",
-"nt_register_payment_info.dart",
-"nt_register_infrastructure_widget.dart",
-"nt_custom_dropdown.dart",
-"nt_dropbox_widget.dart",
-"nt_container_dropbox_widget.dart",
-"nt_noitru_item_widget.dart",
+    # # =====================================================
+    # # Grade models
+    # # =====================================================
+    # "diem_thi_hoc_ky_model.dart",
+    # "diem_hoc_phan_model.dart",
+    # "diem_trung_binh_model.dart",
+    # "tong_ket_den_hien_tai_model.dart",
+    # "model.dart",
 
-"nt_boading_register_view.dart",
-"nt_boarding_register_controller.dart",
-"nt_boarding_controller.dart",
+    # # =====================================================
+    # # AI Radar
+    # # =====================================================
+    # "academic_course.dart",
+    # "ai_radar_analysis.dart",
+    # "radar_axis_profile.dart",
+    # "local_ai_radar_engine.dart",
+    # "semantic_axis_discovery_engine.dart",
+    # "semantic_scoring_engine.dart",
+    # "vector_math.dart",
+    # "ai_axis_cache.dart",
+    # "onnx_embedding_model.dart",
+    # "local_embedding_model.dart",
+    # "simple_tokenizer.dart",
 
-"vnu_noi_tru.dart"
+    # # =====================================================
+    # # Entry points
+    # # =====================================================
+    # "vcore_home_view_v3.dart",
+    # "vcore_home_service_widget.dart",
+    # "vcore_home_service_widget_v2.dart",
+    # "vcore_sidebar_widget.dart",
+
+
+    # =====================================================
+# Avatar / Profile Photos
+# =====================================================
+
+"vcore_profile_view.dart",
+"vcore_profile_avatar_widget.dart",
+
+"vcore_profile_photos_view.dart",
+"vcore_profile_photos_controller.dart",
+
+"current_user_model.dart",
+"globals.dart",
+
+"vcore_sidebar_widget.dart",
+"vcore_home_view.dart",
+
+"app_repository.dart",
+"app_api.dart",
+"app_api.g.dart",
+
+# =====================================================
+# Password
+# =====================================================
+
+"vcore_profile_forgot_pass_view.dart",
+"vcore_profile_pass_controller.dart",
+"vcore_profile_change_pass_view.dart",
+
+"loai_mat_khau_model.dart",
+
+"vcore_login_screen_v3.dart",
+
+"app_repository.dart",
+"app_api.dart",
+"app_api.g.dart",
+
+# =====================================================
+# PROFILE / AVATAR / COVER (BACKEND)
+# =====================================================
+
+"NguoiDung.java",
+
+"NguoiDungRequestDTO.java",
+"NguoiDungResponseDTO.java",
+
+"ContextController.java",
+"NguoiDungController.java",
+
+"Constants.java",
+
+# Mobile API
+"ContextController.java",
+"NguoiDungResponseDTO.java",
+
+# =====================================================
+# FORGOT PASSWORD (BACKEND)
+# =====================================================
+
+"QuenMatKhauRequestDTO.java",
+
+"SinhVienService.java",
+"SinhVienServiceImpl.java",
+
+"LoaiPasswordEnum.java",
+
+"DaoTaoServiceImpl.java",
+"LdapServiceImpl.java",
+
+"EmailServiceImpl.java",
+"JavaMailSenderConfig.java",
+
 }
 
 # =========================================================
@@ -112,48 +207,158 @@ FIXED_FILE_NAMES = {
 
 # suffix/pattern match
 FIXED_FILE_PATTERNS = [
-   "dormitory_registration_cubit.dart",
-"dormitory_registration_state.dart",
-"nt_register_cubit.dart",
-"nt_register_state.dart",
+#     "grade_scale_helper.dart",
 
-"dormitory_registration_repository.dart",
-"dormitory_registration_api.dart",
+#     "vcore_exam_schedule_controller.dart",
+#     "vcore_exam_schedule_view.dart",
 
-"registration_payload_model.dart",
-"my_registration_model.dart",
-"uploaded_attachment_model.dart",
-"registration_period_model.dart",
-"dormitory_model.dart",
-"room_type_model.dart",
-"priority_object_model.dart",
-"registration_history_model.dart",
+#     "vcore_course_points_controller.dart",
+#     "vcore_course_points_view.dart",
 
-"dr_wizard_flow.dart",
-"dr_step1_period_screen.dart",
-"dr_step2_dormitory_screen.dart",
-"dr_step3_info_screen.dart",
-"dr_step4_review_screen.dart",
-"dr_my_registration_screen.dart",
-"dr_history_bottom_sheet.dart",
-"nt_register_process_screen.dart",
+#     "vcore_dropdown_select_widget.dart",
+#     "vcore_course_points_detail_widget.dart",
 
-"nt_register_image_widget.dart",
-"nt_register_cmnd_widget.dart",
-"nt_file_da_upload_widget.dart",
-"nt_register_price_widget.dart",
-"nt_register_payment_info.dart",
-"nt_register_infrastructure_widget.dart",
-"nt_custom_dropdown.dart",
-"nt_dropbox_widget.dart",
-"nt_container_dropbox_widget.dart",
-"nt_noitru_item_widget.dart",
+#     "gpa_cache_manager.dart",
+#     "app_repository.dart",
+#     "app_api.dart",
+#     "app_api.g.dart",
 
-"nt_boading_register_view.dart",
-"nt_boarding_register_controller.dart",
-"nt_boarding_controller.dart",
+#     "hoc_ky_model.dart",
+#     "thoi_khoa_bieu_model.dart",
+#     "lich_thi_hoc_ky_model.dart",
+#     "vcore_schedule_event.dart",
 
-"vnu_noi_tru.dart"
+#     "diem_thi_hoc_ky_model.dart",
+#     "diem_hoc_phan_model.dart",
+#     "diem_trung_binh_model.dart",
+#     "tong_ket_den_hien_tai_model.dart",
+#     "model.dart",
+
+#     "academic_course.dart",
+#     "ai_radar_analysis.dart",
+#     "radar_axis_profile.dart",
+#     "local_ai_radar_engine.dart",
+#     "semantic_axis_discovery_engine.dart",
+#     "semantic_scoring_engine.dart",
+#     "vector_math.dart",
+#     "ai_axis_cache.dart",
+#     "onnx_embedding_model.dart",
+#     "local_embedding_model.dart",
+#     "simple_tokenizer.dart",
+
+#     "vcore_home_view_v3.dart",
+#     "vcore_home_service_widget.dart",
+#     "vcore_home_service_widget_v2.dart",
+#     "vcore_sidebar_widget.dart",
+#     "schedule", "exam_schedule", "course_points", "gpa", "radar", "embedding",
+#   "vcore_news_view_v2.dart",
+#     "vcore_news_view_v3.dart",
+#     "vcore_news_detail_view.dart",
+#     "vcore_news_item_widget.dart",
+#     "vcore_news_tab_widget_v2.dart",
+#     "vcore_news_category_widget_v2.dart",
+#     "vcore_news_filter_widget.dart",
+#     "vcore_news_view.dart",
+#      # =====================================================
+#     # Jobs
+#     # =====================================================
+#     "vcore_jobs_view_v2.dart",
+
+#     # =====================================================
+#     # Controllers
+#     # =====================================================
+#     "vcore_news_controller.dart",
+#     "vcore_news_detail_controller.dart",
+#     "vcore_jobs_controller_v2.dart",
+
+#     # =====================================================
+#     # Generic patterns
+#     # =====================================================
+#     "news",
+#     "job",
+#     "jobs",
+
+# =====================================================
+# Avatar / Profile Photos
+# =====================================================
+
+"vcore_profile_view.dart",
+"vcore_profile_avatar_widget.dart",
+
+"vcore_profile_photos_view.dart",
+"vcore_profile_photos_controller.dart",
+
+"current_user_model.dart",
+"globals.dart",
+
+"vcore_sidebar_widget.dart",
+"vcore_home_view.dart",
+
+"app_repository.dart",
+"app_api.dart",
+"app_api.g.dart",
+
+# =====================================================
+# Password
+# =====================================================
+
+"vcore_profile_forgot_pass_view.dart",
+"vcore_profile_pass_controller.dart",
+"vcore_profile_change_pass_view.dart",
+
+"loai_mat_khau_model.dart",
+
+"vcore_login_screen_v3.dart",
+
+"app_repository.dart",
+"app_api.dart",
+"app_api.g.dart",
+
+# =====================================================
+# Avatar / Cover
+# =====================================================
+
+"nguoidung",
+"anhdaidien",
+"anh_dai_dien",
+"avatar",
+"cover",
+"anhnen",
+"anh_nen",
+
+"NguoiDung.java",
+"NguoiDungRequestDTO.java",
+"NguoiDungResponseDTO.java",
+
+"ContextController.java",
+"NguoiDungController.java",
+
+# =====================================================
+# Password
+# =====================================================
+
+"quenmatkhau",
+"quen_mat_khau",
+"forgot",
+"forgot_password",
+
+"password",
+"matkhau",
+"mat_khau",
+
+"QuenMatKhauRequestDTO.java",
+
+"SinhVienService.java",
+"SinhVienServiceImpl.java",
+
+"LoaiPasswordEnum.java",
+
+"DaoTaoServiceImpl.java",
+"LdapServiceImpl.java",
+
+"EmailServiceImpl.java",
+"JavaMailSenderConfig.java",
+
 ]
 
 # =========================================================

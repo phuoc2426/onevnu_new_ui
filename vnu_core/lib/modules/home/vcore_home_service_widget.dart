@@ -304,6 +304,9 @@ class _VcoreHomeServiceWidgetState extends State<VcoreHomeServiceWidget> {
       case HomeService.DongBo:
         Get.to(() => const VcoreSyncView());
         break;
+      case HomeService.MucHoiDap:
+        Get.to(() => const VcoreQuestionView());
+        break;
       // case HomeService.TheSinhVien:
       //   // snackBarWarning('Thẻ sinh viên');
       //   // Get.to(() => const VcoreStudentCardView());

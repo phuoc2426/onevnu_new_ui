@@ -363,17 +363,6 @@ class _VCoreLoginScreenV3State extends State<VCoreLoginScreenV3> {
                       },
                     ),
                   ),
-
-                  Positioned(
-                    top: 105,
-                    left: 24,
-                    right: 24,
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.translucent,
-                      onTap: _handleSecretTap,
-                      child: const _HeaderText(),
-                    ),
-                  ),
                 ],
               );
             },
@@ -410,49 +399,6 @@ class _LoginBackground extends StatelessWidget {
   }
 }
 
-class _HeaderText extends StatelessWidget {
-  const _HeaderText();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Column(
-      children: [
-        Text.rich(
-          TextSpan(
-            children: [
-              TextSpan(text: 'Chào mừng \n'),
-              TextSpan(
-                text: 'bạn trở lại!',
-                style: TextStyle(
-                  color: _VCoreLoginScreenV3State.green,
-                ),
-              ),
-            ],
-          ),
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: _VCoreLoginScreenV3State.textDark,
-            fontSize: AppFontSizes.font28,
-            height: 1.15,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -0.6,
-          ),
-        ),
-
-
-        Text(
-          'OneVNU – Kết nối mọi tiện ích sinh viên',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: _VCoreLoginScreenV3State.textMuted,
-            fontSize: AppFontSizes.font11,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
-    );
-  }
-}
 
 class _LoginCard extends StatelessWidget {
   const _LoginCard({

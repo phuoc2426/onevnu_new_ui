@@ -1,19 +1,20 @@
 import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:vnu_core/common/gpa_cache_manager.dart';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vnu_core/common/gpa_cache_manager.dart';
 import 'package:vnu_core/common/utils.dart';
 import 'package:vnu_core/repository/app_repository.dart';
 
-import '../../../models/model.dart';
-import '../../../globals.dart';
+import '../../../ai_radar/ai/local_ai_radar_engine.dart';
+import '../../../ai_radar/cache/ai_axis_cache.dart';
+import '../../../ai_radar/embedding/onnx_embedding_model.dart';
 import '../../../ai_radar/models/academic_course.dart';
 import '../../../ai_radar/models/ai_radar_analysis.dart';
-import '../../../ai_radar/ai/local_ai_radar_engine.dart';
-import '../../../ai_radar/embedding/onnx_embedding_model.dart';
-import '../../../ai_radar/cache/ai_axis_cache.dart';
+import '../../../globals.dart';
+import '../../../models/model.dart';
 
 class VcoreCoursePointsController extends GetxController {
   BuildContext? context;
@@ -24,9 +25,12 @@ class VcoreCoursePointsController extends GetxController {
   RxList<HocKyModel> danhSachHocKy = RxList([]);
   Rxn<HocKyModel> hocKy = Rxn();
 
-  // For list data
   RxList<DiemThiHocKyModel> diemThiHocKy = RxList([]);
   Rxn<DiemTrungBinhModel> diemTrungBinhHocKy = Rxn();
+  RxMap<String, List<DiemThiHocKyModel>> diemThiTheoHocKy = RxMap();
+
+  // 0: Điểm học phần, 1: AI phân tích năng lực
+  RxInt selectedTabIndex = 0.obs;
 
   RxBool isTheoChuongTrinhDaoTao = true.obs;
 
@@ -35,12 +39,15 @@ class VcoreCoursePointsController extends GetxController {
   int pageIndex = 1;
   int pageSize = 20;
 
-  // AI Radar Engine states
+  // AI Radar states
   Rxn<AiRadarAnalysis> aiRadarAnalysis = Rxn();
-  RxString schoolName = 'Trường Đại học Quốc gia Hà Nội'.obs;
-  RxString majorName = 'Khoa học Máy tính'.obs;
+  RxString schoolName = 'Đại học Quốc gia Hà Nội'.obs;
+  RxString majorName = 'Ngành đào tạo chưa xác định'.obs;
   RxBool isLoadingAi = false.obs;
   RxString loadingStateText = ''.obs;
+
+  // Chỉ dùng để tránh gọi AI lặp nhiều lần khi user bấm tab AI.
+  RxBool hasRequestedAiAnalysis = false.obs;
 
   late final AiAxisCache _cache = AiAxisCache();
 
@@ -63,20 +70,25 @@ class VcoreCoursePointsController extends GetxController {
     super.onClose();
   }
 
-  getDanhSachKieuTruong() async {
+  Future<void> getDanhSachKieuTruong() async {
     kieuTruong.value = null;
+
     try {
       Utils.showProgress(context);
-      var response = await ApiRepository().getDanhSachKieuTruong();
+
+      final response = await ApiRepository().getDanhSachKieuTruong();
+
       Utils.dismissProgress(context);
 
       danhSachKieuTruong.value = response;
+
       if (danhSachKieuTruong.isNotEmpty) {
         kieuTruong.value = danhSachKieuTruong.firstWhereOrNull((obj) {
-              return obj == "TruongChinh";
-            }) ??
+          return obj == 'TruongChinh';
+        }) ??
             danhSachKieuTruong.first;
-        getDanhSachHocKy();
+
+        await getDanhSachHocKy();
       }
     } catch (e) {
       Utils.dismissProgress(context);
@@ -84,18 +96,25 @@ class VcoreCoursePointsController extends GetxController {
     }
   }
 
-  getDanhSachHocKy() async {
+  Future<void> getDanhSachHocKy() async {
     hocKy.value = null;
+
     try {
       Utils.showProgress(context);
-      var response = await ApiRepository().getDanhSachHocKyTheoDiem(
-          isTheoChuongTrinhDaoTao.value, kieuTruong.value ?? '');
+
+      final response = await ApiRepository().getDanhSachHocKyTheoDiem(
+        isTheoChuongTrinhDaoTao.value,
+        kieuTruong.value ?? '',
+      );
+
       Utils.dismissProgress(context);
 
       danhSachHocKy.value = response;
+
       if (danhSachHocKy.isNotEmpty) {
         hocKy.value = danhSachHocKy.first;
       }
+
       refreshData();
     } catch (e) {
       Utils.dismissProgress(context);
@@ -103,261 +122,372 @@ class VcoreCoursePointsController extends GetxController {
     }
   }
 
-  changeHocKy(String? displayName) {
-    HocKyModel? obj = danhSachHocKy.firstWhereOrNull(
-        (element) => element.disPlayName() == (displayName ?? "_///_"));
+  void changeHocKy(String? displayName) {
+    final obj = danhSachHocKy.firstWhereOrNull(
+          (element) => element.disPlayName() == (displayName ?? '_///_'),
+    );
+
     if (obj != null) {
       hocKy.value = obj;
       refreshData();
     }
   }
 
-  refreshData() {
+  void refreshData() {
     pageIndex = 1;
     _loadData();
   }
 
-  loadMoreData() {
+  void loadMoreData() {
     pageIndex += 1;
     _loadData();
   }
 
+  void switchToGradeTab() {
+    selectedTabIndex.value = 0;
+  }
+
+  void switchToAiTab() {
+    selectedTabIndex.value = 1;
+
+    if (aiRadarAnalysis.value != null) return;
+    if (isLoadingAi.value) return;
+    if (diemThiHocKy.isEmpty) return;
+    if (hasRequestedAiAnalysis.value) return;
+
+    hasRequestedAiAnalysis.value = true;
+    runAiAnalysis();
+  }
+
   Future<void> _resolveStudentInfo() async {
     final student = Globals().thongTinSinhVienModel.value;
+
     if (student == null) {
-      schoolName.value = 'Trường Đại học Quốc gia Hà Nội';
-      majorName.value = 'Công nghệ Thông tin';
+      schoolName.value = 'Đại học Quốc gia Hà Nội';
+      majorName.value = 'Ngành đào tạo chưa xác định';
       return;
     }
 
     try {
       if (student.guidDonVi != null && student.guidDonVi!.isNotEmpty) {
         final donVi = await ApiRepository().getDonVi(student.guidDonVi!);
-        schoolName.value = donVi.tenDonVi ?? 'Trường Đại học Quốc gia Hà Nội';
+        schoolName.value = donVi.tenDonVi ?? 'Đại học Quốc gia Hà Nội';
       } else {
-        schoolName.value = 'Trường Đại học Quốc gia Hà Nội';
+        schoolName.value = 'Đại học Quốc gia Hà Nội';
       }
-    } catch (e) {
-      schoolName.value = 'Trường Đại học Quốc gia Hà Nội';
+    } catch (_) {
+      schoolName.value = 'Đại học Quốc gia Hà Nội';
     }
 
     try {
-      if (student.idNganhDaoTao != null && student.idNganhDaoTao!.isNotEmpty) {
+      if (student.idNganhDaoTao != null &&
+          student.idNganhDaoTao!.isNotEmpty) {
         final listNganh = await ApiRepository().getDataNganhDaoTao(
           student.idNganhDaoTao,
           student.guidDonVi,
           student.idBacDaoTao,
         );
-        final nganh = listNganh.firstWhereOrNull((e) => e.id == student.idNganhDaoTao);
-        majorName.value = nganh?.ten ?? 'Công nghệ Thông tin';
+
+        final nganh = listNganh.firstWhereOrNull(
+              (e) => e.id == student.idNganhDaoTao,
+        );
+
+        majorName.value = nganh?.ten ?? 'Ngành đào tạo chưa xác định';
       } else {
-        majorName.value = 'Công nghệ Thông tin';
+        majorName.value = 'Ngành đào tạo chưa xác định';
       }
-    } catch (e) {
-      majorName.value = 'Công nghệ Thông tin';
+    } catch (_) {
+      majorName.value = 'Ngành đào tạo chưa xác định';
     }
   }
 
-  _loadData() async {
+  Future<void> _loadData() async {
     diemThiHocKy.value = [];
     aiRadarAnalysis.value = null;
+    hasRequestedAiAnalysis.value = false;
 
     try {
-      // 1. Try to load from cache first
       final cachedData = await GpaCacheManager.getCachedGpaData();
+
       if (cachedData != null) {
-        try {
-          if (cachedData['danhSachHocKy'] is List) {
-            final List<dynamic> listHk = cachedData['danhSachHocKy'];
-            danhSachHocKy.value = listHk.map((e) => HocKyModel.fromJson(e as Map<String, dynamic>)).toList();
-            if (danhSachHocKy.isNotEmpty) {
-              hocKy.value = danhSachHocKy.first;
-            }
-          }
-          if (cachedData['kieuTruong'] is String) {
-            kieuTruong.value = cachedData['kieuTruong'];
-          }
-          if (cachedData['deduplicatedList'] is List) {
-            final List<dynamic> listCourses = cachedData['deduplicatedList'];
-            diemThiHocKy.value = listCourses.map((e) => DiemThiHocKyModel.fromJson(e as Map<String, dynamic>)).toList();
-          }
-          final gpa4 = cachedData['gpaHe4']?.toString() ?? '0.00';
-          final gpa10 = cachedData['gpaHe10']?.toString() ?? '0.00';
-          final tcTichLuy = cachedData['tongTinChi']?.toString() ?? '0';
+        final parsedFromCache = await _loadFromCache(cachedData);
 
-          diemTrungBinhHocKy.value = DiemTrungBinhModel(
-            diemTrungBinhHe4HocKy: gpa4,
-            diemTrungBinhHe4TichLuyDenHocKyHienTai: gpa4,
-            diemTrungBinhHe10HocKy: gpa10,
-            diemTrungBinhHe10TichLuyDenHocKyHienTai: gpa10,
-            tongSoTinChiTichLuyHocKy: tcTichLuy,
-            tongSoTinChiTichLuyTichLuyDenHocKyHienTai: tcTichLuy,
-            tongSoTinChiTruotHocKy: '0',
-            tongSoTinChiTruotTichLuyDenHocKyHienTai: '0',
-          );
-
-          await _resolveStudentInfo();
-
-          if (diemThiHocKy.isNotEmpty) {
-            final signature = buildCourseSignature(diemThiHocKy);
-            final cacheKey = AiAxisCache.buildKey(
-              school: schoolName.value,
-              major: majorName.value,
-            );
-
-            final cachedSig = await _cache.getSignature(cacheKey);
-            final cachedAnalysis = await _cache.getAnalysis(cacheKey);
-
-            if (cachedSig == signature && cachedAnalysis != null) {
-              aiRadarAnalysis.value = cachedAnalysis;
-            } else {
-              aiRadarAnalysis.value = null;
-              Future.microtask(() => runAiAnalysis());
-            }
-          }
-
+        if (parsedFromCache) {
           refreshController.refreshCompleted();
           refreshController.loadComplete();
           return;
-        } catch (_) {
-          // Fall through to loading from API if parsing fails
         }
       }
 
-      Utils.showProgress(context);
-      
-      // 1. Resolve student school & major names in parallel
-      await _resolveStudentInfo();
-
-      // 2. Fetch all semesters' grades in parallel
-      if (danhSachHocKy.isEmpty) {
-        var response = await ApiRepository().getDanhSachHocKyTheoDiem(
-            isTheoChuongTrinhDaoTao.value, kieuTruong.value ?? '');
-        danhSachHocKy.value = response;
-      }
-
-      if (danhSachHocKy.isEmpty) {
-        throw Exception('Không tìm thấy danh sách học kỳ.');
-      }
-
-      final futures = danhSachHocKy.map((hk) {
-        return ApiRepository().getDiemThiHocKy(
-            hk.id ?? '',
-            kieuTruong.value ?? '',
-            isTheoChuongTrinhDaoTao.value);
-      }).toList();
-
-      final results = await Future.wait(futures);
-      Utils.dismissProgress(context);
-
-      // 3. Deduplicate courses: take the highest grade for any repeated courses
-      final uniqueCourses = <String, DiemThiHocKyModel>{};
-      for (final list in results) {
-        for (final course in list) {
-          final name = course.tenHocPhan?.trim() ?? '';
-          if (name.isEmpty) continue;
-          
-          final key = '${course.maHocPhan?.trim() ?? ''}_$name';
-          final existing = uniqueCourses[key];
-          if (existing == null) {
-            uniqueCourses[key] = course;
-          } else {
-            final existingGrade = double.tryParse(existing.diemHe10?.replaceAll(',', '.') ?? '') ?? 0.0;
-            final currentGrade = double.tryParse(course.diemHe10?.replaceAll(',', '.') ?? '') ?? 0.0;
-            if (currentGrade > existingGrade) {
-              uniqueCourses[key] = course;
-            }
-          }
-        }
-      }
-
-      final deduplicatedList = uniqueCourses.values.toList();
-      diemThiHocKy.value = deduplicatedList;
-
-      // 4. Calculate cumulative GPA statistics
-      double totalCredits = 0;
-      double weightedGrade10 = 0;
-      double weightedGrade4 = 0;
-      int tcTichLuy = 0;
-      int tcTruot = 0;
-
-      for (final course in deduplicatedList) {
-        final grade10 = double.tryParse(course.diemHe10?.replaceAll(',', '.') ?? '');
-        final grade4 = double.tryParse(course.diemHe4?.replaceAll(',', '.') ?? '');
-        final credits = double.tryParse(course.soTinChi?.replaceAll(',', '.') ?? '');
-
-        if (grade10 == null || credits == null) continue;
-
-        weightedGrade10 += grade10 * credits;
-        if (grade4 != null) {
-          weightedGrade4 += grade4 * credits;
-        }
-        totalCredits += credits;
-
-        if (grade10 >= 4.0) {
-          tcTichLuy += credits.round();
-        } else {
-          tcTruot += credits.round();
-        }
-      }
-
-      double gpa10 = totalCredits > 0 ? (weightedGrade10 / totalCredits) : 0.0;
-      double gpa4 = totalCredits > 0 ? (weightedGrade4 / totalCredits) : 0.0;
-
-      diemTrungBinhHocKy.value = DiemTrungBinhModel(
-        diemTrungBinhHe4HocKy: gpa4.toStringAsFixed(2),
-        diemTrungBinhHe4TichLuyDenHocKyHienTai: gpa4.toStringAsFixed(2),
-        diemTrungBinhHe10HocKy: gpa10.toStringAsFixed(2),
-        diemTrungBinhHe10TichLuyDenHocKyHienTai: gpa10.toStringAsFixed(2),
-        tongSoTinChiTichLuyHocKy: tcTichLuy.toString(),
-        tongSoTinChiTichLuyTichLuyDenHocKyHienTai: tcTichLuy.toString(),
-        tongSoTinChiTruotHocKy: tcTruot.toString(),
-        tongSoTinChiTruotTichLuyDenHocKyHienTai: tcTruot.toString(),
-      );
-
-      // Save calculated data to local cache
-      try {
-        final data = {
-          'gpaHe4': double.parse(gpa4.toStringAsFixed(2)),
-          'gpaHe10': double.parse(gpa10.toStringAsFixed(2)),
-          'tongTinChi': tcTichLuy,
-          'soKyDaHoc': danhSachHocKy.length,
-          'deduplicatedList': deduplicatedList.map((e) => e.toJson()).toList(),
-          'danhSachHocKy': danhSachHocKy.map((e) => e.toJson()).toList(),
-          'kieuTruong': kieuTruong.value ?? '',
-        };
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('bg_cached_gpa_data', jsonEncode(data));
-      } catch (_) {}
-
-      // 5. Check AI Radar signature & cache
-      if (deduplicatedList.isNotEmpty) {
-        final signature = buildCourseSignature(deduplicatedList);
-        final cacheKey = AiAxisCache.buildKey(
-          school: schoolName.value,
-          major: majorName.value,
-        );
-
-        final cachedSig = await _cache.getSignature(cacheKey);
-        final cachedAnalysis = await _cache.getAnalysis(cacheKey);
-
-        if (cachedSig == signature && cachedAnalysis != null) {
-          aiRadarAnalysis.value = cachedAnalysis;
-        } else {
-          // Signature mismatch or no cache -> Run AI analysis automatically!
-          aiRadarAnalysis.value = null;
-          Future.microtask(() => runAiAnalysis());
-        }
-      }
+      await _loadFromApi();
 
       refreshController.refreshCompleted();
       refreshController.loadComplete();
     } catch (e) {
       isLoadingAi.value = false;
-      snackBarError(e.toString());
+      Utils.dismissProgress(context);
       refreshController.refreshCompleted();
       refreshController.loadComplete();
-      Utils.dismissProgress(context);
+      snackBarError(e.toString());
+    }
+  }
+
+  Future<bool> _loadFromCache(Map<String, dynamic> cachedData) async {
+    try {
+      if (cachedData['danhSachHocKy'] is List) {
+        final List<dynamic> listHk = cachedData['danhSachHocKy'];
+
+        danhSachHocKy.value = listHk
+            .map((e) => HocKyModel.fromJson(e as Map<String, dynamic>))
+            .toList();
+
+        if (danhSachHocKy.isNotEmpty) {
+          final currentHocKyId = hocKy.value?.id;
+          final stillAvailable = currentHocKyId != null &&
+              danhSachHocKy.any((e) => e.id == currentHocKyId);
+
+          if (!stillAvailable) {
+            hocKy.value = danhSachHocKy.first;
+          }
+        }
+      }
+
+      if (cachedData['kieuTruong'] is String) {
+        kieuTruong.value = cachedData['kieuTruong'];
+      }
+
+      if (cachedData['deduplicatedList'] is List) {
+        final List<dynamic> listCourses = cachedData['deduplicatedList'];
+
+        final list = listCourses
+            .map((e) => DiemThiHocKyModel.fromJson(e as Map<String, dynamic>))
+            .toList();
+
+        diemThiHocKy.value = list;
+
+        final Map<String, List<DiemThiHocKyModel>> grouped = {};
+
+        for (final course in list) {
+          final hkId = course.idHocKy ?? '';
+
+          if (!grouped.containsKey(hkId)) {
+            grouped[hkId] = [];
+          }
+
+          grouped[hkId]!.add(course);
+        }
+
+        diemThiTheoHocKy.value = grouped;
+      }
+
+      final gpa4 = cachedData['gpaHe4']?.toString() ?? '0.00';
+      final gpa10 = cachedData['gpaHe10']?.toString() ?? '0.00';
+      final tcTichLuy = cachedData['tongTinChi']?.toString() ?? '0';
+
+      diemTrungBinhHocKy.value = DiemTrungBinhModel(
+        diemTrungBinhHe4HocKy: gpa4,
+        diemTrungBinhHe4TichLuyDenHocKyHienTai: gpa4,
+        diemTrungBinhHe10HocKy: gpa10,
+        diemTrungBinhHe10TichLuyDenHocKyHienTai: gpa10,
+        tongSoTinChiTichLuyHocKy: tcTichLuy,
+        tongSoTinChiTichLuyTichLuyDenHocKyHienTai: tcTichLuy,
+        tongSoTinChiTruotHocKy: '0',
+        tongSoTinChiTruotTichLuyDenHocKyHienTai: '0',
+      );
+
+      await _resolveStudentInfo();
+      await _loadAiAnalysisFromCacheOnly(diemThiHocKy.toList());
+
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _loadFromApi() async {
+    Utils.showProgress(context);
+
+    await _resolveStudentInfo();
+
+    if (danhSachHocKy.isEmpty) {
+      final response = await ApiRepository().getDanhSachHocKyTheoDiem(
+        isTheoChuongTrinhDaoTao.value,
+        kieuTruong.value ?? '',
+      );
+
+      danhSachHocKy.value = response;
+    }
+
+    if (danhSachHocKy.isEmpty) {
+      throw Exception('Không tìm thấy danh sách học kỳ.');
+    }
+
+    final futures = danhSachHocKy.map((hk) {
+      return ApiRepository().getDiemThiHocKy(
+        hk.id ?? '',
+        kieuTruong.value ?? '',
+        isTheoChuongTrinhDaoTao.value,
+      );
+    }).toList();
+
+    final results = await Future.wait(futures);
+
+    Utils.dismissProgress(context);
+
+    final Map<String, List<DiemThiHocKyModel>> tempSemesterMap = {};
+
+    for (int i = 0; i < danhSachHocKy.length; i++) {
+      final hkId = danhSachHocKy[i].id ?? '';
+      tempSemesterMap[hkId] = results[i];
+    }
+
+    diemThiTheoHocKy.value = tempSemesterMap;
+
+    final deduplicatedList = _deduplicateCourses(results);
+
+    diemThiHocKy.value = deduplicatedList;
+
+    _calculateGpaStatistics(deduplicatedList);
+
+    await _saveCalculatedDataToCache(deduplicatedList);
+
+    await _loadAiAnalysisFromCacheOnly(deduplicatedList);
+  }
+
+  List<DiemThiHocKyModel> _deduplicateCourses(
+      List<List<DiemThiHocKyModel>> results,
+      ) {
+    final uniqueCourses = <String, DiemThiHocKyModel>{};
+
+    for (final list in results) {
+      for (final course in list) {
+        final name = course.tenHocPhan?.trim() ?? '';
+
+        if (name.isEmpty) continue;
+
+        final key = '${course.maHocPhan?.trim() ?? ''}_$name';
+        final existing = uniqueCourses[key];
+
+        if (existing == null) {
+          uniqueCourses[key] = course;
+        } else {
+          final existingGrade = double.tryParse(
+            existing.diemHe10?.replaceAll(',', '.') ?? '',
+          ) ??
+              0.0;
+
+          final currentGrade = double.tryParse(
+            course.diemHe10?.replaceAll(',', '.') ?? '',
+          ) ??
+              0.0;
+
+          if (currentGrade > existingGrade) {
+            uniqueCourses[key] = course;
+          }
+        }
+      }
+    }
+
+    return uniqueCourses.values.toList();
+  }
+
+  void _calculateGpaStatistics(List<DiemThiHocKyModel> deduplicatedList) {
+    double totalCredits = 0;
+    double weightedGrade10 = 0;
+    double weightedGrade4 = 0;
+    int tcTichLuy = 0;
+    int tcTruot = 0;
+
+    for (final course in deduplicatedList) {
+      final grade10 = double.tryParse(
+        course.diemHe10?.replaceAll(',', '.') ?? '',
+      );
+
+      final grade4 = double.tryParse(
+        course.diemHe4?.replaceAll(',', '.') ?? '',
+      );
+
+      final credits = double.tryParse(
+        course.soTinChi?.replaceAll(',', '.') ?? '',
+      );
+
+      if (grade10 == null || credits == null) continue;
+
+      weightedGrade10 += grade10 * credits;
+
+      if (grade4 != null) {
+        weightedGrade4 += grade4 * credits;
+      }
+
+      totalCredits += credits;
+
+      if (grade10 >= 4.0) {
+        tcTichLuy += credits.round();
+      } else {
+        tcTruot += credits.round();
+      }
+    }
+
+    final gpa10 = totalCredits > 0 ? (weightedGrade10 / totalCredits) : 0.0;
+    final gpa4 = totalCredits > 0 ? (weightedGrade4 / totalCredits) : 0.0;
+
+    diemTrungBinhHocKy.value = DiemTrungBinhModel(
+      diemTrungBinhHe4HocKy: gpa4.toStringAsFixed(2),
+      diemTrungBinhHe4TichLuyDenHocKyHienTai: gpa4.toStringAsFixed(2),
+      diemTrungBinhHe10HocKy: gpa10.toStringAsFixed(2),
+      diemTrungBinhHe10TichLuyDenHocKyHienTai: gpa10.toStringAsFixed(2),
+      tongSoTinChiTichLuyHocKy: tcTichLuy.toString(),
+      tongSoTinChiTichLuyTichLuyDenHocKyHienTai: tcTichLuy.toString(),
+      tongSoTinChiTruotHocKy: tcTruot.toString(),
+      tongSoTinChiTruotTichLuyDenHocKyHienTai: tcTruot.toString(),
+    );
+  }
+
+  Future<void> _saveCalculatedDataToCache(
+      List<DiemThiHocKyModel> deduplicatedList,
+      ) async {
+    try {
+      final gpa = diemTrungBinhHocKy.value;
+
+      final data = {
+        'gpaHe4': double.tryParse(gpa?.diemTrungBinhHe4HocKy ?? '0') ?? 0.0,
+        'gpaHe10': double.tryParse(gpa?.diemTrungBinhHe10HocKy ?? '0') ?? 0.0,
+        'tongTinChi': int.tryParse(gpa?.tongSoTinChiTichLuyHocKy ?? '0') ?? 0,
+        'soKyDaHoc': danhSachHocKy.length,
+        'deduplicatedList': deduplicatedList.map((e) => e.toJson()).toList(),
+        'danhSachHocKy': danhSachHocKy.map((e) => e.toJson()).toList(),
+        'kieuTruong': kieuTruong.value ?? '',
+      };
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('bg_cached_gpa_data', jsonEncode(data));
+    } catch (_) {}
+  }
+
+  Future<void> _loadAiAnalysisFromCacheOnly(
+      List<DiemThiHocKyModel> courses,
+      ) async {
+    if (courses.isEmpty) {
+      aiRadarAnalysis.value = null;
+      hasRequestedAiAnalysis.value = false;
+      return;
+    }
+
+    final signature = buildCourseSignature(courses);
+
+    final cacheKey = AiAxisCache.buildKey(
+      school: schoolName.value,
+      major: majorName.value,
+    );
+
+    final cachedSig = await _cache.getSignature(cacheKey);
+    final cachedAnalysis = await _cache.getAnalysis(cacheKey);
+
+    if (cachedSig == signature && cachedAnalysis != null) {
+      aiRadarAnalysis.value = cachedAnalysis;
+    } else {
+      aiRadarAnalysis.value = null;
+      hasRequestedAiAnalysis.value = false;
     }
   }
 
@@ -372,12 +502,15 @@ class VcoreCoursePointsController extends GetxController {
 
   Future<void> runAiAnalysis() async {
     final deduplicatedList = diemThiHocKy.toList();
+
     if (deduplicatedList.isEmpty) {
       snackBarError('Không tìm thấy học phần để phân tích.');
       return;
     }
 
+    hasRequestedAiAnalysis.value = true;
     isLoadingAi.value = true;
+
     try {
       loadingStateText.value = 'AI đang xác định ngành học...';
       await Future.delayed(const Duration(milliseconds: 500));
@@ -391,10 +524,17 @@ class VcoreCoursePointsController extends GetxController {
       loadingStateText.value = 'AI đang vẽ radar...';
       await Future.delayed(const Duration(milliseconds: 500));
 
-      // Convert to AcademicCourse models
       final academicCourses = deduplicatedList.map((e) {
-        final grade = double.tryParse(e.diemHe10?.replaceAll(',', '.') ?? '') ?? 0.0;
-        final credits = double.tryParse(e.soTinChi?.replaceAll(',', '.') ?? '') ?? 3.0;
+        final grade = double.tryParse(
+          e.diemHe10?.replaceAll(',', '.') ?? '',
+        ) ??
+            0.0;
+
+        final credits = double.tryParse(
+          e.soTinChi?.replaceAll(',', '.') ?? '',
+        ) ??
+            3.0;
+
         return AcademicCourse(
           name: e.tenHocPhan ?? 'Học phần không tên',
           grade: grade,
@@ -413,12 +553,14 @@ class VcoreCoursePointsController extends GetxController {
         school: schoolName.value,
         major: majorName.value,
       );
+
       final signature = buildCourseSignature(deduplicatedList);
 
       await _cache.saveAnalysis(cacheKey, signature, analysis);
 
       aiRadarAnalysis.value = analysis;
     } catch (e) {
+      hasRequestedAiAnalysis.value = false;
       snackBarError(e.toString());
     } finally {
       isLoadingAi.value = false;

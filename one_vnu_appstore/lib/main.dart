@@ -64,7 +64,7 @@ Future<void> main() async {
   await ServicesUrl().init();
 
   final RemoteMessage? message =
-      await FirebaseMessaging.instance.getInitialMessage();
+  await FirebaseMessaging.instance.getInitialMessage();
 
   // Để sử dụng device_preview, hãy mở comment import ở đầu file và đoạn code dưới đây,
   // đồng thời comment lại dòng `runApp(MyApp(message: message));` phía dưới.
@@ -100,7 +100,7 @@ class MyApp extends StatefulHookWidget {
 
 class _MyAppState extends State<MyApp> {
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-      FlutterLocalNotificationsPlugin();
+  FlutterLocalNotificationsPlugin();
 
   @override
   void initState() {
@@ -161,13 +161,13 @@ class _MyAppState extends State<MyApp> {
 
   void _initializationLocalPushNotificationPlugin() {
     const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings('app_icon');
+    AndroidInitializationSettings('app_icon');
 
     const DarwinInitializationSettings initializationSettingsIOS =
-        DarwinInitializationSettings();
+    DarwinInitializationSettings();
 
     const InitializationSettings initializationSettings =
-        InitializationSettings(
+    InitializationSettings(
       android: initializationSettingsAndroid,
       iOS: initializationSettingsIOS,
     );
@@ -215,9 +215,9 @@ class _MyAppState extends State<MyApp> {
   }
 
   void _handleNotificationTapped(
-    BuildContext context,
-    Map<String, dynamic>? message,
-  ) {
+      BuildContext context,
+      Map<String, dynamic>? message,
+      ) {
     VnuCore().handleNotificationTapped(
       context,
       message,
@@ -232,14 +232,14 @@ class _MyAppState extends State<MyApp> {
     }
 
     const AndroidNotificationDetails androidPlatformChannelSpecifics =
-        AndroidNotificationDetails(
+    AndroidNotificationDetails(
       'OneVNU',
       'OneVNU',
       channelDescription: 'OneVNU Notification',
     );
 
     const DarwinNotificationDetails iOSPlatformChannelSpecifics =
-        DarwinNotificationDetails(
+    DarwinNotificationDetails(
       presentAlert: true,
       presentSound: true,
       presentBadge: true,
@@ -262,11 +262,11 @@ class _MyAppState extends State<MyApp> {
   }
 
   void onDidReceiveLocalNotification(
-    int id,
-    String title,
-    String? body,
-    String? payload,
-  ) {
+      int id,
+      String title,
+      String? body,
+      String? payload,
+      ) {
     showDialog(
       context: context,
       builder: (BuildContext context) {

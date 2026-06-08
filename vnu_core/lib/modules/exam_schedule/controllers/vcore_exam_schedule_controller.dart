@@ -39,7 +39,48 @@ class VcoreExamScheduleController extends GetxController {
   RefreshController refreshController = RefreshController();
   RxBool isTheoChuongTrinhDaoTao = true.obs;
   RxBool isLoading = false.obs;
+  RxBool showIncompleteExams = false.obs;
   bool skipAutoSelectNearest = false;
+
+  List<LichThiHocKyModel> get incompleteExams {
+    return listLichThi.where(_isIncompleteExam).toList();
+  }
+
+  bool _isBlank(String? value) => value == null || value.trim().isEmpty;
+
+  bool _isIncompleteExam(LichThiHocKyModel exam) {
+    final hasNoDate = _isBlank(exam.ngayThi) || _parseDate(exam.ngayThi) == null;
+    final hasNoTime = _isBlank(exam.gioBatDauThi);
+    final hasNoRoom = _isBlank(exam.phongThi);
+    final hasNoSbd = _isBlank(exam.sobaodanh);
+    return hasNoDate || hasNoTime || hasNoRoom || hasNoSbd;
+  }
+
+  String _unknownIfBlank(String? value) {
+    final text = value?.trim() ?? '';
+    return text.isEmpty ? '?' : text;
+  }
+
+  String _buildExamLocation(LichThiHocKyModel exam) {
+    final room = _unknownIfBlank(exam.phongThi);
+    final address = exam.diaChi?.trim() ?? '';
+
+    if (address.isEmpty) return room;
+    return '$room - $address';
+  }
+
+  String _buildExamTeacherText(LichThiHocKyModel exam) {
+    if (!_isBlank(exam.sobaodanh)) {
+      return 'SBD: ${exam.sobaodanh!.trim()}';
+    }
+
+    if (!_isBlank(exam.hinhThucThi)) {
+      return exam.hinhThucThi!.trim();
+    }
+
+    return '?';
+  }
+
   bool _hasSelectedNearestDate = false;
   DateTime? pendingInitialDate;
   bool _isInitialDateSet = false;
@@ -79,8 +120,8 @@ class VcoreExamScheduleController extends GetxController {
       danhSachKieuTruong.value = response;
       if (danhSachKieuTruong.isNotEmpty) {
         kieuTruong.value = danhSachKieuTruong.firstWhereOrNull((obj) {
-              return obj == "TruongChinh";
-            }) ??
+          return obj == "TruongChinh";
+        }) ??
             danhSachKieuTruong.first;
         getDanhSachHocKy();
       }
@@ -180,12 +221,12 @@ class VcoreExamScheduleController extends GetxController {
   void selectSemester(HocKyModel sem) {
     hocKySelected.value = sem;
     _hasSelectedNearestDate = false;
-    
+
     // Jump calendar view to target date or the start date of this semester
     final targetDate = pendingInitialDate ?? _inferSemesterStartDate(sem);
     focusedDay.value = targetDate;
     selectedDay.value = targetDate;
-    
+
     refreshData();
   }
 
@@ -276,28 +317,37 @@ class VcoreExamScheduleController extends GetxController {
   void _generateEventsMap(HocKyModel sem) {
     final Map<DateTime, List<ScheduleEvent>> tempMap = {};
 
-    // 1. Map Lịch thi (Exam schedule) - Specific days
+    // 1. Map Lịch thi.
+// Chỉ cần có ngày thi hợp lệ thì vẫn hiển thị trên calendar.
+// Nếu thiếu giờ/phòng/SBD thì các trường thiếu hiển thị bằng "?".
+// Đồng thời vẫn được giữ trong tab "Chưa cập nhật" thông qua incompleteExams.
     for (var exam in listLichThi) {
       final examDate = _parseDate(exam.ngayThi);
+
+      // Không có ngày thi thì không thể gắn lên calendar.
+      // Nhưng vẫn nằm trong tab "Chưa cập nhật".
       if (examDate == null) continue;
 
       final key = _normalizeDate(examDate);
+
       final event = ScheduleEvent(
         type: ScheduleType.exam,
-        title: exam.tenHocPhan ?? 'Lịch thi',
+        title: _unknownIfBlank(exam.tenHocPhan) == '?'
+            ? 'Lịch thi'
+            : _unknownIfBlank(exam.tenHocPhan),
         date: examDate,
-        startTime: exam.gioBatDauThi ?? '',
-        endTime: exam.thoiLuong != null ? '${exam.thoiLuong} phút' : '',
-        location: '${exam.phongThi ?? ""} - ${exam.diaChi ?? ""}',
-        teacher: exam.sobaodanh != null && exam.sobaodanh!.isNotEmpty 
-            ? 'SBD: ${exam.sobaodanh}' 
-            : (exam.hinhThucThi ?? ''),
-        hocPhanCode: exam.maHocPhan,
+        startTime: _unknownIfBlank(exam.gioBatDauThi),
+        endTime: !_isBlank(exam.thoiLuong)
+            ? '${exam.thoiLuong!.trim()} phút'
+            : '?',
+        location: _buildExamLocation(exam),
+        teacher: _buildExamTeacherText(exam),
+        hocPhanCode: _unknownIfBlank(exam.maHocPhan),
         id: exam.idLichThi,
         soTinChi: exam.soTinChi,
-        caThi: exam.caThi,
-        hinhThucThi: exam.hinhThucThi,
-        soBaoDanh: exam.sobaodanh,
+        caThi: _unknownIfBlank(exam.caThi),
+        hinhThucThi: _unknownIfBlank(exam.hinhThucThi),
+        soBaoDanh: _unknownIfBlank(exam.sobaodanh),
       );
 
       if (!tempMap.containsKey(key)) {
@@ -313,7 +363,7 @@ class VcoreExamScheduleController extends GetxController {
     for (var classSession in listThoiKhoaBieu) {
       final ngayTrongTuanStr = classSession.ngayTrongTuan;
       if (ngayTrongTuanStr == null || ngayTrongTuanStr.isEmpty) continue;
-      
+
       int? ngayTrongTuan = int.tryParse(ngayTrongTuanStr);
       if (ngayTrongTuan == null) continue;
 
@@ -398,9 +448,33 @@ class VcoreExamScheduleController extends GetxController {
   void updateSelectedEvents() {
     final key = _normalizeDate(selectedDay.value);
     final events = List<ScheduleEvent>.from(eventsMap[key] ?? []);
-    // Sort events by start time
-    events.sort((a, b) => a.startTime.compareTo(b.startTime));
+    // Sort by real lesson/exam start time instead of string compare.
+    events.sort((a, b) {
+      final startA = _extractStartOrder(a.startTime);
+      final startB = _extractStartOrder(b.startTime);
+      if (startA != startB) return startA.compareTo(startB);
+      return a.title.compareTo(b.title);
+    });
     selectedEvents.value = events;
+  }
+
+  int _extractStartOrder(String value) {
+    if (value.trim().isEmpty) return 9999;
+
+    final timeMatch = RegExp(r'(\d{1,2}):(\d{2})').firstMatch(value);
+    if (timeMatch != null) {
+      final hour = int.tryParse(timeMatch.group(1) ?? '') ?? 99;
+      final minute = int.tryParse(timeMatch.group(2) ?? '') ?? 99;
+      return hour * 60 + minute;
+    }
+
+    final lessonMatch = RegExp(r'\d+').firstMatch(value);
+    if (lessonMatch != null) {
+      final lesson = int.tryParse(lessonMatch.group(0) ?? '') ?? 9999;
+      return lesson * 100;
+    }
+
+    return 9999;
   }
 
   DateTime _normalizeDate(DateTime date) {
@@ -411,7 +485,7 @@ class VcoreExamScheduleController extends GetxController {
     if (dateStr == null || dateStr.isEmpty) return null;
     var parsed = DateTime.tryParse(dateStr);
     if (parsed != null) return parsed;
-    
+
     // Attempt parsing dd/MM/yyyy or dd-MM-yyyy
     final cleanStr = dateStr.replaceAll('-', '/');
     var parts = cleanStr.split('/');
@@ -430,7 +504,7 @@ class VcoreExamScheduleController extends GetxController {
     final yearStr = sem.nam ?? '';
     final semName = sem.ten ?? '';
     int startYear = DateTime.now().year;
-    
+
     final years = yearStr.split('-');
     if (years.isNotEmpty) {
       startYear = int.tryParse(years[0]) ?? startYear;
@@ -454,7 +528,7 @@ class VcoreExamScheduleController extends GetxController {
     final yearStr = sem.nam ?? '';
     final semName = sem.ten ?? '';
     int startYear = DateTime.now().year;
-    
+
     final years = yearStr.split('-');
     if (years.isNotEmpty) {
       startYear = int.tryParse(years[0]) ?? startYear;
