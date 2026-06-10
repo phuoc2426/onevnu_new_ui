@@ -7,7 +7,7 @@ import 'package:vnu_noi_tru/cubit/dormitory_registration_cubit.dart';
 import 'package:intl/intl.dart';
 
 class DRHistoryBottomSheet extends StatefulWidget {
-  final int registrationId;
+  final Object registrationId;
   const DRHistoryBottomSheet({super.key, required this.registrationId});
 
   @override
@@ -34,150 +34,150 @@ class _DRHistoryBottomSheetState extends State<DRHistoryBottomSheet> {
         ),
       ),
       padding: const EdgeInsets.all(20),
-      child: BlocBuilder<DormitoryRegistrationCubit, DormitoryRegistrationState>(
-        bloc: _cubit,
-        builder: (context, state) {
-          if (state is DormitoryRegistrationLoading ||
-              state is DormitoryRegistrationShowHub) {
-            return const SizedBox(
-              height: 200,
-              child: Center(child: LoadingIndicator()),
-            );
-          }
+      child:
+          BlocBuilder<DormitoryRegistrationCubit, DormitoryRegistrationState>(
+            bloc: _cubit,
+            builder: (context, state) {
+              if (state is DormitoryRegistrationLoading ||
+                  state is DormitoryRegistrationShowHub) {
+                return const SizedBox(
+                  height: 200,
+                  child: Center(child: LoadingIndicator()),
+                );
+              }
 
-          if (state is DormitoryRegistrationError) {
-            return SizedBox(
-              height: 200,
-              child: Center(
-                child: Text(
-                  state.message,
-                  style: const TextStyle(color: Colors.red),
-                ),
-              ),
-            );
-          }
+              if (state is DormitoryRegistrationError) {
+                return SizedBox(
+                  height: 200,
+                  child: Center(
+                    child: Text(
+                      state.message,
+                      style: const TextStyle(color: Colors.red),
+                    ),
+                  ),
+                );
+              }
 
-          if (state is DormitoryRegistrationHistoryLoaded) {
-            final list = state.history;
-            if (list.isEmpty) {
-              return const SizedBox(
-                height: 200,
-                child: EmptyDataWidget(),
-              );
-            }
+              if (state is DormitoryRegistrationHistoryLoaded) {
+                final list = state.history;
+                if (list.isEmpty) {
+                  return const SizedBox(height: 200, child: EmptyDataWidget());
+                }
 
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Lịch sử xử lý',
-                      style: AppTheme.headline6.copyWith(
-                        color: AppTheme.textTitleColor,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 15),
-                Flexible(
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    physics: const BouncingScrollPhysics(),
-                    itemCount: list.length,
-                    itemBuilder: (context, index) {
-                      final item = list[index];
-                      final isLast = index == list.length - 1;
-                      return Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Column(
-                            children: [
-                              Container(
-                                width: 16,
-                                height: 16,
-                                decoration: BoxDecoration(
-                                  color: index == 0
-                                      ? AppTheme.backgroundBlueColor
-                                      : Colors.grey[300],
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: index == 0
-                                        ? AppTheme.backgroundBlueColor.withOpacity(0.3)
-                                        : Colors.transparent,
-                                    width: 4,
-                                  ),
-                                ),
-                              ),
-                              if (!isLast)
-                                Container(
-                                  width: 2,
-                                  height: 50,
-                                  color: Colors.grey[300],
-                                ),
-                            ],
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Lịch sử xử lý',
+                          style: AppTheme.headline6.copyWith(
+                            color: AppTheme.textTitleColor,
+                            fontWeight: FontWeight.bold,
                           ),
-                          const SizedBox(width: 15),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  item.action ?? 'Cập nhật trạng thái',
-                                  style: AppTheme.subtitle2.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: AppTheme.textTitleColor,
-                                  ),
-                                ),
-                                if (item.note != null &&
-                                    item.note!.isNotEmpty) ...[
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    item.note!,
-                                    style: AppTheme.body2.copyWith(
-                                      color: AppTheme.textSubColor,
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 15),
+                    Flexible(
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        physics: const BouncingScrollPhysics(),
+                        itemCount: list.length,
+                        itemBuilder: (context, index) {
+                          final item = list[index];
+                          final isLast = index == list.length - 1;
+                          return Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Column(
+                                children: [
+                                  Container(
+                                    width: 16,
+                                    height: 16,
+                                    decoration: BoxDecoration(
+                                      color: index == 0
+                                          ? AppTheme.backgroundBlueColor
+                                          : Colors.grey[300],
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: index == 0
+                                            ? AppTheme.backgroundBlueColor
+                                                  .withOpacity(0.3)
+                                            : Colors.transparent,
+                                        width: 4,
+                                      ),
                                     ),
                                   ),
+                                  if (!isLast)
+                                    Container(
+                                      width: 2,
+                                      height: 50,
+                                      color: Colors.grey[300],
+                                    ),
                                 ],
-                                const SizedBox(height: 4),
-                                Row(
+                              ),
+                              const SizedBox(width: 15),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    if (item.createdAt != null)
+                                    Text(
+                                      item.action ?? 'Cập nhật trạng thái',
+                                      style: AppTheme.subtitle2.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: AppTheme.textTitleColor,
+                                      ),
+                                    ),
+                                    if (item.note != null &&
+                                        item.note!.isNotEmpty) ...[
+                                      const SizedBox(height: 4),
                                       Text(
-                                        DateFormat('dd/MM/yyyy HH:mm')
-                                            .format(item.createdAt!),
-                                        style: AppTheme.caption.copyWith(
+                                        item.note!,
+                                        style: AppTheme.body2.copyWith(
                                           color: AppTheme.textSubColor,
                                         ),
                                       ),
+                                    ],
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        if (item.createdAt != null)
+                                          Text(
+                                            DateFormat(
+                                              'dd/MM/yyyy HH:mm',
+                                            ).format(item.createdAt!),
+                                            style: AppTheme.caption.copyWith(
+                                              color: AppTheme.textSubColor,
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 15),
                                   ],
                                 ),
-                                const SizedBox(height: 15),
-                              ],
-                            ),
-                          ),
-                        ],
-                      );
-                    },
-                  ),
-                ),
-              ],
-            );
-          }
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                );
+              }
 
-          return const SizedBox(
-            height: 200,
-            child: Center(child: Text('Đang tải...')),
-          );
-        },
-      ),
+              return const SizedBox(
+                height: 200,
+                child: Center(child: Text('Đang tải...')),
+              );
+            },
+          ),
     );
   }
 }

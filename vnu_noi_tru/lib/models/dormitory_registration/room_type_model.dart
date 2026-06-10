@@ -57,11 +57,11 @@ class RoomTypeModel {
 
     return RoomTypeModel(
       id: _parseInt(json['id']),
-      name: json['name'] as String?,
-      gender: json['gender'] as String?,
+      name: json['name']?.toString(),
+      gender: json['gender']?.toString(),
       capacity: _parseInt(json['capacity']),
-      price: json['price'] as String?,
-      description: json['description'] as String?,
+      price: json['price']?.toString(),
+      description: json['description']?.toString(),
     );
   }
 

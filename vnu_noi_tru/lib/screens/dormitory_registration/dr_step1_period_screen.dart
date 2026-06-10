@@ -36,7 +36,10 @@ class _DRStep1PeriodScreenState extends State<DRStep1PeriodScreen> {
                 const SizedBox(height: 12),
                 Text(
                   'Không có đợt đăng ký nào đang mở',
-                  style: TextStyle(color: Colors.grey[600], fontSize: AppFontSizes.mediumSmall),
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: AppFontSizes.mediumSmall,
+                  ),
                 ),
               ],
             ),
@@ -49,8 +52,10 @@ class _DRStep1PeriodScreenState extends State<DRStep1PeriodScreen> {
         }
 
         final period = cubit.selectedPeriod ?? cubit.periods.first;
-        final statusText = period.status == 'open' ? 'Đang mở' : 'Đã đóng';
-        final isStatusOpen = period.status == 'open';
+        final status = period.status?.toLowerCase();
+        final isStatusOpen =
+            status == 'open' || status == 'active' || status == '1';
+        final statusText = isStatusOpen ? 'Đang mở' : 'Đã đóng';
 
         // Calculate remaining days
         int remainDays = 0;
@@ -86,7 +91,11 @@ class _DRStep1PeriodScreenState extends State<DRStep1PeriodScreen> {
                               color: Color(0xFFEAF8EF),
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(Icons.check_box_outlined, color: Color(0xFF078B3E), size: 20),
+                            child: const Icon(
+                              Icons.check_box_outlined,
+                              color: Color(0xFF078B3E),
+                              size: 20,
+                            ),
                           ),
                           const SizedBox(width: 12),
                           const Text(
@@ -122,9 +131,14 @@ class _DRStep1PeriodScreenState extends State<DRStep1PeriodScreen> {
                         crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
                             decoration: BoxDecoration(
-                              color: isStatusOpen ? const Color(0xFFEAF8EF) : const Color(0xFFFFF1F2),
+                              color: isStatusOpen
+                                  ? const Color(0xFFEAF8EF)
+                                  : const Color(0xFFFFF1F2),
                               borderRadius: BorderRadius.circular(999),
                             ),
                             child: Row(
@@ -134,7 +148,9 @@ class _DRStep1PeriodScreenState extends State<DRStep1PeriodScreen> {
                                   width: 8,
                                   height: 8,
                                   decoration: BoxDecoration(
-                                    color: isStatusOpen ? const Color(0xFF078B3E) : const Color(0xFFDC2626),
+                                    color: isStatusOpen
+                                        ? const Color(0xFF078B3E)
+                                        : const Color(0xFFDC2626),
                                     shape: BoxShape.circle,
                                   ),
                                 ),
@@ -142,7 +158,9 @@ class _DRStep1PeriodScreenState extends State<DRStep1PeriodScreen> {
                                 Text(
                                   statusText,
                                   style: TextStyle(
-                                    color: isStatusOpen ? const Color(0xFF078B3E) : const Color(0xFFDC2626),
+                                    color: isStatusOpen
+                                        ? const Color(0xFF078B3E)
+                                        : const Color(0xFFDC2626),
                                     fontSize: AppFontSizes.font11,
                                     fontWeight: FontWeight.w800,
                                   ),
@@ -150,7 +168,11 @@ class _DRStep1PeriodScreenState extends State<DRStep1PeriodScreen> {
                               ],
                             ),
                           ),
-                          const Icon(Icons.calendar_today_outlined, size: 16, color: Color(0xFF666B75)),
+                          const Icon(
+                            Icons.calendar_today_outlined,
+                            size: 16,
+                            color: Color(0xFF666B75),
+                          ),
                           Text(
                             '${period.startTime != null ? DateFormat('dd/MM/yyyy').format(period.startTime!) : '-'} - ${period.endTime != null ? DateFormat('dd/MM/yyyy').format(period.endTime!) : '-'}',
                             style: const TextStyle(
@@ -174,7 +196,10 @@ class _DRStep1PeriodScreenState extends State<DRStep1PeriodScreen> {
                       const SizedBox(height: 16),
                       // Notice banner
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
                             colors: [Color(0xFFEDF9F1), Color(0xFFE4F5E9)],
@@ -183,11 +208,18 @@ class _DRStep1PeriodScreenState extends State<DRStep1PeriodScreen> {
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.timer_outlined, color: Color(0xFF078B3E), size: 18),
+                            const Icon(
+                              Icons.timer_outlined,
+                              color: Color(0xFF078B3E),
+                              size: 18,
+                            ),
                             const SizedBox(width: 8),
                             RichText(
                               text: TextSpan(
-                                style: const TextStyle(color: Color(0xFF1C2D22), fontSize: AppFontSizes.small),
+                                style: const TextStyle(
+                                  color: Color(0xFF1C2D22),
+                                  fontSize: AppFontSizes.small,
+                                ),
                                 children: [
                                   const TextSpan(text: 'Còn '),
                                   TextSpan(

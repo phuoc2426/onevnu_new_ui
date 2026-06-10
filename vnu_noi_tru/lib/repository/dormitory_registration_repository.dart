@@ -2,31 +2,32 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:path/path.dart' as path;
 import 'package:vnu_core/constants/config.dart';
-import 'package:vnu_core/globals.dart';
 import 'package:vnu_core/services/dio_options.dart';
-import 'package:vnu_noi_tru/data/dormitory_registration_api.dart';
 import 'package:vnu_noi_tru/models/model.dart';
 
 class DormitoryRegistrationRepository {
   DormitoryRegistrationRepository._internal() {
     _dio = DioOptions().createDio(kBaseUrlNewDormitory);
-    _apiClient = DormitoryRegistrationApi(_dio);
+    _studentDio = DioOptions().createDio(_studentApiBaseUrl);
   }
 
+  static const String _studentApiBaseUrl = 'https://ktx.sohatech.vn/api/';
+
   static final DormitoryRegistrationRepository _singleton =
-  DormitoryRegistrationRepository._internal();
+      DormitoryRegistrationRepository._internal();
 
   factory DormitoryRegistrationRepository() {
     return _singleton;
   }
 
   late Dio _dio;
-  late DormitoryRegistrationApi _apiClient;
+  late Dio _studentDio;
 
-  Future<RegistrationPeriodResponse> getRegistrationPeriods() async {
+  Future<RegistrationPeriodResponse> getRegistrationPeriods({
+    required int dormitoryId,
+  }) async {
     final response = await _dio.get<Map<String, dynamic>>(
-      'registration-periods',
-      queryParameters: {'size': 100},
+      '$dormitoryId/registration-periods',
       options: _jsonOptions(),
     );
     return RegistrationPeriodResponse.fromJson(response.data ?? {});
@@ -59,20 +60,15 @@ class DormitoryRegistrationRepository {
   Future<MyRegistrationResponse> getMyRegistrations({
     required String studentCode,
   }) async {
-    _ensureToken();
-
-    final response = await _dio.get<Map<String, dynamic>>(
-      'registrations/me',
-      queryParameters: {
-        'student_code': studentCode,
-      },
+    final response = await _studentDio.get<Map<String, dynamic>>(
+      'students/${Uri.encodeComponent(studentCode)}',
       options: _jsonOptions(),
     );
 
     return MyRegistrationResponse.fromJson(response.data ?? {});
   }
 
-  Future<SingleRegistrationResponse> getRegistrationDetail(int id) async {
+  Future<SingleRegistrationResponse> getRegistrationDetail(Object id) async {
     final response = await _dio.get<Map<String, dynamic>>(
       'registrations/$id',
       options: _jsonOptions(),
@@ -123,8 +119,8 @@ class DormitoryRegistrationRepository {
   }
 
   Future<SingleRegistrationResponse> registerDormitory(
-      RegistrationPayloadModel payload,
-      ) async {
+    RegistrationPayloadModel payload,
+  ) async {
     final response = await _dio.post<Map<String, dynamic>>(
       'registrations',
       data: payload.toJson(),
@@ -133,12 +129,23 @@ class DormitoryRegistrationRepository {
     return SingleRegistrationResponse.fromJson(response.data ?? {});
   }
 
-  Future<dynamic> submitDraft(int id) {
-    return _apiClient.submitDraft(id);
+  Future<dynamic> submitDraft(Object id) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      'registrations/$id/submit',
+      data: <String, dynamic>{},
+      options: _jsonOptions(),
+    );
+    return response.data;
   }
 
-  Future<RegistrationHistoryResponse> getRegistrationHistories(int id) {
-    return _apiClient.getRegistrationHistories(id);
+  Future<RegistrationHistoryResponse> getRegistrationHistories(
+    Object id,
+  ) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      'registrations/$id/histories',
+      options: _jsonOptions(),
+    );
+    return RegistrationHistoryResponse.fromJson(response.data ?? {});
   }
 
   Options _jsonOptions() {
@@ -148,12 +155,6 @@ class DormitoryRegistrationRepository {
         'Content-Type': 'application/json',
       },
     );
-  }
-
-  void _ensureToken() {
-    if (Globals().token.isEmpty) {
-      throw Exception('Chưa có token đăng nhập. Vui lòng đăng nhập lại.');
-    }
   }
 
   List<File> _deduplicateFiles(List<File> files) {

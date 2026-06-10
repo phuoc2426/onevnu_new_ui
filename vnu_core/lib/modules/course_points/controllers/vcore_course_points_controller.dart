@@ -15,7 +15,8 @@ import '../../../ai_radar/models/academic_course.dart';
 import '../../../ai_radar/models/ai_radar_analysis.dart';
 import '../../../globals.dart';
 import '../../../models/model.dart';
-
+import 'package:vnu_core/extensions/extension_string.dart';
+import 'package:vnu_core/extensions/extension_string.dart';
 class VcoreCoursePointsController extends GetxController {
   BuildContext? context;
 
@@ -69,7 +70,28 @@ class VcoreCoursePointsController extends GetxController {
     refreshController.dispose();
     super.onClose();
   }
+  Future<void> changeKieuTruong(String? displayName) async {
+    final selected = danhSachKieuTruong.firstWhereOrNull(
+          (e) => e.toDisplayName() == displayName,
+    );
 
+    if (selected == null) return;
+    if (selected == kieuTruong.value) return;
+
+    kieuTruong.value = selected;
+
+    hocKy.value = null;
+    danhSachHocKy.clear();
+
+    diemThiHocKy.clear();
+    diemThiTheoHocKy.clear();
+    diemTrungBinhHocKy.value = null;
+
+    aiRadarAnalysis.value = null;
+    hasRequestedAiAnalysis.value = false;
+
+    await getDanhSachHocKy();
+  }
   Future<void> getDanhSachKieuTruong() async {
     kieuTruong.value = null;
 
@@ -83,9 +105,10 @@ class VcoreCoursePointsController extends GetxController {
       danhSachKieuTruong.value = response;
 
       if (danhSachKieuTruong.isNotEmpty) {
-        kieuTruong.value = danhSachKieuTruong.firstWhereOrNull((obj) {
-          return obj == 'TruongChinh';
-        }) ??
+        kieuTruong.value =
+            danhSachKieuTruong.firstWhereOrNull((obj) {
+              return obj == 'TruongChinh';
+            }) ??
             danhSachKieuTruong.first;
 
         await getDanhSachHocKy();
@@ -122,9 +145,10 @@ class VcoreCoursePointsController extends GetxController {
     }
   }
 
+
   void changeHocKy(String? displayName) {
     final obj = danhSachHocKy.firstWhereOrNull(
-          (element) => element.disPlayName() == (displayName ?? '_///_'),
+      (element) => element.disPlayName() == (displayName ?? '_///_'),
     );
 
     if (obj != null) {
@@ -180,8 +204,7 @@ class VcoreCoursePointsController extends GetxController {
     }
 
     try {
-      if (student.idNganhDaoTao != null &&
-          student.idNganhDaoTao!.isNotEmpty) {
+      if (student.idNganhDaoTao != null && student.idNganhDaoTao!.isNotEmpty) {
         final listNganh = await ApiRepository().getDataNganhDaoTao(
           student.idNganhDaoTao,
           student.guidDonVi,
@@ -189,7 +212,7 @@ class VcoreCoursePointsController extends GetxController {
         );
 
         final nganh = listNganh.firstWhereOrNull(
-              (e) => e.id == student.idNganhDaoTao,
+          (e) => e.id == student.idNganhDaoTao,
         );
 
         majorName.value = nganh?.ten ?? 'Ngành đào tạo chưa xác định';
@@ -243,7 +266,8 @@ class VcoreCoursePointsController extends GetxController {
 
         if (danhSachHocKy.isNotEmpty) {
           final currentHocKyId = hocKy.value?.id;
-          final stillAvailable = currentHocKyId != null &&
+          final stillAvailable =
+              currentHocKyId != null &&
               danhSachHocKy.any((e) => e.id == currentHocKyId);
 
           if (!stillAvailable) {
@@ -355,8 +379,8 @@ class VcoreCoursePointsController extends GetxController {
   }
 
   List<DiemThiHocKyModel> _deduplicateCourses(
-      List<List<DiemThiHocKyModel>> results,
-      ) {
+    List<List<DiemThiHocKyModel>> results,
+  ) {
     final uniqueCourses = <String, DiemThiHocKyModel>{};
 
     for (final list in results) {
@@ -371,14 +395,12 @@ class VcoreCoursePointsController extends GetxController {
         if (existing == null) {
           uniqueCourses[key] = course;
         } else {
-          final existingGrade = double.tryParse(
-            existing.diemHe10?.replaceAll(',', '.') ?? '',
-          ) ??
+          final existingGrade =
+              double.tryParse(existing.diemHe10?.replaceAll(',', '.') ?? '') ??
               0.0;
 
-          final currentGrade = double.tryParse(
-            course.diemHe10?.replaceAll(',', '.') ?? '',
-          ) ??
+          final currentGrade =
+              double.tryParse(course.diemHe10?.replaceAll(',', '.') ?? '') ??
               0.0;
 
           if (currentGrade > existingGrade) {
@@ -444,8 +466,8 @@ class VcoreCoursePointsController extends GetxController {
   }
 
   Future<void> _saveCalculatedDataToCache(
-      List<DiemThiHocKyModel> deduplicatedList,
-      ) async {
+    List<DiemThiHocKyModel> deduplicatedList,
+  ) async {
     try {
       final gpa = diemTrungBinhHocKy.value;
 
@@ -465,8 +487,8 @@ class VcoreCoursePointsController extends GetxController {
   }
 
   Future<void> _loadAiAnalysisFromCacheOnly(
-      List<DiemThiHocKyModel> courses,
-      ) async {
+    List<DiemThiHocKyModel> courses,
+  ) async {
     if (courses.isEmpty) {
       aiRadarAnalysis.value = null;
       hasRequestedAiAnalysis.value = false;
@@ -492,12 +514,14 @@ class VcoreCoursePointsController extends GetxController {
   }
 
   String buildCourseSignature(List<DiemThiHocKyModel> list) {
-    return list.map((e) {
-      final name = e.tenHocPhan?.trim() ?? '';
-      final grade = e.diemHe10?.trim() ?? '';
-      final credits = e.soTinChi?.trim() ?? '';
-      return '${name}_${grade}_$credits';
-    }).join('|');
+    return list
+        .map((e) {
+          final name = e.tenHocPhan?.trim() ?? '';
+          final grade = e.diemHe10?.trim() ?? '';
+          final credits = e.soTinChi?.trim() ?? '';
+          return '${name}_${grade}_$credits';
+        })
+        .join('|');
   }
 
   Future<void> runAiAnalysis() async {
@@ -518,28 +542,27 @@ class VcoreCoursePointsController extends GetxController {
       loadingStateText.value = 'AI đang thiết kế bộ mũi nhọn theo ngành...';
       await Future.delayed(const Duration(milliseconds: 500));
 
-      loadingStateText.value = 'AI đang chấm điểm học phần lên từng mũi nhọn...';
+      loadingStateText.value =
+          'AI đang chấm điểm học phần lên từng mũi nhọn...';
       await Future.delayed(const Duration(milliseconds: 500));
 
       loadingStateText.value = 'AI đang vẽ radar...';
       await Future.delayed(const Duration(milliseconds: 500));
 
       final academicCourses = deduplicatedList.map((e) {
-        final grade = double.tryParse(
-          e.diemHe10?.replaceAll(',', '.') ?? '',
-        ) ??
-            0.0;
+        final grade =
+            double.tryParse(e.diemHe10?.replaceAll(',', '.') ?? '') ?? 0.0;
 
-        final credits = double.tryParse(
-          e.soTinChi?.replaceAll(',', '.') ?? '',
-        ) ??
-            3.0;
+        final credits =
+            double.tryParse(e.soTinChi?.replaceAll(',', '.') ?? '') ?? 3.0;
 
         return AcademicCourse(
           name: e.tenHocPhan ?? 'Học phần không tên',
           grade: grade,
           credits: credits,
-          description: e.maHocPhan != null ? 'Mã học phần: ${e.maHocPhan}' : null,
+          description: e.maHocPhan != null
+              ? 'Mã học phần: ${e.maHocPhan}'
+              : null,
         );
       }).toList();
 

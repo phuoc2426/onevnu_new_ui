@@ -1230,7 +1230,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
   }
 
   Widget _buildNextStudyCard() {
-    final todaySchedule = widget.controller.getUpcomingClassSchedule();
+    final todaySchedule = widget.controller.getTodayClassSchedule();
 
     if (todaySchedule.isEmpty) {
       return _schedulePanel(
@@ -1247,20 +1247,21 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
     }
 
     final nextClass = todaySchedule.first;
+    final data = nextClass.data;
 
     return _schedulePanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _panelTitle('Tiết học tiếp theo'),
+          _panelTitle('Lịch học hôm nay'),
           const SizedBox(height: 12),
           _timeBadge(
-            'Tiết ${nextClass.tietBatDau ?? ''} - ${nextClass.tietKetThuc ?? ''}',
+            'Tiết ${data.tietBatDau ?? ''} - ${data.tietKetThuc ?? ''}',
             AppColors.brandGreen,
           ),
           const SizedBox(height: 10),
           Text(
-            nextClass.tenHocPhan ?? 'Lớp học',
+            data.tenHocPhan ?? 'Lớp học',
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
@@ -1271,9 +1272,9 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
             ),
           ),
           const SizedBox(height: 12),
-          _infoLine('Phòng: ${nextClass.tenPhong ?? '--'}'),
+          _infoLine('Phòng: ${data.tenPhong ?? '--'}'),
           const SizedBox(height: 8),
-          _infoLine('GV: ${nextClass.giangVien1 ?? 'Chưa cập nhật'}'),
+          _infoLine('GV: ${data.giangVien1 ?? 'Chưa cập nhật'}'),
           const Spacer(),
           _statusPill('Hôm nay', AppColors.brandGreen),
         ],
@@ -1282,13 +1283,13 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
   }
 
   Widget _buildNextExamCard() {
-    final upcomingExams = widget.controller.getUpcomingExamSchedule();
+    final todayExams = widget.controller.getTodayExamSchedule();
 
-    if (upcomingExams.isEmpty) {
+    if (todayExams.isEmpty) {
       return _schedulePanel(
         child: const Center(
           child: Text(
-            'Không có lịch thi sắp tới',
+            'Hôm nay không có lịch thi',
             style: TextStyle(
               color: Colors.grey,
               fontSize: AppFontSizes.mediumSmall,
@@ -1298,13 +1299,13 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
       );
     }
 
-    final nextExam = upcomingExams.first;
+    final nextExam = todayExams.first;
 
     return _schedulePanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _panelTitle('Ca thi tiếp theo'),
+          _panelTitle('Lịch thi hôm nay'),
           const SizedBox(height: 12),
           _timeBadge(nextExam.gioBatDauThi ?? '--:--', const Color(0xFF2563EB)),
           const SizedBox(height: 10),
@@ -1324,14 +1325,14 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
           const SizedBox(height: 8),
           _infoLine('Ngày thi: ${nextExam.ngayThi ?? '--'}'),
           const Spacer(),
-          _statusPill('Sắp thi', const Color(0xFF2563EB)),
+          _statusPill('Hôm nay', const Color(0xFF2563EB)),
         ],
       ),
     );
   }
 
   Widget _buildTodayStudyTimeline() {
-    final todaySchedule = widget.controller.getUpcomingClassSchedule();
+    final upcomingSchedule = widget.controller.getUpcomingClassSchedule(days: 7);
 
     return _schedulePanel(
       child: Column(
@@ -1340,36 +1341,38 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
           _panelTitle('Lịch học sắp tới', hasArrow: true),
           const SizedBox(height: 12),
           Expanded(
-            child: todaySchedule.isEmpty
+            child: upcomingSchedule.isEmpty
                 ? const Center(
-                    child: Text(
-                      'Không có lịch học sắp tới',
-                      style: TextStyle(
-                        color: Colors.grey,
-                        fontSize: AppFontSizes.small,
-                      ),
-                    ),
-                  )
+              child: Text(
+                'Không có lịch học sắp tới',
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontSize: AppFontSizes.small,
+                ),
+              ),
+            )
                 : ListView.builder(
-                    itemCount: min(todaySchedule.length, 3),
-                    padding: EdgeInsets.zero,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemBuilder: (context, index) {
-                      final item = todaySchedule[index];
+              itemCount: min(upcomingSchedule.length, 3),
+              padding: EdgeInsets.zero,
+              physics: const NeverScrollableScrollPhysics(),
+              itemBuilder: (context, index) {
+                final item = upcomingSchedule[index];
+                final data = item.data;
 
-                      return _timelineItem(
-                        time: 'Tiết ${item.tietBatDau ?? '--'}',
-                        title: item.tenHocPhan ?? '',
-                        room: item.tenPhong ?? '--',
-                        color: index == 0
-                            ? const Color(0xFF059669)
-                            : index == 1
-                            ? const Color(0xFF3B82F6)
-                            : const Color(0xFFF59E0B),
-                        isLast: index == min(todaySchedule.length, 3) - 1,
-                      );
-                    },
-                  ),
+                return _timelineItem(
+                  time:
+                  '${item.ngayHocShortText} • Tiết ${data.tietBatDau ?? '--'}',
+                  title: data.tenHocPhan ?? '',
+                  room: data.tenPhong ?? '--',
+                  color: index == 0
+                      ? const Color(0xFF059669)
+                      : index == 1
+                      ? const Color(0xFF3B82F6)
+                      : const Color(0xFFF59E0B),
+                  isLast: index == min(upcomingSchedule.length, 3) - 1,
+                );
+              },
+            ),
           ),
         ],
       ),
@@ -1377,7 +1380,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
   }
 
   Widget _buildTodayExamTimeline() {
-    final todayExams = widget.controller.getUpcomingExamSchedule();
+    final upcomingExams = widget.controller.getUpcomingExamSchedule(days: 7);
 
     return _schedulePanel(
       child: Column(
@@ -1386,36 +1389,37 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
           _panelTitle('Lịch thi sắp tới', hasArrow: true),
           const SizedBox(height: 12),
           Expanded(
-            child: todayExams.isEmpty
+            child: upcomingExams.isEmpty
                 ? const Center(
-                    child: Text(
-                      'Không có lịch thi sắp tới',
-                      style: TextStyle(
-                        color: Colors.grey,
-                        fontSize: AppFontSizes.small,
-                      ),
-                    ),
-                  )
+              child: Text(
+                'Không có lịch thi sắp tới',
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontSize: AppFontSizes.small,
+                ),
+              ),
+            )
                 : ListView.builder(
-                    itemCount: min(todayExams.length, 3),
-                    padding: EdgeInsets.zero,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemBuilder: (context, index) {
-                      final item = todayExams[index];
+              itemCount: min(upcomingExams.length, 3),
+              padding: EdgeInsets.zero,
+              physics: const NeverScrollableScrollPhysics(),
+              itemBuilder: (context, index) {
+                final item = upcomingExams[index];
 
-                      return _timelineItem(
-                        time: item.gioBatDauThi ?? '--:--',
-                        title: item.tenHocPhan ?? '',
-                        room: item.phongThi ?? '--',
-                        color: index == 0
-                            ? const Color(0xFF2563EB)
-                            : index == 1
-                            ? const Color(0xFF7C3AED)
-                            : const Color(0xFFF97316),
-                        isLast: index == min(todayExams.length, 3) - 1,
-                      );
-                    },
-                  ),
+                return _timelineItem(
+                  time:
+                  '${_formatShortDate(item.ngayThi)} • ${item.gioBatDauThi ?? '--:--'}',
+                  title: item.tenHocPhan ?? '',
+                  room: item.phongThi ?? '--',
+                  color: index == 0
+                      ? const Color(0xFF2563EB)
+                      : index == 1
+                      ? const Color(0xFF7C3AED)
+                      : const Color(0xFFF97316),
+                  isLast: index == min(upcomingExams.length, 3) - 1,
+                );
+              },
+            ),
           ),
         ],
       ),
@@ -1745,6 +1749,17 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
     );
   }
 
+  String _formatShortDate(String? rawDate) {
+    if (rawDate == null || rawDate.trim().isEmpty) return '--/--';
+
+    try {
+      final date = DateFormat('dd/MM/yyyy').parseStrict(rawDate.trim());
+      return DateFormat('dd/MM').format(date);
+    } catch (_) {
+      return rawDate;
+    }
+  }
+
   Widget _timeBadge(String text, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -1853,7 +1868,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
           ),
           const SizedBox(width: 4),
           SizedBox(
-            width: 55,
+            width: 86,
             child: Text(
               time,
               maxLines: 1,

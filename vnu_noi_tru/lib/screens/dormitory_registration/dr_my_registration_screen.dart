@@ -6,7 +6,9 @@ import 'package:vnu_core/widgets/vcore_module_scaffold.dart';
 import 'package:vnu_core/widgets/progress_hub_widget.dart';
 import 'package:vnu_core/common/utils.dart';
 import 'package:vnu_noi_tru/cubit/dormitory_registration_cubit.dart';
+import 'package:vnu_noi_tru/models/model.dart';
 import 'package:intl/intl.dart';
+import 'dr_history_bottom_sheet.dart';
 import 'dr_wizard_flow.dart';
 import 'package:vnu_core/common/app_text_styles.dart';
 
@@ -27,8 +29,6 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
 
   bool _showFAB = false;
 
-  List<dynamic> _currentHistories = [];
-
   @override
   void initState() {
     super.initState();
@@ -40,7 +40,6 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
   }
 
   Future<void> _loadData() async {
-    await _cubit.getRegistrationPeriods();
     await _cubit.getDormitories();
     await _cubit.getRoomTypes();
     await _cubit.getPriorityObjects();
@@ -83,45 +82,37 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
     if (data == null) return [];
 
     if (data is Map) {
-      return List<dynamic>.from(data['accommodations'] ?? []);
+      return _asList(data['accommodations']);
     }
 
     try {
-      return List<dynamic>.from(data.accommodations ?? []);
+      return _asList(data.accommodations);
     } catch (_) {
       return [];
     }
   }
 
-  List<dynamic> _readHistories(dynamic data) {
-    if (data == null) return [];
-
-    if (data is Map) {
-      return List<dynamic>.from(data['histories'] ?? []);
-    }
-
-    try {
-      return List<dynamic>.from(data.histories ?? []);
-    } catch (_) {
-      return [];
-    }
+  List<dynamic> _asList(dynamic value) {
+    if (value == null) return [];
+    if (value is List) return List<dynamic>.from(value);
+    if (value is Iterable && value is! String) return List<dynamic>.from(value);
+    if (value is Map) return [value];
+    return [];
   }
 
-  dynamic _readMapValue(dynamic obj, String key) {
-    if (obj == null) return null;
-
-    if (obj is Map) {
-      return obj[key];
-    }
-
-    return null;
-  }
-
-  String _readString(dynamic obj, String mapKey, String Function(dynamic o) getter) {
+  String _readString(
+    dynamic obj,
+    String mapKey,
+    String Function(dynamic o) getter, {
+    List<String> aliases = const [],
+  }) {
     if (obj == null) return '';
 
     if (obj is Map) {
-      final value = obj[mapKey];
+      dynamic value = obj[mapKey];
+      for (final alias in aliases) {
+        value ??= obj[alias];
+      }
       return value?.toString() ?? '';
     }
 
@@ -133,11 +124,19 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
     }
   }
 
-  int? _readInt(dynamic obj, String mapKey, int? Function(dynamic o) getter) {
+  int? _readInt(
+    dynamic obj,
+    String mapKey,
+    int? Function(dynamic o) getter, {
+    List<String> aliases = const [],
+  }) {
     if (obj == null) return null;
 
     if (obj is Map) {
-      final value = obj[mapKey];
+      dynamic value = obj[mapKey];
+      for (final alias in aliases) {
+        value ??= obj[alias];
+      }
       if (value is int) return value;
       return int.tryParse(value?.toString() ?? '');
     }
@@ -154,11 +153,20 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
     return DateTime.tryParse(value.toString());
   }
 
-  DateTime? _readDate(dynamic obj, String mapKey, dynamic Function(dynamic o) getter) {
+  DateTime? _readDate(
+    dynamic obj,
+    String mapKey,
+    dynamic Function(dynamic o) getter, {
+    List<String> aliases = const [],
+  }) {
     if (obj == null) return null;
 
     if (obj is Map) {
-      return _parseDate(obj[mapKey]);
+      dynamic value = obj[mapKey];
+      for (final alias in aliases) {
+        value ??= obj[alias];
+      }
+      return _parseDate(value);
     }
 
     try {
@@ -168,11 +176,20 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
     }
   }
 
-  dynamic _readNested(dynamic obj, String mapKey, dynamic Function(dynamic o) getter) {
+  dynamic _readNested(
+    dynamic obj,
+    String mapKey,
+    dynamic Function(dynamic o) getter, {
+    List<String> aliases = const [],
+  }) {
     if (obj == null) return null;
 
     if (obj is Map) {
-      return obj[mapKey];
+      dynamic value = obj[mapKey];
+      for (final alias in aliases) {
+        value ??= obj[alias];
+      }
+      return value;
     }
 
     try {
@@ -187,21 +204,36 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
   // =========================================================
 
   String _studentFullName(dynamic student) {
-    final fromApi = _readString(student, 'full_name', (o) => o.fullName);
+    final fromApi = _readString(
+      student,
+      'full_name',
+      (o) => o.fullName,
+      aliases: const ['fullName'],
+    );
     if (fromApi.isNotEmpty) return fromApi;
 
     return Globals().thongTinSinhVienModel.value?.hoVaTen ?? '';
   }
 
   String _studentCodeText(dynamic student) {
-    final fromApi = _readString(student, 'student_code', (o) => o.studentCode);
+    final fromApi = _readString(
+      student,
+      'student_code',
+      (o) => o.studentCode,
+      aliases: const ['studentCode'],
+    );
     if (fromApi.isNotEmpty) return fromApi;
 
     return Globals().thongTinSinhVienModel.value?.maSinhVien ?? '';
   }
 
   String _studentClass(dynamic student) {
-    return _readString(student, 'class', (o) => o.className);
+    return _readString(
+      student,
+      'class',
+      (o) => o.className,
+      aliases: const ['className'],
+    );
   }
 
   String _studentMajor(dynamic student) {
@@ -209,7 +241,12 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
   }
 
   String _studentPhone(dynamic student) {
-    return _readString(student, 'phone', (o) => o.phone);
+    return _readString(
+      student,
+      'phone_number',
+      (o) => o.phone,
+      aliases: const ['phoneNumber', 'phone'],
+    );
   }
 
   String _studentEmail(dynamic student) {
@@ -217,15 +254,31 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
   }
 
   String _studentUniversity(dynamic student) {
-    return _readString(student, 'university_name', (o) => o.universityName);
+    return _readString(
+      student,
+      'university_name',
+      (o) => o.universityName,
+      aliases: const ['university'],
+    );
   }
 
   // =========================================================
   // Accommodation helpers
   // =========================================================
 
-  int? _accommodationId(dynamic item) {
-    return _readInt(item, 'id', (o) => o.id);
+  Object? _accommodationId(dynamic item) {
+    if (item == null) return null;
+    if (item is Map) {
+      final value = item['id'];
+      if (value == null) return null;
+      return int.tryParse(value.toString()) ?? value.toString();
+    }
+
+    try {
+      return item.id;
+    } catch (_) {
+      return null;
+    }
   }
 
   String _accommodationStatus(dynamic item) {
@@ -237,27 +290,57 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
   }
 
   DateTime? _accommodationCreatedAt(dynamic item) {
-    return _readDate(item, 'created_at', (o) => o.createdAt);
+    return _readDate(
+      item,
+      'created_at',
+      (o) => o.createdAt,
+      aliases: const ['createdAt'],
+    );
   }
 
   DateTime? _accommodationApprovedAt(dynamic item) {
-    return _readDate(item, 'approved_at', (o) => o.approvedAt);
+    return _readDate(
+      item,
+      'approved_at',
+      (o) => o.approvedAt,
+      aliases: const ['approvedAt'],
+    );
   }
 
   DateTime? _accommodationAssignedAt(dynamic item) {
-    return _readDate(item, 'assigned_at', (o) => o.assignedAt);
+    return _readDate(
+      item,
+      'assigned_at',
+      (o) => o.assignedAt,
+      aliases: const ['assignedAt'],
+    );
   }
 
   DateTime? _accommodationStartDate(dynamic item) {
-    return _readDate(item, 'start_date', (o) => o.startDate);
+    return _readDate(
+      item,
+      'start_date',
+      (o) => o.startDate,
+      aliases: const ['startDate'],
+    );
   }
 
   DateTime? _accommodationEndDate(dynamic item) {
-    return _readDate(item, 'end_date', (o) => o.endDate);
+    return _readDate(
+      item,
+      'end_date',
+      (o) => o.endDate,
+      aliases: const ['endDate'],
+    );
   }
 
   dynamic _registrationPeriod(dynamic item) {
-    return _readNested(item, 'registration_period', (o) => o.registrationPeriod);
+    return _readNested(
+      item,
+      'registration_period',
+      (o) => o.registrationPeriod,
+      aliases: const ['registrationPeriod'],
+    );
   }
 
   dynamic _dormitory(dynamic item) {
@@ -265,7 +348,12 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
   }
 
   dynamic _roomType(dynamic item) {
-    return _readNested(item, 'room_type', (o) => o.roomType);
+    return _readNested(
+      item,
+      'room_type',
+      (o) => o.roomType,
+      aliases: const ['roomType'],
+    );
   }
 
   dynamic _room(dynamic item) {
@@ -278,12 +366,29 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
 
     if (name.isNotEmpty) return name;
 
-    final periodId = _readInt(item, 'registration_period_id', (o) => o.registrationPeriodId);
+    final directName = _readString(
+      item,
+      'registrationPeriodName',
+      (o) => o.registrationPeriodName ?? '',
+      aliases: const ['registration_period_name'],
+    );
+    if (directName.isNotEmpty) return directName;
+
+    final periodId = _readInt(
+      item,
+      'registration_period_id',
+      (o) => o.registrationPeriodId,
+      aliases: const ['registrationPeriodId'],
+    );
     return periodId != null ? 'Đợt đăng ký #$periodId' : 'Đợt đăng ký';
   }
 
   String _dormitoryName(dynamic item) {
     final dormitory = _dormitory(item);
+    if (dormitory is String && dormitory.trim().isNotEmpty) {
+      return dormitory;
+    }
+
     final name = _readString(dormitory, 'name', (o) => o.name);
 
     return name.isNotEmpty ? name : 'Chưa có thông tin';
@@ -296,6 +401,10 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
 
   String _roomTypeName(dynamic item) {
     final roomType = _roomType(item);
+    if (roomType is String && roomType.trim().isNotEmpty) {
+      return roomType;
+    }
+
     final name = _readString(roomType, 'name', (o) => o.name);
 
     return name.isNotEmpty ? name : 'Chưa có thông tin';
@@ -308,7 +417,20 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
 
   String _roomNumber(dynamic item) {
     final room = _room(item);
-    return _readString(room, 'room_number', (o) => o.roomNumber);
+    final roomNumber = _readString(
+      room,
+      'room_number',
+      (o) => o.roomNumber,
+      aliases: const ['roomNumber'],
+    );
+    if (roomNumber.isNotEmpty) return roomNumber;
+
+    return _readString(
+      item,
+      'assignedRoom',
+      (o) => o.assignedRoom ?? '',
+      aliases: const ['assigned_room'],
+    );
   }
 
   String _roomCapacity(dynamic item) {
@@ -319,7 +441,11 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
 
   String _roomCurrentOccupancy(dynamic item) {
     final room = _room(item);
-    final current = _readInt(room, 'current_occupancy', (o) => o.currentOccupancy);
+    final current = _readInt(
+      room,
+      'current_occupancy',
+      (o) => o.currentOccupancy,
+    );
     return current?.toString() ?? '';
   }
 
@@ -406,51 +532,6 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
     }
   }
 
-  String _getActionText(String? action) {
-    switch (action?.toLowerCase()) {
-      case 'draft_saved':
-        return 'Lưu nháp';
-      case 'submitted':
-        return 'Nộp đơn';
-      case 'updated':
-        return 'Cập nhật hồ sơ';
-      case 'approved':
-        return 'Đã duyệt';
-      case 'assigned':
-        return 'Đã xếp phòng';
-      case 'rejected':
-        return 'Từ chối';
-      case 'checked_in':
-        return 'Nhận phòng';
-      case 'checked_out':
-        return 'Trả phòng';
-      case 'terminated':
-        return 'Chấm dứt';
-      default:
-        return action ?? 'Không xác định';
-    }
-  }
-
-  Color _getActionColor(String? action) {
-    switch (action?.toLowerCase()) {
-      case 'approved':
-      case 'assigned':
-      case 'checked_in':
-        return AppTheme.colorSuccess;
-      case 'rejected':
-      case 'terminated':
-        return AppTheme.colorError;
-      case 'updated':
-        return Colors.blue;
-      case 'submitted':
-        return AppTheme.colorWarning;
-      case 'draft_saved':
-        return Colors.orange;
-      default:
-        return Colors.grey;
-    }
-  }
-
   // =========================================================
   // Build
   // =========================================================
@@ -461,131 +542,153 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
       title: 'Ký túc xá của tôi',
       floatingActionButton: _showFAB
           ? FloatingActionButton.extended(
-        onPressed: _goToRegisterFlow,
-        label: const Text(
-          'Đăng ký mới',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: AppFontSizes.mediumSmall,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        icon: const Icon(
-          Icons.app_registration,
-          color: Colors.white,
-          size: 18,
-        ),
-        backgroundColor: const Color(0xFF078B3E),
-      )
+              onPressed: _goToRegisterFlow,
+              label: const Text(
+                'Đăng ký mới',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: AppFontSizes.mediumSmall,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              icon: const Icon(
+                Icons.app_registration,
+                color: Colors.white,
+                size: 18,
+              ),
+              backgroundColor: const Color(0xFF078B3E),
+            )
           : null,
       body: ProgressHubWidget(
         contextComplete: (ctx) {
           _hubContext = ctx;
         },
-        child: BlocListener<DormitoryRegistrationCubit, DormitoryRegistrationState>(
-          bloc: _cubit,
-          listener: (context, state) {
-            if (state is DormitoryRegistrationShowHub) {
-              Utils.showProgress(_hubContext);
-            }
+        child:
+            BlocListener<
+              DormitoryRegistrationCubit,
+              DormitoryRegistrationState
+            >(
+              bloc: _cubit,
+              listener: (context, state) {
+                if (state is DormitoryRegistrationShowHub) {
+                  Utils.showProgress(_hubContext);
+                }
 
-            if (state is DormitoryRegistrationDismissHub) {
-              Utils.dismissProgress(_hubContext);
-            }
+                if (state is DormitoryRegistrationDismissHub) {
+                  Utils.dismissProgress(_hubContext);
+                }
 
-            if (state is DormitoryRegistrationSavedSuccess) {
-              snackBarSuccess(state.message);
-              _refreshData();
-            }
+                if (state is DormitoryRegistrationSavedSuccess) {
+                  snackBarSuccess(state.message);
+                  _refreshData();
+                }
 
-            if (state is DormitoryRegistrationError) {
-              snackBarError(state.message);
-            }
+                if (state is DormitoryRegistrationError) {
+                  snackBarError(state.message);
+                }
 
-            final data = _readDataFromState(state);
-            if (data != null) {
-              final accommodations = _readAccommodations(data);
+                final data = _readDataFromState(state);
+                if (data != null) {
+                  final accommodations = _readAccommodations(data);
 
-              _currentHistories = _readHistories(data);
-
-              setState(() {
-                _showFAB = accommodations.isEmpty ||
-                    !_hasBlockingRegistration(accommodations);
-              });
-            }
-          },
-          child: BlocBuilder<DormitoryRegistrationCubit, DormitoryRegistrationState>(
-            bloc: _cubit,
-            builder: (context, state) {
-              if (state is DormitoryRegistrationLoading) {
-                return const Center(
-                  child: CircularProgressIndicator(color: AppTheme.colorMain),
-                );
-              }
-
-              final data = _readDataFromState(state);
-
-              if (data == null) {
-                return const Center(
-                  child: CircularProgressIndicator(color: AppTheme.colorMain),
-                );
-              }
-
-              final student = _readStudent(data);
-              final accommodations = _readAccommodations(data);
-              final histories = _readHistories(data);
-
-              _currentHistories = histories;
-
-              accommodations.sort((a, b) {
-                final timeA = _accommodationCreatedAt(a) ??
-                    DateTime.fromMillisecondsSinceEpoch(0);
-                final timeB = _accommodationCreatedAt(b) ??
-                    DateTime.fromMillisecondsSinceEpoch(0);
-
-                final compTime = timeB.compareTo(timeA);
-                if (compTime != 0) return compTime;
-
-                return (_accommodationId(b) ?? 0).compareTo(_accommodationId(a) ?? 0);
-              });
-
-              if (accommodations.isEmpty) {
-                return RefreshIndicator(
-                  onRefresh: _refreshData,
-                  child: ListView(
-                    children: [
-                      SizedBox(height: MediaQuery.of(context).size.height * 0.25),
-                      const Center(
-                        child: Text(
-                          'Chưa có thông tin đăng ký ký túc xá',
-                          style: TextStyle(
-                            color: Colors.grey,
-                            fontSize: AppFontSizes.mediumSmall,
-                            fontWeight: FontWeight.w500,
+                  setState(() {
+                    _showFAB =
+                        accommodations.isEmpty ||
+                        !kHideRegisterNewIfHasActiveRegistration ||
+                        !_hasBlockingRegistration(accommodations);
+                  });
+                }
+              },
+              child:
+                  BlocBuilder<
+                    DormitoryRegistrationCubit,
+                    DormitoryRegistrationState
+                  >(
+                    bloc: _cubit,
+                    builder: (context, state) {
+                      if (state is DormitoryRegistrationLoading) {
+                        return const Center(
+                          child: CircularProgressIndicator(
+                            color: AppTheme.colorMain,
                           ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }
+                        );
+                      }
 
-              return RefreshIndicator(
-                onRefresh: _refreshData,
-                child: ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    _buildStudentCard(student),
-                    const SizedBox(height: 16),
-                    ...accommodations.map(
-                          (item) => _buildAccommodationCard(item, student),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-        ),
+                      final data = _readDataFromState(state);
+
+                      if (data == null) {
+                        return const Center(
+                          child: CircularProgressIndicator(
+                            color: AppTheme.colorMain,
+                          ),
+                        );
+                      }
+
+                      final student = _readStudent(data);
+                      final accommodations = _readAccommodations(data);
+
+                      accommodations.sort((a, b) {
+                        final timeA =
+                            _accommodationCreatedAt(a) ??
+                            DateTime.fromMillisecondsSinceEpoch(0);
+                        final timeB =
+                            _accommodationCreatedAt(b) ??
+                            DateTime.fromMillisecondsSinceEpoch(0);
+
+                        final compTime = timeB.compareTo(timeA);
+                        if (compTime != 0) return compTime;
+
+                        final idA = _accommodationId(a);
+                        final idB = _accommodationId(b);
+                        final intA = idA is int
+                            ? idA
+                            : int.tryParse(idA?.toString() ?? '') ?? 0;
+                        final intB = idB is int
+                            ? idB
+                            : int.tryParse(idB?.toString() ?? '') ?? 0;
+                        return intB.compareTo(intA);
+                      });
+
+                      if (accommodations.isEmpty) {
+                        return RefreshIndicator(
+                          onRefresh: _refreshData,
+                          child: ListView(
+                            children: [
+                              SizedBox(
+                                height:
+                                    MediaQuery.of(context).size.height * 0.25,
+                              ),
+                              const Center(
+                                child: Text(
+                                  'Chưa có thông tin đăng ký ký túc xá',
+                                  style: TextStyle(
+                                    color: Colors.grey,
+                                    fontSize: AppFontSizes.mediumSmall,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+
+                      return RefreshIndicator(
+                        onRefresh: _refreshData,
+                        child: ListView(
+                          padding: const EdgeInsets.all(16),
+                          children: [
+                            _buildStudentCard(student),
+                            const SizedBox(height: 16),
+                            ...accommodations.map(
+                              (item) => _buildAccommodationCard(item, student),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+            ),
       ),
     );
   }
@@ -594,9 +697,7 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
     return Card(
       elevation: 4,
       shadowColor: Colors.black.withOpacity(0.05),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(15),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
       color: Colors.white,
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -605,11 +706,7 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
           children: [
             Row(
               children: const [
-                Icon(
-                  Icons.person_rounded,
-                  color: Color(0xFF078B3E),
-                  size: 20,
-                ),
+                Icon(Icons.person_rounded, color: Color(0xFF078B3E), size: 20),
                 SizedBox(width: 8),
                 Text(
                   'Thông tin sinh viên',
@@ -662,9 +759,7 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
       margin: const EdgeInsets.only(bottom: 16),
       elevation: 4,
       shadowColor: Colors.black.withOpacity(0.05),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(15),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
       color: Colors.white,
       child: InkWell(
         onTap: () => _showHistory(_accommodationId(item)),
@@ -709,13 +804,9 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
               _buildInfoRow('Loại phòng:', roomTypeName),
 
               if (roomTypePrice.isNotEmpty)
-                _buildInfoRow(
-                  'Giá phòng:',
-                  '${_formatPrice(roomTypePrice)} đ',
-                ),
+                _buildInfoRow('Giá phòng:', '${_formatPrice(roomTypePrice)} đ'),
 
-              if (roomNumber.isNotEmpty)
-                _buildInfoRow('Phòng:', roomNumber),
+              if (roomNumber.isNotEmpty) _buildInfoRow('Phòng:', roomNumber),
 
               if (roomCapacity.isNotEmpty)
                 _buildInfoRow(
@@ -755,8 +846,7 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
                   DateFormat('dd/MM/yyyy HH:mm').format(assignedAt),
                 ),
 
-              if (note.isNotEmpty)
-                _buildInfoRow('Ghi chú:', note),
+              if (note.isNotEmpty) _buildInfoRow('Ghi chú:', note),
 
               const SizedBox(height: 12),
 
@@ -803,11 +893,7 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
                 _cubit.submitDraft(id);
               }
             },
-            icon: const Icon(
-              Icons.send,
-              size: 12,
-              color: Colors.white,
-            ),
+            icon: const Icon(Icons.send, size: 12, color: Colors.white),
             label: const Text(
               'Gửi',
               style: TextStyle(
@@ -826,12 +912,8 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
           ),
           const SizedBox(width: 8),
           OutlinedButton.icon(
-            onPressed: () => _goToEditDraftFlow(),
-            icon: const Icon(
-              Icons.edit,
-              size: 12,
-              color: Color(0xFF078B3E),
-            ),
+            onPressed: () => _goToEditDraftFlow(item),
+            icon: const Icon(Icons.edit, size: 12, color: Color(0xFF078B3E)),
             label: const Text(
               'Sửa',
               style: TextStyle(
@@ -994,177 +1076,16 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
   // History bottom sheet
   // =========================================================
 
-  void _showHistory(int? accommodationId) {
+  void _showHistory(Object? accommodationId) {
     if (accommodationId == null) return;
-
-    final histories = _currentHistories.where((item) {
-      final id = _readInt(item, 'accommodation_id', (o) => o.accommodationId);
-      return id == accommodationId;
-    }).toList();
-
-    histories.sort((a, b) {
-      final timeA = _readDate(a, 'created_at', (o) => o.createdAt) ??
-          DateTime.fromMillisecondsSinceEpoch(0);
-      final timeB = _readDate(b, 'created_at', (o) => o.createdAt) ??
-          DateTime.fromMillisecondsSinceEpoch(0);
-
-      return timeB.compareTo(timeA);
-    });
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
-        return FractionallySizedBox(
-          heightFactor: 0.65,
-          child: Container(
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(
-                top: Radius.circular(20),
-              ),
-            ),
-            child: Column(
-              children: [
-                const SizedBox(height: 10),
-                Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Lịch sử xử lý hồ sơ',
-                  style: TextStyle(
-                    fontSize: AppFontSizes.mediumSmall,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF111318),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                const Divider(height: 1),
-                Expanded(
-                  child: histories.isEmpty
-                      ? const Center(
-                    child: Text(
-                      'Chưa có lịch sử xử lý',
-                      style: TextStyle(
-                        color: Colors.grey,
-                        fontSize: AppFontSizes.mediumSmall,
-                      ),
-                    ),
-                  )
-                      : ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: histories.length,
-                    itemBuilder: (context, index) {
-                      return _buildHistoryItem(histories[index], index);
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
+        return DRHistoryBottomSheet(registrationId: accommodationId);
       },
-    );
-  }
-
-  Widget _buildHistoryItem(dynamic item, int index) {
-    final action = _readString(item, 'action', (o) => o.action);
-    final note = _readString(item, 'note', (o) => o.note);
-    final createdAt = _readDate(item, 'created_at', (o) => o.createdAt);
-
-    final performer = _readNested(item, 'performer', (o) => o.performer);
-    final performerName = _readString(performer, 'name', (o) => o.name);
-
-    final color = _getActionColor(action);
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Column(
-          children: [
-            Container(
-              width: 28,
-              height: 28,
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.circle,
-                size: 10,
-                color: color,
-              ),
-            ),
-            Container(
-              width: 1,
-              height: 58,
-              color: Colors.grey.shade300,
-            ),
-          ],
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8F9FB),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _getActionText(action),
-                  style: TextStyle(
-                    fontSize: AppFontSizes.font11,
-                    fontWeight: FontWeight.bold,
-                    color: color,
-                  ),
-                ),
-                if (note.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    note,
-                    style: const TextStyle(
-                      fontSize: AppFontSizes.font11,
-                      color: Color(0xFF111318),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-                if (performerName.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    'Người xử lý: $performerName',
-                    style: const TextStyle(
-                      fontSize: AppFontSizes.font11,
-                      color: Color(0xFF666B75),
-                    ),
-                  ),
-                ],
-                if (createdAt != null) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    DateFormat('dd/MM/yyyy HH:mm').format(createdAt),
-                    style: const TextStyle(
-                      fontSize: AppFontSizes.font11,
-                      color: Color(0xFF666B75),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
-      ],
     );
   }
 
@@ -1175,9 +1096,7 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
   void _goToRegisterFlow() async {
     final result = await Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => const DRWizardFlow(),
-      ),
+      MaterialPageRoute(builder: (context) => const DRWizardFlow()),
     );
 
     if (result is String && result.isNotEmpty) {
@@ -1207,11 +1126,23 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
     }
   }
 
-  void _goToEditDraftFlow() async {
+  MyRegistrationModel? _toRegistrationModel(dynamic item) {
+    if (item == null) return null;
+    if (item is MyRegistrationModel) return item;
+    if (item is Map<String, dynamic>) {
+      return MyRegistrationModel.fromJson(item);
+    }
+    if (item is Map) {
+      return MyRegistrationModel.fromJson(Map<String, dynamic>.from(item));
+    }
+    return null;
+  }
+
+  void _goToEditDraftFlow(dynamic item) async {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => const DRWizardFlow(),
+        builder: (_) => DRWizardFlow(draft: _toRegistrationModel(item)),
       ),
     );
 

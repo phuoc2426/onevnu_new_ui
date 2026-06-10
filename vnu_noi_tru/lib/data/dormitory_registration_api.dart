@@ -22,13 +22,13 @@ abstract class DormitoryRegistrationApi {
   @GET('priority-objects')
   Future<PriorityObjectListResponse> getPriorityObjects();
 
-  @GET('registrations/me')
-  Future<MyRegistrationResponse> getMyRegistrations();
+  @GET('/api/students/{studentCode}')
+  Future<MyRegistrationResponse> getMyRegistrations(
+    @Path('studentCode') String studentCode,
+  );
 
   @GET('registrations/{id}')
-  Future<SingleRegistrationResponse> getRegistrationDetail(
-    @Path('id') int id,
-  );
+  Future<SingleRegistrationResponse> getRegistrationDetail(@Path('id') int id);
 
   @POST('attachments/upload')
   @MultiPart()
@@ -44,9 +44,7 @@ abstract class DormitoryRegistrationApi {
   );
 
   @POST('registrations/{id}/submit')
-  Future<dynamic> submitDraft(
-    @Path('id') int id,
-  );
+  Future<dynamic> submitDraft(@Path('id') int id);
 
   @GET('registrations/{id}/histories')
   Future<RegistrationHistoryResponse> getRegistrationHistories(

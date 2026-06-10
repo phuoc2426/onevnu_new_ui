@@ -57,9 +57,13 @@ class _DRStep2DormitoryScreenState extends State<DRStep2DormitoryScreen> {
     final list = cubit.roomTypes;
     final student = Globals().thongTinSinhVienModel.value;
     if (student == null) return list;
-    final targetGender = student.gioiTinh?.toLowerCase() == 'nữ' ? 'female' : 'male';
+    final targetGender = student.gioiTinh?.toLowerCase() == 'nữ'
+        ? 'female'
+        : 'male';
     return list
-        .where((element) => element.gender == null || element.gender == targetGender)
+        .where(
+          (element) => element.gender == null || element.gender == targetGender,
+        )
         .toList();
   }
 
@@ -74,134 +78,146 @@ class _DRStep2DormitoryScreenState extends State<DRStep2DormitoryScreen> {
           )
         : SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Card: Dormitory selection
-                  Card(
-                    color: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
-                      side: const BorderSide(color: Color(0xFFE3E6EB)),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Row(
-                            children: [
-                              Icon(Icons.business, color: Color(0xFF078B3E), size: 20),
-                              SizedBox(width: 8),
-                              Text(
-                                'Ký túc xá',
-                                style: TextStyle(
-                                  fontSize: AppFontSizes.small,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF111318),
-                                ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Card: Dormitory selection
+                Card(
+                  color: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18),
+                    side: const BorderSide(color: Color(0xFFE3E6EB)),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(
+                              Icons.business,
+                              color: Color(0xFF078B3E),
+                              size: 20,
+                            ),
+                            SizedBox(width: 8),
+                            Text(
+                              'Ký túc xá',
+                              style: TextStyle(
+                                fontSize: AppFontSizes.small,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF111318),
                               ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          // Tabs scroll bar
-                          _buildTabs(),
-                          const SizedBox(height: 16),
-                          // Dormitories Grid
-                          _buildDormGrid(cubit),
-                        ],
-                      ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        // Tabs scroll bar
+                        _buildTabs(),
+                        const SizedBox(height: 16),
+                        // Dormitories Grid
+                        _buildDormGrid(cubit),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  // Card: Room Type selection
-                  Card(
-                    color: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
-                      side: const BorderSide(color: Color(0xFFE3E6EB)),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Row(
-                            children: [
-                              Icon(Icons.meeting_room_outlined, color: Color(0xFF078B3E), size: 20),
-                              SizedBox(width: 8),
-                              Text(
-                                'Loại phòng',
-                                style: TextStyle(
-                                  fontSize: AppFontSizes.small,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF111318),
-                                ),
+                ),
+                const SizedBox(height: 16),
+                // Card: Room Type selection
+                Card(
+                  color: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18),
+                    side: const BorderSide(color: Color(0xFFE3E6EB)),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(
+                              Icons.meeting_room_outlined,
+                              color: Color(0xFF078B3E),
+                              size: 20,
+                            ),
+                            SizedBox(width: 8),
+                            Text(
+                              'Loại phòng',
+                              style: TextStyle(
+                                fontSize: AppFontSizes.small,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF111318),
                               ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          // Room Grid
-                          _buildRoomGrid(cubit),
-                        ],
-                      ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        // Room Grid
+                        _buildRoomGrid(cubit),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  // Card: Priority Object
-                  Card(
-                    color: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
-                      side: const BorderSide(color: Color(0xFFE3E6EB)),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Row(
-                            children: [
-                              Icon(Icons.settings_outlined, color: Color(0xFF078B3E), size: 20),
-                              SizedBox(width: 8),
-                              Text(
-                                'Đối tượng ưu tiên',
-                                style: TextStyle(
-                                  fontSize: AppFontSizes.small,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF111318),
-                                ),
+                ),
+                const SizedBox(height: 16),
+                // Card: Priority Object
+                Card(
+                  color: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18),
+                    side: const BorderSide(color: Color(0xFFE3E6EB)),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(
+                              Icons.settings_outlined,
+                              color: Color(0xFF078B3E),
+                              size: 20,
+                            ),
+                            SizedBox(width: 8),
+                            Text(
+                              'Đối tượng ưu tiên',
+                              style: TextStyle(
+                                fontSize: AppFontSizes.small,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF111318),
                               ),
-                            ],
-                          ),
-                          const SizedBox(height: 14),
-                          // Custom Dropdown selection field
-                          NtCustomDropdown<PriorityObjectModel>(
-                            label: 'Đối tượng ưu tiên',
-                            hintText: 'Chọn nếu có',
-                            value: cubit.selectedPriorityObject,
-                            items: cubit.priorityObjects,
-                            itemAsString: (item) => item.name ?? '',
-                            itemAsSubtitle: (item) => item.description ?? '',
-                            clearable: true,
-                            clearableText: 'Không có đối tượng ưu tiên',
-                            onChanged: (value) {
-                              setState(() {
-                                cubit.selectedPriorityObject = value;
-                              });
-                            },
-                          ),
-                        ],
-                      ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        // Custom Dropdown selection field
+                        NtCustomDropdown<PriorityObjectModel>(
+                          label: 'Đối tượng ưu tiên',
+                          hintText: 'Chọn nếu có',
+                          value: cubit.selectedPriorityObject,
+                          items: cubit.priorityObjects,
+                          itemAsString: (item) => item.name ?? '',
+                          itemAsSubtitle: (item) => item.description ?? '',
+                          clearable: true,
+                          clearableText: 'Không có đối tượng ưu tiên',
+                          onChanged: (value) {
+                            setState(() {
+                              cubit.selectedPriorityObject = value;
+                            });
+                          },
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 24),
-                ],
-              ),
-            );
+                ),
+                const SizedBox(height: 24),
+              ],
+            ),
+          );
   }
 
   Widget _buildTabs() {
@@ -228,7 +244,9 @@ class _DRStep2DormitoryScreenState extends State<DRStep2DormitoryScreen> {
               label: Text(
                 t,
                 style: TextStyle(
-                  color: isActive ? const Color(0xFF078B3E) : const Color(0xFF41454C),
+                  color: isActive
+                      ? const Color(0xFF078B3E)
+                      : const Color(0xFF41454C),
                   fontWeight: isActive ? FontWeight.w800 : FontWeight.normal,
                   fontSize: AppFontSizes.small,
                 ),
@@ -239,7 +257,9 @@ class _DRStep2DormitoryScreenState extends State<DRStep2DormitoryScreen> {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(999),
                 side: BorderSide(
-                  color: isActive ? Colors.transparent : const Color(0xFFE3E6EB),
+                  color: isActive
+                      ? Colors.transparent
+                      : const Color(0xFFE3E6EB),
                 ),
               ),
               onSelected: (selected) {
@@ -261,7 +281,9 @@ class _DRStep2DormitoryScreenState extends State<DRStep2DormitoryScreen> {
     if (list.isEmpty) {
       return const SizedBox(
         height: 100,
-        child: Center(child: Text('Không có dữ liệu', style: TextStyle(color: Colors.grey))),
+        child: Center(
+          child: Text('Không có dữ liệu', style: TextStyle(color: Colors.grey)),
+        ),
       );
     }
 
@@ -287,6 +309,8 @@ class _DRStep2DormitoryScreenState extends State<DRStep2DormitoryScreen> {
           onTap: () {
             setState(() {
               cubit.selectedDormitory = d;
+              cubit.selectedPeriod = null;
+              cubit.periods = [];
             });
           },
           child: Container(
@@ -294,7 +318,9 @@ class _DRStep2DormitoryScreenState extends State<DRStep2DormitoryScreen> {
               color: Colors.white,
               borderRadius: BorderRadius.circular(13),
               border: Border.all(
-                color: isSelected ? const Color(0xFF078B3E) : const Color(0xFFE3E6EB),
+                color: isSelected
+                    ? const Color(0xFF078B3E)
+                    : const Color(0xFFE3E6EB),
                 width: isSelected ? 1.8 : 1.0,
               ),
             ),
@@ -334,7 +360,9 @@ class _DRStep2DormitoryScreenState extends State<DRStep2DormitoryScreen> {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: isSelected ? const Color(0xFF078B3E) : const Color(0xFF9AA0A8),
+                      color: isSelected
+                          ? const Color(0xFF078B3E)
+                          : const Color(0xFF9AA0A8),
                       width: isSelected ? 2 : 1.5,
                     ),
                   ),
@@ -438,10 +466,7 @@ class _DRStep2DormitoryScreenState extends State<DRStep2DormitoryScreen> {
                           spacing: 8,
                           runSpacing: 6,
                           children: [
-                            _roomInfoChip(
-                              Icons.wc_outlined,
-                              genderText,
-                            ),
+                            _roomInfoChip(Icons.wc_outlined, genderText),
                             _roomInfoChip(
                               Icons.people_alt_outlined,
                               'Sức chứa: ${r.capacity ?? 0} người',
@@ -476,12 +501,7 @@ class _DRStep2DormitoryScreenState extends State<DRStep2DormitoryScreen> {
     );
   }
 
-
-  Widget _roomInfoChip(
-      IconData icon,
-      String text, {
-        bool isPrice = false,
-      }) {
+  Widget _roomInfoChip(IconData icon, String text, {bool isPrice = false}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
@@ -501,7 +521,9 @@ class _DRStep2DormitoryScreenState extends State<DRStep2DormitoryScreen> {
             text,
             style: TextStyle(
               fontSize: 11,
-              color: isPrice ? const Color(0xFF078B3E) : const Color(0xFF444A54),
+              color: isPrice
+                  ? const Color(0xFF078B3E)
+                  : const Color(0xFF444A54),
               fontWeight: isPrice ? FontWeight.w800 : FontWeight.w500,
             ),
           ),
@@ -509,6 +531,7 @@ class _DRStep2DormitoryScreenState extends State<DRStep2DormitoryScreen> {
       ),
     );
   }
+
   Widget _buildDormImage(String dormName) {
     String assetPath = '';
     final nameLower = dormName.toLowerCase();
@@ -570,7 +593,10 @@ class _DRStep2DormitoryScreenState extends State<DRStep2DormitoryScreen> {
                 child: Center(
                   child: Text(
                     _dormMark(dormName),
-                    style: const TextStyle(color: Color(0xFF5590B0), fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      color: Color(0xFF5590B0),
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               );
@@ -608,7 +634,11 @@ class _DRStep2DormitoryScreenState extends State<DRStep2DormitoryScreen> {
           color: Color(0xFFEAF8EF),
           shape: BoxShape.circle,
         ),
-        child: const Icon(Icons.grid_view_outlined, color: Color(0xFF078B3E), size: 18),
+        child: const Icon(
+          Icons.grid_view_outlined,
+          color: Color(0xFF078B3E),
+          size: 18,
+        ),
       );
     }
 
@@ -633,7 +663,11 @@ class _DRStep2DormitoryScreenState extends State<DRStep2DormitoryScreen> {
                   color: Color(0xFFEAF8EF),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.grid_view_outlined, color: Color(0xFF078B3E), size: 18),
+                child: const Icon(
+                  Icons.grid_view_outlined,
+                  color: Color(0xFF078B3E),
+                  size: 18,
+                ),
               );
             },
           );

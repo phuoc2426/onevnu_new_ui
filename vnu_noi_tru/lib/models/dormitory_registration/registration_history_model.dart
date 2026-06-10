@@ -22,11 +22,26 @@ class RegistrationHistoryResponse {
 
 class RegistrationHistoryModel {
   final int? id;
+  final int? studentId;
+  final int? accommodationId;
+  final String? type;
   final String? action;
+  final dynamic data;
+  final int? performedBy;
   final String? note;
   final DateTime? createdAt;
 
-  RegistrationHistoryModel({this.id, this.action, this.note, this.createdAt});
+  RegistrationHistoryModel({
+    this.id,
+    this.studentId,
+    this.accommodationId,
+    this.type,
+    this.action,
+    this.data,
+    this.performedBy,
+    this.note,
+    this.createdAt,
+  });
 
   factory RegistrationHistoryModel.fromJson(Map<String, dynamic> json) {
     int? _parseInt(dynamic v) {
@@ -38,17 +53,31 @@ class RegistrationHistoryModel {
 
     return RegistrationHistoryModel(
       id: _parseInt(json['id']),
+      studentId: _parseInt(json['student_id'] ?? json['studentId']),
+      accommodationId: _parseInt(
+        json['accommodation_id'] ?? json['accommodationId'],
+      ),
+      type: json['type'] as String?,
       action: json['action'] as String?,
+      data: json['data'],
+      performedBy: _parseInt(json['performed_by'] ?? json['performedBy']),
       note: json['note'] as String?,
-      createdAt: json['created_at'] != null
-          ? DateTime.tryParse(json['created_at'] as String)
+      createdAt: (json['created_at'] ?? json['createdAt']) != null
+          ? DateTime.tryParse(
+              (json['created_at'] ?? json['createdAt']).toString(),
+            )
           : null,
     );
   }
 
   Map<String, dynamic> toJson() => {
     'id': id,
+    'student_id': studentId,
+    'accommodation_id': accommodationId,
+    'type': type,
     'action': action,
+    'data': data,
+    'performed_by': performedBy,
     'note': note,
     'created_at': createdAt?.toIso8601String(),
   };

@@ -50,8 +50,8 @@ class PriorityObjectModel {
 
     return PriorityObjectModel(
       id: _parseInt(json['id']),
-      name: json['name'] as String?,
-      description: json['description'] as String?,
+      name: json['name']?.toString(),
+      description: json['description']?.toString(),
     );
   }
 

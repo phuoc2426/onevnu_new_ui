@@ -79,13 +79,15 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
     collect(responseData);
 
     final text = parts.join(' ').toLowerCase();
-    final mentionsStudent = text.contains('student') ||
+    final mentionsStudent =
+        text.contains('student') ||
         text.contains('student_code') ||
         text.contains('mã sinh viên') ||
         text.contains('ma sinh vien') ||
         text.contains('sinh viên') ||
         text.contains('sinh vien');
-    final mentionsNotFound = text.contains('not found') ||
+    final mentionsNotFound =
+        text.contains('not found') ||
         text.contains('không tồn tại') ||
         text.contains('khong ton tai') ||
         text.contains('không tìm thấy') ||
@@ -208,11 +210,25 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
     }
   }
 
-  Future<void> getRegistrationPeriods() async {
+  Future<void> getRegistrationPeriods({int? dormitoryId}) async {
     emit(DormitoryRegistrationLoading());
     try {
-      final res = await _repository.getRegistrationPeriods();
+      final selectedDormitoryId = dormitoryId ?? selectedDormitory?.id;
+      if (selectedDormitoryId == null) {
+        periods = [];
+        selectedPeriod = null;
+        emit(DormitoryRegistrationPeriodsLoaded(periods));
+        return;
+      }
+
+      final res = await _repository.getRegistrationPeriods(
+        dormitoryId: selectedDormitoryId,
+      );
       periods = res.data?.items ?? [];
+      if (selectedPeriod != null &&
+          !periods.any((p) => p.id == selectedPeriod!.id)) {
+        selectedPeriod = null;
+      }
       if (draftRecord != null && periods.isNotEmpty) {
         selectedPeriod = periods.firstWhere(
           (p) => p.id == draftRecord!.registrationPeriodId,
@@ -282,7 +298,8 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
 
   Future<void> getMyRegistrations({String? studentCode}) async {
     try {
-      final code = studentCode ??
+      final code =
+          studentCode ??
           Globals().thongTinSinhVienModel.value?.maSinhVien ??
           '';
 
@@ -292,9 +309,7 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
         return;
       }
 
-      final res = await _repository.getMyRegistrations(
-        studentCode: code,
-      );
+      final res = await _repository.getMyRegistrations(studentCode: code);
 
       emit(DormitoryRegistrationDismissHub());
 
@@ -315,18 +330,23 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
         final statusCode = e.response?.statusCode;
         final responseData = e.response?.data;
 
+        if (statusCode == 500) {
+          _emitEmptyMyRegistrations();
+          return;
+        }
+
         final message = responseData is Map
             ? responseData['message']?.toString().toLowerCase() ?? ''
             : e.message?.toLowerCase() ?? '';
 
         final isStudentNotFound =
             statusCode == 404 ||
-                message.contains('student') ||
-                message.contains('not found') ||
-                message.contains('không tồn tại') ||
-                message.contains('khong ton tai') ||
-                message.contains('không tìm thấy') ||
-                message.contains('khong tim thay');
+            message.contains('student') ||
+            message.contains('not found') ||
+            message.contains('không tồn tại') ||
+            message.contains('khong ton tai') ||
+            message.contains('không tìm thấy') ||
+            message.contains('khong tim thay');
 
         if (isStudentNotFound) {
           emit(
@@ -344,7 +364,8 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
       emit(DormitoryRegistrationError(e.toString()));
     }
   }
-  Future<void> getRegistrationDetail(int id) async {
+
+  Future<void> getRegistrationDetail(Object id) async {
     // emit(DormitoryRegistrationShowHub());
     try {
       final res = await _repository.getRegistrationDetail(id);
@@ -361,7 +382,7 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
     }
   }
 
-  Future<void> getRegistrationHistories(int id) async {
+  Future<void> getRegistrationHistories(Object id) async {
     // emit(DormitoryRegistrationShowHub());
     try {
       final res = await _repository.getRegistrationHistories(id);
@@ -452,7 +473,7 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
     }
   }
 
-  Future<void> submitDraft(int id) async {
+  Future<void> submitDraft(Object id) async {
     // emit(DormitoryRegistrationShowHub());
     try {
       await _repository.submitDraft(id);

@@ -20,6 +20,12 @@ class RegistrationPeriodData {
   RegistrationPeriodData({this.items});
 
   factory RegistrationPeriodData.fromJson(Map<String, dynamic> json) {
+    if (json['items'] == null && json['id'] != null) {
+      return RegistrationPeriodData(
+        items: [RegistrationPeriodModel.fromJson(json)],
+      );
+    }
+
     return RegistrationPeriodData(
       items: json['items'] != null
           ? (json['items'] as List)
@@ -36,6 +42,7 @@ class RegistrationPeriodData {
 
 class RegistrationPeriodModel {
   final int? id;
+  final int? dormitoryId;
   final String? name;
   final String? status;
   final DateTime? startTime;
@@ -44,6 +51,7 @@ class RegistrationPeriodModel {
 
   RegistrationPeriodModel({
     this.id,
+    this.dormitoryId,
     this.name,
     this.status,
     this.startTime,
@@ -61,13 +69,14 @@ class RegistrationPeriodModel {
 
     return RegistrationPeriodModel(
       id: _parseInt(json['id']),
+      dormitoryId: _parseInt(json['dormitory_id'] ?? json['dormitoryId']),
       name: json['name'] as String?,
-      status: json['status'] as String?,
+      status: json['status']?.toString(),
       startTime: json['start_time'] != null
-          ? DateTime.tryParse(json['start_time'] as String)
+          ? DateTime.tryParse(json['start_time'].toString())
           : null,
       endTime: json['end_time'] != null
-          ? DateTime.tryParse(json['end_time'] as String)
+          ? DateTime.tryParse(json['end_time'].toString())
           : null,
       description: json['description'] as String?,
     );
@@ -75,6 +84,7 @@ class RegistrationPeriodModel {
 
   Map<String, dynamic> toJson() => {
     'id': id,
+    'dormitory_id': dormitoryId,
     'name': name,
     'status': status,
     'start_time': startTime?.toIso8601String(),

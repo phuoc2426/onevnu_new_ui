@@ -24,6 +24,23 @@ const kCacheKeyListThongBaoDaoTao = 'listThongBaoDaoTao.json';
 const kCacheKeyListTop10ThongBao = 'listTop10ThongBao.json';
 
 const kCacheKeyListTinTucBySchool = 'listTinTucBySchool.json';
+class HomeClassScheduleItem {
+  final ThoiKhoaBieuModel data;
+  final DateTime date;
+
+  HomeClassScheduleItem({
+    required this.data,
+    required this.date,
+  });
+
+  String get ngayHocText {
+    return DateFormat('dd/MM/yyyy').format(date);
+  }
+
+  String get ngayHocShortText {
+    return DateFormat('dd/MM').format(date);
+  }
+}
 
 class VcoreHomeController extends GetxController {
   BuildContext? context;
@@ -42,6 +59,8 @@ class VcoreHomeController extends GetxController {
   Rxn<TongKetDenHienTaiModel> tongKetModel = Rxn();
   RxList<ThoiKhoaBieuModel> listThoiKhoaBieu = RxList([]);
   RxList<LichThiHocKyModel> listLichThi = RxList([]);
+  HocKyModel? currentThoiKhoaBieuHocKy;
+  HocKyModel? currentLichThiHocKy;
   RxBool isLoadingSchedule = false.obs;
 
   RxInt unreadSystemCount = 0.obs;
@@ -345,10 +364,14 @@ class VcoreHomeController extends GetxController {
         var hocKyListTKB = await ApiRepository()
             .getDanhSachHocKyTheoThoiKhoaBieu(true, kieuTruong);
         final hocKyTKB = _selectCurrentSemester(hocKyListTKB);
+        currentThoiKhoaBieuHocKy = hocKyTKB;
+
         if (hocKyTKB != null) {
           var tkbResponse = await ApiRepository()
               .getThoiKhoaBieuHocKy(hocKyTKB.id ?? '', kieuTruong);
           listThoiKhoaBieu.value = tkbResponse;
+        } else {
+          listThoiKhoaBieu.clear();
         }
       } catch (e) {
         logError('fetchThoiKhoaBieu: ${e.toString()}');
@@ -359,10 +382,14 @@ class VcoreHomeController extends GetxController {
         var hocKyListLT =
             await ApiRepository().getDanhSachHocKyTheoLichThi(true, kieuTruong);
         final hocKyLT = _selectCurrentSemester(hocKyListLT);
+        currentLichThiHocKy = hocKyLT;
+
         if (hocKyLT != null) {
           var ltResponse = await ApiRepository()
               .getLichThiHocKy(hocKyLT.id ?? '', kieuTruong);
           listLichThi.value = ltResponse;
+        } else {
+          listLichThi.clear();
         }
       } catch (e) {
         logError('fetchLichThi: ${e.toString()}');
@@ -441,6 +468,27 @@ class VcoreHomeController extends GetxController {
     return DateTime(endYear, 2, 28);
   }
 
+  DateTime _dateOnly(DateTime date) {
+    return DateTime(date.year, date.month, date.day);
+  }
+
+  bool _isSameDate(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  String _dateToApiFormat(DateTime date) {
+    return DateFormat('dd/MM/yyyy').format(date);
+  }
+
+  DateTime? _parseNgayHoc(String? ngayHoc) {
+    if (ngayHoc == null || ngayHoc.trim().isEmpty) return null;
+
+    try {
+      return DateFormat('dd/MM/yyyy').parseStrict(ngayHoc.trim());
+    } catch (_) {
+      return null;
+    }
+  }
   /// Get today's day-of-week string for ThoiKhoaBieuModel (1=Mon...7=Sun)
   String _getTodayDayOfWeek() {
     int weekday = DateTime.now().weekday; // 1=Mon...7=Sun
@@ -456,7 +504,45 @@ class VcoreHomeController extends GetxController {
       ..sort((a, b) => (int.tryParse(a.tietBatDau ?? '0') ?? 0)
           .compareTo(int.tryParse(b.tietBatDau ?? '0') ?? 0));
   }
+  List<HomeClassScheduleItem> _getClassScheduleForDate(DateTime date) {
+    final targetDate = _dateOnly(date);
 
+    if (!_isDateInCurrentThoiKhoaBieuSemester(targetDate)) {
+      return [];
+    }
+
+    final dayOfWeek = targetDate.weekday.toString();
+
+    final items = getClassScheduleForDay(dayOfWeek);
+
+    return items
+        .map(
+          (item) => HomeClassScheduleItem(
+        data: item,
+        date: targetDate,
+      ),
+    )
+        .toList()
+      ..sort((a, b) {
+        final tietA = int.tryParse(a.data.tietBatDau ?? '') ?? 999;
+        final tietB = int.tryParse(b.data.tietBatDau ?? '') ?? 999;
+        return tietA.compareTo(tietB);
+      });
+  }
+
+  bool _isDateInCurrentThoiKhoaBieuSemester(DateTime date) {
+    final semester = currentThoiKhoaBieuHocKy;
+
+    if (semester == null) {
+      return true;
+    }
+
+    final start = _dateOnly(_inferSemesterStartDate(semester));
+    final end = _dateOnly(_inferSemesterEndDate(semester));
+    final target = _dateOnly(date);
+
+    return !target.isBefore(start) && !target.isAfter(end);
+  }
   /// Parse ngayThi string (dd/MM/yyyy) to DateTime
   DateTime? _parseNgayThi(String? ngayThi) {
     if (ngayThi == null || ngayThi.isEmpty) return null;
@@ -474,22 +560,28 @@ class VcoreHomeController extends GetxController {
   }
 
   /// Get today's class schedule
-  List<ThoiKhoaBieuModel> getTodayClassSchedule() {
-    return getClassScheduleForDay(_getTodayDayOfWeek());
+  List<HomeClassScheduleItem> getTodayClassSchedule() {
+    return _getClassScheduleForDate(DateTime.now());
   }
-
   /// Get class schedule from today through the next [days] days.
-  List<ThoiKhoaBieuModel> getUpcomingClassSchedule({int days = 5}) {
-    final result = <ThoiKhoaBieuModel>[];
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
+  List<HomeClassScheduleItem> getUpcomingClassSchedule({int days = 7}) {
+    final result = <HomeClassScheduleItem>[];
+    final today = _dateOnly(DateTime.now());
 
     for (var offset = 0; offset < days; offset++) {
       final date = today.add(Duration(days: offset));
-      final dayOfWeek = date.weekday.toString();
-      final items = getClassScheduleForDay(dayOfWeek);
-      result.addAll(items);
+      result.addAll(_getClassScheduleForDate(date));
     }
+
+    result.sort((a, b) {
+      final cmpDate = a.date.compareTo(b.date);
+      if (cmpDate != 0) return cmpDate;
+
+      final tietA = int.tryParse(a.data.tietBatDau ?? '') ?? 999;
+      final tietB = int.tryParse(b.data.tietBatDau ?? '') ?? 999;
+
+      return tietA.compareTo(tietB);
+    });
 
     return result;
   }
@@ -501,7 +593,7 @@ class VcoreHomeController extends GetxController {
   }
 
   /// Get exam schedule from today through the next [days] days.
-  List<LichThiHocKyModel> getUpcomingExamSchedule({int days = 5}) {
+  List<LichThiHocKyModel> getUpcomingExamSchedule({int days = 7}) {
     final now = DateTime.now();
     final todayStart = DateTime(now.year, now.month, now.day);
     final endExclusive = todayStart.add(Duration(days: days));
@@ -553,9 +645,10 @@ class VcoreHomeController extends GetxController {
       });
   }
 
-  /// Get count of upcoming exams
-  int getUpcomingExamCount() => getUpcomingExams().length;
 
+
+  /// Get count of upcoming exams
+  int getUpcomingExamCount() => getUpcomingExamSchedule(days: 7).length;
   /// Total subjects today (class + exam)
   int getTodayTotalSubjects() {
     return getTodayClassSchedule().length + getTodayExamSchedule().length;

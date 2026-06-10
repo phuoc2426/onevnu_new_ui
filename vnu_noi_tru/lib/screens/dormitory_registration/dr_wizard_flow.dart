@@ -47,23 +47,33 @@ class _DRWizardFlowState extends State<DRWizardFlow> {
   }
 
   void _loadData() async {
-    await _cubit.getRegistrationPeriods();
     await _cubit.getDormitories();
     await _cubit.getRoomTypes();
     await _cubit.getPriorityObjects();
 
+    MyRegistrationModel? draft;
     if (widget.draft != null && widget.draft!.id != null) {
       try {
         await _cubit.getRegistrationDetail(widget.draft!.id!);
         if (_cubit.state is DormitoryRegistrationDetailLoaded) {
-          final detail = (_cubit.state as DormitoryRegistrationDetailLoaded)
-              .registration;
-          _cubit.loadDraftData(detail);
+          draft =
+              (_cubit.state as DormitoryRegistrationDetailLoaded).registration;
+          _cubit.loadDraftData(draft);
         } else {
-          _cubit.loadDraftData(widget.draft!);
+          draft = widget.draft!;
+          _cubit.loadDraftData(draft);
         }
       } catch (e) {
-        _cubit.loadDraftData(widget.draft!);
+        draft = widget.draft!;
+        _cubit.loadDraftData(draft);
+      }
+    }
+    if (_cubit.selectedDormitory?.id != null) {
+      await _cubit.getRegistrationPeriods(
+        dormitoryId: _cubit.selectedDormitory!.id!,
+      );
+      if (draft != null) {
+        _cubit.loadDraftData(draft);
       }
     }
     await _cubit.getMyRegistrations();
@@ -71,18 +81,25 @@ class _DRWizardFlowState extends State<DRWizardFlow> {
 
   Future<void> _nextStep() async {
     if (_currentStep == 0) {
-      if (_cubit.selectedPeriod == null) {
-        _showSnackbarError('Vui lòng chọn đợt đăng ký');
-        return;
-      }
-      setState(() => _currentStep = 1);
-    } else if (_currentStep == 1) {
       if (_cubit.selectedDormitory == null) {
         _showSnackbarError('Vui lòng chọn ký túc xá');
         return;
       }
       if (_cubit.selectedRoomType == null) {
         _showSnackbarError('Vui lòng chọn loại phòng');
+        return;
+      }
+      await _cubit.getRegistrationPeriods(
+        dormitoryId: _cubit.selectedDormitory!.id!,
+      );
+      if (_cubit.periods.isEmpty) {
+        _showSnackbarError('Ký túc xá này chưa có đợt đăng ký đang mở');
+        return;
+      }
+      setState(() => _currentStep = 1);
+    } else if (_currentStep == 1) {
+      if (_cubit.selectedPeriod == null) {
+        _showSnackbarError('Vui lòng chọn đợt đăng ký');
         return;
       }
       setState(() => _currentStep = 2);
@@ -124,34 +141,34 @@ class _DRWizardFlowState extends State<DRWizardFlow> {
             ),
           ),
           child: AlertDialog(
-          backgroundColor: Colors.white,
-          surfaceTintColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          title: const Row(
-            children: [
-              Icon(Icons.verified_user_outlined, color: Color(0xFF078B3E)),
-              SizedBox(width: 8),
-              Expanded(child: Text('Xác nhận thông tin')),
+            backgroundColor: Colors.white,
+            surfaceTintColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: const Row(
+              children: [
+                Icon(Icons.verified_user_outlined, color: Color(0xFF078B3E)),
+                SizedBox(width: 8),
+                Expanded(child: Text('Xác nhận thông tin')),
+              ],
+            ),
+            content: const Text(
+              'Hãy chắc chắn với các thông tin mà bạn gửi, nhất là với minh chứng và lý do.',
+              style: TextStyle(height: 1.4),
+            ),
+            actions: [
+              OutlinedButton.icon(
+                onPressed: () => Navigator.pop(context, false),
+                icon: const Icon(Icons.arrow_back_rounded),
+                label: const Text('Kiểm tra lại'),
+              ),
+              FilledButton.icon(
+                onPressed: () => Navigator.pop(context, true),
+                icon: const Icon(Icons.check_circle_outline_rounded),
+                label: const Text('Tiếp tục'),
+              ),
             ],
-          ),
-          content: const Text(
-            'Hãy chắc chắn với các thông tin mà bạn gửi, nhất là với minh chứng và lý do.',
-            style: TextStyle(height: 1.4),
-          ),
-          actions: [
-            OutlinedButton.icon(
-              onPressed: () => Navigator.pop(context, false),
-              icon: const Icon(Icons.arrow_back_rounded),
-              label: const Text('Kiểm tra lại'),
-            ),
-            FilledButton.icon(
-              onPressed: () => Navigator.pop(context, true),
-              icon: const Icon(Icons.check_circle_outline_rounded),
-              label: const Text('Tiếp tục'),
-            ),
-          ],
           ),
         );
       },
@@ -402,12 +419,14 @@ class _DRWizardFlowState extends State<DRWizardFlow> {
     if (student == null) return;
 
     final dobFormatted = student.ngaySinh != null
-        ? DateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'").format(
-        student.ngaySinh!.toUtc())
+        ? DateFormat(
+            "yyyy-MM-dd'T'HH:mm:ss'Z'",
+          ).format(student.ngaySinh!.toUtc())
         : '';
     final cccdIssueDateFormatted = student.ngayCapCmtCccd != null
-        ? DateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'").format(
-        student.ngayCapCmtCccd!.toUtc())
+        ? DateFormat(
+            "yyyy-MM-dd'T'HH:mm:ss'Z'",
+          ).format(student.ngayCapCmtCccd!.toUtc())
         : '';
 
     final payload = RegistrationPayloadModel(
@@ -418,10 +437,10 @@ class _DRWizardFlowState extends State<DRWizardFlow> {
       status: 'draft',
       reason: _cubit.tempReason ?? 'Đăng ký nội trú (Tự động lưu nháp)',
       attachmentFileIds: [
-        if (_cubit.cccdFrontAttachment?.id != null) _cubit.cccdFrontAttachment!
-            .id!,
-        if (_cubit.cccdBackAttachment?.id != null) _cubit.cccdBackAttachment!
-            .id!,
+        if (_cubit.cccdFrontAttachment?.id != null)
+          _cubit.cccdFrontAttachment!.id!,
+        if (_cubit.cccdBackAttachment?.id != null)
+          _cubit.cccdBackAttachment!.id!,
         ..._cubit.proofAttachments.where((e) => e.id != null).map((e) => e.id!),
       ],
       student: RegistrationStudentPayload(
@@ -430,8 +449,11 @@ class _DRWizardFlowState extends State<DRWizardFlow> {
         dob: dobFormatted,
         cccd: _cubit.tempCccd ?? student.soCmtCccd ?? '',
         cccdIssueDate: _cubit.tempCccdIssueDate ?? cccdIssueDateFormatted,
-        hometown: _cubit.tempHometown ?? student.hoKhauThuongTruDuongThon ??
-            student.hoKhauThuongTruPhuongXa ?? 'N/A',
+        hometown:
+            _cubit.tempHometown ??
+            student.hoKhauThuongTruDuongThon ??
+            student.hoKhauThuongTruPhuongXa ??
+            'N/A',
         className: Globals().lopDaoTaoModel.value?.ten ?? 'N/A',
         major: Globals().lopDaoTaoModel.value?.ten ?? 'N/A',
         academicYear: Globals().nienKhoaDaoTaoModel.value?.ten ?? 'N/A',
@@ -439,8 +461,10 @@ class _DRWizardFlowState extends State<DRWizardFlow> {
         level: 'Đại học',
         universityName: 'Đại học Quốc gia Hà Nội',
         priorityObjectName: _cubit.selectedPriorityObject?.name,
-        temporaryAddress: _cubit.tempTemporaryAddress ??
-            student.noiOHienNayDuongThon ?? student.noiOHienNayPhuongXa ??
+        temporaryAddress:
+            _cubit.tempTemporaryAddress ??
+            student.noiOHienNayDuongThon ??
+            student.noiOHienNayPhuongXa ??
             'N/A',
         gender: student.gioiTinh?.toLowerCase() == 'nữ' ? 'female' : 'male',
         phone: _cubit.tempPhone ?? '',
@@ -517,12 +541,14 @@ class _DRWizardFlowState extends State<DRWizardFlow> {
     }
 
     final dobFormatted = student.ngaySinh != null
-        ? DateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'").format(
-        student.ngaySinh!.toUtc())
+        ? DateFormat(
+            "yyyy-MM-dd'T'HH:mm:ss'Z'",
+          ).format(student.ngaySinh!.toUtc())
         : '';
     final cccdIssueDateFormatted = student.ngayCapCmtCccd != null
-        ? DateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'").format(
-        student.ngayCapCmtCccd!.toUtc())
+        ? DateFormat(
+            "yyyy-MM-dd'T'HH:mm:ss'Z'",
+          ).format(student.ngayCapCmtCccd!.toUtc())
         : '';
 
     final payload = RegistrationPayloadModel(
@@ -533,10 +559,10 @@ class _DRWizardFlowState extends State<DRWizardFlow> {
       status: 'draft',
       reason: _cubit.tempReason ?? 'Đăng ký nội trú',
       attachmentFileIds: [
-        if (_cubit.cccdFrontAttachment?.id != null) _cubit.cccdFrontAttachment!
-            .id!,
-        if (_cubit.cccdBackAttachment?.id != null) _cubit.cccdBackAttachment!
-            .id!,
+        if (_cubit.cccdFrontAttachment?.id != null)
+          _cubit.cccdFrontAttachment!.id!,
+        if (_cubit.cccdBackAttachment?.id != null)
+          _cubit.cccdBackAttachment!.id!,
         ..._cubit.proofAttachments.where((e) => e.id != null).map((e) => e.id!),
       ],
       student: RegistrationStudentPayload(
@@ -545,8 +571,11 @@ class _DRWizardFlowState extends State<DRWizardFlow> {
         dob: dobFormatted,
         cccd: _cubit.tempCccd ?? student.soCmtCccd ?? '',
         cccdIssueDate: _cubit.tempCccdIssueDate ?? cccdIssueDateFormatted,
-        hometown: _cubit.tempHometown ?? student.hoKhauThuongTruDuongThon ??
-            student.hoKhauThuongTruPhuongXa ?? 'N/A',
+        hometown:
+            _cubit.tempHometown ??
+            student.hoKhauThuongTruDuongThon ??
+            student.hoKhauThuongTruPhuongXa ??
+            'N/A',
         className: Globals().lopDaoTaoModel.value?.ten ?? 'N/A',
         major: Globals().lopDaoTaoModel.value?.ten ?? 'N/A',
         academicYear: Globals().nienKhoaDaoTaoModel.value?.ten ?? 'N/A',
@@ -554,8 +583,10 @@ class _DRWizardFlowState extends State<DRWizardFlow> {
         level: 'Đại học',
         universityName: 'Đại học Quốc gia Hà Nội',
         priorityObjectName: _cubit.selectedPriorityObject?.name,
-        temporaryAddress: _cubit.tempTemporaryAddress ??
-            student.noiOHienNayDuongThon ?? student.noiOHienNayPhuongXa ??
+        temporaryAddress:
+            _cubit.tempTemporaryAddress ??
+            student.noiOHienNayDuongThon ??
+            student.noiOHienNayPhuongXa ??
             'N/A',
         gender: student.gioiTinh?.toLowerCase() == 'nữ' ? 'female' : 'male',
         phone: _cubit.tempPhone ?? '',
@@ -570,7 +601,8 @@ class _DRWizardFlowState extends State<DRWizardFlow> {
     final reviewState = _step4Key.currentState;
     if (reviewState != null && !reviewState.isCommitted) {
       _showSnackbarError(
-          'Bạn phải đồng ý cam kết thông tin cung cấp là chính xác');
+        'Bạn phải đồng ý cam kết thông tin cung cấp là chính xác',
+      );
       return;
     }
 
@@ -593,12 +625,14 @@ class _DRWizardFlowState extends State<DRWizardFlow> {
     }
 
     final dobFormatted = student.ngaySinh != null
-        ? DateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'").format(
-        student.ngaySinh!.toUtc())
+        ? DateFormat(
+            "yyyy-MM-dd'T'HH:mm:ss'Z'",
+          ).format(student.ngaySinh!.toUtc())
         : '';
     final cccdIssueDateFormatted = student.ngayCapCmtCccd != null
-        ? DateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'").format(
-        student.ngayCapCmtCccd!.toUtc())
+        ? DateFormat(
+            "yyyy-MM-dd'T'HH:mm:ss'Z'",
+          ).format(student.ngayCapCmtCccd!.toUtc())
         : '';
 
     final payload = RegistrationPayloadModel(
@@ -609,10 +643,10 @@ class _DRWizardFlowState extends State<DRWizardFlow> {
       status: 'pending',
       reason: _cubit.tempReason ?? 'Đăng ký nội trú',
       attachmentFileIds: [
-        if (_cubit.cccdFrontAttachment?.id != null) _cubit.cccdFrontAttachment!
-            .id!,
-        if (_cubit.cccdBackAttachment?.id != null) _cubit.cccdBackAttachment!
-            .id!,
+        if (_cubit.cccdFrontAttachment?.id != null)
+          _cubit.cccdFrontAttachment!.id!,
+        if (_cubit.cccdBackAttachment?.id != null)
+          _cubit.cccdBackAttachment!.id!,
         ..._cubit.proofAttachments.where((e) => e.id != null).map((e) => e.id!),
       ],
       student: RegistrationStudentPayload(
@@ -621,8 +655,11 @@ class _DRWizardFlowState extends State<DRWizardFlow> {
         dob: dobFormatted,
         cccd: _cubit.tempCccd ?? student.soCmtCccd ?? '',
         cccdIssueDate: _cubit.tempCccdIssueDate ?? cccdIssueDateFormatted,
-        hometown: _cubit.tempHometown ?? student.hoKhauThuongTruDuongThon ??
-            student.hoKhauThuongTruPhuongXa ?? 'N/A',
+        hometown:
+            _cubit.tempHometown ??
+            student.hoKhauThuongTruDuongThon ??
+            student.hoKhauThuongTruPhuongXa ??
+            'N/A',
         className: Globals().lopDaoTaoModel.value?.ten ?? 'N/A',
         major: Globals().lopDaoTaoModel.value?.ten ?? 'N/A',
         academicYear: Globals().nienKhoaDaoTaoModel.value?.ten ?? 'N/A',
@@ -630,8 +667,10 @@ class _DRWizardFlowState extends State<DRWizardFlow> {
         level: 'Đại học',
         universityName: 'Đại học Quốc gia Hà Nội',
         priorityObjectName: _cubit.selectedPriorityObject?.name,
-        temporaryAddress: _cubit.tempTemporaryAddress ??
-            student.noiOHienNayDuongThon ?? student.noiOHienNayPhuongXa ??
+        temporaryAddress:
+            _cubit.tempTemporaryAddress ??
+            student.noiOHienNayDuongThon ??
+            student.noiOHienNayPhuongXa ??
             'N/A',
         gender: student.gioiTinh?.toLowerCase() == 'nữ' ? 'female' : 'male',
         phone: _cubit.tempPhone ?? '',
@@ -652,10 +691,10 @@ class _DRWizardFlowState extends State<DRWizardFlow> {
     Widget child;
     switch (_currentStep) {
       case 0:
-        child = const DRStep1PeriodScreen(key: ValueKey(0));
+        child = const DRStep2DormitoryScreen(key: ValueKey(0));
         break;
       case 1:
-        child = const DRStep2DormitoryScreen(key: ValueKey(1));
+        child = const DRStep1PeriodScreen(key: ValueKey(1));
         break;
       case 2:
         child = KeyedSubtree(
@@ -697,8 +736,7 @@ class _DRWizardFlowState extends State<DRWizardFlow> {
   Widget build(BuildContext context) {
     return BlocProvider<DormitoryRegistrationCubit>(
       create: (context) => _cubit,
-      child: BlocListener<DormitoryRegistrationCubit,
-          DormitoryRegistrationState>(
+      child: BlocListener<DormitoryRegistrationCubit, DormitoryRegistrationState>(
         bloc: _cubit,
         listener: (context, state) {
           if (state is DormitoryRegistrationShowHub) {
@@ -812,15 +850,15 @@ class _DRWizardFlowState extends State<DRWizardFlow> {
                       ),
                       if (false)
                         const Text(
-                        'Äang táº£i lÃªn há»“ sÆ¡ Ä‘Äƒng kÃ½...',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: AppFontSizes.mediumSmall,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF111318),
-                          decoration: TextDecoration.none,
+                          'Äang táº£i lÃªn há»“ sÆ¡ Ä‘Äƒng kÃ½...',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: AppFontSizes.mediumSmall,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF111318),
+                            decoration: TextDecoration.none,
+                          ),
                         ),
-                      ),
                     ],
                   ),
                 ),
@@ -832,9 +870,7 @@ class _DRWizardFlowState extends State<DRWizardFlow> {
               body: Column(
                 children: [
                   _buildStepIndicator(),
-                  Expanded(
-                    child: _buildStepContent(),
-                  ),
+                  Expanded(child: _buildStepContent()),
                   _buildBottomBar(),
                 ],
               ),
@@ -863,12 +899,7 @@ class _DRWizardFlowState extends State<DRWizardFlow> {
         break;
     }
 
-    final steps = [
-      'Chọn đợt',
-      'KTX & loại phòng',
-      'Hồ sơ cá nhân',
-      'Xác nhận',
-    ];
+    final steps = ['KTX & loại phòng', 'Chọn đợt', 'Hồ sơ cá nhân', 'Xác nhận'];
 
     return Container(
       color: Colors.white,
@@ -932,20 +963,20 @@ class _DRWizardFlowState extends State<DRWizardFlow> {
                               child: Center(
                                 child: isDone
                                     ? const Icon(
-                                  Icons.check,
-                                  color: Colors.white,
-                                  size: 16,
-                                )
+                                        Icons.check,
+                                        color: Colors.white,
+                                        size: 16,
+                                      )
                                     : Text(
-                                  '${index + 1}',
-                                  style: TextStyle(
-                                    color: isActive || isDone
-                                        ? Colors.white
-                                        : const Color(0xFF555B64),
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: AppFontSizes.mediumSmall,
-                                  ),
-                                ),
+                                        '${index + 1}',
+                                        style: TextStyle(
+                                          color: isActive || isDone
+                                              ? Colors.white
+                                              : const Color(0xFF555B64),
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: AppFontSizes.mediumSmall,
+                                        ),
+                                      ),
                               ),
                             ),
                           ),
@@ -985,15 +1016,13 @@ class _DRWizardFlowState extends State<DRWizardFlow> {
   }
 
   Widget _buildBottomBar() {
-    final isSaveDraftButton = _currentStep == 0 || _currentStep == 3;
+    final isSaveDraftButton = _currentStep == 3;
     final isSubmitButton = _currentStep == 3;
 
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(
-          top: BorderSide(color: Color(0xFFE3E6EB), width: 1.0),
-        ),
+        border: Border(top: BorderSide(color: Color(0xFFE3E6EB), width: 1.0)),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: SafeArea(

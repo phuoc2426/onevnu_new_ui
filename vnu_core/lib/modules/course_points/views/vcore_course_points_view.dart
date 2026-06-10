@@ -155,7 +155,7 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
                 ],
               ),
               const SizedBox(height: 16),
-              if (controller.danhSachKieuTruong.isNotEmpty) ...[
+              if (controller.danhSachKieuTruong.length > 1) ...[
                 Text(
                   'Đơn vị đào tạo',
                   style: TextStyles.bold.copyWith(
@@ -164,27 +164,57 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                VcoreDropdownSelectWidget(
-                  items: controller.danhSachKieuTruong.map((e) => e.toDisplayName()).toList(),
-                  hint: 'Chọn trường',
-                  value: controller.kieuTruong.value?.toDisplayName(),
-                  onSelected: (value) {
-                    final kieuTruong = controller.danhSachKieuTruong.firstWhereOrNull(
-                          (e) => e.toDisplayName() == value,
-                    );
-                    if (kieuTruong != null) {
-                      controller.kieuTruong.value = kieuTruong;
-                      controller.getDanhSachHocKy();
-                    }
-                  },
+                Obx(
+                      () => VcoreDropdownSelectWidget(
+                    items: controller.danhSachKieuTruong
+                        .map((e) => e.toDisplayName())
+                        .toList(),
+                    hint: 'Chọn trường',
+                    value: controller.kieuTruong.value?.toDisplayName(),
+                    onSelected: (value) async {
+                      await controller.changeKieuTruong(value);
+                    },
+                  ),
                 ),
                 const SizedBox(height: 20),
               ],
+              Text(
+                'Học kỳ',
+                style: TextStyles.bold.copyWith(
+                  fontSize: AppFontSizes.mediumSmall,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Obx(
+                    () => VcoreDropdownSelectWidget(
+                  items: controller.danhSachHocKy
+                      .map((e) => e.disPlayName())
+                      .toList(),
+                  hint: 'Chọn kỳ',
+                  value: controller.hocKy.value?.disPlayName(),
+                  onSelected: (value) {
+                    controller.changeHocKy(value);
+                  },
+                ),
+              ),
+              const SizedBox(height: 20),
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                onTap: () {
+                onTap: () async {
                   controller.isTheoChuongTrinhDaoTao.toggle();
-                  controller.refreshData();
+
+                  controller.hocKy.value = null;
+                  controller.danhSachHocKy.clear();
+
+                  controller.diemThiHocKy.clear();
+                  controller.diemThiTheoHocKy.clear();
+                  controller.diemTrungBinhHocKy.value = null;
+
+                  controller.aiRadarAnalysis.value = null;
+                  controller.hasRequestedAiAnalysis.value = false;
+
+                  await controller.getDanhSachHocKy();
                 },
                 child: Row(
                   children: [
@@ -271,7 +301,7 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
           Expanded(
             child: InkWell(
               borderRadius: BorderRadius.circular(18),
-              onTap: () => _showSemesterSelectorBottomSheet(context, controller),
+              onTap: () => _showFilterBottomSheet(context, controller),
               child: Container(
                 height: 52,
                 padding: const EdgeInsets.symmetric(horizontal: 14),

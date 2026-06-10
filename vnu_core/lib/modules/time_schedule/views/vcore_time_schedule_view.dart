@@ -51,15 +51,8 @@ class VcoreTimeScheduleView extends GetView<VcoreTimeScheduleController> {
                                 .toList(),
                             hint: 'Chọn trường',
                             value: controller.kieuTruong.value?.toDisplayName(),
-                            onSelected: (value) {
-                              String? kieuTruong = controller.danhSachKieuTruong
-                                  .firstWhereOrNull((e) {
-                                return e.toDisplayName() == value;
-                              });
-                              if (kieuTruong != null) {
-                                controller.kieuTruong.value = kieuTruong;
-                                controller.refreshData();
-                              }
+                            onSelected: (value) async {
+                              await controller.changeKieuTruong(value);
                             },
                           ),
                           spaceHeight(8),

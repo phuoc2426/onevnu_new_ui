@@ -57,9 +57,9 @@ class RegistrationStudentPayload {
   final String studentCode;
   final String fullName;
   final String dob; // format e.g. "2003-05-20T00:00:00Z"
-  final String cccd;
-  final String cccdIssueDate; // format e.g. "2021-01-01T00:00:00Z"
-  final String hometown;
+  final String cccd; // API: identity_no
+  final String cccdIssueDate; // API: identity_issue_date
+  final String hometown; // API: permanent_address
   final String className; // map to 'class' in JSON
   final String major;
   final String academicYear;
@@ -94,23 +94,45 @@ class RegistrationStudentPayload {
 
   factory RegistrationStudentPayload.fromJson(Map<String, dynamic> json) {
     return RegistrationStudentPayload(
-      studentCode: json['student_code'] as String? ?? '',
-      fullName: json['full_name'] as String? ?? '',
-      dob: json['dob'] as String? ?? '',
-      cccd: json['cccd'] as String? ?? '',
-      cccdIssueDate: json['cccd_issue_date'] as String? ?? '',
-      hometown: json['hometown'] as String? ?? '',
-      className: (json['class'] ?? json['class_name']) as String? ?? '',
-      major: json['major'] as String? ?? '',
-      academicYear: json['academic_year'] as String? ?? '',
-      system: json['system'] as String? ?? '',
-      level: json['level'] as String? ?? '',
-      universityName: json['university_name'] as String? ?? '',
-      priorityObjectName: json['priority_object_name'] as String?,
-      temporaryAddress: json['temporary_address'] as String? ?? '',
-      gender: json['gender'] as String? ?? 'male',
-      phone: json['phone'] as String? ?? '',
-      email: json['email'] as String? ?? '',
+      studentCode:
+          (json['student_code'] ?? json['studentCode'])?.toString() ?? '',
+      fullName: (json['full_name'] ?? json['fullName'])?.toString() ?? '',
+      dob: json['dob']?.toString() ?? '',
+      cccd:
+          (json['identity_no'] ?? json['identityNo'] ?? json['cccd'])
+              ?.toString() ??
+          '',
+      cccdIssueDate:
+          (json['identity_issue_date'] ??
+                  json['identityIssueDate'] ??
+                  json['cccd_issue_date'])
+              ?.toString() ??
+          '',
+      hometown:
+          (json['permanent_address'] ??
+                  json['permanentAddress'] ??
+                  json['hometown'])
+              ?.toString() ??
+          '',
+      className: (json['class'] ?? json['class_name'])?.toString() ?? '',
+      major: json['major']?.toString() ?? '',
+      academicYear:
+          (json['academic_year'] ?? json['academicYear'])?.toString() ?? '',
+      system: json['system']?.toString() ?? '',
+      level: json['level']?.toString() ?? '',
+      universityName:
+          (json['university_name'] ?? json['university'])?.toString() ?? '',
+      priorityObjectName:
+          (json['priority_object_name'] ?? json['priorityObject'])?.toString(),
+      temporaryAddress:
+          (json['temporary_address'] ?? json['temporaryAddress'])?.toString() ??
+          '',
+      gender: json['gender']?.toString() ?? 'male',
+      phone:
+          (json['phone_number'] ?? json['phoneNumber'] ?? json['phone'])
+              ?.toString() ??
+          '',
+      email: json['email']?.toString() ?? '',
     );
   }
 
@@ -118,9 +140,9 @@ class RegistrationStudentPayload {
     'student_code': studentCode,
     'full_name': fullName,
     'dob': dob,
-    'cccd': cccd,
-    'cccd_issue_date': cccdIssueDate,
-    'hometown': hometown,
+    'identity_no': cccd,
+    'identity_issue_date': cccdIssueDate,
+    'permanent_address': hometown,
     'class': className,
     'major': major,
     'academic_year': academicYear,
@@ -130,7 +152,7 @@ class RegistrationStudentPayload {
     'priority_object_name': priorityObjectName,
     'temporary_address': temporaryAddress,
     'gender': gender,
-    'phone': phone,
+    'phone_number': phone,
     'email': email,
   };
 }

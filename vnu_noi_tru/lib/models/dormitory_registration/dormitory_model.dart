@@ -33,10 +33,21 @@ class DormitoryListData {
 class DormitoryModel {
   final int? id;
   final String? name;
+  final int? universityId;
   final String? address;
+  final int? provinceId;
+  final int? wardId;
   final String? status;
 
-  DormitoryModel({this.id, this.name, this.address, this.status});
+  DormitoryModel({
+    this.id,
+    this.name,
+    this.universityId,
+    this.address,
+    this.provinceId,
+    this.wardId,
+    this.status,
+  });
 
   factory DormitoryModel.fromJson(Map<String, dynamic> json) {
     int? _parseInt(dynamic v) {
@@ -48,16 +59,22 @@ class DormitoryModel {
 
     return DormitoryModel(
       id: _parseInt(json['id']),
-      name: json['name'] as String?,
-      address: json['address'] as String?,
-      status: json['status'] as String?,
+      name: json['name']?.toString(),
+      universityId: _parseInt(json['university_id'] ?? json['universityId']),
+      address: json['address']?.toString(),
+      provinceId: _parseInt(json['province_id'] ?? json['provinceId']),
+      wardId: _parseInt(json['ward_id'] ?? json['wardId']),
+      status: json['status']?.toString(),
     );
   }
 
   Map<String, dynamic> toJson() => {
     'id': id,
     'name': name,
+    'university_id': universityId,
     'address': address,
+    'province_id': provinceId,
+    'ward_id': wardId,
     'status': status,
   };
 }
