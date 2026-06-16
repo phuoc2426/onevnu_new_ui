@@ -14,7 +14,7 @@ import 'package:vnu_core/extensions/map_ext.dart';
 import 'package:vnu_core/models/box_service_model.dart';
 import 'package:vnu_core/modules/course_points/views/vcore_course_points_view.dart';
 import 'package:vnu_core/modules/inmapz/vcore_immap_view.dart';
-import 'package:vnu_core/modules/motel/views/vcore_motel_view.dart';
+import 'package:vnu_core/modules/motel/vcore_motel_webview.dart';
 import 'package:vnu_core/modules/paht/views/vcore_paht_view.dart';
 import 'package:vnu_core/modules/student_card/views/vcore_student_card_view.dart';
 import 'package:vnu_core/modules/sync/views/vcore_sync_view.dart';
@@ -504,7 +504,7 @@ class _VcoreHomeServiceWidgetV2State extends State<VcoreHomeServiceWidgetV2>
         Get.to(() => const VcoreOneDoorView());
         break;
       case HomeService.TimPhongTro:
-        Get.to(() => const VcoreMotelView());
+        openMotelWebView();
         break;
       case HomeService.XemLichThi:
         Get.to(() => const VcoreExamScheduleView());

@@ -1,3 +1,6 @@
+// home_v4.dart
+// Extracted from VcoreHomeViewV3 and renamed to VcoreHomeViewV4.
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
@@ -132,14 +135,14 @@ class _LocalNotificationService {
   }
 }
 
-class VcoreHomeViewV3 extends StatelessWidget {
-  const VcoreHomeViewV3({super.key});
+class VcoreHomeViewV4 extends StatelessWidget {
+  const VcoreHomeViewV4({super.key});
 
   @override
   Widget build(BuildContext context) {
     return GetBuilder<VcoreHomeController>(
       init: VcoreHomeController(),
-      tag: 'home_v3',
+      tag: 'home_v4',
       builder: (controller) {
         controller.getLienKetDanhDau();
 
@@ -285,7 +288,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
   Future<void> _loadPinnedFunctions() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final saved = prefs.getStringList('kPinnedFunctions_v3');
+      final saved = prefs.getStringList('kPinnedFunctions_v4');
 
       if (saved != null && saved.isNotEmpty) {
         setState(() {
@@ -300,7 +303,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
   Future<void> _savePinnedFunctions(List<String> labels) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setStringList('kPinnedFunctions_v3', labels);
+      await prefs.setStringList('kPinnedFunctions_v4', labels);
 
       setState(() {
         _pinnedFunctionLabels = labels;

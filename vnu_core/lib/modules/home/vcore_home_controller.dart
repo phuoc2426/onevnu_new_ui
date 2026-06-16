@@ -7,6 +7,7 @@ import 'package:vnu_core/common/log.dart';
 import 'package:vnu_core/common/utils.dart';
 import 'package:vnu_core/common/vnu_cache_manager.dart';
 import 'package:vnu_core/common/gpa_cache_manager.dart';
+import 'package:vnu_core/common/hoc_ky_date_helper.dart';
 
 import 'package:vnu_core/globals.dart';
 import 'package:vnu_core/extensions/map_ext.dart';
@@ -405,17 +406,13 @@ class VcoreHomeController extends GetxController {
 
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    for (final semester in semesters) {
-      final start = _inferSemesterStartDate(semester);
-      final end = _inferSemesterEndDate(semester);
-      final inRange = (today.isAfter(start) || today.isAtSameMomentAs(start)) &&
-          (today.isBefore(end) || today.isAtSameMomentAs(end));
-      if (inRange) return semester;
-    }
+    final current = HocKyDateHelper.findContaining(semesters, today);
+    if (current != null) return current;
 
     return semesters.first;
   }
 
+  // ignore: unused_element
   DateTime _inferSemesterStartDate(HocKyModel semester) {
     final yearStr = semester.nam ?? '';
     final semName = semester.ten ?? '';
@@ -442,6 +439,7 @@ class VcoreHomeController extends GetxController {
     return DateTime(startYear, 9, 1);
   }
 
+  // ignore: unused_element
   DateTime _inferSemesterEndDate(HocKyModel semester) {
     final yearStr = semester.nam ?? '';
     final semName = semester.ten ?? '';
@@ -537,8 +535,9 @@ class VcoreHomeController extends GetxController {
       return true;
     }
 
-    final start = _dateOnly(_inferSemesterStartDate(semester));
-    final end = _dateOnly(_inferSemesterEndDate(semester));
+    final semesterRange = HocKyDateHelper.rangeFor(semester);
+    final start = _dateOnly(semesterRange.start);
+    final end = _dateOnly(semesterRange.end);
     final target = _dateOnly(date);
 
     return !target.isBefore(start) && !target.isAfter(end);

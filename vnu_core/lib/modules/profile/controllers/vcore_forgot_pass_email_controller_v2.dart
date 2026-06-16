@@ -2,11 +2,32 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_email_sender/flutter_email_sender.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:vnu_core/globals.dart';
+
+class MailNativeResult {
+  final bool success;
+  final String mode;
+  final String message;
+
+  const MailNativeResult({
+    required this.success,
+    required this.mode,
+    required this.message,
+  });
+
+  factory MailNativeResult.fromMap(dynamic raw) {
+    final map = raw is Map ? raw : <dynamic, dynamic>{};
+
+    return MailNativeResult(
+      success: map['success'] == true,
+      mode: map['mode']?.toString() ?? 'unknown',
+      message: map['message']?.toString() ?? '',
+    );
+  }
+}
 
 class VcoreForgotPassEmailControllerV2 extends GetxController {
   static const String recipientEmail = 'vnunet@vnu.edu.vn';
@@ -33,7 +54,7 @@ class VcoreForgotPassEmailControllerV2 extends GetxController {
     super.onInit();
     loadStudentInfoFromCache();
     buildDefaultMailContent();
-    // checkGmailInstalled();
+    checkGmailInstalled();
   }
 
   @override
@@ -191,85 +212,63 @@ ${bodyController.text.trim()}''';
     isSending.value = true;
 
     try {
-      if (Platform.isAndroid) {
-        await sendWithGmailAndroid(context);
-      } else if (Platform.isIOS) {
-        await sendWithIosMailComposer(context);
-      } else {
-        await copyManualContent();
-        if (!context.mounted) return;
-        showMailGuide(
-          context,
-          title: 'Không hỗ trợ nền tảng này',
-          message: 'Nội dung email đã được copy. Vui lòng gửi thủ công.',
-        );
-      }
-    } finally {
-      isSending.value = false;
-    }
-  }
-
-  Future<void> sendWithGmailAndroid(BuildContext context) async {
-    try {
       final attachmentPaths = images.map((x) => x.path).toList();
 
-      debugPrint('Calling sendToGmail...');
-      debugPrint('attachments: $attachmentPaths');
-
-      await gmailChannel.invokeMethod('sendToGmail', {
+      final raw = await gmailChannel.invokeMethod('composeEmail', {
         'to': recipientEmail,
+        'recipients': [recipientEmail],
         'subject': subjectController.text.trim(),
         'body': bodyController.text.trim(),
         'attachmentPaths': attachmentPaths,
+        'attachments': attachmentPaths,
+        'preferGmail': true,
       });
+
+      final result = MailNativeResult.fromMap(raw);
+
+      if (!context.mounted) return;
+
+      if (result.success) {
+        showSuccess(
+          result.message.isNotEmpty
+              ? result.message
+              : 'Đã mở ứng dụng gửi email. Vui lòng kiểm tra nội dung và bấm Gửi.',
+        );
+      } else {
+        await copyManualContent();
+
+        if (!context.mounted) return;
+
+        showMailGuide(
+          context,
+          title: 'Không mở được ứng dụng gửi email',
+          message: result.message.isNotEmpty
+              ? '${result.message}\n\nNội dung email đã được copy.'
+              : 'Không thể mở ứng dụng gửi email. Nội dung email đã được copy.',
+        );
+      }
     } on PlatformException catch (e) {
-      debugPrint(
-        'sendToGmail PlatformException: code=${e.code}, message=${e.message}, details=${e.details}',
-      );
       await copyManualContent();
 
       if (!context.mounted) return;
 
       showMailGuide(
         context,
-        title: 'Không mở được Gmail',
-        message:
-        e.message ?? 'Không thể mở Gmail. Nội dung email đã được copy.',
+        title: 'Không mở được ứng dụng gửi email',
+        message: '${e.message ?? e.code}\n\nNội dung email đã được copy.',
       );
     } catch (e) {
-      debugPrint('sendToGmail error: $e');
       await copyManualContent();
 
       if (!context.mounted) return;
 
       showMailGuide(
         context,
-        title: 'Không mở được Gmail',
-        message: 'Không thể mở Gmail. Nội dung email đã được copy.',
+        title: 'Không mở được ứng dụng gửi email',
+        message: 'Lỗi: $e\n\nNội dung email đã được copy.',
       );
-    }
-  }
-  Future<void> sendWithIosMailComposer(BuildContext context) async {
-    try {
-      final email = Email(
-        recipients: const [recipientEmail],
-        subject: subjectController.text.trim(),
-        body: bodyController.text.trim(),
-        attachmentPaths: images.map((x) => x.path).toList(),
-        isHTML: false,
-      );
-
-      await FlutterEmailSender.send(email);
-    } catch (_) {
-      await copyManualContent();
-      if (!context.mounted) return;
-
-      showMailGuide(
-        context,
-        title: 'Không mở được ứng dụng Mail',
-        message:
-        'Thiết bị chưa cấu hình ứng dụng Mail hoặc chưa có ứng dụng email phù hợp. Nội dung email đã được copy.',
-      );
+    } finally {
+      isSending.value = false;
     }
   }
 

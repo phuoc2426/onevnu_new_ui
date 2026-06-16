@@ -13,7 +13,7 @@ import 'package:vnu_core/constants/constant.dart';
 import 'package:vnu_core/cubit/auth_cubit.dart';
 import 'package:vnu_core/globals.dart';
 import 'package:vnu_core/modules/inmapz/vcore_immap_view.dart';
-import 'package:vnu_core/modules/motel/views/vcore_motel_view.dart';
+import 'package:vnu_core/modules/motel/vcore_motel_webview.dart';
 import 'package:vnu_core/modules/profile/views/vcore_profile_domain_dialog.dart';
 import 'package:vnu_core/modules/profile/views/widget/vcore_profile_textfield_widget.dart';
 import 'package:vnu_core/repository/data_repository.dart';
@@ -780,7 +780,7 @@ class _UtilityButtons extends StatelessWidget {
             icon: Icons.home_work_outlined,
             title: 'Phòng trọ',
             onTap: () {
-              Get.to(() => const VcoreMotelView());
+              openMotelWebView();
             },
           ),
         ),

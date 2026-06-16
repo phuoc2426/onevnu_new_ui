@@ -45,7 +45,10 @@ class ApiRepository {
 
   // --  New API
   Future<SigninResponse> signin(
-      String username, String password, String deviceToken) async {
+    String username,
+    String password,
+    String deviceToken,
+  ) async {
     final response = await _dio.post<Map<String, dynamic>>(
       '/api/auth/signin',
       data: {
@@ -63,14 +66,14 @@ class ApiRepository {
 
     final result = SigninResponse.fromJson(response.data ?? {});
     if ((result.accessToken ?? '').isEmpty) {
-      logError('Signin response does not contain access token: ${response.data}');
+      logError(
+        'Signin response does not contain access token: ${response.data}',
+      );
     }
     return result;
   }
 
-  Future<SigninResponse> refreshToken(
-    String refreshToken,
-  ) {
+  Future<SigninResponse> refreshToken(String refreshToken) {
     return _apiClient.refreshToken(refreshToken);
   }
 
@@ -118,7 +121,8 @@ class ApiRepository {
       final String json = await _apiClient.getBoxServices();
       final Iterable l = jsonDecode(json);
       final List<BoxServiceModel> services = List<BoxServiceModel>.from(
-          l.map((model) => BoxServiceModel.fromJson(model)));
+        l.map((model) => BoxServiceModel.fromJson(model)),
+      );
       services.sort((a, b) => a.thuTu.compareTo(b.thuTu));
       return services;
     } catch (e) {
@@ -137,9 +141,7 @@ class ApiRepository {
     return _apiClient.getCamNang(pageIndex, pageSize, sort, tieuDe);
   }
 
-  Future<CamNangModel> getDetailCamNang(
-    String guid,
-  ) {
+  Future<CamNangModel> getDetailCamNang(String guid) {
     return _apiClient.getDetailCamNang(guid);
   }
 
@@ -172,9 +174,7 @@ class ApiRepository {
     return _apiClient.updateLienKetDanhDau(guid, tenLienKet, lienKet);
   }
 
-  Future<void> deleteLienKetDanhDau(
-    String guid,
-  ) {
+  Future<void> deleteLienKetDanhDau(String guid) {
     return _apiClient.deleteLienKetDanhDau(guid);
   }
 
@@ -191,12 +191,21 @@ class ApiRepository {
     String linhVuc,
   ) {
     return _apiClient.getThuTucMotCua(
-        pageIndex, pageSize, sort, tieuDe, linhVuc);
+      pageIndex,
+      pageSize,
+      sort,
+      tieuDe,
+      linhVuc,
+    );
   }
 
   // Phong tro
   Future<ApiResponse<List<PhongTroModel>>> getPhongTro(
-      int pageIndex, int pageSize, String sort, String guidKhuVucBanDo) {
+    int pageIndex,
+    int pageSize,
+    String sort,
+    String guidKhuVucBanDo,
+  ) {
     if (Globals().token.isNotEmpty) {
       return _apiClient.getPhongTro(
         pageIndex,
@@ -222,10 +231,14 @@ class ApiRepository {
     return _apiClient.getTatChuDeHoiDap();
   }
 
-  Future<FileDinhKemModel> uploadFileDinhKem(File fileUpload,
-      {ProgressCallback? onSendProgress}) {
-    return _apiClient.uploadFileDinhKem(fileUpload,
-        onSendProgress: onSendProgress);
+  Future<FileDinhKemModel> uploadFileDinhKem(
+    File fileUpload, {
+    ProgressCallback? onSendProgress,
+  }) {
+    return _apiClient.uploadFileDinhKem(
+      fileUpload,
+      onSendProgress: onSendProgress,
+    );
   }
 
   Future<HoiDapModel> guiCauHoiDap(TaoHoiDapRequest request) {
@@ -241,8 +254,15 @@ class ApiRepository {
     String thoiGianGuiStart,
     String thoiGianGuiEnd,
   ) {
-    return _apiClient.getCauHoiDap(pageIndex, pageSize, sort, guidChuDe,
-        trangThaiTraLoi, thoiGianGuiStart, thoiGianGuiEnd);
+    return _apiClient.getCauHoiDap(
+      pageIndex,
+      pageSize,
+      sort,
+      guidChuDe,
+      trangThaiTraLoi,
+      thoiGianGuiStart,
+      thoiGianGuiEnd,
+    );
   }
 
   Future<HoiDapModel> getDetailCauHoiDap(String guid) {
@@ -274,7 +294,8 @@ class ApiRepository {
   }
 
   Future<ApiResponse<List<DiaDiemBanDoModel>>> getDiaDiemBanDo(
-      Map<String, dynamic> queries) {
+    Map<String, dynamic> queries,
+  ) {
     if (Globals().token.isNotEmpty) {
       return _apiClient.getDiaDiemBanDo(queries);
     }
@@ -293,8 +314,16 @@ class ApiRepository {
     String thoiGianEnd,
     String guidChuyenMuc,
   ) {
-    return _apiClient.getTinTuc(pageIndex, pageSize, sort, tieuDe,
-        guidDonViPhatHanh, thoiGianStart, thoiGianEnd, guidChuyenMuc);
+    return _apiClient.getTinTuc(
+      pageIndex,
+      pageSize,
+      sort,
+      tieuDe,
+      guidDonViPhatHanh,
+      thoiGianStart,
+      thoiGianEnd,
+      guidChuyenMuc,
+    );
   }
 
   Future<TinTucModel> getDetailTinTuc(String guid) {
@@ -308,7 +337,11 @@ class ApiRepository {
     String guidChuyenMuc,
   ) {
     return _apiClient.getTinTucCungChuyenMuc(
-        pageIndex, pageSize, sort, guidChuyenMuc);
+      pageIndex,
+      pageSize,
+      sort,
+      guidChuyenMuc,
+    );
   }
 
   Future<ApiResponse<List<TinHeThongModel>>> getTinHeThong(
@@ -320,12 +353,16 @@ class ApiRepository {
     String thoiGianEnd,
   ) {
     return _apiClient.getTinHeThong(
-        pageIndex, pageSize, sort, tieuDe, thoiGianStart, thoiGianEnd);
+      pageIndex,
+      pageSize,
+      sort,
+      tieuDe,
+      thoiGianStart,
+      thoiGianEnd,
+    );
   }
 
-  Future<TinHeThongModel> getChiTietTinHeThong(
-    String guid,
-  ) {
+  Future<TinHeThongModel> getChiTietTinHeThong(String guid) {
     return _apiClient.getChiTietTinHeThong(guid, "HeThong");
   }
 
@@ -333,9 +370,7 @@ class ApiRepository {
     return _apiClient.getTatCaDonVi();
   }
 
-  Future<DonViModel> getDonVi(
-    String guid,
-  ) {
+  Future<DonViModel> getDonVi(String guid) {
     return _apiClient.getDonVi(guid);
   }
 
@@ -349,7 +384,9 @@ class ApiRepository {
     String kieuTruong,
   ) {
     return _apiClient.getDanhSachHocKyTheoThoiKhoaBieu(
-        isTheoChuongTrinhDaoTao, kieuTruong);
+      isTheoChuongTrinhDaoTao,
+      kieuTruong,
+    );
   }
 
   Future<List<HocKyModel>> getDanhSachHocKyTheoLichThi(
@@ -357,7 +394,9 @@ class ApiRepository {
     String kieuTruong,
   ) {
     return _apiClient.getDanhSachHocKyTheoLichThi(
-        isTheoChuongTrinhDaoTao, kieuTruong);
+      isTheoChuongTrinhDaoTao,
+      kieuTruong,
+    );
   }
 
   Future<List<HocKyModel>> getDanhSachHocKyTheoDiem(
@@ -365,7 +404,9 @@ class ApiRepository {
     String kieuTruong,
   ) {
     return _apiClient.getDanhSachHocKyTheoDiem(
-        isTheoChuongTrinhDaoTao, kieuTruong);
+      isTheoChuongTrinhDaoTao,
+      kieuTruong,
+    );
   }
 
   Future<List<ThoiKhoaBieuModel>> getThoiKhoaBieuHocKy(
@@ -388,7 +429,10 @@ class ApiRepository {
     bool isTheoChuongTrinhDaoTao,
   ) {
     return _apiClient.getDiemThiHocKy(
-        idHocKy, kieuTruong, isTheoChuongTrinhDaoTao);
+      idHocKy,
+      kieuTruong,
+      isTheoChuongTrinhDaoTao,
+    );
   }
 
   Future<List<DiemHocPhanModel>> getDiemHocPhanHocKy(
@@ -399,13 +443,104 @@ class ApiRepository {
     return _apiClient.getDiemHocPhanHocKy(idHocKy, kieuTruong, idHocPhan);
   }
 
+  // ---------------------------------------------------------------------------
+  // Mobile API xem điểm mới: /api/mobile/diem-sinh-vien/brc1|brc2|brc3
+  // ---------------------------------------------------------------------------
+
+  String _toMobileBrcKey(String kieuTruong) {
+    switch (kieuTruong) {
+      case 'BangKep':
+      case 'BRC2':
+      case 'brc2':
+        return 'brc2';
+      case 'TruongGui':
+      case 'BRC3':
+      case 'brc3':
+        return 'brc3';
+      case 'TruongChinh':
+      case 'BRC1':
+      case 'brc1':
+      default:
+        return 'brc1';
+    }
+  }
+
+  Future<Map<String, dynamic>> getDiemSinhVienMobileFull(
+    String kieuTruong,
+    bool xemCaMonNgoaiCtdt,
+  ) async {
+    final brc = _toMobileBrcKey(kieuTruong);
+
+    String path;
+    if (brc == 'brc1') {
+      path =
+          '/api/mobile/diem-sinh-vien/brc1/full?xemCaMonNgoaiCtdt=$xemCaMonNgoaiCtdt';
+    } else if (brc == 'brc2') {
+      path = '/api/mobile/diem-sinh-vien/brc2/full';
+    } else {
+      path =
+          '/api/mobile/diem-sinh-vien/brc3/full?xemCaMonNgoaiCtdt=$xemCaMonNgoaiCtdt&includeChungChi=true&includeMonThieuDiem=true';
+    }
+
+    final response = await _dio.get<Map<String, dynamic>>(path);
+    return response.data ?? <String, dynamic>{};
+  }
+
+  Future<List<Map<String, dynamic>>> getChungChiMobile(
+    String kieuTruong,
+  ) async {
+    final brc = _toMobileBrcKey(kieuTruong);
+
+    if (brc == 'brc2') {
+      return <Map<String, dynamic>>[];
+    }
+
+    final response = await _dio.get<List<dynamic>>(
+      '/api/mobile/diem-sinh-vien/$brc/chung-chi',
+    );
+
+    return (response.data ?? [])
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+  }
+
+  Future<List<DiemHocPhanModel>> getDiemHocPhanHocKyMobile(
+    String idHocKy,
+    String kieuTruong,
+    String idHocPhan,
+  ) async {
+    final brc = _toMobileBrcKey(kieuTruong);
+
+    final response = await _dio.get<List<dynamic>>(
+      '/api/mobile/diem-sinh-vien/$brc/hoc-ky/$idHocKy/hoc-phan/$idHocPhan/diem-chi-tiet',
+    );
+
+    return (response.data ?? []).whereType<Map>().map((e) {
+      final map = Map<String, dynamic>.from(e);
+
+      return DiemHocPhanModel.fromJson({
+        ...map,
+        'loaiDiemHocPhan':
+            map['banChatKyThi'] ?? map['loaiDiemHocPhan'] ?? map['RES_NATURE'],
+        'trongSo': (map['trongSo'] ?? map['coeffi'] ?? map['COEFFI'])
+            ?.toString(),
+        'diemHe10': (map['diem'] ?? map['resPnt'] ?? map['RES_PNT'])
+            ?.toString(),
+      });
+    }).toList();
+  }
+
   Future<List<DiemTrungBinhModel>> getDiemTrungBinhHocKy(
     String idHocKy,
     String kieuTruong,
     bool isTheoChuongTrinhDaoTao,
   ) {
     return _apiClient.getDiemTrungBinhHocKy(
-        idHocKy, kieuTruong, isTheoChuongTrinhDaoTao);
+      idHocKy,
+      kieuTruong,
+      isTheoChuongTrinhDaoTao,
+    );
   }
 
   Future<List<LopDaoTaoModel>> getDataLopDaoTao(
@@ -417,8 +552,15 @@ class ApiRepository {
     String? idNienKhoaDaoTao,
     String? idChuongTrinhDaoTao,
   ) {
-    return _apiClient.getDataLopDaoTao(id, guidDonVi, idBacDaoTao, idHeDaoTao,
-        idNganhDaoTao, idNienKhoaDaoTao, idChuongTrinhDaoTao);
+    return _apiClient.getDataLopDaoTao(
+      id,
+      guidDonVi,
+      idBacDaoTao,
+      idHeDaoTao,
+      idNganhDaoTao,
+      idNienKhoaDaoTao,
+      idChuongTrinhDaoTao,
+    );
   }
 
   Future<List<TongKetDenHienTaiModel>> getTongKetDenHienTai() {
@@ -434,17 +576,11 @@ class ApiRepository {
     return _apiClient.updateSinhVienInfo(sinhvien);
   }
 
-  Future<List<QuocGiaModel>> getDataQuocGia(
-    String? id,
-    String? guidDonVi,
-  ) {
+  Future<List<QuocGiaModel>> getDataQuocGia(String? id, String? guidDonVi) {
     return _apiClient.getDataQuocGia(id, guidDonVi);
   }
 
-  Future<List<DanTocModel>> getDataDanToc(
-    String? id,
-    String? guidDonVi,
-  ) {
+  Future<List<DanTocModel>> getDataDanToc(String? id, String? guidDonVi) {
     return _apiClient.getDataDanToc(id, guidDonVi);
   }
 
@@ -455,10 +591,7 @@ class ApiRepository {
     return _apiClient.getDataDoiTuongUuTien(id, guidDonVi);
   }
 
-  Future<List<TonGiaoModel>> getDataTonGiao(
-    String? id,
-    String? guidDonVi,
-  ) {
+  Future<List<TonGiaoModel>> getDataTonGiao(String? id, String? guidDonVi) {
     return _apiClient.getDataTonGiao(id, guidDonVi);
   }
 
@@ -484,10 +617,7 @@ class ApiRepository {
     return _apiClient.getDataKhuVucUuTien(id, guidDonVi);
   }
 
-  Future<List<BacDaoTaoModel>> getDataBacDaoTao(
-    String? id,
-    String? guidDonVi,
-  ) {
+  Future<List<BacDaoTaoModel>> getDataBacDaoTao(String? id, String? guidDonVi) {
     return _apiClient.getDataBacDaoTao(id, guidDonVi);
   }
 
@@ -531,8 +661,14 @@ class ApiRepository {
     String? idNganhDaoTao,
     String? idNienKhoaDaoTao,
   ) {
-    return _apiClient.getDataChuongTrinhDaoTao(id, guidDonVi, idBacDaoTao,
-        idHeDaoTao, idNganhDaoTao, idNienKhoaDaoTao);
+    return _apiClient.getDataChuongTrinhDaoTao(
+      id,
+      guidDonVi,
+      idBacDaoTao,
+      idHeDaoTao,
+      idNganhDaoTao,
+      idNienKhoaDaoTao,
+    );
   }
 
   // - End update thong tin
@@ -542,15 +678,17 @@ class ApiRepository {
     return _apiClient.getAllAnhCanNhan();
   }
 
-  Future<AnhCaNhanModel> uploadAnhCanNhan(File fileUpload,
-      {ProgressCallback? onSendProgress}) {
-    return _apiClient.uploadAnhCanNhan(fileUpload,
-        onSendProgress: onSendProgress);
+  Future<AnhCaNhanModel> uploadAnhCanNhan(
+    File fileUpload, {
+    ProgressCallback? onSendProgress,
+  }) {
+    return _apiClient.uploadAnhCanNhan(
+      fileUpload,
+      onSendProgress: onSendProgress,
+    );
   }
 
-  Future<void> deleteAnhCanNhan(
-    String guid,
-  ) {
+  Future<void> deleteAnhCanNhan(String guid) {
     return _apiClient.deleteAnhCanNhan(guid);
   }
 
@@ -587,7 +725,10 @@ class ApiRepository {
     String newPassword,
   ) {
     return _apiClient.putCapNhatMatKhau(
-        keyLoaiMatKhau, oldPassword, newPassword);
+      keyLoaiMatKhau,
+      oldPassword,
+      newPassword,
+    );
   }
 
   Future<List<TopTinTucModel>> getTop10TinTuc(
@@ -599,11 +740,11 @@ class ApiRepository {
   }
 
   Future<TopTinTucDetailModel> getChiTietCmsTinTuc(
-      String idTinTuc, int width, int height) {
-    return _apiClient.getChiTietCmsTinTuc(
-      idTinTuc,
-      width,
-    );
+    String idTinTuc,
+    int width,
+    int height,
+  ) {
+    return _apiClient.getChiTietCmsTinTuc(idTinTuc, width);
   }
 
   Future<List<TopThongBaoModel>> getTop10ThongBao() {
@@ -636,9 +777,7 @@ class ApiRepository {
     return _apiClient.createPaht(request);
   }
 
-  Future<PhanAnhHienTruongModel> getPaht(
-    String guid,
-  ) {
+  Future<PhanAnhHienTruongModel> getPaht(String guid) {
     return _apiClient.getPaht(guid);
   }
 
@@ -663,7 +802,12 @@ class ApiRepository {
     String sort,
   ) {
     return _apiClient.getPahtCongDong(
-        guidChuDe, guidKhuVuc, pageIndex, pageSize, sort);
+      guidChuDe,
+      guidKhuVuc,
+      pageIndex,
+      pageSize,
+      sort,
+    );
   }
 
   Future<ApiResponse<List<PhanAnhHienTruongModel>>> getPahtCaNhan(
@@ -674,7 +818,12 @@ class ApiRepository {
     String sort,
   ) {
     return _apiClient.getPahtCaNhan(
-        guidChuDe, trangThaiXuLy, pageIndex, pageSize, sort);
+      guidChuDe,
+      trangThaiXuLy,
+      pageIndex,
+      pageSize,
+      sort,
+    );
   }
 
   Future<void> deletePaht(String guid) {
@@ -682,8 +831,10 @@ class ApiRepository {
   }
 
   // -- File
-  Future<FileDinhKemModel> uploadFile(File fileUpload,
-      {ProgressCallback? onSendProgress}) {
+  Future<FileDinhKemModel> uploadFile(
+    File fileUpload, {
+    ProgressCallback? onSendProgress,
+  }) {
     return _apiClient.uploadFile(fileUpload, onSendProgress: onSendProgress);
   }
 

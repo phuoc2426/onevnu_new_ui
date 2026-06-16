@@ -27,6 +27,10 @@ class ThoiKhoaBieuModel {
   String? tietBatDau;
   @JsonKey(name: "tietKetThuc")
   String? tietKetThuc;
+  @JsonKey(name: "ngayBatDau")
+  String? ngayBatDau;
+  @JsonKey(name: "ngayKetThuc")
+  String? ngayKetThuc;
   @JsonKey(name: "ngayTrongTuan")
   String? ngayTrongTuan;
   @JsonKey(name: "diaChi")
@@ -49,6 +53,8 @@ class ThoiKhoaBieuModel {
     this.nhom,
     this.tietBatDau,
     this.tietKetThuc,
+    this.ngayBatDau,
+    this.ngayKetThuc,
     this.ngayTrongTuan,
     this.diaChi,
     this.tenPhong,
@@ -65,6 +71,8 @@ class ThoiKhoaBieuModel {
     String? nhom,
     String? tietBatDau,
     String? tietKetThuc,
+    String? ngayBatDau,
+    String? ngayKetThuc,
     String? ngayTrongTuan,
     String? diaChi,
     String? tenPhong,
@@ -80,6 +88,8 @@ class ThoiKhoaBieuModel {
         nhom: nhom ?? this.nhom,
         tietBatDau: tietBatDau ?? this.tietBatDau,
         tietKetThuc: tietKetThuc ?? this.tietKetThuc,
+        ngayBatDau: ngayBatDau ?? this.ngayBatDau,
+        ngayKetThuc: ngayKetThuc ?? this.ngayKetThuc,
         ngayTrongTuan: ngayTrongTuan ?? this.ngayTrongTuan,
         diaChi: diaChi ?? this.diaChi,
         tenPhong: tenPhong ?? this.tenPhong,

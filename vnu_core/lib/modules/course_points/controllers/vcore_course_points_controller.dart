@@ -17,6 +17,7 @@ import '../../../globals.dart';
 import '../../../models/model.dart';
 import 'package:vnu_core/extensions/extension_string.dart';
 import 'package:vnu_core/extensions/extension_string.dart';
+
 class VcoreCoursePointsController extends GetxController {
   BuildContext? context;
 
@@ -29,6 +30,11 @@ class VcoreCoursePointsController extends GetxController {
   RxList<DiemThiHocKyModel> diemThiHocKy = RxList([]);
   Rxn<DiemTrungBinhModel> diemTrungBinhHocKy = Rxn();
   RxMap<String, List<DiemThiHocKyModel>> diemThiTheoHocKy = RxMap();
+  RxList<BrcChungChiModel> chungChis = RxList([]);
+  RxString chungChiError = ''.obs;
+  RxBool isCheckingDiemSources = false.obs;
+
+  final Map<String, Map<String, dynamic>> _mobileFullCache = {};
 
   // 0: Điểm học phần, 1: AI phân tích năng lực
   RxInt selectedTabIndex = 0.obs;
@@ -70,9 +76,10 @@ class VcoreCoursePointsController extends GetxController {
     refreshController.dispose();
     super.onClose();
   }
+
   Future<void> changeKieuTruong(String? displayName) async {
     final selected = danhSachKieuTruong.firstWhereOrNull(
-          (e) => e.toDisplayName() == displayName,
+      (e) => e.toDisplayName() == displayName,
     );
 
     if (selected == null) return;
@@ -86,65 +93,101 @@ class VcoreCoursePointsController extends GetxController {
     diemThiHocKy.clear();
     diemThiTheoHocKy.clear();
     diemTrungBinhHocKy.value = null;
+    chungChis.clear();
+    chungChiError.value = '';
 
     aiRadarAnalysis.value = null;
     hasRequestedAiAnalysis.value = false;
 
+    final cached = _mobileFullCache[selected];
+    if (cached != null && _hasHocKyData(cached)) {
+      _applyMobileFullResponse(cached);
+      await _afterApplyFullResponse();
+      return;
+    }
+
     await getDanhSachHocKy();
   }
+
   Future<void> getDanhSachKieuTruong() async {
     kieuTruong.value = null;
+    danhSachKieuTruong.clear();
+    danhSachHocKy.clear();
+    hocKy.value = null;
+    diemThiHocKy.clear();
+    diemThiTheoHocKy.clear();
+    diemTrungBinhHocKy.value = null;
+    chungChis.clear();
+    chungChiError.value = '';
+    aiRadarAnalysis.value = null;
+    hasRequestedAiAnalysis.value = false;
+
+    final candidates = <String>['TruongChinh', 'BangKep', 'TruongGui'];
 
     try {
       Utils.showProgress(context);
+      isCheckingDiemSources.value = true;
+      _mobileFullCache.clear();
 
-      final response = await ApiRepository().getDanhSachKieuTruong();
+      await _resolveStudentInfo();
+
+      final available = <String>[];
+
+      for (final source in candidates) {
+        try {
+          final full = await ApiRepository().getDiemSinhVienMobileFull(
+            source,
+            !isTheoChuongTrinhDaoTao.value,
+          );
+
+          if (_hasHocKyData(full)) {
+            _mobileFullCache[source] = full;
+            available.add(source);
+          }
+        } catch (e) {
+          _mobileFullCache[source] = {'error': e.toString()};
+        }
+      }
 
       Utils.dismissProgress(context);
+      isCheckingDiemSources.value = false;
 
-      danhSachKieuTruong.value = response;
+      danhSachKieuTruong.value = available;
 
-      if (danhSachKieuTruong.isNotEmpty) {
-        kieuTruong.value =
-            danhSachKieuTruong.firstWhereOrNull((obj) {
-              return obj == 'TruongChinh';
-            }) ??
-            danhSachKieuTruong.first;
-
-        await getDanhSachHocKy();
+      if (available.isEmpty) {
+        snackBarError('Không tìm thấy dữ liệu điểm ở BRC1, BRC2 hoặc BRC3.');
+        return;
       }
+
+      kieuTruong.value = available.contains('TruongChinh')
+          ? 'TruongChinh'
+          : available.first;
+
+      _applyMobileFullResponse(_mobileFullCache[kieuTruong.value] ?? {});
+      await _afterApplyFullResponse();
     } catch (e) {
       Utils.dismissProgress(context);
+      isCheckingDiemSources.value = false;
       snackBarError(e.toString());
     }
   }
 
   Future<void> getDanhSachHocKy() async {
     hocKy.value = null;
+    danhSachHocKy.clear();
+    diemThiHocKy.clear();
+    diemThiTheoHocKy.clear();
+    diemTrungBinhHocKy.value = null;
+    chungChis.clear();
+    chungChiError.value = '';
 
-    try {
-      Utils.showProgress(context);
-
-      final response = await ApiRepository().getDanhSachHocKyTheoDiem(
-        isTheoChuongTrinhDaoTao.value,
-        kieuTruong.value ?? '',
-      );
-
-      Utils.dismissProgress(context);
-
-      danhSachHocKy.value = response;
-
-      if (danhSachHocKy.isNotEmpty) {
-        hocKy.value = danhSachHocKy.first;
-      }
-
-      refreshData();
-    } catch (e) {
-      Utils.dismissProgress(context);
-      snackBarError(e.toString());
+    if (kieuTruong.value == null || kieuTruong.value!.isEmpty) {
+      await getDanhSachKieuTruong();
+      return;
     }
-  }
 
+    await _loadData();
+  }
 
   void changeHocKy(String? displayName) {
     final obj = danhSachHocKy.firstWhereOrNull(
@@ -153,7 +196,6 @@ class VcoreCoursePointsController extends GetxController {
 
     if (obj != null) {
       hocKy.value = obj;
-      refreshData();
     }
   }
 
@@ -230,18 +272,7 @@ class VcoreCoursePointsController extends GetxController {
     hasRequestedAiAnalysis.value = false;
 
     try {
-      final cachedData = await GpaCacheManager.getCachedGpaData();
-
-      if (cachedData != null) {
-        final parsedFromCache = await _loadFromCache(cachedData);
-
-        if (parsedFromCache) {
-          refreshController.refreshCompleted();
-          refreshController.loadComplete();
-          return;
-        }
-      }
-
+      // Không dùng cache cũ vì API mobile mới trả cấu trúc /full khác pipeline cũ.
       await _loadFromApi();
 
       refreshController.refreshCompleted();
@@ -333,41 +364,34 @@ class VcoreCoursePointsController extends GetxController {
 
     await _resolveStudentInfo();
 
-    if (danhSachHocKy.isEmpty) {
-      final response = await ApiRepository().getDanhSachHocKyTheoDiem(
-        isTheoChuongTrinhDaoTao.value,
-        kieuTruong.value ?? '',
-      );
+    final currentSource = kieuTruong.value ?? 'TruongChinh';
+    final cached = _mobileFullCache[currentSource];
 
-      danhSachHocKy.value = response;
-    }
+    final full = cached != null && _hasHocKyData(cached)
+        ? cached
+        : await ApiRepository().getDiemSinhVienMobileFull(
+            currentSource,
+            !isTheoChuongTrinhDaoTao.value,
+          );
 
-    if (danhSachHocKy.isEmpty) {
-      throw Exception('Không tìm thấy danh sách học kỳ.');
-    }
-
-    final futures = danhSachHocKy.map((hk) {
-      return ApiRepository().getDiemThiHocKy(
-        hk.id ?? '',
-        kieuTruong.value ?? '',
-        isTheoChuongTrinhDaoTao.value,
-      );
-    }).toList();
-
-    final results = await Future.wait(futures);
+    _mobileFullCache[currentSource] = full;
+    _applyMobileFullResponse(full);
 
     Utils.dismissProgress(context);
 
-    final Map<String, List<DiemThiHocKyModel>> tempSemesterMap = {};
-
-    for (int i = 0; i < danhSachHocKy.length; i++) {
-      final hkId = danhSachHocKy[i].id ?? '';
-      tempSemesterMap[hkId] = results[i];
+    if (danhSachHocKy.isEmpty) {
+      throw Exception(
+        'Không tìm thấy danh sách học kỳ cho nguồn điểm đang chọn.',
+      );
     }
 
-    diemThiTheoHocKy.value = tempSemesterMap;
+    await _afterApplyFullResponse();
+  }
 
-    final deduplicatedList = _deduplicateCourses(results);
+  Future<void> _afterApplyFullResponse() async {
+    final deduplicatedList = _deduplicateCourses(
+      diemThiTheoHocKy.values.toList(),
+    );
 
     diemThiHocKy.value = deduplicatedList;
 
@@ -376,6 +400,159 @@ class VcoreCoursePointsController extends GetxController {
     await _saveCalculatedDataToCache(deduplicatedList);
 
     await _loadAiAnalysisFromCacheOnly(deduplicatedList);
+  }
+
+  bool _hasHocKyData(Map<String, dynamic> full) {
+    final hocKys = _asList(full['hocKys'] ?? full['hocKyList']);
+    return hocKys.isNotEmpty;
+  }
+
+  Future<void> toggleXemCaMonNgoaiCtdt() async {
+    isTheoChuongTrinhDaoTao.toggle();
+    _mobileFullCache.clear();
+    await getDanhSachKieuTruong();
+  }
+
+  void _applyMobileFullResponse(Map<String, dynamic> full) {
+    final rawHocKys = _asList(full['hocKys'] ?? full['hocKyList']);
+    final Map<String, List<DiemThiHocKyModel>> semesterMap = {};
+
+    final parsedHocKys = <HocKyModel>[];
+
+    for (final raw in rawHocKys) {
+      if (raw is! Map) continue;
+
+      final hkMap = Map<String, dynamic>.from(raw);
+
+      final idHocKy = _text(hkMap['idHocKy'] ?? hkMap['termId'] ?? hkMap['id']);
+      final tenHocKy = _text(
+        hkMap['tenHocKy'] ?? hkMap['termName'] ?? hkMap['ten'],
+      );
+      final namHoc = _text(
+        hkMap['namHoc'] ?? hkMap['nam'] ?? hkMap['yearStart'],
+      );
+
+      final hk = HocKyModel.fromJson({
+        ...hkMap,
+        'id': idHocKy,
+        'idHocKy': idHocKy,
+        'ten': tenHocKy,
+        'tenHocKy': tenHocKy,
+        'nam': namHoc,
+        'namHoc': namHoc,
+      });
+
+      parsedHocKys.add(hk);
+
+      final rawCourses = _asList(
+        hkMap['diemMonHocs'] ?? hkMap['diemMonHoc'] ?? hkMap['diems'],
+      );
+
+      semesterMap[idHocKy] = rawCourses
+          .whereType<Map>()
+          .map(
+            (course) =>
+                _parseMobileCourse(Map<String, dynamic>.from(course), idHocKy),
+          )
+          .toList();
+    }
+
+    danhSachHocKy.value = parsedHocKys;
+
+    if (danhSachHocKy.isNotEmpty) {
+      final currentHocKyId = hocKy.value?.id;
+      final stillAvailable =
+          currentHocKyId != null &&
+          danhSachHocKy.any((e) => e.id == currentHocKyId);
+
+      hocKy.value = stillAvailable
+          ? danhSachHocKy.firstWhere((e) => e.id == currentHocKyId)
+          : danhSachHocKy.first;
+    }
+
+    diemThiTheoHocKy.value = semesterMap;
+
+    final rawChungChi = _asList(
+      full['chungChis'] ?? full['chungChiList'] ?? full['chungChisFromApi'],
+    );
+
+    chungChis.value = rawChungChi
+        .whereType<Map>()
+        .map((e) => BrcChungChiModel.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+
+    chungChiError.value = '';
+  }
+
+  DiemThiHocKyModel _parseMobileCourse(
+    Map<String, dynamic> raw,
+    String idHocKy,
+  ) {
+    return DiemThiHocKyModel.fromJson({
+      ...raw,
+      'idHocKy': idHocKy,
+      'idHocPhan': _text(raw['idHocPhan'] ?? raw['crdId'] ?? raw['CRD_ID']),
+      'maHocPhan': _text(raw['maHocPhan'] ?? raw['crdCode'] ?? raw['CRD_CODE']),
+      'tenHocPhan': _text(
+        raw['tenHocPhan'] ?? raw['crdName'] ?? raw['CRD_NAME'],
+      ),
+      'soTinChi': _text(raw['soTinChi'] ?? raw['numCrd'] ?? raw['NUM_CRD']),
+      'diemHe10': _text(
+        raw['diemHe10'] ?? raw['pntOfficial'] ?? raw['PNT_OFFICIAL'],
+      ),
+      'diemHeChu': _text(
+        raw['diemChu'] ??
+            raw['diemHeChu'] ??
+            raw['DIEM_CHU'] ??
+            raw['DIEMCHUT'],
+      ),
+      'diemHe4': _text(raw['diemHe4'] ?? raw['DIEM_HE_4'] ?? raw['DIEM4T']),
+    });
+  }
+
+  Future<void> reloadChungChi() async {
+    final current = kieuTruong.value ?? 'TruongChinh';
+
+    if (_mobileBrcKey(current) == 'brc2') {
+      chungChis.clear();
+      chungChiError.value = 'BRC2 không có chứng chỉ theo logic ASP.';
+      return;
+    }
+
+    try {
+      final response = await ApiRepository().getChungChiMobile(current);
+
+      chungChis.value = response
+          .map((e) => BrcChungChiModel.fromJson(e))
+          .toList();
+
+      chungChiError.value = '';
+    } catch (e) {
+      chungChiError.value = e.toString();
+      chungChis.clear();
+    }
+  }
+
+  String _mobileBrcKey(String kieuTruong) {
+    switch (kieuTruong) {
+      case 'BangKep':
+        return 'brc2';
+      case 'TruongGui':
+        return 'brc3';
+      case 'TruongChinh':
+      default:
+        return 'brc1';
+    }
+  }
+
+  List<dynamic> _asList(dynamic value) {
+    if (value is List) return value;
+    return [];
+  }
+
+  String _text(dynamic value) {
+    if (value == null) return '';
+    return value.toString();
   }
 
   List<DiemThiHocKyModel> _deduplicateCourses(
@@ -588,5 +765,62 @@ class VcoreCoursePointsController extends GetxController {
     } finally {
       isLoadingAi.value = false;
     }
+  }
+}
+
+class BrcChungChiModel {
+  final String trangThai;
+  final String ctfId;
+  final String tenChungChi;
+  final String moTa;
+  final String soQuyetDinh;
+  final String ngayQuyetDinh;
+
+  const BrcChungChiModel({
+    required this.trangThai,
+    required this.ctfId,
+    required this.tenChungChi,
+    required this.moTa,
+    required this.soQuyetDinh,
+    required this.ngayQuyetDinh,
+  });
+
+  factory BrcChungChiModel.fromJson(Map<String, dynamic> json) {
+    final trangThai = _string(json['trangThai'] ?? json['status']);
+    final soQuyetDinh = _string(
+      json['soQuyetDinh'] ?? json['soQD'] ?? json['So_QD'],
+    );
+    final hasPassed =
+        trangThai.toLowerCase().contains('đạt') ||
+        trangThai.toLowerCase().contains('dat') ||
+        soQuyetDinh.isNotEmpty ||
+        _string(json['stdId'] ?? json['Std_id'] ?? json['STD_ID']).isNotEmpty;
+
+    return BrcChungChiModel(
+      trangThai: trangThai.isNotEmpty
+          ? trangThai
+          : (hasPassed ? 'Đạt' : 'Chưa đạt'),
+      ctfId: _string(
+        json['ctfId'] ?? json['ctfID'] ?? json['idChungChi'] ?? json['CTF_ID'],
+      ),
+      tenChungChi: _string(
+        json['tenChungChi'] ?? json['ctfName'] ?? json['CTF_NAME'],
+      ),
+      moTa: _string(json['moTa'] ?? json['ctfDesc'] ?? json['CTF_DESC']),
+      soQuyetDinh: soQuyetDinh,
+      ngayQuyetDinh: _string(
+        json['ngayQuyetDinh'] ?? json['ngayQD'] ?? json['Ngay_QD'],
+      ),
+    );
+  }
+
+  bool get daDat {
+    final s = trangThai.toLowerCase();
+    return s.contains('đạt') || s.contains('dat') || soQuyetDinh.isNotEmpty;
+  }
+
+  static String _string(dynamic value) {
+    if (value == null) return '';
+    return value.toString();
   }
 }

@@ -15,6 +15,10 @@ class ScheduleEvent {
   final String? caThi;
   final String? hinhThucThi;
   final String? soBaoDanh;
+  final String? actualStartTime;
+  final String? actualEndTime;
+  final bool fromExtraTerm;
+  final String? sourceNote;
 
   const ScheduleEvent({
     required this.type,
@@ -31,5 +35,9 @@ class ScheduleEvent {
     this.caThi,
     this.hinhThucThi,
     this.soBaoDanh,
+    this.actualStartTime,
+    this.actualEndTime,
+    this.fromExtraTerm = false,
+    this.sourceNote,
   });
 }

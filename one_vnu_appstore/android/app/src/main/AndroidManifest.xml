@@ -1,7 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     package="com.vnu.students">
-    
+
     <uses-permission android:name="android.permission.INTERNET"/>
 
     <!-- Permissions options for the `location` group -->
@@ -16,48 +16,16 @@
     <uses-permission
         android:name="android.permission.READ_MEDIA_VIDEO"
         tools:node="remove"/>
-
     <queries>
         <package android:name="com.google.android.gm" />
-
-        <intent>
-            <action android:name="android.intent.action.SENDTO" />
-            <data android:scheme="mailto" />
-        </intent>
-
-        <intent>
-            <action android:name="android.intent.action.SEND" />
-            <data android:mimeType="image/*" />
-        </intent>
-
-        <intent>
-            <action android:name="android.intent.action.SEND_MULTIPLE" />
-            <data android:mimeType="image/*" />
-        </intent>
-
-        <intent>
-            <action android:name="android.intent.action.VIEW" />
-            <data android:scheme="market" />
-        </intent>
     </queries>
-
-   <application
+    <application
         android:label="OneVNU"
         tools:replace="android:label"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon"
         android:requestLegacyExternalStorage="true"
         android:extractNativeLibs="true">
-        <provider
-            android:name=".GmailFileProvider"
-            android:authorities="${applicationId}.gmail.fileprovider"
-            android:exported="false"
-            android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/file_paths" />
-        </provider>
-
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -71,9 +39,9 @@
                  while the Flutter UI initializes. After that, this theme continues
                  to determine the Window background behind the Flutter UI. -->
             <meta-data
-              android:name="io.flutter.embedding.android.NormalTheme"
-              android:resource="@style/NormalTheme"
-              />
+                android:name="io.flutter.embedding.android.NormalTheme"
+                android:resource="@style/NormalTheme"
+                />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
@@ -87,6 +55,15 @@
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="VNUStudents"/>
         <!-- <meta-data android:name="com.google.android.geo.API_KEY" android:value="AIzaSyBe6xAnvolDgwd5icTDcsTH3ITMOz384F4"/> -->
+        <provider
+            android:name="com.vnu.students.GmailFileProvider"
+            android:authorities="${applicationId}.gmail_fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/gmail_file_paths" />
+        </provider>
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />

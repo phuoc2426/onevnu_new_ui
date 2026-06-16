@@ -73,11 +73,13 @@ class VcoreExamScheduleView extends StatelessWidget {
 
                       const SizedBox(height: 12),
 
-                      if (!controller.showIncompleteExams.value) ...[
+                      if (controller.showExtraTermCourses.value) ...[
+                        _buildExtraTermCoursesList(context, controller),
+                      ] else if (controller.showIncompleteExams.value) ...[
+                        _buildIncompleteExamsList(controller),
+                      ] else ...[
                         _buildEventsHeader(context, controller),
                         _buildEventsList(context, controller),
-                      ] else ...[
-                        _buildIncompleteExamsList(controller),
                       ],
 
                       const SizedBox(height: 40),
@@ -177,6 +179,7 @@ class VcoreExamScheduleView extends StatelessWidget {
             ),
             onDaySelected: (selectedDay, focusedDay) {
               controller.showIncompleteExams.value = false;
+              controller.showExtraTermCourses.value = false;
               controller.selectedDay.value = selectedDay;
               controller.focusedDay.value = focusedDay;
               controller.updateSelectedEvents();
@@ -466,7 +469,7 @@ class VcoreExamScheduleView extends StatelessWidget {
       bool isLast,
       ) {
     final isClass = event.type == ScheduleType.classSession;
-    final clockRange = _mapTietToTime(event.startTime, event.endTime);
+    final clockRange = _displayTimeRange(event);
     final lessonRange = _formatLessonRange(event);
     final clockParts = clockRange.split(' - ');
 
@@ -727,7 +730,7 @@ class VcoreExamScheduleView extends StatelessWidget {
     if (eventDate.isBefore(today)) return true;
     if (eventDate.isAfter(today)) return false;
 
-    final timeRange = _mapTietToTime(event.startTime, event.endTime);
+    final timeRange = _displayTimeRange(event);
     final parts = timeRange.split(' - ');
     if (parts.length < 2) return false;
 
@@ -1106,7 +1109,7 @@ class VcoreExamScheduleView extends StatelessWidget {
     final dateStr = DateFormat('dd/MM/yyyy').format(rawDate);
     final displayDate = '$dayOfWeek, $dateStr';
 
-    final timeRange = _mapTietToTime(event.startTime, event.endTime);
+    final timeRange = _displayTimeRange(event);
     final lessonRange = _formatLessonRange(event);
     final timeValue = isClass && lessonRange.isNotEmpty
         ? '$lessonRange\n$timeRange\n$displayDate'
@@ -1335,8 +1338,16 @@ class VcoreExamScheduleView extends StatelessWidget {
 
   Widget _buildModeSelector(VcoreExamScheduleController controller) {
     return Obx(() {
-      final count = controller.incompleteExams.length;
-      final isTheoNgay = !controller.showIncompleteExams.value;
+      final incompleteCount = controller.incompleteExams.length;
+      final extraTermCount = controller.extraTermCourses.length;
+
+      final hasExtraTerm = extraTermCount > 0;
+      final tabCount = hasExtraTerm ? 3 : 2;
+
+      final isTheoNgay = !controller.showIncompleteExams.value &&
+          !controller.showExtraTermCourses.value;
+      final isChuaCapNhat = controller.showIncompleteExams.value;
+      final isHocKyHe = controller.showExtraTermCourses.value;
 
       return Container(
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -1348,15 +1359,23 @@ class VcoreExamScheduleView extends StatelessWidget {
         ),
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final itemWidth = constraints.maxWidth / 2;
+            final itemWidth = constraints.maxWidth / tabCount;
+
+            Alignment selectedAlignment;
+            if (isTheoNgay) {
+              selectedAlignment = Alignment.centerLeft;
+            } else if (isChuaCapNhat && hasExtraTerm) {
+              selectedAlignment = Alignment.center;
+            } else {
+              selectedAlignment = Alignment.centerRight;
+            }
 
             return Stack(
               children: [
                 AnimatedAlign(
                   duration: const Duration(milliseconds: 220),
                   curve: Curves.easeOutCubic,
-                  alignment:
-                  isTheoNgay ? Alignment.centerLeft : Alignment.centerRight,
+                  alignment: selectedAlignment,
                   child: SizedBox(
                     width: itemWidth,
                     height: double.infinity,
@@ -1381,17 +1400,35 @@ class VcoreExamScheduleView extends StatelessWidget {
                       child: _buildModeButton(
                         label: 'Theo ngày',
                         selected: isTheoNgay,
-                        onTap: () => controller.showIncompleteExams.value = false,
+                        onTap: () {
+                          controller.showIncompleteExams.value = false;
+                          controller.showExtraTermCourses.value = false;
+                        },
                       ),
                     ),
                     Expanded(
                       child: _buildModeButton(
                         label: 'Chưa cập nhật',
-                        selected: !isTheoNgay,
-                        count: count,
-                        onTap: () => controller.showIncompleteExams.value = true,
+                        selected: isChuaCapNhat,
+                        count: incompleteCount,
+                        onTap: () {
+                          controller.showIncompleteExams.value = true;
+                          controller.showExtraTermCourses.value = false;
+                        },
                       ),
                     ),
+                    if (hasExtraTerm)
+                      Expanded(
+                        child: _buildModeButton(
+                          label: 'Học kỳ hè',
+                          selected: isHocKyHe,
+                          count: extraTermCount,
+                          onTap: () {
+                            controller.showIncompleteExams.value = false;
+                            controller.showExtraTermCourses.value = true;
+                          },
+                        ),
+                      ),
                   ],
                 ),
               ],
@@ -1402,6 +1439,20 @@ class VcoreExamScheduleView extends StatelessWidget {
     });
   }
 
+  String _displayTimeRange(ScheduleEvent event) {
+    final actualStart = event.actualStartTime?.trim() ?? '';
+    final actualEnd = event.actualEndTime?.trim() ?? '';
+
+    if (actualStart.isNotEmpty && actualEnd.isNotEmpty) {
+      return '$actualStart - $actualEnd';
+    }
+
+    if (actualStart.isNotEmpty) {
+      return actualStart;
+    }
+
+    return _mapTietToTime(event.startTime, event.endTime);
+  }
   Widget _buildModeButton({
     required String label,
     required bool selected,
@@ -1622,6 +1673,182 @@ class VcoreExamScheduleView extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildExtraTermCoursesList(
+      BuildContext context,
+      VcoreExamScheduleController controller,
+      ) {
+    final list = controller.extraTermCourses;
+
+    if (list.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 40.0),
+        child: Center(
+          child: Column(
+            children: [
+              Icon(
+                Icons.menu_book_outlined,
+                size: 48,
+                color: Colors.grey.shade400,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Không có học phần học kỳ hè',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.greenAccent.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: AppColors.greenAccent.withOpacity(0.2),
+              width: 1,
+            ),
+          ),
+          child: const Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.info_rounded,
+                color: AppColors.greenAccent,
+                size: 18,
+              ),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Các học phần học kỳ hè/kỳ phụ được liệt kê riêng vì thời gian học chưa đủ chắc chắn để hiển thị theo lịch ngày.',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: Color(0xFF137A3A),
+                    height: 1.35,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        ...list.map((event) => _buildExtraTermCourseCard(context, event)),
+      ],
+    );
+  }
+
+  Widget _buildExtraTermCourseCard(
+      BuildContext context,
+      ScheduleEvent event,
+      ) {
+    final timeRange = _displayTimeRange(event);
+    final lessonRange = _formatLessonRange(event);
+
+    final subjectName = event.title.trim().isNotEmpty ? event.title : '?';
+    final subjectCode = event.hocPhanCode?.trim().isNotEmpty == true
+        ? event.hocPhanCode!
+        : '?';
+    final credits = event.soTinChi?.trim().isNotEmpty == true
+        ? event.soTinChi!
+        : '?';
+    final group = event.nhom?.trim().isNotEmpty == true ? event.nhom! : '?';
+    final location = event.location.trim().isNotEmpty ? event.location : '?';
+    final teacher = event.teacher.trim().isNotEmpty ? event.teacher : '?';
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.calendarBorder,
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.greenAccent.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.menu_book_outlined,
+                  color: AppColors.greenAccent,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      subjectName,
+                      style: TextStyles.bold.copyWith(
+                        fontSize: AppFontSizes.medium,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$subjectCode • $credits tín chỉ • Nhóm $group',
+                      style: TextStyles.regular.copyWith(
+                        fontSize: AppFontSizes.small,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Divider(height: 1, thickness: 0.5, color: Color(0xFFE5E7EB)),
+          const SizedBox(height: 12),
+          _buildInfoRow(
+            'Thời gian',
+            lessonRange.isNotEmpty ? '$lessonRange • $timeRange' : timeRange,
+            isWarning: timeRange == 'Chưa có giờ' || timeRange.contains('?'),
+          ),
+          const SizedBox(height: 6),
+          _buildInfoRow(
+            'Phòng học',
+            location,
+            isWarning: location == '?',
+          ),
+          const SizedBox(height: 6),
+          _buildInfoRow(
+            'Giảng viên',
+            teacher,
+            isWarning: teacher == '?',
+          ),
+        ],
+      ),
     );
   }
 }

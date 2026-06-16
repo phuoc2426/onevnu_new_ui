@@ -19,7 +19,7 @@ import 'package:vnu_core/modules/course_points/views/vcore_course_points_view.da
 import 'package:vnu_core/modules/exam_schedule/views/vcore_exam_schedule_view.dart';
 import 'package:vnu_core/modules/hdsd/views/vcore_hdsd_view.dart';
 import 'package:vnu_core/modules/inmapz/vcore_immap_view.dart';
-import 'package:vnu_core/modules/motel/views/vcore_motel_view.dart';
+import 'package:vnu_core/modules/motel/vcore_motel_webview.dart';
 import 'package:vnu_core/modules/one_door/views/vcore_one_door_view.dart';
 import 'package:vnu_core/modules/paht/views/vcore_paht_view.dart';
 import 'package:vnu_core/modules/question/views/vcore_question_view.dart';
@@ -559,7 +559,7 @@ class _VcoreSidebarWidgetState extends State<VcoreSidebarWidget> {
         Get.to(() => const VcoreOneDoorView());
         break;
       case HomeService.TimPhongTro:
-        Get.to(() => const VcoreMotelView());
+        openMotelWebView();
         break;
       case HomeService.XemLichThi:
         Get.to(() => const VcoreExamScheduleView());

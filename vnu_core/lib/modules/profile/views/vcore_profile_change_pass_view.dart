@@ -6,8 +6,8 @@ import 'package:vnu_core/common/app_text_styles.dart';
 import 'package:vnu_core/common/space_widget.dart';
 import 'package:vnu_core/models/loai_mat_khau_model.dart';
 import 'package:vnu_core/modules/profile/controllers/vcore_profile_pass_controller.dart';
-import 'package:vnu_core/modules/profile/views/vcore_profile_forgot_pass_view.dart';
-// import 'package:vnu_core/modules/profile/views/vcore_profile_forgot_pass_view_v2.dart';
+// import 'package:vnu_core/modules/profile/views/vcore_profile_forgot_pass_view.dart';
+import 'package:vnu_core/modules/profile/views/vcore_profile_forgot_pass_view_v2.dart';
 import 'package:vnu_core/widgets/buttons_widget.dart';
 import 'package:vnu_core/widgets/container_dissmis.dart';
 import 'package:vnu_core/widgets/navi_widget.dart';
@@ -102,7 +102,7 @@ class VcoreProfileChangePassView extends GetView<VcoreProfilePassController> {
                             TextButton(
                                 onPressed: () {
                                   Get.to(
-                                      () => const VcoreProfileForgotPassView());
+                                      () => const VcoreProfileForgotPassViewV2());
                                 },
                                 child: Text(
                                   'Quên mật khẩu',

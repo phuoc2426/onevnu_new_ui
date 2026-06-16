@@ -39,7 +39,7 @@ class _VcoreCoursePointsDetailWidgetState
     });
 
     try {
-      final response = await ApiRepository().getDiemHocPhanHocKy(
+      final response = await ApiRepository().getDiemHocPhanHocKyMobile(
         widget.diemThiHocKyModel.idHocKy ?? '',
         widget.kieuTruong,
         widget.diemThiHocKyModel.idHocPhan ?? '',
@@ -129,19 +129,17 @@ class _VcoreCoursePointsDetailWidgetState
     final theme = _scoreTheme(score10);
 
     final scoreText =
-    widget.diemThiHocKyModel.diemHe10?.trim().isNotEmpty == true
+        widget.diemThiHocKyModel.diemHe10?.trim().isNotEmpty == true
         ? widget.diemThiHocKyModel.diemHe10!.trim()
         : '--';
 
-    final letterGrade =
-    score10 != null ? GradeScaleHelper.getLetterGrade(score10) : '--';
+    final letterGrade = _displayText(widget.diemThiHocKyModel.diemHeChu);
 
-    final score4 = score10 != null
-        ? GradeScaleHelper.getScore4(score10).toStringAsFixed(1)
-        : '--';
+    final score4 = _displayText(widget.diemThiHocKyModel.diemHe4);
 
-    final isPassed =
-    score10 != null ? GradeScaleHelper.isPassed(score10) : false;
+    final isPassed = score10 != null
+        ? GradeScaleHelper.isPassed(score10)
+        : false;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
@@ -245,10 +243,7 @@ class _VcoreCoursePointsDetailWidgetState
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: theme.borderColor,
-          width: 1,
-        ),
+        border: Border.all(color: theme.borderColor, width: 1),
         boxShadow: [
           BoxShadow(
             color: theme.accentColor.withOpacity(0.08),
@@ -268,11 +263,7 @@ class _VcoreCoursePointsDetailWidgetState
                   color: theme.softColor,
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: Icon(
-                  theme.icon,
-                  color: theme.accentColor,
-                  size: 28,
-                ),
+                child: Icon(theme.icon, color: theme.accentColor, size: 28),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -305,9 +296,7 @@ class _VcoreCoursePointsDetailWidgetState
                 decoration: BoxDecoration(
                   color: theme.softColor,
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: theme.borderColor,
-                  ),
+                  border: Border.all(color: theme.borderColor),
                 ),
                 child: Text(
                   score10Text,
@@ -371,9 +360,7 @@ class _VcoreCoursePointsDetailWidgetState
             child: Row(
               children: [
                 Icon(
-                  isPassed
-                      ? Icons.check_circle_rounded
-                      : Icons.cancel_rounded,
+                  isPassed ? Icons.check_circle_rounded : Icons.cancel_rounded,
                   size: 18,
                   color: isPassed
                       ? const Color(0xFF16A34A)
@@ -407,9 +394,7 @@ class _VcoreCoursePointsDetailWidgetState
       decoration: BoxDecoration(
         color: const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: const Color(0xFFE5E7EB),
-        ),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -436,10 +421,16 @@ class _VcoreCoursePointsDetailWidgetState
     );
   }
 
+  String _displayText(String? value) {
+    final text = value?.trim() ?? '';
+    return text.isEmpty ? '--' : text;
+  }
+
   Widget _buildPointItem(DiemHocPhanModel diemHocPhan) {
     final rawScore = diemHocPhan.diemHe10?.trim() ?? '';
-    final componentScore =
-    rawScore.isEmpty ? null : double.tryParse(rawScore.replaceAll(',', '.'));
+    final componentScore = rawScore.isEmpty
+        ? null
+        : double.tryParse(rawScore.replaceAll(',', '.'));
     final theme = _scoreTheme(componentScore);
 
     return Container(
@@ -449,9 +440,7 @@ class _VcoreCoursePointsDetailWidgetState
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: const Color(0xFFE5E7EB),
-        ),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.018),
@@ -527,10 +516,7 @@ class _VcoreCoursePointsDetailWidgetState
     );
   }
 
-  Widget _buildInlineInfo({
-    required String label,
-    required String value,
-  }) {
+  Widget _buildInlineInfo({required String label, required String value}) {
     return RichText(
       text: TextSpan(
         children: [
@@ -583,10 +569,7 @@ class _VcoreCoursePointsDetailWidgetState
     );
   }
 
-  Widget _buildSoftTag({
-    required IconData icon,
-    required String text,
-  }) {
+  Widget _buildSoftTag({required IconData icon, required String text}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
@@ -597,11 +580,7 @@ class _VcoreCoursePointsDetailWidgetState
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            icon,
-            size: 13,
-            color: const Color(0xFF18A957),
-          ),
+          Icon(icon, size: 13, color: const Color(0xFF18A957)),
           const SizedBox(width: 5),
           Text(
             text,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
+import 'package:vnu_core/common/hoc_ky_date_helper.dart';
 import 'package:vnu_core/common/utils.dart';
 import 'package:vnu_core/repository/app_repository.dart';
 
@@ -86,11 +87,17 @@ class VcoreTimeScheduleController extends GetxController {
   HocKyModel _findDefaultHocKy() {
     final now = DateTime.now();
     final currentYear = now.year;
+    final today = DateTime(now.year, now.month, now.day);
+
+    final byDateRange = HocKyDateHelper.findContaining(danhSachHocKy, today);
+    if (byDateRange != null) {
+      return byDateRange;
+    }
 
     // Ưu tiên học kỳ có năm bắt đầu trùng năm hiện tại.
     // Ví dụ: "2026-2027" => lấy 2026.
     final byCurrentStartYear = danhSachHocKy.firstWhereOrNull((hk) {
-      final startYear = _extractStartYear(hk.nam);
+      final startYear = HocKyDateHelper.extractStartYear(hk.nam);
       return startYear == currentYear;
     });
 
@@ -101,8 +108,8 @@ class VcoreTimeScheduleController extends GetxController {
     // Nếu không có, chọn học kỳ gần năm hiện tại nhất.
     final sorted = danhSachHocKy.toList()
       ..sort((a, b) {
-        final yearA = _extractStartYear(a.nam) ?? 0;
-        final yearB = _extractStartYear(b.nam) ?? 0;
+        final yearA = HocKyDateHelper.extractStartYear(a.nam) ?? 0;
+        final yearB = HocKyDateHelper.extractStartYear(b.nam) ?? 0;
 
         final diffA = (yearA - currentYear).abs();
         final diffB = (yearB - currentYear).abs();
@@ -113,6 +120,7 @@ class VcoreTimeScheduleController extends GetxController {
     return sorted.first;
   }
 
+  // ignore: unused_element
   int? _extractStartYear(String? nam) {
     if (nam == null || nam.trim().isEmpty) return null;
 

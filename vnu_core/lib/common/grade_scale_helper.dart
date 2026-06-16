@@ -4,6 +4,7 @@ class GradeScaleHelper {
   /// Quy đổi từ điểm hệ 10 sang điểm chữ
   static String getLetterGrade(double? score10) {
     if (score10 == null) return 'Chưa có';
+    if (score10 >= 9.0) return 'A+';
     if (score10 >= 8.5) return 'A';
     if (score10 >= 8.0) return 'B+';
     if (score10 >= 7.0) return 'B';

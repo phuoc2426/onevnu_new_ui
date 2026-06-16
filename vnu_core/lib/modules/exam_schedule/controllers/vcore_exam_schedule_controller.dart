@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
+import 'package:vnu_core/common/hoc_ky_date_helper.dart';
+import 'package:vnu_core/common/schedule_override_config.dart';
 import 'package:vnu_core/common/utils.dart';
 import 'package:vnu_core/repository/app_repository.dart';
 import 'package:vnu_core/common/vnu_cache_manager.dart';
@@ -27,6 +29,7 @@ class VcoreExamScheduleController extends GetxController {
   // Raw data from cache/API
   RxList<ThoiKhoaBieuModel> listThoiKhoaBieu = RxList([]);
   RxList<LichThiHocKyModel> listLichThi = RxList([]);
+  RxList<ScheduleEvent> extraTermCourses = RxList([]);
 
   // Unified calendar events Map
   RxMap<DateTime, List<ScheduleEvent>> eventsMap = RxMap();
@@ -40,7 +43,9 @@ class VcoreExamScheduleController extends GetxController {
   RxBool isTheoChuongTrinhDaoTao = true.obs;
   RxBool isLoading = false.obs;
   RxBool showIncompleteExams = false.obs;
+  RxBool showExtraTermCourses = false.obs;
   bool skipAutoSelectNearest = false;
+  ScheduleOverrideConfig scheduleOverrideConfig = ScheduleOverrideConfig.empty();
 
   List<LichThiHocKyModel> get incompleteExams {
     return listLichThi.where(_isIncompleteExam).toList();
@@ -79,6 +84,83 @@ class VcoreExamScheduleController extends GetxController {
     }
 
     return '?';
+  }
+
+  String _classLocation(ThoiKhoaBieuModel classSession) {
+    final room = _unknownIfBlank(classSession.tenPhong);
+    final address = classSession.diaChi?.trim() ?? '';
+
+    if (address.isEmpty) return room;
+    return '$room - $address';
+  }
+
+  String _classTeachers(ThoiKhoaBieuModel classSession) {
+    final teachers = [
+      classSession.giangVien1,
+      classSession.giangVien2,
+      classSession.giangVien3,
+      classSession.giangVien4,
+    ].where((g) => g != null && g.trim().isNotEmpty).join(', ');
+
+    return teachers.isEmpty ? '?' : teachers;
+  }
+
+  String _lessonLabel(String? value) {
+    final text = value?.trim() ?? '';
+    return text.isEmpty ? '?' : 'Tiết $text';
+  }
+
+  HocKyDateRange _classDateRange({
+    required HocKyModel sem,
+    required ThoiKhoaBieuModel classSession,
+    required ScheduleCourseOverride? override,
+    required DateTime defaultStart,
+    required DateTime defaultEnd,
+  }) {
+    final range = HocKyDateHelper.rangeForDates(
+      sem,
+      startDate: override?.startDate ?? classSession.ngayBatDau,
+      endDate: override?.endDate ?? classSession.ngayKetThuc,
+    );
+
+    final start = range.start.isBefore(defaultStart) ? defaultStart : range.start;
+    final end = range.end.isAfter(defaultEnd) ? defaultEnd : range.end;
+
+    if (end.isBefore(start)) {
+      return HocKyDateRange(start: defaultStart, end: defaultEnd);
+    }
+
+    return HocKyDateRange(start: start, end: end);
+  }
+
+  ScheduleEvent _buildClassEvent({
+    required HocKyModel sem,
+    required ThoiKhoaBieuModel classSession,
+    required DateTime date,
+    required ScheduleCourseOverride? override,
+    bool fromExtraTerm = false,
+  }) {
+    final actualStartTime = _unknownIfBlank(override?.startTime);
+    final actualEndTime = _unknownIfBlank(override?.endTime);
+
+    return ScheduleEvent(
+      type: ScheduleType.classSession,
+      title: _unknownIfBlank(classSession.tenHocPhan) == '?'
+          ? 'Lịch học'
+          : _unknownIfBlank(classSession.tenHocPhan),
+      date: date,
+      startTime: _lessonLabel(classSession.tietBatDau),
+      endTime: _lessonLabel(classSession.tietKetThuc),
+      location: _classLocation(classSession),
+      teacher: _classTeachers(classSession),
+      hocPhanCode: _unknownIfBlank(classSession.maHocPhan),
+      soTinChi: _unknownIfBlank(classSession.soTinChi),
+      nhom: _unknownIfBlank(classSession.nhom),
+      actualStartTime: actualStartTime == '?' ? null : actualStartTime,
+      actualEndTime: actualEndTime == '?' ? null : actualEndTime,
+      fromExtraTerm: fromExtraTerm,
+      sourceNote: fromExtraTerm ? 'Kỳ phụ' : null,
+    );
   }
 
   bool _hasSelectedNearestDate = false;
@@ -160,17 +242,7 @@ class VcoreExamScheduleController extends GetxController {
         final now = DateTime.now();
         final today = DateTime(now.year, now.month, now.day);
         final targetDate = pendingInitialDate ?? today;
-        HocKyModel? currentSem;
-
-        for (var sem in response) {
-          final start = _inferSemesterStartDate(sem);
-          final end = _inferSemesterEndDate(sem);
-          if ((targetDate.isAfter(start) || targetDate.isAtSameMomentAs(start)) &&
-              (targetDate.isBefore(end) || targetDate.isAtSameMomentAs(end))) {
-            currentSem = sem;
-            break;
-          }
-        }
+        final currentSem = HocKyDateHelper.findContaining(response, targetDate);
 
         if (currentSem != null) {
           final year = currentSem.nam ?? years.first;
@@ -215,6 +287,9 @@ class VcoreExamScheduleController extends GetxController {
       hocKySelected.value = null;
       eventsMap.clear();
       selectedEvents.clear();
+      extraTermCourses.clear();
+      showExtraTermCourses.value = false;
+      showIncompleteExams.value = false;
     }
   }
 
@@ -223,7 +298,7 @@ class VcoreExamScheduleController extends GetxController {
     _hasSelectedNearestDate = false;
 
     // Jump calendar view to target date or the start date of this semester
-    final targetDate = pendingInitialDate ?? _inferSemesterStartDate(sem);
+    final targetDate = pendingInitialDate ?? HocKyDateHelper.rangeFor(sem).start;
     focusedDay.value = targetDate;
     selectedDay.value = targetDate;
 
@@ -237,17 +312,23 @@ class VcoreExamScheduleController extends GetxController {
   _loadData() async {
     final sem = hocKySelected.value;
     if (sem == null) {
+      eventsMap.clear();
+      selectedEvents.clear();
+      extraTermCourses.clear();
+      showExtraTermCourses.value = false;
+      showIncompleteExams.value = false;
+
       refreshController.refreshCompleted();
       refreshController.loadComplete();
       return;
     }
-
     final hocKyId = sem.id ?? '';
     final kieuTruongVal = kieuTruong.value ?? '';
 
     // Cache-first: loading local data instantly
     isLoading.value = true;
     try {
+      scheduleOverrideConfig = await ScheduleOverrideConfigCache().load();
       final cachedTkb = await VnuCacheFileManager().getCacheFile('tkb_$hocKyId.json');
       final cachedLichThi = await VnuCacheFileManager().getCacheFile('lichthi_$hocKyId.json');
 
@@ -280,6 +361,7 @@ class VcoreExamScheduleController extends GetxController {
 
     // Refresh from Network
     try {
+      scheduleOverrideConfig = await ScheduleOverrideConfigCache().load();
       final results = await Future.wait([
         ApiRepository().getThoiKhoaBieuHocKy(hocKyId, kieuTruongVal),
         ApiRepository().getLichThiHocKy(hocKyId, kieuTruongVal),
@@ -316,6 +398,7 @@ class VcoreExamScheduleController extends GetxController {
 
   void _generateEventsMap(HocKyModel sem) {
     final Map<DateTime, List<ScheduleEvent>> tempMap = {};
+    final extraCourses = <ScheduleEvent>[];
 
     // 1. Map Lịch thi.
 // Chỉ cần có ngày thi hợp lệ thì vẫn hiển thị trên calendar.
@@ -357,10 +440,31 @@ class VcoreExamScheduleController extends GetxController {
     }
 
     // 2. Map Lịch học (Class schedule) - Recurring weekly on weekdays in date range
-    final startDate = _inferSemesterStartDate(sem);
-    final endDate = _inferSemesterEndDate(sem);
+    final termOverride = scheduleOverrideConfig.termFor(sem);
+    final semesterRange = HocKyDateHelper.rangeForDates(
+      sem,
+      startDate: termOverride?.startDate ?? sem.ngayBatDau,
+      endDate: termOverride?.endDate ?? sem.ngayKetThuc,
+    );
+    final startDate = semesterRange.start;
+    final endDate = semesterRange.end;
+    final isExtraTerm = HocKyDateHelper.isExtraTerm(sem);
 
     for (var classSession in listThoiKhoaBieu) {
+      final override = scheduleOverrideConfig.courseFor(sem, classSession);
+      if (isExtraTerm) {
+        extraCourses.add(
+          _buildClassEvent(
+            sem: sem,
+            classSession: classSession,
+            date: startDate,
+            override: override,
+            fromExtraTerm: true,
+          ),
+        );
+        continue;
+      }
+
       final ngayTrongTuanStr = classSession.ngayTrongTuan;
       if (ngayTrongTuanStr == null || ngayTrongTuanStr.isEmpty) continue;
 
@@ -371,36 +475,44 @@ class VcoreExamScheduleController extends GetxController {
       // ngayTrongTuan mapping matches: '1' is Thứ 2 (Monday), ..., '7' is Chủ nhật (Sunday)
       int targetWeekday = ngayTrongTuan;
 
-      for (var date = startDate; date.isBefore(endDate) || date.isAtSameMomentAs(endDate); date = date.add(const Duration(days: 1))) {
+      final classRange = _classDateRange(
+        sem: sem,
+        classSession: classSession,
+        override: override,
+        defaultStart: startDate,
+        defaultEnd: endDate,
+      );
+
+      for (var date = classRange.start;
+      date.isBefore(classRange.end) || date.isAtSameMomentAs(classRange.end);
+      date = date.add(const Duration(days: 1))) {
         if (date.weekday == targetWeekday) {
           final key = _normalizeDate(date);
-          final event = ScheduleEvent(
-            type: ScheduleType.classSession,
-            title: classSession.tenHocPhan ?? 'Lịch học',
+
+          final event = _buildClassEvent(
+            sem: sem,
+            classSession: classSession,
             date: date,
-            startTime: classSession.tietBatDau != null ? 'Tiết ${classSession.tietBatDau}' : '',
-            endTime: classSession.tietKetThuc != null ? 'Tiết ${classSession.tietKetThuc}' : '',
-            location: '${classSession.tenPhong ?? ""} - ${classSession.diaChi ?? ""}',
-            teacher: [
-              classSession.giangVien1,
-              classSession.giangVien2,
-              classSession.giangVien3,
-              classSession.giangVien4
-            ].where((g) => g != null && g.isNotEmpty).join(', '),
-            hocPhanCode: classSession.maHocPhan,
-            soTinChi: classSession.soTinChi,
-            nhom: classSession.nhom,
+            override: override,
           );
 
           if (!tempMap.containsKey(key)) {
             tempMap[key] = [];
           }
+
           tempMap[key]!.add(event);
         }
       }
     }
 
     eventsMap.value = tempMap;
+
+    extraTermCourses.value = extraCourses;
+    showExtraTermCourses.value = isExtraTerm && extraCourses.isNotEmpty;
+
+    if (showExtraTermCourses.value) {
+      showIncompleteExams.value = false;
+    }
     if (pendingInitialDate != null) {
       selectedDay.value = pendingInitialDate!;
       focusedDay.value = pendingInitialDate!;
@@ -478,7 +590,7 @@ class VcoreExamScheduleController extends GetxController {
   }
 
   DateTime _normalizeDate(DateTime date) {
-    return DateTime(date.year, date.month, date.day);
+    return HocKyDateHelper.dateOnly(date);
   }
 
   DateTime? _parseDate(String? dateStr) {
@@ -500,6 +612,7 @@ class VcoreExamScheduleController extends GetxController {
     return null;
   }
 
+  // ignore: unused_element
   DateTime _inferSemesterStartDate(HocKyModel sem) {
     final yearStr = sem.nam ?? '';
     final semName = sem.ten ?? '';
@@ -524,6 +637,7 @@ class VcoreExamScheduleController extends GetxController {
     return DateTime(startYear, 9, 1);
   }
 
+  // ignore: unused_element
   DateTime _inferSemesterEndDate(HocKyModel sem) {
     final yearStr = sem.nam ?? '';
     final semName = sem.ten ?? '';

@@ -9,7 +9,7 @@ import 'package:vnu_core/common/space_widget.dart';
 import 'package:vnu_core/modules/browser/views/vcore_browser_view.dart';
 import 'package:vnu_core/modules/cam_nang/views/vcore_cam_nang_view.dart';
 import 'package:vnu_core/modules/inmapz/vcore_immap_view.dart';
-import 'package:vnu_core/modules/motel/views/vcore_motel_view.dart';
+import 'package:vnu_core/modules/motel/vcore_motel_webview.dart';
 import 'package:vnu_core/modules/tabbar/views/vcore_tabbar_view.dart';
 import 'package:vnu_core/screens/vcore_splash_screen.dart';
 import 'package:vnu_core/screens/vcore_login_screen_v3.dart';
@@ -393,7 +393,7 @@ class _VcoreAdmissionViewState extends State<VcoreAdmissionView> {
         title: 'Nhà trọ',
         description: 'Tìm kiếm nhà trọ an toàn, tiện lợi',
         image: 'assets/images/state_0_dormitory.png',
-        onTap: () => Get.to(() => const VcoreMotelView()),
+        onTap: openMotelWebView,
       ),
       _UtilityItem(
         title: 'Bản đồ số',

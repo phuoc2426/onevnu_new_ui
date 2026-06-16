@@ -11,6 +11,7 @@ import 'package:vnu_core/services/services_url.dart';
 import 'package:vnu_core/vnu_core.dart';
 
 import '../../home/vcore_home_view_v3.dart';
+// import '../../home/home_v4.dart';
 import '../../news/views/vcore_news_view_v3.dart';
 import '../../profile/views/vcore_profile_view.dart';
 import '../../system_news/views/vcore_system_news_view.dart';
@@ -28,11 +29,12 @@ class _VcoreTabbarViewState extends State<VcoreTabbarView> {
   final GlobalKey<ScaffoldState> _key = GlobalKey();
 
   static List<Widget> get _widgetOptions => const <Widget>[
-        VcoreHomeViewV3(),
-        VcoreNewsViewV3(),
-        VcoreSystemNewsView(),
-        VcoreProfileView(),
-      ];
+    VcoreHomeViewV3(),
+    // VcoreHomeViewV4(),
+    VcoreNewsViewV3(),
+    VcoreSystemNewsView(),
+    VcoreProfileView(),
+  ];
 
   void _onItemTapped(int index) {
     if (index == _selectedIndex) return;
@@ -46,8 +48,8 @@ class _VcoreTabbarViewState extends State<VcoreTabbarView> {
     // Firebase token
     try {
       FirebaseMessaging.instance.getToken().then(
-            (firebaseToken) => VnuCore().addFirebaseToken(firebaseToken),
-          );
+        (firebaseToken) => VnuCore().addFirebaseToken(firebaseToken),
+      );
     } catch (e) {
       logError(e.toString());
     }
@@ -68,9 +70,9 @@ class _VcoreTabbarViewState extends State<VcoreTabbarView> {
 
   Future<void> _loadAndRefreshStartInfo() async {
     try {
-      ApiRepository()
-          .getConfig()
-          .then((domain) => ServicesUrl().baseUrlFileDownload = domain);
+      ApiRepository().getConfig().then(
+        (domain) => ServicesUrl().baseUrlFileDownload = domain,
+      );
     } catch (e) {
       logError(e.toString());
     }
@@ -151,10 +153,7 @@ class _VcoreTabbarViewState extends State<VcoreTabbarView> {
       key: _key,
       extendBody: true,
       backgroundColor: Colors.white,
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: _widgetOptions,
-      ),
+      body: IndexedStack(index: _selectedIndex, children: _widgetOptions),
       bottomNavigationBar: _buildSalomonBottomNavBar(),
     );
   }
@@ -190,7 +189,10 @@ class _VcoreTabbarViewState extends State<VcoreTabbarView> {
               icon: const Icon(Icons.home_rounded, size: 22),
               title: const Text(
                 "Trang chủ",
-                style: TextStyle(fontSize: AppFontSizes.small, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontSize: AppFontSizes.small,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               selectedColor: const Color(0xFF16A34A),
             ),
@@ -199,7 +201,10 @@ class _VcoreTabbarViewState extends State<VcoreTabbarView> {
               icon: const Icon(Icons.newspaper, size: 22),
               title: const Text(
                 "Tin tức",
-                style: TextStyle(fontSize: AppFontSizes.small, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontSize: AppFontSizes.small,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               selectedColor: const Color(0xFFEA580C),
             ),
@@ -207,7 +212,10 @@ class _VcoreTabbarViewState extends State<VcoreTabbarView> {
               icon: const Icon(Icons.campaign, size: 22),
               title: const Text(
                 "Tin hệ thống",
-                style: TextStyle(fontSize: AppFontSizes.small, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontSize: AppFontSizes.small,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               selectedColor: const Color(0xFF0284C7),
             ),
@@ -215,7 +223,10 @@ class _VcoreTabbarViewState extends State<VcoreTabbarView> {
               icon: const Icon(Icons.person_outline_rounded, size: 22),
               title: const Text(
                 "Cá nhân",
-                style: TextStyle(fontSize: AppFontSizes.small, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontSize: AppFontSizes.small,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               selectedColor: const Color(0xFF7C3AED),
             ),

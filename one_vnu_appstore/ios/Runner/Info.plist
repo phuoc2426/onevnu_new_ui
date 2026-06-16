@@ -71,5 +71,9 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+	<key>LSApplicationQueriesSchemes</key>
+    <array>
+        <string>googlegmail</string>
+    </array>
 </dict>
 </plist>

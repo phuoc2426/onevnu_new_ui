@@ -30,23 +30,32 @@ if (flutterVersionName == null) {
 }
 
 android {
-//    compileSdkVersion 34
-    compileSdkVersion 35
-//    ndkVersion flutter.ndkVersion
-    ndkVersion "29.0.14206865"
     namespace "com.vnu.students"
+    compileSdkVersion 35
+    ndkVersion flutter.ndkVersion
+
     compileOptions {
         coreLibraryDesugaringEnabled true
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
+
     kotlinOptions {
-        jvmTarget = '1.8'
+        jvmTarget = '17'
     }
 
     sourceSets {
         main.java.srcDirs += 'src/main/kotlin'
     }
+
+    defaultConfig {
+        applicationId "com.vnu.students"
+        minSdkVersion 26
+        targetSdkVersion flutter.targetSdkVersion
+        versionCode flutterVersionCode.toInteger()
+        versionName flutterVersionName
+    }
+
 
     signingConfigs {
         release {
@@ -55,21 +64,6 @@ android {
             keyAlias 'key0'
             keyPassword '123456'
         }
-    }
-
-    defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId "com.vnu.students"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://docs.flutter.dev/deployment/android#reviewing-the-build-configuration.
-        minSdkVersion 26
-//        minSdkVersion 35
-        targetSdkVersion 35
-        versionCode flutterVersionCode.toInteger()
-        versionName flutterVersionName
-        
-        // Enable multidex for SDK 35 / Android 14/15
-        multiDexEnabled true
     }
 
     buildTypes {
@@ -85,11 +79,13 @@ android {
         }
     }
 
-    applicationVariants.all { variant ->
-        variant.outputs.all {
-            outputFileName = "OneVNU-${variant.buildType.name}-v${defaultConfig.versionName}.apk"
-        }
-    }
+//    applicationVariants.all { variant ->
+//        variant.outputs.all { output ->
+//            if (variant.buildType.name == "release") {
+//                outputFileName = "OneVNU-release-v${defaultConfig.versionName}.apk"
+//            }
+//        }
+//    }
     
     // Fix for Android 14/15 (SDK 35) BaseDexClassLoader issue
     packagingOptions {

@@ -112,162 +112,437 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
     );
   }
 
-
-
-  void _showFilterBottomSheet(BuildContext context, VcoreCoursePointsController controller) {
+  void _showFilterBottomSheet(
+    BuildContext context,
+    VcoreCoursePointsController controller,
+  ) {
     Get.bottomSheet(
       Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.88,
+        ),
         decoration: const BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
         ),
-        padding: const EdgeInsets.only(left: 20, right: 20, top: 16, bottom: 32),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        child: SafeArea(
+          top: false,
+          child: Obx(() {
+            final sources = controller.danhSachKieuTruong.toList();
+            final semesters = controller.danhSachHocKy.toList();
+            final selectedSource = controller.kieuTruong.value;
+            final selectedSemesterId = controller.hocKy.value?.id;
+
+            return SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(18, 12, 18, 28),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    'Xem điểm khác',
-                    style: TextStyles.bold.copyWith(
-                      fontSize: AppFontSizes.large,
-                      color: AppColors.textTitle,
+                  Center(
+                    child: Container(
+                      width: 42,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE5E7EB),
+                        borderRadius: BorderRadius.circular(99),
+                      ),
                     ),
                   ),
-                  IconButton(
-                    onPressed: () => Get.back(),
-                    icon: const Icon(Icons.close, size: 20),
+                  const SizedBox(height: 18),
+                  Row(
+                    children: [
+                      Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEFFAF3),
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                        child: const Icon(
+                          Icons.tune_rounded,
+                          color: Color(0xFF18A957),
+                          size: 22,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Bộ lọc xem điểm',
+                              style: TextStyles.extraBold.copyWith(
+                                fontSize: AppFontSizes.large,
+                                color: AppColors.textTitle,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              'Chỉ hiển thị nguồn điểm và học kỳ có dữ liệu.',
+                              style: TextStyles.medium.copyWith(
+                                fontSize: AppFontSizes.small,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Get.back(),
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  _buildFilterSectionTitle(
+                    icon: Icons.account_balance_rounded,
+                    title: 'Loại điểm',
+                    subtitle: 'BRC nào không có học kỳ sẽ tự ẩn.',
+                  ),
+                  const SizedBox(height: 10),
+                  if (sources.isEmpty)
+                    _buildCustomEmptyFilter(
+                      icon: Icons.inbox_rounded,
+                      text: 'Không có nguồn điểm nào có dữ liệu.',
+                    )
+                  else
+                    ...sources.map((source) {
+                      final isSelected = selectedSource == source;
+                      return _buildSourceChoiceCard(
+                        source: source,
+                        isSelected: isSelected,
+                        onTap: () async {
+                          await controller.changeKieuTruong(
+                            source.toDisplayName(),
+                          );
+                        },
+                      );
+                    }),
+
+                  const SizedBox(height: 20),
+                  _buildFilterSectionTitle(
+                    icon: Icons.calendar_month_rounded,
+                    title: 'Học kỳ',
+                    subtitle: 'Chọn nhanh học kỳ cần xem điểm.',
+                  ),
+                  const SizedBox(height: 10),
+                  if (semesters.isEmpty)
+                    _buildCustomEmptyFilter(
+                      icon: Icons.event_busy_rounded,
+                      text: 'Nguồn điểm này chưa có học kỳ.',
+                    )
+                  else
+                    ...semesters.map((hk) {
+                      final isSelected = selectedSemesterId == hk.id;
+                      return _buildSemesterChoiceCard(
+                        hocKy: hk,
+                        isSelected: isSelected,
+                        onTap: () {
+                          controller.changeHocKy(hk.disPlayName());
+                          Get.back();
+                        },
+                      );
+                    }),
+
+                  const SizedBox(height: 18),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(18),
+                    onTap: () async {
+                      await controller.toggleXemCaMonNgoaiCtdt();
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: const Color(0xFFE5E7EB)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            controller.isTheoChuongTrinhDaoTao.value
+                                ? Icons.check_box_outline_blank_rounded
+                                : Icons.check_box_rounded,
+                            color: const Color(0xFF18A957),
+                            size: 24,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Xem cả môn ngoài CTĐT',
+                                  style: TextStyles.bold.copyWith(
+                                    fontSize: AppFontSizes.mediumSmall,
+                                    color: AppColors.textTitle,
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  'Bật/tắt xong hệ thống sẽ kiểm tra lại BRC nào có dữ liệu.',
+                                  style: TextStyles.medium.copyWith(
+                                    fontSize: AppFontSizes.extraSmall,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
-              if (controller.danhSachKieuTruong.length > 1) ...[
-                Text(
-                  'Đơn vị đào tạo',
-                  style: TextStyles.bold.copyWith(
-                    fontSize: AppFontSizes.mediumSmall,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Obx(
-                      () => VcoreDropdownSelectWidget(
-                    items: controller.danhSachKieuTruong
-                        .map((e) => e.toDisplayName())
-                        .toList(),
-                    hint: 'Chọn trường',
-                    value: controller.kieuTruong.value?.toDisplayName(),
-                    onSelected: (value) async {
-                      await controller.changeKieuTruong(value);
-                    },
-                  ),
-                ),
-                const SizedBox(height: 20),
-              ],
+            );
+          }),
+        ),
+      ),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+    );
+  }
+
+  Widget _buildFilterSectionTitle({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 18, color: const Color(0xFF18A957)),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               Text(
-                'Học kỳ',
-                style: TextStyles.bold.copyWith(
-                  fontSize: AppFontSizes.mediumSmall,
+                title,
+                style: TextStyles.extraBold.copyWith(
+                  fontSize: AppFontSizes.medium,
+                  color: AppColors.textTitle,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: TextStyles.medium.copyWith(
+                  fontSize: AppFontSizes.extraSmall,
                   color: AppColors.textSecondary,
                 ),
               ),
-              const SizedBox(height: 8),
-              Obx(
-                    () => VcoreDropdownSelectWidget(
-                  items: controller.danhSachHocKy
-                      .map((e) => e.disPlayName())
-                      .toList(),
-                  hint: 'Chọn kỳ',
-                  value: controller.hocKy.value?.disPlayName(),
-                  onSelected: (value) {
-                    controller.changeHocKy(value);
-                  },
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSourceChoiceCard({
+    required String source,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    final icon = source == 'BangKep'
+        ? Icons.swap_horiz_rounded
+        : source == 'TruongGui'
+        ? Icons.account_balance_rounded
+        : Icons.school_rounded;
+
+    final subtitle = source == 'BangKep'
+        ? 'Chương trình bằng kép'
+        : source == 'TruongGui'
+        ? 'Điểm từ trường gửi'
+        : 'Chương trình chính';
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: isSelected ? const Color(0xFFEFFAF3) : Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: isSelected
+                  ? const Color(0xFF18A957)
+                  : const Color(0xFFE5E7EB),
+              width: isSelected ? 1.4 : 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(isSelected ? 0.045 : 0.02),
+                blurRadius: isSelected ? 18 : 10,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? const Color(0xFFDFF7E8)
+                      : const Color(0xFFF3F6FA),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(
+                  icon,
+                  color: isSelected
+                      ? const Color(0xFF18A957)
+                      : const Color(0xFF667085),
+                  size: 22,
                 ),
               ),
-              const SizedBox(height: 20),
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () async {
-                  controller.isTheoChuongTrinhDaoTao.toggle();
-
-                  controller.hocKy.value = null;
-                  controller.danhSachHocKy.clear();
-
-                  controller.diemThiHocKy.clear();
-                  controller.diemThiTheoHocKy.clear();
-                  controller.diemTrungBinhHocKy.value = null;
-
-                  controller.aiRadarAnalysis.value = null;
-                  controller.hasRequestedAiAnalysis.value = false;
-
-                  await controller.getDanhSachHocKy();
-                },
-                child: Row(
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Obx(() => Icon(
-                      controller.isTheoChuongTrinhDaoTao.value
-                          ? Icons.check_box_rounded
-                          : Icons.check_box_outline_blank_outlined,
-                      color: AppColors.primary,
-                      size: 24,
-                    )),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Xem cả các môn ngoài chương trình đào tạo',
-                        style: TextStyles.semiBold.copyWith(
-                          fontSize: AppFontSizes.mediumSmall,
-                          color: AppColors.textPrimary,
-                        ),
+                    Text(
+                      source.toDisplayName(),
+                      style: TextStyles.bold.copyWith(
+                        fontSize: AppFontSizes.medium,
+                        color: AppColors.textTitle,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      style: TextStyles.medium.copyWith(
+                        fontSize: AppFontSizes.small,
+                        color: AppColors.textSecondary,
                       ),
                     ),
                   ],
                 ),
               ),
-              if (controller.aiRadarAnalysis.value != null) ...[
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Get.back();
-                      controller.runAiAnalysis();
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.greenAccent,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                    child: Text(
-                      'Quét lại',
-                      style: TextStyles.bold.copyWith(fontSize: AppFontSizes.medium),
-                    ),
-                  ),
+              if (isSelected)
+                const Icon(
+                  Icons.check_circle_rounded,
+                  color: Color(0xFF18A957),
                 ),
-              ],
             ],
           ),
         ),
       ),
-      isScrollControlled: true,
+    );
+  }
+
+  Widget _buildSemesterChoiceCard({
+    required HocKyModel hocKy,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: isSelected ? const Color(0xFFEFF6FF) : Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: isSelected ? AppColors.primary : const Color(0xFFE5E7EB),
+              width: isSelected ? 1.4 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? const Color(0xFFDBEAFE)
+                      : const Color(0xFFF3F6FA),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(
+                  Icons.calendar_today_rounded,
+                  color: isSelected
+                      ? AppColors.primary
+                      : const Color(0xFF667085),
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Kỳ ${_displayText(hocKy.ten)}',
+                      style: TextStyles.bold.copyWith(
+                        fontSize: AppFontSizes.medium,
+                        color: AppColors.textTitle,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      hocKy.nam?.isNotEmpty == true
+                          ? 'Năm học ${hocKy.nam}'
+                          : hocKy.disPlayName(),
+                      style: TextStyles.medium.copyWith(
+                        fontSize: AppFontSizes.small,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (isSelected)
+                const Icon(
+                  Icons.check_circle_rounded,
+                  color: AppColors.primary,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCustomEmptyFilter({
+    required IconData icon,
+    required String text,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: const Color(0xFF9CA3AF)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyles.medium.copyWith(
+                fontSize: AppFontSizes.small,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -285,15 +560,17 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
             ),
           ),
         ),
-        ...analysis.dimensions.map((dim) => _CapabilityDimensionCard(dimension: dim)),
+        ...analysis.dimensions.map(
+          (dim) => _CapabilityDimensionCard(dimension: dim),
+        ),
       ],
     );
   }
 
   Widget _buildTopControlSection(
-      BuildContext context,
-      VcoreCoursePointsController controller,
-      ) {
+    BuildContext context,
+    VcoreCoursePointsController controller,
+  ) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
       child: Row(
@@ -454,9 +731,9 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
   }
 
   Widget _buildAiAnalysisView(
-      BuildContext context,
-      VcoreCoursePointsController controller,
-      ) {
+    BuildContext context,
+    VcoreCoursePointsController controller,
+  ) {
     final courses = controller.diemThiHocKy.toList();
     final gpa = controller.diemTrungBinhHocKy.value;
     final analysis = controller.aiRadarAnalysis.value;
@@ -470,12 +747,12 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: analysis == null
               ? _AiRadarPromotionalCard(
-            onStart: () => controller.runAiAnalysis(),
-          )
+                  onStart: () => controller.runAiAnalysis(),
+                )
               : _AnimatedCourseRadarCard(
-            analysis: analysis,
-            courseCount: courses.length,
-          ),
+                  analysis: analysis,
+                  courseCount: courses.length,
+                ),
         ),
         const SizedBox(height: 14),
         Padding(
@@ -494,11 +771,23 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
   }
 
   Widget _buildGradeListView(
-      BuildContext context,
-      VcoreCoursePointsController controller,
-      ) {
+    BuildContext context,
+    VcoreCoursePointsController controller,
+  ) {
     return Obx(() {
       final currentHk = controller.hocKy.value;
+
+      if (controller.danhSachKieuTruong.isEmpty) {
+        return ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
+          children: [
+            _buildTopControlSection(context, controller),
+            const SizedBox(height: 80),
+            _buildNoGradeSourceState(),
+          ],
+        );
+      }
 
       if (currentHk == null) {
         return ListView(
@@ -524,6 +813,8 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
         padding: const EdgeInsets.only(bottom: 40),
         children: [
           _buildTopControlSection(context, controller),
+          if (courses.isNotEmpty) _buildSemesterSummaryCard(courses),
+          _buildCertificateOverviewCard(controller),
           if (courses.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 80),
@@ -554,26 +845,84 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
                 ),
               ),
             )
-          else ...[
+          else
             ...courses.map(
-                  (course) => _buildCourseGradeCard(context, course, controller),
+              (course) => _buildCourseGradeCard(context, course, controller),
             ),
-            _buildSemesterSummaryCard(courses),
-          ],
         ],
       );
     });
   }
 
+  Widget _buildNoGradeSourceState() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: const Color(0xFFE6EAF0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.025),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF3F4F6),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Icon(
+              Icons.school_outlined,
+              color: Colors.grey.shade500,
+              size: 32,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'Chưa có dữ liệu điểm',
+            style: TextStyles.extraBold.copyWith(
+              fontSize: AppFontSizes.large,
+              color: AppColors.textTitle,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Hệ thống đã kiểm tra BRC1, BRC2 và BRC3 nhưng chưa tìm thấy học kỳ có dữ liệu điểm.',
+            textAlign: TextAlign.center,
+            style: TextStyles.medium.copyWith(
+              fontSize: AppFontSizes.small,
+              color: AppColors.textSecondary,
+              height: 1.35,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-  void _showSemesterSelectorBottomSheet(BuildContext context, VcoreCoursePointsController controller) {
+  void _showSemesterSelectorBottomSheet(
+    BuildContext context,
+    VcoreCoursePointsController controller,
+  ) {
     Get.bottomSheet(
       Container(
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
-        padding: const EdgeInsets.only(left: 20, right: 20, top: 16, bottom: 32),
+        padding: const EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 16,
+          bottom: 32,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -591,7 +940,11 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
             const SizedBox(height: 16),
             const Text(
               'Chọn học kỳ tra cứu',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF212529)),
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF212529),
+              ),
             ),
             const SizedBox(height: 12),
             Flexible(
@@ -605,11 +958,20 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
                     title: Text(
                       'Học kỳ ${hk.ten} • ${hk.nam}',
                       style: TextStyle(
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                        color: isSelected ? const Color(0xFF18A957) : const Color(0xFF212529),
+                        fontWeight: isSelected
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                        color: isSelected
+                            ? const Color(0xFF18A957)
+                            : const Color(0xFF212529),
                       ),
                     ),
-                    trailing: isSelected ? const Icon(Icons.check_circle, color: Color(0xFF18A957)) : null,
+                    trailing: isSelected
+                        ? const Icon(
+                            Icons.check_circle,
+                            color: Color(0xFF18A957),
+                          )
+                        : null,
                     onTap: () {
                       controller.hocKy.value = hk;
                       Get.back();
@@ -625,22 +987,235 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
     );
   }
 
+  Widget _buildCertificateOverviewCard(VcoreCoursePointsController controller) {
+    return Obx(() {
+      final kieuTruong = controller.kieuTruong.value ?? '';
+      final isBrc2 = kieuTruong == 'BangKep';
+      final list = controller.chungChis.toList();
+      final error = controller.chungChiError.value;
+
+      if (isBrc2) {
+        return const SizedBox.shrink();
+      }
+
+      // UX mới: không hiển thị block chứng chỉ nếu API không trả chứng chỉ.
+      // Nếu có lỗi khi gọi API thì mới hiện card để hỗ trợ debug.
+      if (list.isEmpty && error.isEmpty) {
+        return const SizedBox.shrink();
+      }
+
+      return Container(
+        margin: const EdgeInsets.fromLTRB(16, 6, 16, 10),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0xFFE6EAF0)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.025),
+              blurRadius: 14,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF7ED),
+                    borderRadius: BorderRadius.circular(13),
+                  ),
+                  child: const Icon(
+                    Icons.workspace_premium_rounded,
+                    color: Color(0xFFF59E0B),
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Chứng chỉ',
+                    style: TextStyles.bold.copyWith(
+                      fontSize: AppFontSizes.mediumLarge,
+                      color: AppColors.textTitle,
+                    ),
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: controller.reloadChungChi,
+                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                  label: const Text('Tải lại'),
+                ),
+              ],
+            ),
+            if (error.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              _buildNoticeBox(
+                text: error,
+                icon: Icons.info_outline_rounded,
+                color: const Color(0xFFE8590C),
+                background: const Color(0xFFFFF4E6),
+              ),
+            ] else if (list.isEmpty) ...[
+              const SizedBox(height: 12),
+              _buildNoticeBox(
+                text:
+                    'Chưa có dữ liệu chứng chỉ hoặc đơn vị đào tạo không cấu hình chứng chỉ.',
+                icon: Icons.verified_outlined,
+                color: const Color(0xFF667085),
+                background: const Color(0xFFF3F6FA),
+              ),
+            ] else ...[
+              const SizedBox(height: 12),
+              ...list.map((item) {
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: item.daDat
+                        ? const Color(0xFFEAFBF0)
+                        : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: item.daDat
+                          ? const Color(0xFFB7E4C7)
+                          : const Color(0xFFE5E7EB),
+                    ),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        item.daDat
+                            ? Icons.check_circle_rounded
+                            : Icons.radio_button_unchecked_rounded,
+                        color: item.daDat
+                            ? const Color(0xFF16A34A)
+                            : const Color(0xFF9CA3AF),
+                        size: 22,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${item.ctfId.isNotEmpty ? '${item.ctfId} - ' : ''}${item.tenChungChi}',
+                              style: TextStyles.bold.copyWith(
+                                fontSize: AppFontSizes.mediumSmall,
+                                color: AppColors.textTitle,
+                              ),
+                            ),
+                            if (item.moTa.isNotEmpty) ...[
+                              const SizedBox(height: 3),
+                              Text(
+                                item.moTa,
+                                style: TextStyles.medium.copyWith(
+                                  fontSize: AppFontSizes.small,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                            if (item.soQuyetDinh.isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              Text(
+                                'Số QĐ: ${item.soQuyetDinh}'
+                                '${item.ngayQuyetDinh.isNotEmpty ? ' • Ngày: ${item.ngayQuyetDinh}' : ''}',
+                                style: TextStyles.semiBold.copyWith(
+                                  fontSize: AppFontSizes.extraSmall,
+                                  color: const Color(0xFF18864B),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 9,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: item.daDat
+                              ? const Color(0xFFDFF7E8)
+                              : const Color(0xFFFFF4E6),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          item.trangThai,
+                          style: TextStyles.bold.copyWith(
+                            fontSize: AppFontSizes.extraSmall,
+                            color: item.daDat
+                                ? const Color(0xFF18864B)
+                                : const Color(0xFFE8590C),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ],
+          ],
+        ),
+      );
+    });
+  }
+
+  Widget _buildNoticeBox({
+    required String text,
+    required IconData icon,
+    required Color color,
+    required Color background,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyles.medium.copyWith(
+                fontSize: AppFontSizes.small,
+                color: color,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildCourseGradeCard(
-      BuildContext context,
-      DiemThiHocKyModel course,
-      VcoreCoursePointsController controller,
-      ) {
+    BuildContext context,
+    DiemThiHocKyModel course,
+    VcoreCoursePointsController controller,
+  ) {
     final hasGrade = course.diemHe10 != null && course.diemHe10!.isNotEmpty;
     final credits = course.soTinChi ?? '0';
     final score10 = hasGrade
         ? double.tryParse(course.diemHe10!.replaceAll(',', '.'))
         : null;
 
-    final letterGrade =
-    score10 != null ? GradeScaleHelper.getLetterGrade(score10) : '--';
-    final score4 =
-    score10 != null ? GradeScaleHelper.getScore4(score10).toStringAsFixed(1) : '--';
-    final isPassed = score10 != null ? GradeScaleHelper.isPassed(score10) : false;
+    final letterGrade = _displayText(course.diemHeChu);
+    final score4 = _displayText(course.diemHe4);
+    final isPassed = score10 != null
+        ? GradeScaleHelper.isPassed(score10)
+        : false;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
@@ -660,11 +1235,8 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(22),
-          onTap: () => _showCoursePointDetailBottomSheet(
-            context,
-            course,
-            controller,
-          ),
+          onTap: () =>
+              _showCoursePointDetailBottomSheet(context, course, controller),
           child: Padding(
             padding: const EdgeInsets.all(18),
             child: Column(
@@ -723,9 +1295,16 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
                 if (hasGrade) ...[
                   Row(
                     children: [
-                      Expanded(child: _buildMetricTile('Hệ 10', course.diemHe10 ?? '--')),
+                      Expanded(
+                        child: _buildMetricTile(
+                          'Hệ 10',
+                          course.diemHe10 ?? '--',
+                        ),
+                      ),
                       const SizedBox(width: 10),
-                      Expanded(child: _buildMetricTile('Điểm chữ', letterGrade)),
+                      Expanded(
+                        child: _buildMetricTile('Điểm chữ', letterGrade),
+                      ),
                       const SizedBox(width: 10),
                       Expanded(child: _buildMetricTile('Hệ 4', score4)),
                     ],
@@ -734,7 +1313,10 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
                           color: isPassed
                               ? const Color(0xFFEAFBF0)
@@ -842,11 +1424,16 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
     );
   }
 
+  String _displayText(String? value) {
+    final text = value?.trim() ?? '';
+    return text.isEmpty ? '--' : text;
+  }
+
   void _showCoursePointDetailBottomSheet(
-      BuildContext context,
-      DiemThiHocKyModel course,
-      VcoreCoursePointsController controller,
-      ) {
+    BuildContext context,
+    DiemThiHocKyModel course,
+    VcoreCoursePointsController controller,
+  ) {
     Get.bottomSheet(
       Container(
         constraints: BoxConstraints(
@@ -854,9 +1441,7 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
         ),
         decoration: const BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.vertical(
-            top: Radius.circular(24),
-          ),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -924,6 +1509,7 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
       backgroundColor: Colors.transparent,
     );
   }
+
   Widget _buildGradeSubMetric(String label, String value) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -935,7 +1521,11 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
         const SizedBox(height: 2),
         Text(
           value,
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF212529)),
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF212529),
+          ),
         ),
       ],
     );
@@ -948,7 +1538,9 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
     int noScoreCredits = 0;
 
     for (var course in semesterGrades) {
-      final credits = double.tryParse(course.soTinChi?.replaceAll(',', '.') ?? '');
+      final credits = double.tryParse(
+        course.soTinChi?.replaceAll(',', '.') ?? '',
+      );
       final score10 = course.diemHe10 != null && course.diemHe10!.isNotEmpty
           ? double.tryParse(course.diemHe10!.replaceAll(',', '.'))
           : null;
@@ -966,6 +1558,9 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
 
     double gpa10 = totalGpaCredits > 0 ? (weighted10 / totalGpaCredits) : 0.0;
     double gpa4 = totalGpaCredits > 0 ? (weighted4 / totalGpaCredits) : 0.0;
+    final gpaLetter = totalGpaCredits > 0
+        ? GradeScaleHelper.getLetterGrade(gpa10)
+        : '--';
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -994,28 +1589,39 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
             ),
           ),
           const SizedBox(height: 12),
-          _buildSummaryRow('Số tín chỉ tính GPA', totalGpaCredits.round().toString()),
+          _buildSummaryRow(
+            'Số tín chỉ tính GPA',
+            totalGpaCredits.round().toString(),
+          ),
           const SizedBox(height: 8),
           _buildSummaryRow('GPA hệ 10', gpa10.toStringAsFixed(2)),
           const SizedBox(height: 8),
+          _buildSummaryRow('Điểm chữ', gpaLetter),
+          const SizedBox(height: 8),
           _buildSummaryRow('GPA hệ 4', gpa4.toStringAsFixed(2), isGpa4: true),
           const SizedBox(height: 8),
-          _buildSummaryRow('Số tín chỉ chưa có điểm', noScoreCredits.toString(), isHighlight: noScoreCredits > 0),
+          _buildSummaryRow(
+            'Số tín chỉ chưa có điểm',
+            noScoreCredits.toString(),
+            isHighlight: noScoreCredits > 0,
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildSummaryRow(String label, String value, {bool isGpa4 = false, bool isHighlight = false}) {
+  Widget _buildSummaryRow(
+    String label,
+    String value, {
+    bool isGpa4 = false,
+    bool isHighlight = false,
+  }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
           label,
-          style: TextStyle(
-            fontSize: 13,
-            color: Colors.grey.shade700,
-          ),
+          style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
         ),
         Text(
           value,
@@ -1024,7 +1630,9 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
             fontWeight: FontWeight.bold,
             color: isGpa4
                 ? const Color(0xFF18A957)
-                : (isHighlight ? const Color(0xFFE8590C) : const Color(0xFF212529)),
+                : (isHighlight
+                      ? const Color(0xFFE8590C)
+                      : const Color(0xFF212529)),
           ),
         ),
       ],
@@ -1112,7 +1720,6 @@ class _AiRadarPromotionalCard extends StatelessWidget {
   }
 }
 
-
 class _AnimatedCourseRadarCard extends StatefulWidget {
   const _AnimatedCourseRadarCard({
     required this.analysis,
@@ -1123,10 +1730,12 @@ class _AnimatedCourseRadarCard extends StatefulWidget {
   final int courseCount;
 
   @override
-  State<_AnimatedCourseRadarCard> createState() => _AnimatedCourseRadarCardState();
+  State<_AnimatedCourseRadarCard> createState() =>
+      _AnimatedCourseRadarCardState();
 }
 
-class _AnimatedCourseRadarCardState extends State<_AnimatedCourseRadarCard> with TickerProviderStateMixin {
+class _AnimatedCourseRadarCardState extends State<_AnimatedCourseRadarCard>
+    with TickerProviderStateMixin {
   late final AnimationController _polygonController;
 
   @override
@@ -1156,7 +1765,9 @@ class _AnimatedCourseRadarCardState extends State<_AnimatedCourseRadarCard> with
                 child: CustomPaint(
                   painter: _CourseRadarPainter(
                     dimensions: widget.analysis.dimensions,
-                    progress: Curves.easeOutCubic.transform(_polygonController.value),
+                    progress: Curves.easeOutCubic.transform(
+                      _polygonController.value,
+                    ),
                   ),
                   child: const SizedBox.expand(),
                 ),
@@ -1180,8 +1791,12 @@ class _AnimatedCourseRadarCardState extends State<_AnimatedCourseRadarCard> with
   @override
   void didUpdateWidget(covariant _AnimatedCourseRadarCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.analysis.dimensions.map((e) => '${e.code}:${e.score}').join('|') !=
-        widget.analysis.dimensions.map((e) => '${e.code}:${e.score}').join('|')) {
+    if (oldWidget.analysis.dimensions
+            .map((e) => '${e.code}:${e.score}')
+            .join('|') !=
+        widget.analysis.dimensions
+            .map((e) => '${e.code}:${e.score}')
+            .join('|')) {
       _polygonController
         ..reset()
         ..forward();
@@ -1196,10 +1811,7 @@ class _AnimatedCourseRadarCardState extends State<_AnimatedCourseRadarCard> with
 }
 
 class _CourseRadarPainter extends CustomPainter {
-  _CourseRadarPainter({
-    required this.dimensions,
-    required this.progress,
-  });
+  _CourseRadarPainter({required this.dimensions, required this.progress});
 
   final List<RadarDimension> dimensions;
   final double progress;
@@ -1266,7 +1878,8 @@ class _CourseRadarPainter extends CustomPainter {
     for (var i = 0; i < count; i++) {
       final value = (dimensions[i].score.clamp(0, 100) / 100) * progress;
       final angle = startAngle + 2 * math.pi * i / count;
-      final point = center + Offset(math.cos(angle), math.sin(angle)) * radius * value;
+      final point =
+          center + Offset(math.cos(angle), math.sin(angle)) * radius * value;
       points.add(point);
       if (i == 0) {
         polygon.moveTo(point.dx, point.dy);
@@ -1283,7 +1896,8 @@ class _CourseRadarPainter extends CustomPainter {
 
     for (var i = 0; i < count; i++) {
       final angle = startAngle + 2 * math.pi * i / count;
-      final labelPoint = center + Offset(math.cos(angle), math.sin(angle)) * (radius + 26);
+      final labelPoint =
+          center + Offset(math.cos(angle), math.sin(angle)) * (radius + 26);
       _paintText(
         canvas,
         text: '${dimensions[i].code}\n${dimensions[i].score.round()}',
@@ -1300,22 +1914,18 @@ class _CourseRadarPainter extends CustomPainter {
         7,
         Paint()..color = AppColors.primary.withValues(alpha: 0.13),
       );
-      canvas.drawCircle(
-        point,
-        4.2,
-        Paint()..color = AppColors.primary,
-      );
+      canvas.drawCircle(point, 4.2, Paint()..color = AppColors.primary);
     }
   }
 
   void _paintText(
-      Canvas canvas, {
-        required String text,
-        required Offset center,
-        required Color color,
-        required double fontSize,
-        required FontWeight fontWeight,
-      }) {
+    Canvas canvas, {
+    required String text,
+    required Offset center,
+    required Color color,
+    required double fontSize,
+    required FontWeight fontWeight,
+  }) {
     final painter = TextPainter(
       text: TextSpan(
         text: text,
@@ -1331,7 +1941,10 @@ class _CourseRadarPainter extends CustomPainter {
       textDirection: TextDirection.ltr,
     )..layout(maxWidth: 62);
 
-    painter.paint(canvas, center - Offset(painter.width / 2, painter.height / 2));
+    painter.paint(
+      canvas,
+      center - Offset(painter.width / 2, painter.height / 2),
+    );
   }
 
   @override
@@ -1348,7 +1961,8 @@ class _CapabilityDimensionCard extends StatefulWidget {
   final RadarDimension dimension;
 
   @override
-  State<_CapabilityDimensionCard> createState() => _CapabilityDimensionCardState();
+  State<_CapabilityDimensionCard> createState() =>
+      _CapabilityDimensionCardState();
 }
 
 class _CapabilityDimensionCardState extends State<_CapabilityDimensionCard> {
@@ -1408,7 +2022,10 @@ class _CapabilityDimensionCardState extends State<_CapabilityDimensionCard> {
                     Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: levelColor.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(8),
@@ -1500,7 +2117,11 @@ class _CapabilityDimensionCardState extends State<_CapabilityDimensionCard> {
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.warning_amber_rounded, color: AppColors.warningBoxText, size: 18),
+                          const Icon(
+                            Icons.warning_amber_rounded,
+                            color: AppColors.warningBoxText,
+                            size: 18,
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
@@ -1533,7 +2154,9 @@ class _CapabilityDimensionCardState extends State<_CapabilityDimensionCard> {
                       ),
                     )
                   else
-                    ...widget.dimension.evidenceCourses.map((ev) => _EvidenceCourseRow(evidence: ev)),
+                    ...widget.dimension.evidenceCourses.map(
+                      (ev) => _EvidenceCourseRow(evidence: ev),
+                    ),
                 ],
               ),
             ),
@@ -1654,9 +2277,7 @@ class _GpaSummaryCard extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(26),
         border: Border.all(color: AppColors.primary.withValues(alpha: 0.10)),
-        boxShadow: [
-          AppColors.cardShadow,
-        ],
+        boxShadow: [AppColors.cardShadow],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1692,17 +2313,11 @@ class _GpaSummaryCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: _SmallInfo(
-                  label: 'Tổng TC tích lũy',
-                  value: tcTotal,
-                ),
+                child: _SmallInfo(label: 'Tổng TC tích lũy', value: tcTotal),
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: _SmallInfo(
-                  label: 'Tổng TC trượt',
-                  value: tcFailed,
-                ),
+                child: _SmallInfo(label: 'Tổng TC trượt', value: tcFailed),
               ),
             ],
           ),
@@ -1830,5 +2445,3 @@ class _MiniPill extends StatelessWidget {
     );
   }
 }
-
-
