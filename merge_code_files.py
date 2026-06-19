@@ -6,10 +6,11 @@ from datetime import datetime
 # =========================================================
 
 ROOT_DIR = Path(
-    r"D:\Data\App\ONEVNU\git\iworkspace_mobile_onevnu-master"
+    r"D:\Data\App\ONEVNU\code3\code\iworkspace_mobile_onevnu-master"
 )
 
-OUTPUT_FILE = Path("CODE_BUNDLE_AVATAR_PROFILE_PASSWORD.txt")
+# Tên file output đã đổi đúng theo chức năng đang trích code
+OUTPUT_FILE = Path("CODE_BUNDLE_LOGIN_PASSWORD_SINHVIEN_SERVICE.txt")
 
 RECURSIVE_SCAN = True
 MAX_LINES_PER_FILE = None
@@ -21,7 +22,7 @@ WRITE_FULL_PATH = True
 # MODE
 # =========================================================
 
-# True = chỉ lấy file cố định
+# True = chỉ lấy các file cố định / đúng chức năng cần trích
 FIXED_FILE_MODE = True
 
 # =========================================================
@@ -29,6 +30,7 @@ FIXED_FILE_MODE = True
 # =========================================================
 
 ALLOWED_EXTENSIONS = {
+    ".dart",
     ".java",
     ".kt",
     ".ts",
@@ -44,321 +46,160 @@ ALLOWED_EXTENSIONS = {
 # FIXED FILE NAMES
 # =========================================================
 
-# tên file exact match
+# Exact match theo tên file.
+# Nhóm này tập trung vào:
+# - Login cũ
+# - Login v3
+# - Quên mật khẩu
+# - Đổi mật khẩu trong app
+# - API repository / endpoint
+# - Backend SinhVienService và các service liên quan
 FIXED_FILE_NAMES = {
-    # "vcore_news_view_v2.dart",
-    # "vcore_news_view_v3.dart",
-    # "vcore_news_detail_view.dart",
-    # "vcore_news_item_widget.dart",
-    # "vcore_news_tab_widget_v2.dart",
-    # "vcore_news_category_widget_v2.dart",
-    # "vcore_news_filter_widget.dart",
-    # "vcore_news_view.dart",
-    # "vcore_jobs_view_v2.dart",
+    # =====================================================
+    # LOGIN SCREENS
+    # =====================================================
 
-    # # =====================================================
-    # # Controllers
-    # # =====================================================
-    # "vcore_news_controller.dart",
-    # "vcore_news_detail_controller.dart",
-    # "vcore_jobs_controller_v2.dart",
-    # # =====================================================
-    # # Main files
-    # # =====================================================
-    # "grade_scale_helper.dart",
+    # Login cũ:
+    # vcore_login_screen.dart line 239:
+    # "Quên mật khẩu" đang bị comment, không dẫn đi đâu, không gọi service.
+    "vcore_login_screen.dart",
 
-    # "vcore_exam_schedule_controller.dart",
-    # "vcore_exam_schedule_view.dart",
-
-    # "vcore_course_points_controller.dart",
-    # "vcore_course_points_view.dart",
-
-    # # =====================================================
-    # # Related widgets
-    # # =====================================================
-    # "vcore_dropdown_select_widget.dart",
-    # "vcore_course_points_detail_widget.dart",
-
-    # # =====================================================
-    # # Data / repository
-    # # =====================================================
-    # "gpa_cache_manager.dart",
-    # "app_repository.dart",
-    # "app_api.dart",
-    # "app_api.g.dart",
-
-    # # =====================================================
-    # # Schedule models
-    # # =====================================================
-    # "hoc_ky_model.dart",
-    # "thoi_khoa_bieu_model.dart",
-    # "lich_thi_hoc_ky_model.dart",
-    # "vcore_schedule_event.dart",
-
-    # # =====================================================
-    # # Grade models
-    # # =====================================================
-    # "diem_thi_hoc_ky_model.dart",
-    # "diem_hoc_phan_model.dart",
-    # "diem_trung_binh_model.dart",
-    # "tong_ket_den_hien_tai_model.dart",
-    # "model.dart",
-
-    # # =====================================================
-    # # AI Radar
-    # # =====================================================
-    # "academic_course.dart",
-    # "ai_radar_analysis.dart",
-    # "radar_axis_profile.dart",
-    # "local_ai_radar_engine.dart",
-    # "semantic_axis_discovery_engine.dart",
-    # "semantic_scoring_engine.dart",
-    # "vector_math.dart",
-    # "ai_axis_cache.dart",
-    # "onnx_embedding_model.dart",
-    # "local_embedding_model.dart",
-    # "simple_tokenizer.dart",
-
-    # # =====================================================
-    # # Entry points
-    # # =====================================================
-    # "vcore_home_view_v3.dart",
-    # "vcore_home_service_widget.dart",
-    # "vcore_home_service_widget_v2.dart",
-    # "vcore_sidebar_widget.dart",
-
+    # Login v3:
+    # vcore_login_screen_v3.dart line 625:
+    # chỉ là Text('Quên mật khẩu?'), không có onTap, chưa gọi service.
+    "vcore_login_screen_v3.dart",
 
     # =====================================================
-# Avatar / Profile Photos
-# =====================================================
+    # PROFILE PASSWORD - MOBILE FRONTEND
+    # =====================================================
 
-"vcore_profile_view.dart",
-"vcore_profile_avatar_widget.dart",
+    # Màn hình đổi mật khẩu trong app:
+    # Vào app > Quản lý mật khẩu > Đổi mật khẩu
+    # vcore_profile_change_pass_view.dart line 124:
+    # gọi controller.thayDoiMatKhau()
+    "vcore_profile_change_pass_view.dart",
 
-"vcore_profile_photos_view.dart",
-"vcore_profile_photos_controller.dart",
+    # Controller đổi mật khẩu:
+    # vcore_profile_pass_controller.dart line 88:
+    # gọi ApiRepository().putCapNhatMatKhau(...)
+    # cũng load danh sách loại mật khẩu bằng getDanhSachLoaiMatKhau()
+    "vcore_profile_pass_controller.dart",
 
-"current_user_model.dart",
-"globals.dart",
+    # Quên mật khẩu bản cũ:
+    # vcore_profile_forgot_pass_view.dart line 63:
+    # gọi controller.quenMatKhau()
+    # service ApiRepository().putQuenMatKhau(...)
+    "vcore_profile_forgot_pass_view.dart",
 
-"vcore_sidebar_widget.dart",
-"vcore_home_view.dart",
+    # Quên mật khẩu bản hiện tại:
+    # VcoreProfileForgotPassViewV2 không gọi API quên mật khẩu;
+    # mở cổng https://it.vnu.edu.vn/support hoặc compose email qua MethodChannel gmail_sender.
+    "vcore_profile_forgot_pass_view_v2.dart",
 
-"app_repository.dart",
-"app_api.dart",
-"app_api.g.dart",
+    # Model loại mật khẩu:
+    # dùng cho getDanhSachLoaiMatKhau()
+    "loai_mat_khau_model.dart",
 
-# =====================================================
-# Password
-# =====================================================
+    # =====================================================
+    # MOBILE API / REPOSITORY
+    # =====================================================
 
-"vcore_profile_forgot_pass_view.dart",
-"vcore_profile_pass_controller.dart",
-"vcore_profile_change_pass_view.dart",
+    # Repository chứa các hàm gọi API:
+    # putCapNhatMatKhau(...)
+    # putQuenMatKhau(...)
+    # getDanhSachLoaiMatKhau(...)
+    "app_repository.dart",
 
-"loai_mat_khau_model.dart",
+    # API declaration:
+    # app_api.dart line 445:
+    # endpoint PUT /api/context/capNhatMatKhau
+    # ngoài ra có:
+    # GET /api/context/getDanhSachLoaiMatKhau
+    # PUT /api/context/quenMatKhau
+    "app_api.dart",
 
-"vcore_login_screen_v3.dart",
+    # File generated retrofit/dio tương ứng
+    "app_api.g.dart",
 
-"app_repository.dart",
-"app_api.dart",
-"app_api.g.dart",
+    # =====================================================
+    # BACKEND CONTROLLER / DTO
+    # =====================================================
 
-# =====================================================
-# PROFILE / AVATAR / COVER (BACKEND)
-# =====================================================
+    # Controller context thường chứa các endpoint:
+    # /api/context/capNhatMatKhau
+    # /api/context/getDanhSachLoaiMatKhau
+    # /api/context/quenMatKhau
+    "ContextController.java",
 
-"NguoiDung.java",
+    # DTO request quên mật khẩu
+    "QuenMatKhauRequestDTO.java",
 
-"NguoiDungRequestDTO.java",
-"NguoiDungResponseDTO.java",
+    # =====================================================
+    # BACKEND SINHVIEN SERVICE / LOGIN CŨ
+    # =====================================================
 
-"ContextController.java",
-"NguoiDungController.java",
+    # Interface service sinh viên
+    "SinhVienService.java",
 
-"Constants.java",
+    # Implement service sinh viên:
+    # nơi thường xử lý nghiệp vụ sinh viên, login cũ,
+    # đổi mật khẩu, quên mật khẩu, LDAP / đào tạo / email.
+    "SinhVienServiceImpl.java",
 
-# Mobile API
-"ContextController.java",
-"NguoiDungResponseDTO.java",
+    # Enum loại password
+    "LoaiPasswordEnum.java",
 
-# =====================================================
-# FORGOT PASSWORD (BACKEND)
-# =====================================================
+    # Service đào tạo liên quan tài khoản sinh viên
+    "DaoTaoServiceImpl.java",
 
-"QuenMatKhauRequestDTO.java",
+    # LDAP service liên quan xác thực / đổi mật khẩu
+    "LdapServiceImpl.java",
 
-"SinhVienService.java",
-"SinhVienServiceImpl.java",
+    # Email service dùng cho luồng quên mật khẩu
+    "EmailServiceImpl.java",
 
-"LoaiPasswordEnum.java",
+    # Cấu hình gửi mail
+    "JavaMailSenderConfig.java",
 
-"DaoTaoServiceImpl.java",
-"LdapServiceImpl.java",
-
-"EmailServiceImpl.java",
-"JavaMailSenderConfig.java",
-
+    # Constants có thể chứa key, message, loại tài khoản, cấu hình chung
+    "Constants.java",
 }
 
 # =========================================================
-# FILE PATTERNS (logic architecture)
+# FILE PATTERNS
 # =========================================================
 
-# suffix/pattern match
+# Pattern match bổ sung để tránh miss file do tên hơi khác giữa các branch/package.
+# Script vẫn ưu tiên exact file name ở trên.
 FIXED_FILE_PATTERNS = [
-#     "grade_scale_helper.dart",
+    # Login
+    "login",
+    "vcore_login",
 
-#     "vcore_exam_schedule_controller.dart",
-#     "vcore_exam_schedule_view.dart",
+    # Password / forgot password
+    "password",
+    "forgot",
+    "forgot_pass",
+    "forgot_password",
+    "quenmatkhau",
+    "quen_mat_khau",
+    "matkhau",
+    "mat_khau",
+    "loai_mat_khau",
 
-#     "vcore_course_points_controller.dart",
-#     "vcore_course_points_view.dart",
+    # Sinh viên service / login cũ backend
+    "sinhvienservice",
+    "sinh_vien_service",
+    "sinhvien",
+    "sinh_vien",
 
-#     "vcore_dropdown_select_widget.dart",
-#     "vcore_course_points_detail_widget.dart",
-
-#     "gpa_cache_manager.dart",
-#     "app_repository.dart",
-#     "app_api.dart",
-#     "app_api.g.dart",
-
-#     "hoc_ky_model.dart",
-#     "thoi_khoa_bieu_model.dart",
-#     "lich_thi_hoc_ky_model.dart",
-#     "vcore_schedule_event.dart",
-
-#     "diem_thi_hoc_ky_model.dart",
-#     "diem_hoc_phan_model.dart",
-#     "diem_trung_binh_model.dart",
-#     "tong_ket_den_hien_tai_model.dart",
-#     "model.dart",
-
-#     "academic_course.dart",
-#     "ai_radar_analysis.dart",
-#     "radar_axis_profile.dart",
-#     "local_ai_radar_engine.dart",
-#     "semantic_axis_discovery_engine.dart",
-#     "semantic_scoring_engine.dart",
-#     "vector_math.dart",
-#     "ai_axis_cache.dart",
-#     "onnx_embedding_model.dart",
-#     "local_embedding_model.dart",
-#     "simple_tokenizer.dart",
-
-#     "vcore_home_view_v3.dart",
-#     "vcore_home_service_widget.dart",
-#     "vcore_home_service_widget_v2.dart",
-#     "vcore_sidebar_widget.dart",
-#     "schedule", "exam_schedule", "course_points", "gpa", "radar", "embedding",
-#   "vcore_news_view_v2.dart",
-#     "vcore_news_view_v3.dart",
-#     "vcore_news_detail_view.dart",
-#     "vcore_news_item_widget.dart",
-#     "vcore_news_tab_widget_v2.dart",
-#     "vcore_news_category_widget_v2.dart",
-#     "vcore_news_filter_widget.dart",
-#     "vcore_news_view.dart",
-#      # =====================================================
-#     # Jobs
-#     # =====================================================
-#     "vcore_jobs_view_v2.dart",
-
-#     # =====================================================
-#     # Controllers
-#     # =====================================================
-#     "vcore_news_controller.dart",
-#     "vcore_news_detail_controller.dart",
-#     "vcore_jobs_controller_v2.dart",
-
-#     # =====================================================
-#     # Generic patterns
-#     # =====================================================
-#     "news",
-#     "job",
-#     "jobs",
-
-# =====================================================
-# Avatar / Profile Photos
-# =====================================================
-
-"vcore_profile_view.dart",
-"vcore_profile_avatar_widget.dart",
-
-"vcore_profile_photos_view.dart",
-"vcore_profile_photos_controller.dart",
-
-"current_user_model.dart",
-"globals.dart",
-
-"vcore_sidebar_widget.dart",
-"vcore_home_view.dart",
-
-"app_repository.dart",
-"app_api.dart",
-"app_api.g.dart",
-
-# =====================================================
-# Password
-# =====================================================
-
-"vcore_profile_forgot_pass_view.dart",
-"vcore_profile_pass_controller.dart",
-"vcore_profile_change_pass_view.dart",
-
-"loai_mat_khau_model.dart",
-
-"vcore_login_screen_v3.dart",
-
-"app_repository.dart",
-"app_api.dart",
-"app_api.g.dart",
-
-# =====================================================
-# Avatar / Cover
-# =====================================================
-
-"nguoidung",
-"anhdaidien",
-"anh_dai_dien",
-"avatar",
-"cover",
-"anhnen",
-"anh_nen",
-
-"NguoiDung.java",
-"NguoiDungRequestDTO.java",
-"NguoiDungResponseDTO.java",
-
-"ContextController.java",
-"NguoiDungController.java",
-
-# =====================================================
-# Password
-# =====================================================
-
-"quenmatkhau",
-"quen_mat_khau",
-"forgot",
-"forgot_password",
-
-"password",
-"matkhau",
-"mat_khau",
-
-"QuenMatKhauRequestDTO.java",
-
-"SinhVienService.java",
-"SinhVienServiceImpl.java",
-
-"LoaiPasswordEnum.java",
-
-"DaoTaoServiceImpl.java",
-"LdapServiceImpl.java",
-
-"EmailServiceImpl.java",
-"JavaMailSenderConfig.java",
-
+    # Backend helpers
+    "ldap",
+    "daotao",
+    "dao_tao",
+    "emailservice",
+    "java_mail_sender",
+    "javamailsender",
 ]
 
 # =========================================================
@@ -398,30 +239,33 @@ def should_exclude(path: Path) -> bool:
 
 def is_allowed_fixed_file(path: Path) -> bool:
     """
-    chỉ lấy file logic quan trọng
+    Chỉ lấy các file liên quan trực tiếp đến:
+    - Login cũ / Login v3
+    - Quên mật khẩu
+    - Đổi mật khẩu
+    - SinhVienService backend
     """
 
     filename = path.name
     filename_lower = filename.lower()
 
-    # exact file name
+    # Exact file name: cho phép trước extension check
     if filename in FIXED_FILE_NAMES:
         return True
 
-    # extension check
+    # Extension check cho pattern mode
     if path.suffix.lower() not in ALLOWED_EXTENSIONS:
         return False
 
-    # pattern match
+    # Pattern match
     for pattern in FIXED_FILE_PATTERNS:
-        if filename_lower.endswith(pattern.lower()):
+        if pattern.lower() in filename_lower:
             return True
 
     return False
 
 
 def read_text_safely(file_path: Path):
-
     encodings = [
         "utf-8",
         "utf-8-sig",
@@ -434,7 +278,7 @@ def read_text_safely(file_path: Path):
             with file_path.open(
                 "r",
                 encoding=enc,
-                errors="strict"
+                errors="strict",
             ) as f:
                 return f.readlines()
 
@@ -448,7 +292,7 @@ def read_text_safely(file_path: Path):
         with file_path.open(
             "r",
             encoding="utf-8",
-            errors="replace"
+            errors="replace",
         ) as f:
             return f.readlines()
 
@@ -456,12 +300,64 @@ def read_text_safely(file_path: Path):
         return [f"[ERROR] {e}\n"]
 
 
+def build_file_note(relative_path: Path) -> str:
+    """
+    Ghi chú ngắn theo chức năng file để khi đọc bundle dễ định vị.
+    """
+
+    name = relative_path.name
+
+    notes = {
+        "vcore_login_screen.dart":
+            "Login cũ - phần Quên mật khẩu đang bị comment / chưa gọi service.",
+        "vcore_login_screen_v3.dart":
+            "Login v3 - Text('Quên mật khẩu?') chưa có onTap / chưa gọi service.",
+        "vcore_profile_change_pass_view.dart":
+            "UI đổi mật khẩu trong app - gọi controller.thayDoiMatKhau().",
+        "vcore_profile_pass_controller.dart":
+            "Controller đổi mật khẩu / quên mật khẩu / load loại mật khẩu.",
+        "vcore_profile_forgot_pass_view.dart":
+            "Quên mật khẩu bản cũ - gọi controller.quenMatKhau().",
+        "vcore_profile_forgot_pass_view_v2.dart":
+            "Quên mật khẩu bản hiện tại - mở support/email, không gọi API quên mật khẩu.",
+        "loai_mat_khau_model.dart":
+            "Model loại mật khẩu cho getDanhSachLoaiMatKhau().",
+        "app_repository.dart":
+            "Repository mobile - chứa putCapNhatMatKhau / putQuenMatKhau / getDanhSachLoaiMatKhau.",
+        "app_api.dart":
+            "Khai báo endpoint mobile API.",
+        "app_api.g.dart":
+            "Generated API client tương ứng app_api.dart.",
+        "ContextController.java":
+            "Backend controller cho nhóm endpoint /api/context.",
+        "QuenMatKhauRequestDTO.java":
+            "DTO request quên mật khẩu.",
+        "SinhVienService.java":
+            "Interface service sinh viên / login cũ.",
+        "SinhVienServiceImpl.java":
+            "Implement service sinh viên / login cũ / password flow.",
+        "LoaiPasswordEnum.java":
+            "Enum loại mật khẩu.",
+        "DaoTaoServiceImpl.java":
+            "Service đào tạo liên quan tài khoản sinh viên.",
+        "LdapServiceImpl.java":
+            "LDAP service liên quan xác thực / mật khẩu.",
+        "EmailServiceImpl.java":
+            "Email service dùng trong luồng quên mật khẩu.",
+        "JavaMailSenderConfig.java":
+            "Cấu hình gửi email.",
+        "Constants.java":
+            "Hằng số dùng chung.",
+    }
+
+    return notes.get(name, "File liên quan theo pattern Login / Password / SinhVienService.")
+
+
 # =========================================================
 # SCAN FILES
 # =========================================================
 
 def scan_files():
-
     files = []
 
     iterator = (
@@ -471,7 +367,6 @@ def scan_files():
     )
 
     for path in iterator:
-
         if not path.is_file():
             continue
 
@@ -487,7 +382,7 @@ def scan_files():
 
         files.append(path)
 
-    return sorted(files)
+    return sorted(files, key=lambda p: str(p.relative_to(ROOT_DIR)).lower())
 
 
 # =========================================================
@@ -495,31 +390,36 @@ def scan_files():
 # =========================================================
 
 def write_bundle(files):
-
     total_lines_written = 0
 
     with OUTPUT_FILE.open(
         "w",
-        encoding="utf-8"
+        encoding="utf-8",
     ) as out:
 
         out.write("=" * 120 + "\n")
-        out.write("CODE BUNDLE\n")
-        out.write(
-            f"Generated: "
-            f"{datetime.now().isoformat(timespec='seconds')}\n"
-        )
+        out.write("CODE BUNDLE - LOGIN / PASSWORD / SINHVIEN SERVICE\n")
+        out.write(f"Generated: {datetime.now().isoformat(timespec='seconds')}\n")
         out.write(f"Root dir: {ROOT_DIR}\n")
         out.write(f"Total files: {len(files)}\n")
         out.write("=" * 120 + "\n\n")
 
-        for index, file_path in enumerate(files, start=1):
+        out.write("FILE PURPOSE SUMMARY\n")
+        out.write("- Login cũ: kiểm tra Quên mật khẩu bị comment / chưa gọi service.\n")
+        out.write("- Login v3: kiểm tra Text('Quên mật khẩu?') chưa có onTap.\n")
+        out.write("- Đổi mật khẩu trong app: kiểm tra thayDoiMatKhau / putCapNhatMatKhau.\n")
+        out.write("- Quên mật khẩu bản cũ: kiểm tra quenMatKhau / putQuenMatKhau.\n")
+        out.write("- Backend: kiểm tra ContextController, SinhVienService, LDAP, Đào tạo, Email.\n")
+        out.write("=" * 120 + "\n\n")
 
+        for index, file_path in enumerate(files, start=1):
             relative_path = file_path.relative_to(ROOT_DIR)
+            note = build_file_note(relative_path)
 
             out.write("=" * 120 + "\n")
             out.write(f"[{index}/{len(files)}]\n")
             out.write(f"FILE: {relative_path}\n")
+            out.write(f"PURPOSE: {note}\n")
 
             if WRITE_FULL_PATH:
                 out.write(f"FULL_PATH: {file_path}\n")
@@ -532,11 +432,8 @@ def write_bundle(files):
                 lines = lines[:MAX_LINES_PER_FILE]
 
             for line_number, line in enumerate(lines, start=1):
-
                 if WRITE_LINE_NUMBER:
-                    out.write(
-                        f"{line_number:05d}: {line}"
-                    )
+                    out.write(f"{line_number:05d}: {line}")
                 else:
                     out.write(line)
 
@@ -546,13 +443,8 @@ def write_bundle(files):
 
         out.write("=" * 120 + "\n")
         out.write("SUMMARY\n")
-        out.write(
-            f"Files processed: {len(files)}\n"
-        )
-        out.write(
-            f"Total lines written: "
-            f"{total_lines_written}\n"
-        )
+        out.write(f"Files processed: {len(files)}\n")
+        out.write(f"Total lines written: {total_lines_written}\n")
         out.write("=" * 120 + "\n")
 
 
@@ -561,7 +453,6 @@ def write_bundle(files):
 # =========================================================
 
 def main():
-
     if not ROOT_DIR.exists():
         raise FileNotFoundError(
             f"ROOT_DIR does not exist: {ROOT_DIR}"
@@ -580,6 +471,11 @@ def main():
     print(f"Output : {OUTPUT_FILE.resolve()}")
     print(f"Files  : {len(files)}")
     print("=" * 80)
+
+    print("\nFILES EXTRACTED:")
+    for index, file_path in enumerate(files, start=1):
+        relative_path = file_path.relative_to(ROOT_DIR)
+        print(f"{index:03d}. {relative_path}")
 
 
 if __name__ == "__main__":

@@ -6,12 +6,13 @@ import 'package:vnu_core/common/space_widget.dart';
 import 'package:vnu_core/common/utils.dart';
 import 'package:vnu_core/constants/constant.dart';
 import 'package:vnu_core/globals.dart';
+import 'package:vnu_core/modules/admission/views/vcore_admission_view.dart';
 import 'package:vnu_core/modules/bookmark/views/vcore_bookmark_view.dart';
 import 'package:vnu_core/modules/profile/views/vcore_profile_avatar_widget.dart';
+import 'package:vnu_core/modules/profile/views/vcore_profile_change_pass_view_v2.dart';
 import 'package:vnu_core/modules/profile/views/vcore_profile_family_info_view.dart';
 import 'package:vnu_core/modules/profile/views/vcore_profile_person_info_view.dart';
 import 'package:vnu_core/modules/profile/views/vcore_profile_setup_bio_view.dart';
-import 'package:vnu_core/vnu_core.dart';
 
 import '../controllers/vcore_profile_controller.dart';
 import 'vcore_profile_change_pass_view.dart';
@@ -46,7 +47,11 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  Globals().thongTinSinhVienModel.value?.hoVaTen ?? '',
+                                  Globals()
+                                          .thongTinSinhVienModel
+                                          .value
+                                          ?.hoVaTen ??
+                                      '',
                                   style: const TextStyle(
                                     fontSize: AppFontSizes.large,
                                     fontWeight: FontWeight.bold,
@@ -64,7 +69,11 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
                                       ),
                                     ),
                                     Text(
-                                      Globals().thongTinSinhVienModel.value?.maSinhVien ?? '',
+                                      Globals()
+                                              .thongTinSinhVienModel
+                                              .value
+                                              ?.maSinhVien ??
+                                          '',
                                       style: const TextStyle(
                                         fontSize: AppFontSizes.mediumSmall,
                                         fontWeight: FontWeight.w600,
@@ -86,7 +95,8 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
                                     ),
                                     Expanded(
                                       child: Text(
-                                        Globals().lopDaoTaoModel.value?.ten ?? '',
+                                        Globals().lopDaoTaoModel.value?.ten ??
+                                            '',
                                         style: const TextStyle(
                                           fontSize: AppFontSizes.mediumSmall,
                                           fontWeight: FontWeight.w600,
@@ -106,7 +116,8 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
                             width: 76,
                             height: 76,
                             child: VcoreProfileAvatarWidget(
-                              url: 'https://vnu.edu.vn/upload/2014/11/17202/image/Logo-VNU-1995.jpg',
+                              url:
+                                  'https://vnu.edu.vn/upload/2014/11/17202/image/Logo-VNU-1995.jpg',
                               size: 76,
                             ),
                           ),
@@ -118,7 +129,10 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
                   if (controller.tongket.value != null)
                     Container(
                       height: 64,
-                      margin: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+                      margin: const EdgeInsets.symmetric(
+                        vertical: 12,
+                        horizontal: 20,
+                      ),
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
                           begin: Alignment.topCenter,
@@ -130,7 +144,10 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
                       child: Row(
                         children: [
                           const Spacer(),
-                          itemPointProfile('Kỳ đã học', '${controller.tongket.value?.soKyDaHoc ?? ''}'),
+                          itemPointProfile(
+                            'Kỳ đã học',
+                            '${controller.tongket.value?.soKyDaHoc ?? ''}',
+                          ),
                           const Spacer(),
                           Container(
                             height: 40,
@@ -138,7 +155,10 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
                             color: Colors.white.withOpacity(0.3),
                           ),
                           const Spacer(),
-                          itemPointProfile('Tín chỉ tích luỹ', controller.tongket.value?.tongSoTinChiTichLuy ?? ''),
+                          itemPointProfile(
+                            'Tín chỉ tích luỹ',
+                            controller.tongket.value?.tongSoTinChiTichLuy ?? '',
+                          ),
                           const Spacer(),
                           Container(
                             height: 40,
@@ -146,14 +166,18 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
                             color: Colors.white.withOpacity(0.3),
                           ),
                           const Spacer(),
-                          itemPointProfile('Điểm tích luỹ', controller.tongket.value?.diemTrungBinhHe4TichLuy ?? ''),
+                          itemPointProfile(
+                            'Điểm tích luỹ',
+                            controller.tongket.value?.diemTrungBinhHe4TichLuy ??
+                                '',
+                          ),
                           const Spacer(),
                         ],
                       ),
                     )
                   else
                     const SizedBox(height: 16),
-                  
+
                   VcoreProfileItemWidget(
                     title: "Thông tin cá nhân",
                     icon: 'assets/images/ic_profile_person.svg',
@@ -161,9 +185,7 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
                       Get.to(() => const VcoreProfilePersonInfoView());
                     },
                   ),
-                  const SizedBox(
-                    height: 12,
-                  ),
+                  const SizedBox(height: 12),
 
                   VcoreProfileItemWidget(
                     title: "Thông tin gia đình",
@@ -172,9 +194,7 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
                       Get.to(() => const VcoreProfileFamilyInfoView());
                     },
                   ),
-                  const SizedBox(
-                    height: 12,
-                  ),
+                  const SizedBox(height: 12),
 
                   VcoreProfileItemWidget(
                     title: "Quản lý ảnh cá nhân",
@@ -183,9 +203,7 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
                       Get.to(() => const VcoreProfilePhotosView());
                     },
                   ),
-                  const SizedBox(
-                    height: 12,
-                  ),
+                  const SizedBox(height: 12),
 
                   VcoreProfileItemWidget(
                     title: "Liên kết đánh dấu",
@@ -194,9 +212,7 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
                       Get.to(() => const VcoreBookmarkView());
                     },
                   ),
-                  const SizedBox(
-                    height: 12,
-                  ),
+                  const SizedBox(height: 12),
 
                   VcoreProfileItemWidget(
                     title: "Cài đặt sinh trắc học",
@@ -205,20 +221,16 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
                       Get.to(() => const VcoreProfileSetupBioView());
                     },
                   ),
-                  const SizedBox(
-                    height: 12,
-                  ),
+                  const SizedBox(height: 12),
 
                   VcoreProfileItemWidget(
                     title: "Quản lý mật khẩu",
                     icon: 'assets/images/ic_password.svg',
                     action: () {
-                      Get.to(() => const VcoreProfileChangePassView());
+                      Get.to(() => const VcoreProfileChangePassViewV2());
                     },
                   ),
-                  const SizedBox(
-                    height: 12,
-                  ),
+                  const SizedBox(height: 12),
 
                   FutureBuilder(
                     future: Utils.version(),
@@ -234,28 +246,34 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
                       );
                     },
                   ),
-                  const SizedBox(
-                    height: 12,
-                  ),
+                  const SizedBox(height: 12),
 
                   VcoreProfileItemWidget(
                     title: "Đăng xuất",
                     icon: 'assets/images/ic_profile_logout.svg',
                     action: () {
-                      Utils.showAlertDialog(context, "Đăng xuất",
-                          "Bạn có chắc chắn muốn Đăng xuất",
-                          okStr: "Xác nhận",
-                          cancelStr: "Đóng",
-                          withoutBinding: true, callBackOK: () {
-                        Globals().clearSession(deleteUserLogin: false);
-                        VnuCore().gotoLogin();
-                      });
+                      Utils.showAlertDialog(
+                        context,
+                        "Đăng xuất",
+                        "Bạn có chắc chắn muốn Đăng xuất",
+                        okStr: "Xác nhận",
+                        cancelStr: "Đóng",
+                        withoutBinding: true,
+                        callBackOK: () {
+                          Globals().clearSession(deleteUserLogin: false);
+                          Navigator.pushAndRemoveUntil(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const VcoreAdmissionView(),
+                            ),
+                            (route) => false,
+                          );
+                        },
+                      );
                     },
                   ),
-                  
-                  SizedBox(
-                    height: floatingNavBottomPadding(context),
-                  ),
+
+                  SizedBox(height: floatingNavBottomPadding(context)),
                 ],
               ),
             ),
@@ -264,8 +282,6 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
       },
     );
   }
-
-
 
   Widget itemPointProfile(String title, String point) {
     return Column(
@@ -278,16 +294,20 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
             Text(
               point,
               style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: AppFontSizes.large),
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: AppFontSizes.large,
+              ),
             ),
           ],
         ),
         Text(
           title,
-          style: const TextStyle(color: Color(0xFFDCFCE7), fontSize: AppFontSizes.small),
-        )
+          style: const TextStyle(
+            color: Color(0xFFDCFCE7),
+            fontSize: AppFontSizes.small,
+          ),
+        ),
       ],
     );
   }

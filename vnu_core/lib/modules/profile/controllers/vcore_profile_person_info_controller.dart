@@ -26,7 +26,7 @@ class VcoreProfilePersonInfoController extends GetxController {
   RxList<QuanHuyenModel> listQuanHuyenThuongTru = RxList([]);
   RxList<QuanHuyenModel> listQuanHuyenNoiOHienNay = RxList([]);
   RxList<QuanHuyenModel> listQuanHuyenDiaChiLL = RxList([]);
-
+  RxList<QuanHuyenModel> listQuanHuyenDiaChiTamTru = RxList([]);
   bool configValueOk = false;
 
   @override
@@ -38,6 +38,7 @@ class VcoreProfilePersonInfoController extends GetxController {
     if (Globals().thongTinSinhVienModel.value != null) {
       configValueOk = true;
       configWithSinhVienModel(Globals().thongTinSinhVienModel.value!);
+      refreshQuanHuyenDiaChiTamTru();
     }
   }
 
@@ -63,7 +64,6 @@ class VcoreProfilePersonInfoController extends GetxController {
       // soCmtCccd: sinhvien.soCmtCccd,
       // ngayCapCmtCccd: sinhvien.ngayCapCmtCccd,
       // idNoiCapCmtCccdTinhThanhPho: sinhvien.idNoiCapCmtCccdTinhThanhPho,
-
       idDoiTuongUuTien: sinhvien.idDoiTuongUuTien,
 
       nangKhieu: sinhvien.nangKhieu,
@@ -124,13 +124,24 @@ class VcoreProfilePersonInfoController extends GetxController {
       ngayVaoDangChinhThuc: sinhvien.ngayVaoDangChinhThuc,
       noiVaoDang: sinhvien.noiVaoDang,
       viTriCaoNhatDang: sinhvien.viTriCaoNhatDang,
+
+      // - Dia chi tam tru
+      diaChiTamTru: sinhvien.diaChiTamTru,
+      diaChiTamTruQuocGia: sinhvien.diaChiTamTruQuocGia,
+      diaChiTamTruTinhThanhPho: sinhvien.diaChiTamTruTinhThanhPho,
+      diaChiTamTruQuanHuyen: sinhvien.diaChiTamTruQuanHuyen,
+      diaChiTamTruPhuongXa: sinhvien.diaChiTamTruPhuongXa,
+      diaChiTamTruDuongThon: sinhvien.diaChiTamTruDuongThon,
+      diaChiTamTruSoNha: sinhvien.diaChiTamTruSoNha,
     );
   }
 
   getDataDropdown() async {
     try {
       var response = await ApiRepository().getDataQuocGia(
-          null, Globals().thongTinSinhVienModel.value?.guidDonVi);
+        null,
+        Globals().thongTinSinhVienModel.value?.guidDonVi,
+      );
       listQuocGia.value = response;
     } catch (e) {
       logError(e.toString());
@@ -138,7 +149,9 @@ class VcoreProfilePersonInfoController extends GetxController {
 
     try {
       var response = await ApiRepository().getDataTinhThanhPho(
-          null, Globals().thongTinSinhVienModel.value?.guidDonVi);
+        null,
+        Globals().thongTinSinhVienModel.value?.guidDonVi,
+      );
       listTinhThanhPho.value = response;
     } catch (e) {
       logError(e.toString());
@@ -146,7 +159,9 @@ class VcoreProfilePersonInfoController extends GetxController {
 
     try {
       var response = await ApiRepository().getDataDanToc(
-          null, Globals().thongTinSinhVienModel.value?.guidDonVi);
+        null,
+        Globals().thongTinSinhVienModel.value?.guidDonVi,
+      );
       listDanToc.value = response;
     } catch (e) {
       logError(e.toString());
@@ -154,7 +169,9 @@ class VcoreProfilePersonInfoController extends GetxController {
 
     try {
       var response = await ApiRepository().getDataTonGiao(
-          null, Globals().thongTinSinhVienModel.value?.guidDonVi);
+        null,
+        Globals().thongTinSinhVienModel.value?.guidDonVi,
+      );
       listTonGiao.value = response;
     } catch (e) {
       logError(e.toString());
@@ -162,7 +179,9 @@ class VcoreProfilePersonInfoController extends GetxController {
 
     try {
       var response = await ApiRepository().getDataKhuVucUuTien(
-          null, Globals().thongTinSinhVienModel.value?.guidDonVi);
+        null,
+        Globals().thongTinSinhVienModel.value?.guidDonVi,
+      );
       listKhuVucUuTien.value = response;
     } catch (e) {
       logError(e.toString());
@@ -342,22 +361,75 @@ class VcoreProfilePersonInfoController extends GetxController {
     }
   }
 
+  refreshQuanHuyenDiaChiTamTru() async {
+    final idTinhThanhPho = sinhvienEdit.value.diaChiTamTruTinhThanhPho;
+
+    if (idTinhThanhPho == null || idTinhThanhPho.isEmpty) {
+      listQuanHuyenDiaChiTamTru.clear();
+
+      sinhvienEdit.update((item) {
+        item?.diaChiTamTruQuanHuyen = "";
+      });
+
+      return;
+    }
+
+    try {
+      final data = await ApiRepository().getDataQuanHuyen(
+        null,
+        Globals().thongTinSinhVienModel.value?.guidDonVi,
+        idTinhThanhPho,
+      );
+
+      listQuanHuyenDiaChiTamTru.value = data;
+    } catch (e) {
+      logError(e.toString());
+    }
+  }
+
   updatePersonInfo() async {
-    //
     if (!configValueOk) {
       snackBarWarning('Không tìm thấy thông tin sinh viên');
       return;
     }
-    Utils.showProgress(context);
-    try {
-      var response =
-          await ApiRepository().updateSinhVienInfo(sinhvienEdit.value);
 
-      Globals().refreshStudentInfo();
+    Utils.showProgress(context);
+
+    try {
+      // 1. Cập nhật thông tin cá nhân như cũ
+      await ApiRepository().updateSinhVienInfo(sinhvienEdit.value);
+
+      // 2. Cập nhật địa chỉ tạm trú vào API mới
+      await ApiRepository().updateDiaChiTamTru(sinhvienEdit.value);
+
+      // 3. Refresh lại dữ liệu global
+      await Globals().refreshStudentInfo();
 
       Utils.dismissProgress(context);
       Get.back(closeOverlays: true);
       snackBarSuccess('Cập nhật thông tin thành công.');
+    } catch (e) {
+      Utils.dismissProgress(context);
+      snackBarError(e.toString());
+    }
+  }
+
+  updateDiaChiTamTru() async {
+    if (!configValueOk) {
+      snackBarWarning('Không tìm thấy thông tin sinh viên');
+      return;
+    }
+
+    Utils.showProgress(context);
+
+    try {
+      await ApiRepository().updateDiaChiTamTru(sinhvienEdit.value);
+
+      await Globals().refreshStudentInfo();
+
+      Utils.dismissProgress(context);
+      Get.back(closeOverlays: true);
+      snackBarSuccess('Cập nhật địa chỉ tạm trú thành công.');
     } catch (e) {
       Utils.dismissProgress(context);
       snackBarError(e.toString());

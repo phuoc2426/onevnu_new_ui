@@ -16,9 +16,10 @@ import 'package:vnu_core/modules/profile/views/widget/vcore_profile_person_noioh
 import 'package:vnu_core/modules/profile/views/widget/vcore_profile_person_noisinh_widget.dart';
 import 'package:vnu_core/modules/profile/views/widget/vcore_profile_person_phone_widget.dart';
 import 'package:vnu_core/modules/profile/views/widget/vcore_profile_person_quequan_widget.dart';
+import 'package:vnu_core/modules/profile/views/widget/vcore_profile_person_diachitamtru_widget.dart';
 import 'package:vnu_core/widgets/buttons_widget.dart';
 import 'package:vnu_core/widgets/container_dissmis.dart';
-import 'package:vnu_core/widgets/navi_widget.dart';
+// import 'package:vnu_core/widgets/navi_widget.dart';
 import 'package:vnu_core/widgets/progress_hub_widget.dart';
 
 import 'package:vnu_core/widgets/vcore_module_scaffold.dart';
@@ -29,8 +30,9 @@ class VcoreProfilePersonInfoView
 
   @override
   Widget build(BuildContext context) {
-    final VcoreProfilePersonInfoController controller =
-        Get.put(VcoreProfilePersonInfoController());
+    final VcoreProfilePersonInfoController controller = Get.put(
+      VcoreProfilePersonInfoController(),
+    );
 
     const spaceItem = 10.0;
 
@@ -61,6 +63,9 @@ class VcoreProfilePersonInfoView
                 const VcoreProfilePersonNoiOHienTaiWidget(),
                 spaceHeight(spaceItem),
 
+                const VcoreProfilePersonDiaChiTamTruWidget(),
+                spaceHeight(spaceItem),
+
                 const VcoreProfilePersonDiaChiLienLacWidget(),
                 spaceHeight(spaceItem),
 
@@ -89,7 +94,7 @@ class VcoreProfilePersonInfoView
                       controller.updatePersonInfo();
                     },
                   ),
-                )
+                ),
               ],
             ),
           ),

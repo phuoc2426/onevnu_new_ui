@@ -13,7 +13,8 @@ import 'package:vnu_core/screens/vcore_select_location_view.dart';
 import 'package:vnu_core/themes/app_theme.dart';
 import 'package:vnu_core/widgets/buttons_widget.dart';
 import 'package:vnu_core/widgets/container_dissmis.dart';
-import 'package:vnu_core/widgets/navi_widget.dart';
+// import 'package:vnu_core/widgets/navi_widget.dart';
+import 'package:vnu_core/widgets/vcore_module_scaffold.dart';
 import 'package:vnu_core/widgets/progress_hub_widget.dart';
 
 import 'vcore_path_create_file_view.dart';
@@ -27,29 +28,33 @@ class VcorePahtCreateView extends GetView<VcorePahtCreateController> {
       init: VcorePahtCreateController(),
       tag: const Uuid().v4(),
       builder: (controller) {
-        return Scaffold(
-            appBar: NaviWidget(
-              titleStr: 'Gửi phản ánh',
-            ),
-            backgroundColor: AppColor.bgColor,
-            body: ProgressHubWidget(
-              contextComplete: (hubContext) {
-                controller.context = hubContext;
-              },
+        return ProgressHubWidget(
+          contextComplete: (hubContext) {
+            controller.context = hubContext;
+          },
+          child: VcoreModuleScaffold(
+            title: 'Gửi phản ánh',
+            body: Container(
+              color: AppColor.bgColor,
               child: ContainerAutoDissmis(
                 child: Obx(
                   () => Padding(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 23),
+                      horizontal: 16,
+                      vertical: 23,
+                    ),
                     child: SingleChildScrollView(
                       child: Column(
                         children: [
-                          //
                           _titleRequire('Chủ đề', true),
                           VcoreDropdown2SelectWidget(
                             items: controller.listChuDe
-                                .map((e) => VcoreDropdownModel(
-                                    text: e.tenChuDe ?? '', guid: e.guid ?? ''))
+                                .map(
+                                  (e) => VcoreDropdownModel(
+                                    text: e.tenChuDe ?? '',
+                                    guid: e.guid ?? '',
+                                  ),
+                                )
                                 .toList(),
                             hint: 'Chọn chủ đề',
                             selectedGuid: controller.currentChuDe.value?.guid,
@@ -57,14 +62,17 @@ class VcorePahtCreateView extends GetView<VcorePahtCreateController> {
                               controller.changeChuDeDropdown(value);
                             },
                           ),
-                          //
+
                           spaceHeight(11),
                           _titleRequire('Khu vực', true),
                           VcoreDropdown2SelectWidget(
                             items: controller.listKhuVuc
-                                .map((e) => VcoreDropdownModel(
+                                .map(
+                                  (e) => VcoreDropdownModel(
                                     text: e.tenKhuVucBanDo ?? '',
-                                    guid: e.guid ?? ''))
+                                    guid: e.guid ?? '',
+                                  ),
+                                )
                                 .toList(),
                             hint: 'Chọn khu vực',
                             selectedGuid: controller.currentKhuVuc.value?.guid,
@@ -73,7 +81,6 @@ class VcorePahtCreateView extends GetView<VcorePahtCreateController> {
                             },
                           ),
 
-                          //
                           spaceHeight(11),
                           VcoreProfileTextFieldWidget(
                             title: 'Địa điểm phản ánh',
@@ -105,11 +112,12 @@ class VcorePahtCreateView extends GetView<VcorePahtCreateController> {
                             behavior: HitTestBehavior.opaque,
                             onTap: () async {
                               Utils.hideKeyboard();
-                              var result =
-                                  await Get.to(() => VcoreSelectLocationView(
-                                        selectedLocation:
-                                            controller.locationPoint.value,
-                                      ));
+                              var result = await Get.to(
+                                () => VcoreSelectLocationView(
+                                  selectedLocation:
+                                      controller.locationPoint.value,
+                                ),
+                              );
                               if (result != null && result is LatLng) {
                                 controller.locationPoint.value = result;
                               }
@@ -123,14 +131,14 @@ class VcorePahtCreateView extends GetView<VcorePahtCreateController> {
                                 Text(
                                   'Chọn địa điểm từ bản đồ',
                                   style: TextStyles.semiBold.copyWith(
-                                      fontSize: AppFontSizes.mediumSmall,
-                                      color: AppTheme.backgroundBlueColor),
-                                )
+                                    fontSize: AppFontSizes.mediumSmall,
+                                    color: AppTheme.backgroundBlueColor,
+                                  ),
+                                ),
                               ],
                             ),
                           ),
 
-                          //
                           spaceHeight(16),
                           VcoreProfileTextFieldWidget(
                             title: 'Tiêu đề phản ánh',
@@ -144,7 +152,6 @@ class VcorePahtCreateView extends GetView<VcorePahtCreateController> {
                             onSubmitted: (value) {},
                           ),
 
-                          //
                           spaceHeight(16),
                           VcoreProfileTextFieldWidget(
                             title: 'Nội dung phản ánh',
@@ -158,7 +165,6 @@ class VcorePahtCreateView extends GetView<VcorePahtCreateController> {
                             onSubmitted: (value) {},
                           ),
 
-                          //Pick anhr video
                           spaceHeight(16),
                           GestureDetector(
                             behavior: HitTestBehavior.opaque,
@@ -171,11 +177,13 @@ class VcorePahtCreateView extends GetView<VcorePahtCreateController> {
                                     fontSize: AppFontSizes.mediumSmall,
                                   ),
                                 ),
-                                svgAction('assets/images/ic_attach_file.svg',
-                                    action: () {
-                                  Utils.hideKeyboard();
-                                  controller.excPickerPhotoVideo();
-                                }),
+                                svgAction(
+                                  'assets/images/ic_attach_file.svg',
+                                  action: () {
+                                    Utils.hideKeyboard();
+                                    controller.excPickerPhotoVideo();
+                                  },
+                                ),
                                 spaceWidth(6),
                                 IconButton(
                                   onPressed: () {
@@ -197,11 +205,9 @@ class VcorePahtCreateView extends GetView<VcorePahtCreateController> {
                             ),
                           ),
 
-                          //List videos, photos
                           if (controller.listFiles.isNotEmpty)
                             _buildAttachFiles(controller),
 
-                          //
                           spaceHeight(16),
                           Text(
                             'Lưu ý: Thông tin người gửi phản ánh hoàn toàn được giữ bảo mật đối với đơn vị bị phản ánh để đảm bảo các ảnh hưởng liên quan khác.',
@@ -222,7 +228,9 @@ class VcorePahtCreateView extends GetView<VcorePahtCreateController> {
                   ),
                 ),
               ),
-            ));
+            ),
+          ),
+        );
       },
     );
   }
@@ -234,14 +242,18 @@ class VcorePahtCreateView extends GetView<VcorePahtCreateController> {
           children: [
             Text(
               title,
-              style: TextStyles.regular
-                  .copyWith(fontSize: AppFontSizes.mediumSmall, color: Colors.black),
+              style: TextStyles.regular.copyWith(
+                fontSize: AppFontSizes.mediumSmall,
+                color: Colors.black,
+              ),
             ),
             Text(
               isRequired ? ' *' : '',
-              style:
-                  TextStyles.regular.copyWith(fontSize: AppFontSizes.mediumSmall, color: Colors.red),
-            )
+              style: TextStyles.regular.copyWith(
+                fontSize: AppFontSizes.mediumSmall,
+                color: Colors.red,
+              ),
+            ),
           ],
         ),
         spaceHeight(8),
@@ -254,7 +266,10 @@ class VcorePahtCreateView extends GetView<VcorePahtCreateController> {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 3, crossAxisSpacing: 8, mainAxisSpacing: 8),
+        crossAxisCount: 3,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+      ),
       itemCount: controller.listFiles.length,
       itemBuilder: (ctx, index) {
         final file = controller.listFiles[index];

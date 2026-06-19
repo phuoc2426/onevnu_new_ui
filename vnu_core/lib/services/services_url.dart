@@ -25,14 +25,14 @@ class ServicesUrl {
 
   String get baseUrl {
     final String domain =
-        // _prefs.getString("domain") ?? "https://onevnu-mobile-api.vnu.edu.vn";
+        _prefs.getString("domain") ?? "https://onevnu-mobile-api.vnu.edu.vn";
         // _prefs.getString("domain") ?? "http://10.0.2.2:8083";
         // _prefs.getString("domain") ?? "http://10.241.99.23:8082";
         // _prefs.getString("domain") ?? "http://112.137.143.72:8082";
         //ip máy tính
         // _prefs.getString("domain") ?? "http://10.15.194.82:8083";
         //API test
-        _prefs.getString("domain") ?? "http://112.137.132.211:8085";
+        // _prefs.getString("domain") ?? "http://112.137.132.211:8085";
 
     return domain.endsWith("/") ? domain : "$domain/";
   }

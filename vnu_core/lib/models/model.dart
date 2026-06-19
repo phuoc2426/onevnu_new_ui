@@ -62,5 +62,6 @@ export 'thong_bao_dao_tao_model.dart';
 export 'phan_anh_hien_truong_model.dart';
 export 'phan_anh_hien_truong_xu_ly_model.dart';
 export 'phan_anh_hien_truong_chu_de_model.dart';
+export 'vneid_share_info_response_model.dart';
 export 'vcore_schedule_event.dart';
 

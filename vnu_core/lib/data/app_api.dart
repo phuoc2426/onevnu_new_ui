@@ -45,6 +45,14 @@ abstract class AppApiProvider {
   @GET("/api/sinhvien")
   Future<StudentInfoModel> getSinhVienInfo();
 
+  @PUT("/api/sinhvien/tam-tru")
+  Future<void> updateDiaChiTamTru(@Body() Map<String, dynamic> body);
+
+  @POST("/api/vneid/share-info")
+  Future<VneidShareInfoResponseModel> shareVneidInfo(
+    @Body() Map<String, dynamic> body,
+  );
+
   @GET('/api/nguon-tin')
   Future<ApiResponse<List<NguonTinModel>>> getNguonTin(
     @Query('pageIndex') int pageIndex,
@@ -61,9 +69,7 @@ abstract class AppApiProvider {
   );
 
   @GET('/api/cam-nang/{guid}')
-  Future<CamNangModel> getDetailCamNang(
-    @Path('guid') String guid,
-  );
+  Future<CamNangModel> getDetailCamNang(@Path('guid') String guid);
 
   //Liên kết đánh dấu
   @GET('/api/lien-ket-danh-dau')
@@ -88,9 +94,7 @@ abstract class AppApiProvider {
   );
 
   @DELETE('/api/lien-ket-danh-dau/{guid}')
-  Future<void> deleteLienKetDanhDau(
-    @Path('guid') String guid,
-  );
+  Future<void> deleteLienKetDanhDau(@Path('guid') String guid);
 
   // Thu tuc 1 cua
   @GET('/api/linh-vuc/tat-ca-linh-vuc')
@@ -231,9 +235,7 @@ abstract class AppApiProvider {
   Future<List<DonViModel>> getTatCaDonVi();
 
   @GET('/api/donvi/{guid}')
-  Future<DonViModel> getDonVi(
-    @Path('guid') String guid,
-  );
+  Future<DonViModel> getDonVi(@Path('guid') String guid);
 
   //Thong tin sinh vien
 
@@ -409,13 +411,13 @@ abstract class AppApiProvider {
 
   @POST('/api/anh-ca-nhan/upload-anh-ca-nhan')
   @MultiPart()
-  Future<AnhCaNhanModel> uploadAnhCanNhan(@Part() File fileUpload,
-      {@SendProgress() ProgressCallback? onSendProgress});
+  Future<AnhCaNhanModel> uploadAnhCanNhan(
+    @Part() File fileUpload, {
+    @SendProgress() ProgressCallback? onSendProgress,
+  });
 
   @DELETE('/api/anh-ca-nhan/{guid}')
-  Future<void> deleteAnhCanNhan(
-    @Path('guid') String guid,
-  );
+  Future<void> deleteAnhCanNhan(@Path('guid') String guid);
 
   //Thong Bao
   @GET('/api/notification')
@@ -438,9 +440,7 @@ abstract class AppApiProvider {
   Future<List<LoaiMatKhauModel>> getDanhSachLoaiMatKhau();
 
   @PUT('/api/context/quenMatKhau')
-  Future<void> putQuenMatKhau(
-    @Field('keyLoaiMatKhau') String keyLoaiMatKhau,
-  );
+  Future<void> putQuenMatKhau(@Field('keyLoaiMatKhau') String keyLoaiMatKhau);
 
   @PUT('/api/context/capNhatMatKhau')
   Future<void> putCapNhatMatKhau(
@@ -478,12 +478,11 @@ abstract class AppApiProvider {
 
   @POST('/api/phan-anh-hien-truong/tao-phan-anh-hien-truong')
   Future<PhanAnhHienTruongModel> createPaht(
-      @Body() PhanAnhHienTruongRequest request);
+    @Body() PhanAnhHienTruongRequest request,
+  );
 
   @GET('/api/phan-anh-hien-truong/{guid}')
-  Future<PhanAnhHienTruongModel> getPaht(
-    @Path('guid') String guid,
-  );
+  Future<PhanAnhHienTruongModel> getPaht(@Path('guid') String guid);
 
   @GET('/api/phan-anh-hien-truong/search')
   Future<ApiResponse<List<PhanAnhHienTruongModel>>> searchPaht(
@@ -517,9 +516,7 @@ abstract class AppApiProvider {
   );
 
   @DELETE('/api/phan-anh-hien-truong/{guid}')
-  Future<void> deletePaht(
-    @Path('guid') String guid,
-  );
+  Future<void> deletePaht(@Path('guid') String guid);
 
   // File Controller
   @POST('/api/file/upload')

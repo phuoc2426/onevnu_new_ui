@@ -15,6 +15,7 @@ import 'package:vnu_core/globals.dart';
 import 'package:vnu_core/modules/inmapz/vcore_immap_view.dart';
 import 'package:vnu_core/modules/motel/vcore_motel_webview.dart';
 import 'package:vnu_core/modules/profile/views/vcore_profile_domain_dialog.dart';
+import 'package:vnu_core/modules/profile/views/vcore_profile_forgot_pass_view_v2.dart';
 import 'package:vnu_core/modules/profile/views/widget/vcore_profile_textfield_widget.dart';
 import 'package:vnu_core/repository/data_repository.dart';
 import 'package:vnu_core/services/services_url.dart';
@@ -601,15 +602,15 @@ class _LoginOptionsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Row(
+    return Row(
       children: [
-        Icon(
+        const Icon(
           Icons.check_circle,
           color: _VCoreLoginScreenV3State.green,
           size: 22,
         ),
-        SizedBox(width: 5),
-        Expanded(
+        const SizedBox(width: 5),
+        const Expanded(
           child: Text(
             'Ghi nhớ đăng nhập',
             style: TextStyle(
@@ -620,13 +621,22 @@ class _LoginOptionsRow extends StatelessWidget {
             ),
           ),
         ),
-        SizedBox(width: 8),
-        Text(
-          'Quên mật khẩu?',
-          style: TextStyle(
-            color: _VCoreLoginScreenV3State.green,
-            fontSize: AppFontSizes.mediumSmall,
-            fontWeight: FontWeight.w700,
+        const SizedBox(width: 8),
+        InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: () {
+            Get.to(() => const VcoreProfileForgotPassViewV2.loginSupport());
+          },
+          child: const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+            child: Text(
+              'Quên mật khẩu?',
+              style: TextStyle(
+                color: _VCoreLoginScreenV3State.green,
+                fontSize: AppFontSizes.mediumSmall,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ),
         ),
       ],

@@ -30,7 +30,8 @@ import 'package:vnu_core/modules/news/views/vcore_jobs_view_v2.dart';
 import 'package:vnu_core/modules/notify/views/vcore_notify_detail_view_v3.dart';
 import 'package:vnu_core/modules/notify/views/vcore_notify_view_v3.dart';
 import 'package:vnu_core/modules/one_door/views/vcore_one_door_view.dart';
-import 'package:vnu_core/modules/paht/views/vcore_paht_view.dart';
+// import 'package:vnu_core/modules/paht/views/vcore_paht_view.dart';
+import 'package:vnu_core/modules/paht_v2/views/vcore_paht_view_v2.dart';
 import 'package:vnu_core/modules/sync/views/vcore_sync_view.dart';
 import 'package:vnu_core/services/services_url.dart';
 import 'package:vnu_core/widgets/progress_hub_widget.dart';
@@ -187,27 +188,30 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
     'Điểm',
     'Học bổng',
     'Việc làm',
-    // 'Đồng bộ' tạm ẩn
+    // 'Đồng bộ',
   ];
 
   static final List<_FunctionItem> _allAvailableFunctions = [
-    _FunctionItem('Lịch học & thi', Color.fromRGBO(0, 122, 255, 1)),      // Xanh dương
-    _FunctionItem('Điểm', Color.fromRGBO(175, 82, 222, 1)),              // Tím
-    _FunctionItem('Đăng ký môn', Color.fromRGBO(255, 149, 0, 1)),        // Cam
-    _FunctionItem('Việc làm', Color.fromRGBO(48, 209, 88, 1)),           // Xanh lá
-    _FunctionItem('Đồng bộ', Color.fromRGBO(90, 200, 250, 1)),           // Xanh ngọc
-    _FunctionItem('Học phí', Color.fromRGBO(255, 45, 85, 1)),            // Hồng đỏ
-    _FunctionItem('Tài liệu', Color.fromRGBO(94, 92, 230, 1)),           // Indigo
-    _FunctionItem('Điểm danh', Color.fromRGBO(52, 199, 89, 1)),          // Emerald
-    _FunctionItem('Học bổng', Color.fromRGBO(255, 55, 95, 1)),           // Rose
-    _FunctionItem('Phản ánh', Color.fromRGBO(255, 204, 0, 1)),           // Vàng
-    _FunctionItem('Nội trú', Color.fromRGBO(191, 90, 242, 1)),           // Lavender
-    _FunctionItem('Phòng trọ', Color.fromRGBO(0, 199, 190, 1)),          // Turquoise
-    _FunctionItem('Thủ tục', Color.fromRGBO(118, 214, 78, 1)),           // Lime
-    _FunctionItem('Thư viện', Color.fromRGBO(255, 159, 10, 1)),          // Gold
-    _FunctionItem('Bản đồ', Color.fromRGBO(50, 173, 230, 1)),            // Ocean
-    _FunctionItem('Hỏi đáp', Color.fromRGBO(255, 55, 145, 1)),           // Magenta
-    _FunctionItem('Cẩm nang', Color.fromRGBO(142, 142, 147, 1)),         // Gray
+    _FunctionItem(
+      'Lịch học & thi',
+      Color.fromRGBO(0, 122, 255, 1),
+    ), // Xanh dương
+    _FunctionItem('Điểm', Color.fromRGBO(175, 82, 222, 1)), // Tím
+    _FunctionItem('Đăng ký môn', Color.fromRGBO(255, 149, 0, 1)), // Cam
+    _FunctionItem('Việc làm', Color.fromRGBO(48, 209, 88, 1)), // Xanh lá
+    // _FunctionItem('Đồng bộ', Color.fromRGBO(90, 200, 250, 1)), // Xanh ngọc
+    _FunctionItem('Học phí', Color.fromRGBO(255, 45, 85, 1)), // Hồng đỏ
+    _FunctionItem('Tài liệu', Color.fromRGBO(94, 92, 230, 1)), // Indigo
+    _FunctionItem('Điểm danh', Color.fromRGBO(52, 199, 89, 1)), // Emerald
+    _FunctionItem('Học bổng', Color.fromRGBO(255, 55, 95, 1)), // Rose
+    _FunctionItem('Phản ánh', Color.fromRGBO(255, 204, 0, 1)), // Vàng
+    _FunctionItem('Nội trú', Color.fromRGBO(191, 90, 242, 1)), // Lavender
+    _FunctionItem('Phòng trọ', Color.fromRGBO(0, 199, 190, 1)), // Turquoise
+    _FunctionItem('Thủ tục', Color.fromRGBO(118, 214, 78, 1)), // Lime
+    _FunctionItem('Thư viện', Color.fromRGBO(255, 159, 10, 1)), // Gold
+    _FunctionItem('Bản đồ', Color.fromRGBO(50, 173, 230, 1)), // Ocean
+    _FunctionItem('Hỏi đáp', Color.fromRGBO(255, 55, 145, 1)), // Magenta
+    _FunctionItem('Cẩm nang', Color.fromRGBO(142, 142, 147, 1)), // Gray
   ];
 
   static final Map<String, List<_FunctionItem>> _groupedFunctions = {
@@ -229,8 +233,8 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
             'Thủ tục',
             'Nội trú',
             'Phản ánh',
-            'Đồng bộ',
-            'Hỏi đáp'
+            // 'Đồng bộ',
+            'Hỏi đáp',
           ].contains(e.label),
         )
         .toList(),
@@ -337,7 +341,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
         Get.to(() => const VcoreCoursePointsView());
         break;
       case 'Phản ánh':
-        Get.to(() => const VcorePahtView());
+        Get.to(() => const VcorePahtViewV2());
         break;
       case 'Nội trú':
         // snackBarWarning('Chức năng đang hoàn thiện');
@@ -361,12 +365,12 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
       case 'Việc làm':
         Get.to(() => const VcoreJobsViewV2());
         break;
-      case 'Đồng bộ':
-        // snackBarWarning('Chức năng đang hoàn thiện');
-        Get.to(() => VcoreSyncView());
-        break;
+      // case 'Đồng bộ':
+      //   // snackBarWarning('Chức năng đang hoàn thiện');
+      //   Get.to(() => VcoreSyncView());
+      //   break;
       case 'Hỏi đáp':
-        Get.to(() =>  VcoreQuestionView());
+        Get.to(() => VcoreQuestionView());
         break;
       default:
         snackBarWarning('Chức năng đang hoàn thiện');
@@ -384,8 +388,8 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
         return Icons.border_color_rounded;
       case 'Việc làm':
         return Icons.work_outline_rounded;
-      case 'Đồng bộ':
-        return Icons.sync_rounded;
+      // case 'Đồng bộ':
+      //   return Icons.sync_rounded;
       case 'Học phí':
         return Icons.account_balance_wallet_rounded;
       case 'Tài liệu':
@@ -1332,7 +1336,9 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
   }
 
   Widget _buildTodayStudyTimeline() {
-    final upcomingSchedule = widget.controller.getUpcomingClassSchedule(days: 7);
+    final upcomingSchedule = widget.controller.getUpcomingClassSchedule(
+      days: 7,
+    );
 
     return _schedulePanel(
       child: Column(
@@ -1343,36 +1349,36 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
           Expanded(
             child: upcomingSchedule.isEmpty
                 ? const Center(
-              child: Text(
-                'Không có lịch học sắp tới',
-                style: TextStyle(
-                  color: Colors.grey,
-                  fontSize: AppFontSizes.small,
-                ),
-              ),
-            )
+                    child: Text(
+                      'Không có lịch học sắp tới',
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontSize: AppFontSizes.small,
+                      ),
+                    ),
+                  )
                 : ListView.builder(
-              itemCount: min(upcomingSchedule.length, 3),
-              padding: EdgeInsets.zero,
-              physics: const NeverScrollableScrollPhysics(),
-              itemBuilder: (context, index) {
-                final item = upcomingSchedule[index];
-                final data = item.data;
+                    itemCount: min(upcomingSchedule.length, 3),
+                    padding: EdgeInsets.zero,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemBuilder: (context, index) {
+                      final item = upcomingSchedule[index];
+                      final data = item.data;
 
-                return _timelineItem(
-                  time:
-                  '${item.ngayHocShortText} • Tiết ${data.tietBatDau ?? '--'}',
-                  title: data.tenHocPhan ?? '',
-                  room: data.tenPhong ?? '--',
-                  color: index == 0
-                      ? const Color(0xFF059669)
-                      : index == 1
-                      ? const Color(0xFF3B82F6)
-                      : const Color(0xFFF59E0B),
-                  isLast: index == min(upcomingSchedule.length, 3) - 1,
-                );
-              },
-            ),
+                      return _timelineItem(
+                        time:
+                            '${item.ngayHocShortText} • Tiết ${data.tietBatDau ?? '--'}',
+                        title: data.tenHocPhan ?? '',
+                        room: data.tenPhong ?? '--',
+                        color: index == 0
+                            ? const Color(0xFF059669)
+                            : index == 1
+                            ? const Color(0xFF3B82F6)
+                            : const Color(0xFFF59E0B),
+                        isLast: index == min(upcomingSchedule.length, 3) - 1,
+                      );
+                    },
+                  ),
           ),
         ],
       ),
@@ -1391,35 +1397,35 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
           Expanded(
             child: upcomingExams.isEmpty
                 ? const Center(
-              child: Text(
-                'Không có lịch thi sắp tới',
-                style: TextStyle(
-                  color: Colors.grey,
-                  fontSize: AppFontSizes.small,
-                ),
-              ),
-            )
+                    child: Text(
+                      'Không có lịch thi sắp tới',
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontSize: AppFontSizes.small,
+                      ),
+                    ),
+                  )
                 : ListView.builder(
-              itemCount: min(upcomingExams.length, 3),
-              padding: EdgeInsets.zero,
-              physics: const NeverScrollableScrollPhysics(),
-              itemBuilder: (context, index) {
-                final item = upcomingExams[index];
+                    itemCount: min(upcomingExams.length, 3),
+                    padding: EdgeInsets.zero,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemBuilder: (context, index) {
+                      final item = upcomingExams[index];
 
-                return _timelineItem(
-                  time:
-                  '${_formatShortDate(item.ngayThi)} • ${item.gioBatDauThi ?? '--:--'}',
-                  title: item.tenHocPhan ?? '',
-                  room: item.phongThi ?? '--',
-                  color: index == 0
-                      ? const Color(0xFF2563EB)
-                      : index == 1
-                      ? const Color(0xFF7C3AED)
-                      : const Color(0xFFF97316),
-                  isLast: index == min(upcomingExams.length, 3) - 1,
-                );
-              },
-            ),
+                      return _timelineItem(
+                        time:
+                            '${_formatShortDate(item.ngayThi)} • ${item.gioBatDauThi ?? '--:--'}',
+                        title: item.tenHocPhan ?? '',
+                        room: item.phongThi ?? '--',
+                        color: index == 0
+                            ? const Color(0xFF2563EB)
+                            : index == 1
+                            ? const Color(0xFF7C3AED)
+                            : const Color(0xFFF97316),
+                        isLast: index == min(upcomingExams.length, 3) - 1,
+                      );
+                    },
+                  ),
           ),
         ],
       ),
