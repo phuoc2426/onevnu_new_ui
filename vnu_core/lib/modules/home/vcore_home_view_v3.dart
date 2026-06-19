@@ -188,7 +188,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
     'Điểm',
     'Học bổng',
     'Việc làm',
-    // 'Đồng bộ',
+    'Đồng bộ',
   ];
 
   static final List<_FunctionItem> _allAvailableFunctions = [
@@ -199,7 +199,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
     _FunctionItem('Điểm', Color.fromRGBO(175, 82, 222, 1)), // Tím
     _FunctionItem('Đăng ký môn', Color.fromRGBO(255, 149, 0, 1)), // Cam
     _FunctionItem('Việc làm', Color.fromRGBO(48, 209, 88, 1)), // Xanh lá
-    // _FunctionItem('Đồng bộ', Color.fromRGBO(90, 200, 250, 1)), // Xanh ngọc
+    _FunctionItem('Đồng bộ', Color.fromRGBO(90, 200, 250, 1)), // Xanh ngọc
     _FunctionItem('Học phí', Color.fromRGBO(255, 45, 85, 1)), // Hồng đỏ
     _FunctionItem('Tài liệu', Color.fromRGBO(94, 92, 230, 1)), // Indigo
     _FunctionItem('Điểm danh', Color.fromRGBO(52, 199, 89, 1)), // Emerald
@@ -233,7 +233,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
             'Thủ tục',
             'Nội trú',
             'Phản ánh',
-            // 'Đồng bộ',
+            'Đồng bộ',
             'Hỏi đáp',
           ].contains(e.label),
         )
@@ -365,10 +365,10 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
       case 'Việc làm':
         Get.to(() => const VcoreJobsViewV2());
         break;
-      // case 'Đồng bộ':
-      //   // snackBarWarning('Chức năng đang hoàn thiện');
-      //   Get.to(() => VcoreSyncView());
-      //   break;
+      case 'Đồng bộ':
+        // snackBarWarning('Chức năng đang hoàn thiện');
+        Get.to(() => VcoreSyncView());
+        break;
       case 'Hỏi đáp':
         Get.to(() => VcoreQuestionView());
         break;
@@ -388,8 +388,8 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
         return Icons.border_color_rounded;
       case 'Việc làm':
         return Icons.work_outline_rounded;
-      // case 'Đồng bộ':
-      //   return Icons.sync_rounded;
+      case 'Đồng bộ':
+        return Icons.sync_rounded;
       case 'Học phí':
         return Icons.account_balance_wallet_rounded;
       case 'Tài liệu':
