@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:app_links/app_links.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -13,6 +15,9 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:students/firebase_options.dart';
 import 'package:vnu_core/common/log.dart';
+import 'package:vnu_core/globals.dart';
+import 'package:vnu_core/modules/sync/views/vcore_sync_view.dart';
+import 'package:vnu_core/modules/sync/vneid_deep_link_service.dart';
 import 'package:vnu_core/modules/tabbar/views/vcore_tabbar_view.dart';
 import 'package:vnu_core/services/services_url.dart';
 import 'package:vnu_core/vnu_core.dart';
@@ -101,6 +106,9 @@ class MyApp extends StatefulHookWidget {
 class _MyAppState extends State<MyApp> {
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
   FlutterLocalNotificationsPlugin();
+  final AppLinks _appLinks = AppLinks();
+  StreamSubscription<Uri>? _appLinksSubscription;
+  bool _isOpeningVneidSyncView = false;
 
   @override
   void initState() {
@@ -109,6 +117,13 @@ class _MyAppState extends State<MyApp> {
     _initFireBaseMessaging();
     _initializationLocalPushNotificationPlugin();
     _initRemoteConfig();
+    _initVneidDeepLinks();
+  }
+
+  @override
+  void dispose() {
+    _appLinksSubscription?.cancel();
+    super.dispose();
   }
 
   @override
@@ -119,6 +134,8 @@ class _MyAppState extends State<MyApp> {
       VnuCore().gotoMainScreen(
         const VcoreTabbarView(),
       );
+
+      _openPendingVneidCallback();
 
       if (widget.message != null) {
         _handleNotificationTapped(
@@ -131,6 +148,70 @@ class _MyAppState extends State<MyApp> {
     return VnuCore().runVnuApp(
       mainScreen: const VcoreTabbarView(),
     );
+  }
+
+  Future<void> _initVneidDeepLinks() async {
+    try {
+      final initialLink = await _appLinks.getInitialLink();
+      if (initialLink != null) {
+        _handleVneidDeepLink(initialLink);
+      }
+    } catch (e) {
+      logError('VNeID getInitialLink error: $e');
+    }
+
+    _appLinksSubscription = _appLinks.uriLinkStream.listen(
+      _handleVneidDeepLink,
+      onError: (Object error) {
+        logError('VNeID uriLinkStream error: $error');
+      },
+    );
+  }
+
+  void _handleVneidDeepLink(Uri uri) {
+    logInfo('==== VNeID DEEP LINK RECEIVED IN MAIN ====');
+    logInfo('VNeID raw uri: $uri');
+    logInfo('VNeID scheme: ${uri.scheme}');
+    logInfo('VNeID host: ${uri.host}');
+    logInfo('VNeID path: ${uri.path}');
+    logInfo('VNeID pathSegments: ${uri.pathSegments}');
+    logInfo('VNeID queryParameters: ${uri.queryParameters}');
+
+    final handled = VneidDeepLinkService().handleUri(uri);
+
+    logInfo('VNeID handled by service: $handled');
+
+    if (handled) {
+      _openPendingVneidCallback();
+    }
+  }
+
+  void _openPendingVneidCallback() {
+    if (!mounted ||
+        Globals().token.isEmpty ||
+        _isOpeningVneidSyncView ||
+        !VneidDeepLinkService().hasPendingCallback ||
+        VneidDeepLinkService().isSyncViewVisible) {
+      return;
+    }
+
+    _isOpeningVneidSyncView = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final context = navigatorKey.currentContext;
+      if (!mounted ||
+          context == null ||
+          !VneidDeepLinkService().hasPendingCallback ||
+          VneidDeepLinkService().isSyncViewVisible) {
+        _isOpeningVneidSyncView = false;
+        return;
+      }
+
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const VcoreSyncView()),
+      ).whenComplete(() {
+        _isOpeningVneidSyncView = false;
+      });
+    });
   }
 
   Future<void> _initRemoteConfig() async {
