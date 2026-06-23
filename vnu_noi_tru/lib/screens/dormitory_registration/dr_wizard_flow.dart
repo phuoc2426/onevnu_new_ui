@@ -429,48 +429,12 @@ class _DRWizardFlowState extends State<DRWizardFlow> {
           ).format(student.ngayCapCmtCccd!.toUtc())
         : '';
 
-    final payload = RegistrationPayloadModel(
-      registrationPeriodId: _cubit.selectedPeriod!.id!,
-      priorityObjectId: _cubit.selectedPriorityObject?.id,
-      dormitoryId: _cubit.selectedDormitory!.id!,
-      roomTypeId: _cubit.selectedRoomType!.id!,
+    final payload = await _cubit.buildRegistrationPayload(
       status: 'draft',
-      reason: _cubit.tempReason ?? 'Đăng ký nội trú (Tự động lưu nháp)',
-      attachmentFileIds: [
-        if (_cubit.cccdFrontAttachment?.id != null)
-          _cubit.cccdFrontAttachment!.id!,
-        if (_cubit.cccdBackAttachment?.id != null)
-          _cubit.cccdBackAttachment!.id!,
-        ..._cubit.proofAttachments.where((e) => e.id != null).map((e) => e.id!),
-      ],
-      student: RegistrationStudentPayload(
-        studentCode: student.maSinhVien ?? '',
-        fullName: student.hoVaTen ?? '',
-        dob: dobFormatted,
-        cccd: _cubit.tempCccd ?? student.soCmtCccd ?? '',
-        cccdIssueDate: _cubit.tempCccdIssueDate ?? cccdIssueDateFormatted,
-        hometown:
-            _cubit.tempHometown ??
-            student.hoKhauThuongTruDuongThon ??
-            student.hoKhauThuongTruPhuongXa ??
-            'N/A',
-        className: Globals().lopDaoTaoModel.value?.ten ?? 'N/A',
-        major: Globals().lopDaoTaoModel.value?.ten ?? 'N/A',
-        academicYear: Globals().nienKhoaDaoTaoModel.value?.ten ?? 'N/A',
-        system: 'Chính quy',
-        level: 'Đại học',
-        universityName: 'Đại học Quốc gia Hà Nội',
-        priorityObjectName: _cubit.selectedPriorityObject?.name,
-        temporaryAddress:
-            _cubit.tempTemporaryAddress ??
-            student.noiOHienNayDuongThon ??
-            student.noiOHienNayPhuongXa ??
-            'N/A',
-        gender: student.gioiTinh?.toLowerCase() == 'nữ' ? 'female' : 'male',
-        phone: _cubit.tempPhone ?? '',
-        email: _cubit.tempEmail ?? '',
-      ),
+      reason: _cubit.tempReason ?? 'Lưu nháp đăng ký nội trú',
     );
+
+    await _cubit.registerDormitory(payload);
 
     try {
       await _cubit.uploadCachedFiles();
@@ -551,48 +515,12 @@ class _DRWizardFlowState extends State<DRWizardFlow> {
           ).format(student.ngayCapCmtCccd!.toUtc())
         : '';
 
-    final payload = RegistrationPayloadModel(
-      registrationPeriodId: _cubit.selectedPeriod!.id!,
-      priorityObjectId: _cubit.selectedPriorityObject?.id,
-      dormitoryId: _cubit.selectedDormitory!.id!,
-      roomTypeId: _cubit.selectedRoomType!.id!,
+    final payload = await _cubit.buildRegistrationPayload(
       status: 'draft',
-      reason: _cubit.tempReason ?? 'Đăng ký nội trú',
-      attachmentFileIds: [
-        if (_cubit.cccdFrontAttachment?.id != null)
-          _cubit.cccdFrontAttachment!.id!,
-        if (_cubit.cccdBackAttachment?.id != null)
-          _cubit.cccdBackAttachment!.id!,
-        ..._cubit.proofAttachments.where((e) => e.id != null).map((e) => e.id!),
-      ],
-      student: RegistrationStudentPayload(
-        studentCode: student.maSinhVien ?? '',
-        fullName: student.hoVaTen ?? '',
-        dob: dobFormatted,
-        cccd: _cubit.tempCccd ?? student.soCmtCccd ?? '',
-        cccdIssueDate: _cubit.tempCccdIssueDate ?? cccdIssueDateFormatted,
-        hometown:
-            _cubit.tempHometown ??
-            student.hoKhauThuongTruDuongThon ??
-            student.hoKhauThuongTruPhuongXa ??
-            'N/A',
-        className: Globals().lopDaoTaoModel.value?.ten ?? 'N/A',
-        major: Globals().lopDaoTaoModel.value?.ten ?? 'N/A',
-        academicYear: Globals().nienKhoaDaoTaoModel.value?.ten ?? 'N/A',
-        system: 'Chính quy',
-        level: 'Đại học',
-        universityName: 'Đại học Quốc gia Hà Nội',
-        priorityObjectName: _cubit.selectedPriorityObject?.name,
-        temporaryAddress:
-            _cubit.tempTemporaryAddress ??
-            student.noiOHienNayDuongThon ??
-            student.noiOHienNayPhuongXa ??
-            'N/A',
-        gender: student.gioiTinh?.toLowerCase() == 'nữ' ? 'female' : 'male',
-        phone: _cubit.tempPhone ?? '',
-        email: _cubit.tempEmail ?? '',
-      ),
+      reason: _cubit.tempReason ?? 'Lưu nháp đăng ký nội trú',
     );
+
+    await _cubit.registerDormitory(payload);
 
     _cubit.registerDormitory(payload);
   }
@@ -635,49 +563,12 @@ class _DRWizardFlowState extends State<DRWizardFlow> {
           ).format(student.ngayCapCmtCccd!.toUtc())
         : '';
 
-    final payload = RegistrationPayloadModel(
-      registrationPeriodId: _cubit.selectedPeriod!.id!,
-      priorityObjectId: _cubit.selectedPriorityObject?.id,
-      dormitoryId: _cubit.selectedDormitory!.id!,
-      roomTypeId: _cubit.selectedRoomType!.id!,
+    final payload = await _cubit.buildRegistrationPayload(
       status: 'pending',
       reason: _cubit.tempReason ?? 'Đăng ký nội trú',
-      attachmentFileIds: [
-        if (_cubit.cccdFrontAttachment?.id != null)
-          _cubit.cccdFrontAttachment!.id!,
-        if (_cubit.cccdBackAttachment?.id != null)
-          _cubit.cccdBackAttachment!.id!,
-        ..._cubit.proofAttachments.where((e) => e.id != null).map((e) => e.id!),
-      ],
-      student: RegistrationStudentPayload(
-        studentCode: student.maSinhVien ?? '',
-        fullName: student.hoVaTen ?? '',
-        dob: dobFormatted,
-        cccd: _cubit.tempCccd ?? student.soCmtCccd ?? '',
-        cccdIssueDate: _cubit.tempCccdIssueDate ?? cccdIssueDateFormatted,
-        hometown:
-            _cubit.tempHometown ??
-            student.hoKhauThuongTruDuongThon ??
-            student.hoKhauThuongTruPhuongXa ??
-            'N/A',
-        className: Globals().lopDaoTaoModel.value?.ten ?? 'N/A',
-        major: Globals().lopDaoTaoModel.value?.ten ?? 'N/A',
-        academicYear: Globals().nienKhoaDaoTaoModel.value?.ten ?? 'N/A',
-        system: 'Chính quy',
-        level: 'Đại học',
-        universityName: 'Đại học Quốc gia Hà Nội',
-        priorityObjectName: _cubit.selectedPriorityObject?.name,
-        temporaryAddress:
-            _cubit.tempTemporaryAddress ??
-            student.noiOHienNayDuongThon ??
-            student.noiOHienNayPhuongXa ??
-            'N/A',
-        gender: student.gioiTinh?.toLowerCase() == 'nữ' ? 'female' : 'male',
-        phone: _cubit.tempPhone ?? '',
-        email: _cubit.tempEmail ?? '',
-      ),
     );
 
+    await _cubit.submitRegistration(payload);
     _cubit.registerDormitory(payload);
   }
 
@@ -1034,22 +925,14 @@ class _DRWizardFlowState extends State<DRWizardFlow> {
               child: SizedBox(
                 height: 51,
                 child: OutlinedButton.icon(
-                  onPressed: () {
-                    if (isSaveDraftButton) {
-                      _saveDraft();
-                    } else {
-                      _prevStep();
-                    }
-                  },
-                  icon: Icon(
-                    isSaveDraftButton
-                        ? Icons.save_outlined
-                        : Icons.arrow_back_rounded,
+                  onPressed: _prevStep,
+                  icon: const Icon(
+                    Icons.arrow_back_rounded,
                     size: 18,
                   ),
-                  label: Text(
-                    isSaveDraftButton ? 'Lưu nháp' : 'Quay lại',
-                    style: const TextStyle(
+                  label: const Text(
+                    'Quay lại',
+                    style: TextStyle(
                       fontSize: AppFontSizes.mediumSmall,
                       fontWeight: FontWeight.w800,
                     ),

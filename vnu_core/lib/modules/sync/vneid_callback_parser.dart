@@ -1,10 +1,11 @@
+
 class VneidCallbackData {
   final String transactionCode;
-  final String result;
+  final String? result;
 
   const VneidCallbackData({
     required this.transactionCode,
-    required this.result,
+    this.result,
   });
 }
 
@@ -12,10 +13,9 @@ VneidCallbackData? parseVneidCallback(Uri uri) {
   if (!isVneidCallbackUri(uri)) return null;
 
   final rawTransitionCode =
-      uri.queryParameters['transition_code'] ??
-          uri.queryParameters['transitionCode'] ??
-          uri.queryParameters['transactionCode'] ??
-          uri.queryParameters['transitionCode'];
+      uri.queryParameters['transitionCode'] ??
+          uri.queryParameters['transition_code'] ??
+          uri.queryParameters['transactionCode'];
 
   if (rawTransitionCode == null || rawTransitionCode.trim().isEmpty) {
     return null;
@@ -23,10 +23,17 @@ VneidCallbackData? parseVneidCallback(Uri uri) {
 
   final decodedTransitionCode = Uri.decodeComponent(rawTransitionCode).trim();
 
+  if (decodedTransitionCode.isEmpty) {
+    return null;
+  }
+
   final separatorIndex = decodedTransitionCode.indexOf('|');
 
   if (separatorIndex == -1) {
-    return null;
+    return VneidCallbackData(
+      transactionCode: decodedTransitionCode,
+      result: null,
+    );
   }
 
   final transactionCode =
@@ -35,13 +42,19 @@ VneidCallbackData? parseVneidCallback(Uri uri) {
   final resultCode =
   decodedTransitionCode.substring(separatorIndex + 1).trim();
 
-  if (transactionCode.isEmpty || resultCode.isEmpty) {
+  if (transactionCode.isEmpty) {
     return null;
   }
-
+  final String parseUriLog = 'VNeID parse uri: $uri';
+  final String queryParametersLog =
+      'VNeID queryParameters: ${uri.queryParameters}';
+  final String rawTransitionCodeLog =
+      'VNeID rawTransitionCode: $rawTransitionCode';
+  final String decodedTransitionCodeLog =
+      'VNeID decodedTransitionCode: $decodedTransitionCode';
   return VneidCallbackData(
     transactionCode: transactionCode,
-    result: resultCode,
+    result: resultCode.isEmpty ? null : resultCode,
   );
 }
 

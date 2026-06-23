@@ -24,6 +24,8 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
   );
 
   StreamSubscription<VneidDeepLinkEvent>? _callbackSubscription;
+  //test
+  final TextEditingController _configNameController = TextEditingController();
 
   bool _isCallingShareInfo = false;
   bool _isOpeningVneid = false;
@@ -62,13 +64,20 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
     });
   }
 
+  // @override
+  // void dispose() {
+  //   VneidDeepLinkService().isSyncViewVisible = false;
+  //   _callbackSubscription?.cancel();
+  //   super.dispose();
+  // }
+  //test
   @override
   void dispose() {
     VneidDeepLinkService().isSyncViewVisible = false;
     _callbackSubscription?.cancel();
+    _configNameController.dispose();
     super.dispose();
   }
-
   Future<void> _startVneidSync() async {
     if (_isBusy) return;
 
@@ -83,7 +92,11 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
     try {
       // Bước 1: gọi share-info trước.
       // API này có nhiệm vụ validate dữ liệu và gắn cờ để VNeID mở popup consent.
-      await ApiRepository().shareVneidInfo();
+      // await ApiRepository().shareVneidInfo();
+      //test
+      await ApiRepository().shareVneidInfo(
+        configName: _configNameController.text.trim(),
+      );
 
       if (!mounted) return;
 
@@ -154,8 +167,7 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
     }
 
     final transitionCode = data.transactionCode.trim();
-    final resultCode = data.result.trim();
-
+    final resultCode = data.result?.trim() ?? '';
     if (transitionCode.isEmpty || !const ['1', '2', '3'].contains(resultCode)) {
       setState(() {
         _screenMessage = 'Không nhận được kết quả hợp lệ từ VNeID.';
@@ -382,8 +394,22 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  // children: [
+                  //   _buildIntroCard(),
+                  //   if (_currentTransitionCode != null) ...[
+                  //     const SizedBox(height: 16),
+                  //     _buildCallbackCard(),
+                  //   ],
+                  //   if (_currentStatus != null) ...[
+                  //     const SizedBox(height: 16),
+                  //     _buildStatusCard(_currentStatus!),
+                  //   ],
+                  // ],
+                  //test
                   children: [
                     _buildIntroCard(),
+                    const SizedBox(height: 16),
+                    _buildConfigCard(),
                     if (_currentTransitionCode != null) ...[
                       const SizedBox(height: 16),
                       _buildCallbackCard(),
@@ -393,12 +419,97 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
                       _buildStatusCard(_currentStatus!),
                     ],
                   ],
+
                 ),
               ),
             ),
             _buildBottomSyncBar(),
           ],
         ),
+      ),
+    );
+  }
+
+  //test
+  Widget _buildConfigCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: const Color(0xFFE5E7EB),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.035),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionHeader(
+            icon: Icons.tune_outlined,
+            title: 'Cấu hình test',
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Nhập tên config đã tạo trên service test. Ví dụ: quocanh, phuoc.',
+            style: TextStyle(
+              fontSize: 13,
+              height: 1.4,
+              color: Color(0xFF64748B),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _configNameController,
+            enabled: !_isBusy,
+            textInputAction: TextInputAction.done,
+            decoration: InputDecoration(
+              hintText: 'Ví dụ: quocanh',
+              prefixIcon: const Icon(Icons.settings_outlined),
+              filled: true,
+              fillColor: const Color(0xFFF8FAFC),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 13,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(
+                  color: Color(0xFFE5E7EB),
+                ),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(
+                  color: Color(0xFFE5E7EB),
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(
+                  color: Color(0xFF2563EB),
+                  width: 1.4,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Để trống nếu muốn dùng dữ liệu sinh viên thật trong app.',
+            style: TextStyle(
+              fontSize: 12,
+              color: Color(0xFF94A3B8),
+            ),
+          ),
+        ],
       ),
     );
   }

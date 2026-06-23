@@ -645,7 +645,11 @@ class ApiRepository {
     return _apiClient.updateDiaChiTamTru(body);
   }
 
-  Future<VneidShareInfoResponseModel> shareVneidInfo() async {
+  // Future<VneidShareInfoResponseModel> shareVneidInfo() async {
+  // test
+  Future<VneidShareInfoResponseModel> shareVneidInfo({
+    String? configName,
+  }) async {
     final sinhvien =
         Globals().thongTinSinhVienModel.value ??
         await _apiClient.getSinhVienInfo();
@@ -796,8 +800,49 @@ class ApiRepository {
     };
 
     body.removeWhere((key, value) => value == null || value == '');
+    // body['studentCode'] = '9';
+    // body['fullName'] = 'Trần Quốc Anh';
+    // body['birthDate'] = '2003-11-03';
+    // body['gender'] = 'Nam';
+    // body['identityNo'] = '036203012339';
+    // body['phoneNumber'] = '0979345835';
+    // body['email'] = 'anhtq@vnu.edu.vn';
+    // body['temporaryAddress'] = 'Xóm 4 Hải Hậu Ninh Bình';
+    // body['permanentAddress'] = 'Xóm 4 Hải Hậu Ninh Bình';
+    // body['universityName'] = 'Trung tâm Quản trị đại học số';
+    // body['residenceType'] = 1;
+    final normalizedConfigName = configName?.trim();
 
+    if (normalizedConfigName != null && normalizedConfigName.isNotEmpty) {
+      try {
+        final configResponse = await Dio().get<Map<String, dynamic>>(
+          'http://112.137.132.211/cccd-config/configs/$normalizedConfigName',
+          options: Options(
+            headers: {
+              'Accept': 'application/json',
+            },
+          ),
+        );
 
+        final rawConfigData = configResponse.data?['data'];
+
+        if (rawConfigData is Map) {
+          final configData = Map<String, dynamic>.from(rawConfigData);
+
+          configData.removeWhere(
+                (key, value) => value == null || value.toString().trim().isEmpty,
+          );
+
+          body.addAll(configData);
+
+          logInfo('VNeID test config applied: $normalizedConfigName');
+        }
+      } catch (e) {
+        logError('Load VNeID test config error: $e');
+        rethrow;
+      }
+
+    }
     final response = await Dio().post<Map<String, dynamic>>(
       'https://residence.sohatech.vn/residence/api/vneid/share-info',
       data: body,

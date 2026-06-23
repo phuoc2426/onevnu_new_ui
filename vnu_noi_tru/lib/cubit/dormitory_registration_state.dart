@@ -11,6 +11,16 @@ class DormitoryRegistrationLoading extends DormitoryRegistrationState {}
 
 class DormitoryRegistrationDismissHub extends DormitoryRegistrationState {}
 
+class DormitoryRegistrationOpenPeriodChecking
+    extends DormitoryRegistrationState {}
+
+class DormitoryRegistrationOpenPeriodChecked
+    extends DormitoryRegistrationState {
+  final bool hasOpenPeriod;
+
+  DormitoryRegistrationOpenPeriodChecked(this.hasOpenPeriod);
+}
+
 class DormitoryRegistrationError extends DormitoryRegistrationState {
   final String message;
   DormitoryRegistrationError(this.message);
@@ -72,6 +82,12 @@ class DormitoryRegistrationFileSelected extends DormitoryRegistrationState {
   final String slot;
   final File file;
   DormitoryRegistrationFileSelected(this.slot, this.file);
+}
+
+class DormitoryRegistrationFileChanged extends DormitoryRegistrationState {
+  final String type;
+
+  DormitoryRegistrationFileChanged(this.type);
 }
 
 class DormitoryRegistrationUploadProgress extends DormitoryRegistrationState {

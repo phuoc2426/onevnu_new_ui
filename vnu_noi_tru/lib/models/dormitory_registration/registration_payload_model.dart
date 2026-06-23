@@ -1,6 +1,6 @@
 class RegistrationPayloadModel {
   final int registrationPeriodId;
-  final int? priorityObjectId;
+  final List<int> priorityObjectIds;
   final int dormitoryId;
   final int roomTypeId;
   final String status; // "draft" hoặc "pending"
@@ -10,7 +10,7 @@ class RegistrationPayloadModel {
 
   RegistrationPayloadModel({
     required this.registrationPeriodId,
-    this.priorityObjectId,
+    this.priorityObjectIds = const [],
     required this.dormitoryId,
     required this.roomTypeId,
     required this.status,
@@ -21,7 +21,7 @@ class RegistrationPayloadModel {
 
   Map<String, dynamic> toJson() => {
     'registration_period_id': registrationPeriodId,
-    'priority_object_id': priorityObjectId,
+    'priority_object_ids': priorityObjectIds,
     'dormitory_id': dormitoryId,
     'room_type_id': roomTypeId,
     'status': status,
@@ -32,7 +32,7 @@ class RegistrationPayloadModel {
 
   RegistrationPayloadModel copyWith({
     int? registrationPeriodId,
-    int? priorityObjectId,
+    List<int>? priorityObjectIds,
     int? dormitoryId,
     int? roomTypeId,
     String? status,
@@ -42,7 +42,7 @@ class RegistrationPayloadModel {
   }) {
     return RegistrationPayloadModel(
       registrationPeriodId: registrationPeriodId ?? this.registrationPeriodId,
-      priorityObjectId: priorityObjectId ?? this.priorityObjectId,
+      priorityObjectIds: priorityObjectIds ?? this.priorityObjectIds,
       dormitoryId: dormitoryId ?? this.dormitoryId,
       roomTypeId: roomTypeId ?? this.roomTypeId,
       status: status ?? this.status,
@@ -56,16 +56,17 @@ class RegistrationPayloadModel {
 class RegistrationStudentPayload {
   final String studentCode;
   final String fullName;
-  final String dob; // format e.g. "2003-05-20T00:00:00Z"
+  final String dob; // API: dob
   final String cccd; // API: identity_no
   final String cccdIssueDate; // API: identity_issue_date
   final String hometown; // API: permanent_address
-  final String className; // map to 'class' in JSON
+  final String className; // API: class
   final String major;
   final String academicYear;
   final String system;
   final String level;
   final String universityName;
+  final int? univId;
   final String? priorityObjectName;
   final String temporaryAddress;
   final String gender; // "male" / "female"
@@ -85,6 +86,7 @@ class RegistrationStudentPayload {
     required this.system,
     required this.level,
     required this.universityName,
+    this.univId,
     this.priorityObjectName,
     required this.temporaryAddress,
     required this.gender,
@@ -95,64 +97,72 @@ class RegistrationStudentPayload {
   factory RegistrationStudentPayload.fromJson(Map<String, dynamic> json) {
     return RegistrationStudentPayload(
       studentCode:
-          (json['student_code'] ?? json['studentCode'])?.toString() ?? '',
+      (json['student_code'] ?? json['studentCode'])?.toString() ?? '',
       fullName: (json['full_name'] ?? json['fullName'])?.toString() ?? '',
       dob: json['dob']?.toString() ?? '',
       cccd:
-          (json['identity_no'] ?? json['identityNo'] ?? json['cccd'])
-              ?.toString() ??
+      (json['identity_no'] ?? json['identityNo'] ?? json['cccd'])
+          ?.toString() ??
           '',
       cccdIssueDate:
-          (json['identity_issue_date'] ??
-                  json['identityIssueDate'] ??
-                  json['cccd_issue_date'])
-              ?.toString() ??
+      (json['identity_issue_date'] ??
+          json['identityIssueDate'] ??
+          json['cccd_issue_date'])
+          ?.toString() ??
           '',
       hometown:
-          (json['permanent_address'] ??
-                  json['permanentAddress'] ??
-                  json['hometown'])
-              ?.toString() ??
+      (json['permanent_address'] ??
+          json['permanentAddress'] ??
+          json['hometown'])
+          ?.toString() ??
           '',
       className: (json['class'] ?? json['class_name'])?.toString() ?? '',
       major: json['major']?.toString() ?? '',
       academicYear:
-          (json['academic_year'] ?? json['academicYear'])?.toString() ?? '',
+        (json['academic_year'] ?? json['academicYear'])?.toString() ?? '',
       system: json['system']?.toString() ?? '',
       level: json['level']?.toString() ?? '',
       universityName:
-          (json['university_name'] ?? json['university'])?.toString() ?? '',
+      ( json['university_name'] ?? json['university'])?.toString() ?? '',
+      univId: (json['univ_id'] as num?)?.toInt(),
       priorityObjectName:
-          (json['priority_object_name'] ?? json['priorityObject'])?.toString(),
+        (json['priority_object_name'] ?? json['priorityObject'])?.toString(),
       temporaryAddress:
-          (json['temporary_address'] ?? json['temporaryAddress'])?.toString() ??
+        (json['temporary_address'] ?? json['temporaryAddress'])
+          ?.toString() ??
           '',
       gender: json['gender']?.toString() ?? 'male',
       phone:
-          (json['phone_number'] ?? json['phoneNumber'] ?? json['phone'])
-              ?.toString() ??
+      (json['phone_number'] ?? json['phoneNumber'] ?? json['phone'])
+          ?.toString() ??
           '',
       email: json['email']?.toString() ?? '',
     );
   }
 
-  Map<String, dynamic> toJson() => {
-    'student_code': studentCode,
-    'full_name': fullName,
-    'dob': dob,
-    'identity_no': cccd,
-    'identity_issue_date': cccdIssueDate,
-    'permanent_address': hometown,
-    'class': className,
-    'major': major,
-    'academic_year': academicYear,
-    'system': system,
-    'level': level,
-    'university_name': universityName,
-    'priority_object_name': priorityObjectName,
-    'temporary_address': temporaryAddress,
-    'gender': gender,
-    'phone_number': phone,
-    'email': email,
-  };
+  Map<String, dynamic> toJson() {
+    final json = <String, dynamic>{
+      'student_code': studentCode,
+      'full_name': fullName,
+      'dob': dob,
+      'identity_no': cccd,
+      'identity_issue_date': cccdIssueDate,
+      'permanent_address': hometown,
+      'class': className,
+      'major': major,
+      'academic_year': academicYear,
+      'system': system,
+      'level': level,
+      'university_name': universityName,
+      'univ_id': univId,
+      'priority_object_name': priorityObjectName,
+      'temporary_address': temporaryAddress,
+      'gender': gender,
+      'phone_number': phone,
+      'email': email,
+    };
+
+    json.removeWhere((key, value) => value == null);
+    return json;
+  }
 }

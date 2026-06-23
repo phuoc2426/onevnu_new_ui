@@ -402,4 +402,21 @@ Subject: \(subject)
             withId: IMMapView.viewID
         )
     }
+
+    override func application(
+        _ application: UIApplication,
+        continue userActivity: NSUserActivity,
+        restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void
+    ) -> Bool {
+        if userActivity.activityType == NSUserActivityTypeBrowsingWeb {
+            print("==== IOS UNIVERSAL LINK RECEIVED IN APPDELEGATE ====")
+            print("URL: \(userActivity.webpageURL?.absoluteString ?? "nil")")
+        }
+
+        return super.application(
+            application,
+            continue: userActivity,
+            restorationHandler: restorationHandler
+        )
+    }
 }

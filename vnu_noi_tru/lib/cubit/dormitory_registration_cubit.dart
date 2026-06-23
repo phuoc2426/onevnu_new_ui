@@ -6,7 +6,7 @@ import 'package:vnu_core/globals.dart';
 import 'package:vnu_noi_tru/models/model.dart';
 import 'package:vnu_noi_tru/repository/dormitory_registration_repository.dart';
 import 'package:dio/dio.dart';
-
+import 'package:vnu_core/repository/app_repository.dart';
 part 'dormitory_registration_state.dart';
 
 class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
@@ -33,19 +33,24 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
   List<RoomTypeModel> roomTypes = [];
   List<PriorityObjectModel> priorityObjects = [];
 
+  bool hasAnyOpenRegistrationPeriod = false;
+  bool isCheckingOpenRegistrationPeriod = false;
+  int? firstOpenPeriodDormitoryId;
+  String? openPeriodMessage;
+  File? cccdFrontFile;
+  File? cccdBackFile;
+
+  UploadedAttachmentModel? cccdFrontAttachment;
+  UploadedAttachmentModel? cccdBackAttachment;
+
+  List<File> proofFiles = [];
+  List<UploadedAttachmentModel> proofAttachments = [];
   static const Map<String, dynamic> _emptyMyRegistrationsData = {
     'student': null,
     'accommodations': [],
     'histories': [],
   };
 
-  UploadedAttachmentModel? cccdFrontAttachment;
-  UploadedAttachmentModel? cccdBackAttachment;
-  List<UploadedAttachmentModel> proofAttachments = [];
-
-  File? cccdFrontFile;
-  File? cccdBackFile;
-  List<File> proofFiles = [];
 
   bool _isStudentRegistrationNotFound(Object error) {
     if (error is! DioException) return false;
@@ -98,38 +103,381 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
         (mentionsStudent && mentionsNotFound);
   }
 
+  Future<bool> checkAnyOpenRegistrationPeriod() async {
+    isCheckingOpenRegistrationPeriod = true;
+    hasAnyOpenRegistrationPeriod = false;
+    firstOpenPeriodDormitoryId = null;
+    openPeriodMessage = null;
+
+    emit(DormitoryRegistrationOpenPeriodChecking());
+
+    try {
+      if (dormitories.isEmpty) {
+        final dormitoryRes = await _repository.getDormitories();
+        dormitories = dormitoryRes.data?.items ?? [];
+      }
+
+      if (dormitories.isEmpty) {
+        openPeriodMessage = 'Không có ký túc xá khả dụng';
+        emit(DormitoryRegistrationOpenPeriodChecked(false));
+        return false;
+      }
+
+      for (final dormitory in dormitories) {
+        final dormitoryId = dormitory.id;
+        if (dormitoryId == null) continue;
+
+        try {
+          final periodRes = await _repository.getRegistrationPeriods(
+            dormitoryId: dormitoryId,
+          );
+
+          final items = periodRes.data?.items ?? [];
+
+          if (items.isNotEmpty) {
+            hasAnyOpenRegistrationPeriod = true;
+            firstOpenPeriodDormitoryId = dormitoryId;
+
+            selectedDormitory = dormitory;
+            periods = items;
+            selectedPeriod = items.first;
+
+            emit(DormitoryRegistrationOpenPeriodChecked(true));
+            return true;
+          }
+        } catch (e) {
+          logError('Check registration period error for dormitory $dormitoryId: $e');
+        }
+      }
+
+      hasAnyOpenRegistrationPeriod = false;
+      periods = [];
+      selectedPeriod = null;
+      openPeriodMessage = 'Hiện chưa có đợt đăng ký nội trú nào đang mở';
+
+      emit(DormitoryRegistrationOpenPeriodChecked(false));
+      return false;
+    } catch (e) {
+      logError(e.toString());
+
+      hasAnyOpenRegistrationPeriod = false;
+      openPeriodMessage = 'Không kiểm tra được đợt đăng ký nội trú';
+
+      emit(DormitoryRegistrationOpenPeriodChecked(false));
+      return false;
+    } finally {
+      isCheckingOpenRegistrationPeriod = false;
+    }
+  }
+
+  Future<RegistrationPayloadModel> buildRegistrationPayload({
+    required String status,
+    String? reason,
+    List<Object> attachmentFileIds = const [],
+  }) async {
+    if (selectedPeriod?.id == null) {
+      throw Exception('Vui lòng chọn đợt đăng ký');
+    }
+
+    if (selectedDormitory?.id == null) {
+      throw Exception('Vui lòng chọn ký túc xá');
+    }
+
+    if (selectedRoomType?.id == null) {
+      throw Exception('Vui lòng chọn loại phòng');
+    }
+
+    final studentPayload = await _buildStudentPayload();
+
+    return RegistrationPayloadModel(
+      registrationPeriodId: selectedPeriod!.id!,
+      priorityObjectIds: [
+        if (selectedPriorityObject?.id != null) selectedPriorityObject!.id!,
+      ],
+      dormitoryId: selectedDormitory!.id!,
+      roomTypeId: selectedRoomType!.id!,
+      status: status,
+      reason: reason ?? tempReason ?? 'Đăng ký nội trú',
+      attachmentFileIds: attachmentFileIds,
+      student: studentPayload,
+    );
+  }
   void _emitEmptyMyRegistrations() {
     emit(DormitoryRegistrationMyRegistrationsLoaded(_emptyMyRegistrationsData));
   }
 
-  RegistrationStudentPayload _buildStudentPayload() {
-    final s = Globals().thongTinSinhVienModel.value;
-    String formatDate(dynamic d) {
-      if (d == null) return '';
-      if (d is DateTime) return d.toIso8601String().split('T').first;
-      return d.toString();
+  Future<T?> _firstOrNull<T>(Future<List<T>> future) async {
+    try {
+      final data = await future;
+      return data.isEmpty ? null : data.first;
+    } catch (e) {
+      logError(e.toString());
+      return null;
+    }
+  }
+
+  Future<T?> _firstOrNullWhen<T>(
+      String? key,
+      Future<List<T>> Function() futureBuilder,
+      ) {
+    if (key == null || key.trim().isEmpty) {
+      return Future.value(null);
+    }
+    return _firstOrNull(futureBuilder());
+  }
+
+  Future<T?> _nullable<T>(Future<T> Function() action) async {
+    try {
+      return await action();
+    } catch (e) {
+      logError(e.toString());
+      return null;
+    }
+  }
+
+  String _dateOnly(dynamic value) {
+    if (value == null) return '';
+    if (value is DateTime) return value.toIso8601String().split('T').first;
+    return value.toString().split('T').first;
+  }
+
+  String _joinAddress(List<Object?> parts) {
+    final text = parts
+        .map((e) => e?.toString().trim() ?? '')
+        .where((e) => e.isNotEmpty)
+        .join(', ');
+
+    return text;
+  }
+
+  String _mapGender(String? value) {
+    final text = value?.toLowerCase().trim() ?? '';
+
+    if (text == 'female' || text == 'f' || text == 'nữ' || text == 'nu') {
+      return 'female';
     }
 
+    return 'male';
+  }
+
+  Future<void> _ensureStudentCache() async {
+    if (Globals().thongTinSinhVienModel.value == null ||
+        Globals().lopDaoTaoModel.value == null ||
+        Globals().nienKhoaDaoTaoModel.value == null) {
+      await Globals().refreshStudentInfo();
+    }
+  }
+  Future<RegistrationStudentPayload> _buildStudentPayload() async {
+    await _ensureStudentCache();
+
+    final repo = ApiRepository();
+
+    final student = Globals().thongTinSinhVienModel.value;
+    final cachedClassInfo = Globals().lopDaoTaoModel.value;
+    final cachedAcademicYear = Globals().nienKhoaDaoTaoModel.value;
+
+    if (student == null) {
+      return RegistrationStudentPayload(
+        studentCode: '',
+        fullName: '',
+        dob: '',
+        cccd: tempCccd ?? '',
+        cccdIssueDate: tempCccdIssueDate ?? '',
+        hometown: tempHometown ?? '',
+        className: '',
+        major: '',
+        academicYear: '',
+        system: '',
+        level: '',
+        universityName: '',
+        univId: null,
+        priorityObjectName: selectedPriorityObject?.name,
+        temporaryAddress: tempTemporaryAddress ?? '',
+        gender: 'male',
+        phone: tempPhone ?? '',
+        email: tempEmail ?? '',
+      );
+    }
+
+    final guidDonVi = student.guidDonVi;
+
+    final classInfo = cachedClassInfo ??
+        await _firstOrNullWhen(
+          student.idLopDaoTao,
+              () => repo.getDataLopDaoTao(
+            student.idLopDaoTao,
+            guidDonVi,
+            student.idBacDaoTao,
+            student.idHeDaoTao,
+            student.idNganhDaoTao,
+            student.idNienKhoaDaoTao,
+            student.idChuongTrinhDaoTao,
+          ),
+        );
+
+    final major = await _firstOrNullWhen(
+      student.idNganhDaoTao,
+          () => repo.getDataNganhDaoTao(
+        student.idNganhDaoTao,
+        guidDonVi,
+        student.idBacDaoTao,
+      ),
+    );
+
+    final academicYear = cachedAcademicYear ??
+        await _firstOrNullWhen(
+          student.idNienKhoaDaoTao,
+              () => repo.getDataNienKhoaDaoTao(
+            student.idNienKhoaDaoTao,
+            guidDonVi,
+            student.idBacDaoTao,
+          ),
+        );
+
+    final system = await _firstOrNullWhen(
+      student.idHeDaoTao,
+          () => repo.getDataHeDaoTao(
+        student.idHeDaoTao,
+        guidDonVi,
+        student.idBacDaoTao,
+      ),
+    );
+
+    final level = await _firstOrNullWhen(
+      student.idBacDaoTao,
+          () => repo.getDataBacDaoTao(
+        student.idBacDaoTao,
+        guidDonVi,
+      ),
+    );
+
+    final priorityObject = await _firstOrNullWhen(
+      student.idDoiTuongUuTien,
+          () => repo.getDataDoiTuongUuTien(
+        student.idDoiTuongUuTien,
+        guidDonVi,
+      ),
+    );
+
+    final university = guidDonVi == null || guidDonVi.trim().isEmpty
+        ? null
+        : await _nullable(() => repo.getDonVi(guidDonVi));
+
+    final permanentProvince = await _firstOrNullWhen(
+      student.idHoKhauThuongTruTinhThanhPho,
+          () => repo.getDataTinhThanhPho(
+        student.idHoKhauThuongTruTinhThanhPho,
+        guidDonVi,
+      ),
+    );
+
+    final permanentDistrict = await _firstOrNullWhen(
+      student.idHoKhauThuongTruQuanHuyen,
+          () => repo.getDataQuanHuyen(
+        student.idHoKhauThuongTruQuanHuyen,
+        guidDonVi,
+        student.idHoKhauThuongTruTinhThanhPho,
+      ),
+    );
+
+    final temporaryProvince = await _firstOrNullWhen(
+      student.diaChiTamTruTinhThanhPho,
+          () => repo.getDataTinhThanhPho(
+        student.diaChiTamTruTinhThanhPho,
+        guidDonVi,
+      ),
+    );
+
+    final temporaryDistrict = await _firstOrNullWhen(
+      student.diaChiTamTruQuanHuyen,
+          () => repo.getDataQuanHuyen(
+        student.diaChiTamTruQuanHuyen,
+        guidDonVi,
+        student.diaChiTamTruTinhThanhPho,
+      ),
+    );
+
+    final currentProvince = await _firstOrNullWhen(
+      student.idNoiOHienNayTinhThanhPho,
+          () => repo.getDataTinhThanhPho(
+        student.idNoiOHienNayTinhThanhPho,
+        guidDonVi,
+      ),
+    );
+
+    final currentDistrict = await _firstOrNullWhen(
+      student.idNoiOHienNayQuanHuyen,
+          () => repo.getDataQuanHuyen(
+        student.idNoiOHienNayQuanHuyen,
+        guidDonVi,
+        student.idNoiOHienNayTinhThanhPho,
+      ),
+    );
+
+    final permanentAddress = _joinAddress([
+      student.hoKhauThuongTruSoNha,
+      student.hoKhauThuongTruDuongThon,
+      student.hoKhauThuongTruPhuongXa,
+      permanentDistrict?.ten ?? student.idHoKhauThuongTruQuanHuyen,
+      permanentProvince?.ten ?? student.idHoKhauThuongTruTinhThanhPho,
+    ]);
+
+    final temporaryAddress = _joinAddress([
+      student.diaChiTamTruSoNha,
+      student.diaChiTamTruDuongThon,
+      student.diaChiTamTruPhuongXa,
+      temporaryDistrict?.ten ?? student.diaChiTamTruQuanHuyen,
+      temporaryProvince?.ten ?? student.diaChiTamTruTinhThanhPho,
+    ]);
+
+    final currentAddress = _joinAddress([
+      student.noiOHienNaySoNha,
+      student.noiOHienNayDuongThon,
+      student.noiOHienNayPhuongXa,
+      currentDistrict?.ten ?? student.idNoiOHienNayQuanHuyen,
+      currentProvince?.ten ?? student.idNoiOHienNayTinhThanhPho,
+    ]);
+
+    final contactAddress = _joinAddress([
+      student.diaChiLienLacSoNha,
+      student.diaChiLienLacDuongThon,
+      student.diaChiLienLacPhuongXa,
+    ]);
+
     return RegistrationStudentPayload(
-      studentCode: s?.maSinhVien ?? '',
-      fullName: s?.hoVaTen ?? '',
-      dob: formatDate(s?.ngaySinh),
-      cccd: tempCccd ?? s?.soCmtCccd ?? '',
-      cccdIssueDate: tempCccdIssueDate ?? formatDate(s?.ngayCapCmtCccd),
-      hometown: tempHometown ?? s?.hoKhauThuongTruPhuongXa ?? '',
-      className: Globals().lopDaoTaoModel.value?.ten ?? '',
-      major: Globals().lopDaoTaoModel.value?.idNganhDaoTao ?? '',
-      academicYear: Globals().nienKhoaDaoTaoModel.value?.ten ?? '',
-      system: '',
-      level: '',
-      universityName: '',
-      priorityObjectName: selectedPriorityObject?.name,
-      temporaryAddress: tempTemporaryAddress ?? s?.diaChiLienLacPhuongXa ?? '',
-      gender: (s?.gioiTinh ?? 'male').toLowerCase() == 'female'
-          ? 'female'
-          : 'male',
-      phone: tempPhone ?? s?.mobile ?? s?.tel ?? '',
-      email: tempEmail ?? s?.email ?? '',
+      studentCode: student.maSinhVien ?? '',
+      fullName: student.hoVaTen ?? '',
+      dob: _dateOnly(student.ngaySinh),
+      cccd: tempCccd ?? student.soCmtCccd ?? '',
+      cccdIssueDate: tempCccdIssueDate ?? _dateOnly(student.ngayCapCmtCccd),
+      hometown: tempHometown ??
+          (permanentAddress.isNotEmpty
+              ? permanentAddress
+              : student.hoKhauThuongTruPhuongXa ?? ''),
+      className: classInfo?.ten ?? classInfo?.tenVietTat ?? student.idLopDaoTao ?? '',
+      major: major?.ten ?? student.idNganhDaoTao ?? '',
+      academicYear: academicYear?.ten ??
+          _joinAddress([
+            academicYear?.namBatDau,
+            academicYear?.namKetThuc,
+          ]) ??
+          student.idNienKhoaDaoTao ??
+          '',
+      system: system?.ten ?? student.idHeDaoTao ?? '',
+      level: level?.ten ?? student.idBacDaoTao ?? '',
+      universityName: university?.tenDonVi ?? '',
+      univId: university?.idHeThongDaoTao,
+      priorityObjectName:
+      selectedPriorityObject?.name ?? priorityObject?.ten ?? '',
+      temporaryAddress: tempTemporaryAddress ??
+          (temporaryAddress.isNotEmpty
+              ? temporaryAddress
+              : currentAddress.isNotEmpty
+              ? currentAddress
+              : contactAddress),
+      gender: _mapGender(student.gioiTinh),
+      phone: tempPhone ?? student.mobile ?? student.tel ?? '',
+      email: tempEmail ?? student.email ?? student.emailKhac ?? '',
     );
   }
 
@@ -398,7 +746,7 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
   Future<void> uploadCCCDFront(File file) async {
     // emit(DormitoryRegistrationShowHub());
     try {
-      final studentPayload = _buildStudentPayload();
+      final studentPayload = await _buildStudentPayload();
       final res = await _repository.uploadAttachment(
         student: studentPayload,
         files: [file],
@@ -424,7 +772,7 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
   Future<void> uploadCCCDBack(File file) async {
     // emit(DormitoryRegistrationShowHub());
     try {
-      final studentPayload = _buildStudentPayload();
+      final studentPayload = await _buildStudentPayload();
       final res = await _repository.uploadAttachment(
         student: studentPayload,
         files: [file],
@@ -450,7 +798,7 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
   Future<void> uploadProofFile(File file) async {
     // emit(DormitoryRegistrationShowHub());
     try {
-      final studentPayload = _buildStudentPayload();
+      final studentPayload = await _buildStudentPayload();
       final res = await _repository.uploadAttachment(
         student: studentPayload,
         files: [file],
@@ -539,17 +887,76 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
 
   void selectCCCDFront(File file) {
     cccdFrontFile = file;
+
+    // Nếu người dùng chọn lại ảnh mới, attachment cũ không còn đại diện cho ảnh hiện tại nữa.
+    cccdFrontAttachment = null;
+
     emit(DormitoryRegistrationFileSelected('cccd_front', file));
   }
 
   void selectCCCDBack(File file) {
     cccdBackFile = file;
+
+    // Nếu người dùng chọn lại ảnh mới, attachment cũ không còn đại diện cho ảnh hiện tại nữa.
+    cccdBackAttachment = null;
+
     emit(DormitoryRegistrationFileSelected('cccd_back', file));
   }
 
   void addProofFile(File file) {
     proofFiles.add(file);
     emit(DormitoryRegistrationFileSelected('proof', file));
+  }
+
+  void removeCCCDFront() {
+    cccdFrontFile = null;
+    cccdFrontAttachment = null;
+
+    emit(DormitoryRegistrationFileChanged('cccd_front_removed'));
+  }
+
+  void removeCCCDBack() {
+    cccdBackFile = null;
+    cccdBackAttachment = null;
+
+    emit(DormitoryRegistrationFileChanged('cccd_back_removed'));
+  }
+
+  void removeProofFileAt(int index) {
+    if (index < 0 || index >= proofFiles.length) {
+      return;
+    }
+
+    proofFiles.removeAt(index);
+
+    emit(DormitoryRegistrationFileChanged('proof_removed'));
+  }
+
+  void removeProofAttachmentAt(int index) {
+    if (index < 0 || index >= proofAttachments.length) {
+      return;
+    }
+
+    proofAttachments.removeAt(index);
+
+    emit(DormitoryRegistrationFileChanged('proof_attachment_removed'));
+  }
+
+  void clearProofFiles() {
+    proofFiles.clear();
+
+    emit(DormitoryRegistrationFileChanged('proof_cleared'));
+  }
+
+  void clearAllSelectedFiles() {
+    cccdFrontFile = null;
+    cccdBackFile = null;
+    cccdFrontAttachment = null;
+    cccdBackAttachment = null;
+    proofFiles.clear();
+    proofAttachments.clear();
+
+    emit(DormitoryRegistrationFileChanged('all_files_cleared'));
   }
 
   Future<bool> uploadCachedFiles() async {
@@ -564,7 +971,7 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
     }
 
     try {
-      final studentPayload = _buildStudentPayload();
+      final studentPayload = await _buildStudentPayload();
       int currentStep = 0;
 
       // 1. Upload CCCD mặt trước
@@ -625,35 +1032,44 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
         }
       }
 
-      // 3. Upload các giấy tờ ưu tiên cùng lúc
+      // 3. Upload từng giấy tờ ưu tiên, không gom nhiều ảnh vào một request
       if (proofFiles.isNotEmpty) {
-        emit(
-          DormitoryRegistrationUploadProgress(
-            currentStep / totalSteps,
-            "Đang tải lên tài liệu minh chứng (${(currentStep / totalSteps * 100).toInt()}%)...",
-          ),
-        );
-        final res = await _repository.uploadAttachment(
-          student: studentPayload,
-          files: proofFiles,
-        );
-        if (res.data != null && res.data!.isNotEmpty) {
-          proofAttachments.addAll(res.data!);
-          proofFiles.clear();
-          currentStep++;
+        final filesToUpload = List<File>.from(proofFiles);
+
+        for (int i = 0; i < filesToUpload.length; i++) {
+          final file = filesToUpload[i];
+
           emit(
             DormitoryRegistrationUploadProgress(
               currentStep / totalSteps,
-              "Đang tải lên tài liệu minh chứng (${(currentStep / totalSteps * 100).toInt()}%)...",
+              "Đang tải lên tài liệu minh chứng ${i + 1}/${filesToUpload.length}...",
             ),
           );
-        } else {
-          throw Exception(
-            'Không nhận được thông tin file sau khi upload tài liệu ưu tiên',
-          );
-        }
-      }
 
+          final res = await _repository.uploadAttachment(
+            student: studentPayload,
+            files: [file],
+          );
+
+          if (res.data != null && res.data!.isNotEmpty) {
+            proofAttachments.addAll(res.data!);
+          } else {
+            throw Exception(
+              'Không nhận được thông tin file sau khi upload tài liệu ưu tiên ${i + 1}',
+            );
+          }
+        }
+
+        proofFiles.clear();
+        currentStep++;
+
+        emit(
+          DormitoryRegistrationUploadProgress(
+            currentStep / totalSteps,
+            "Đã tải lên tài liệu minh chứng (${(currentStep / totalSteps * 100).toInt()}%)...",
+          ),
+        );
+      }
       emit(
         DormitoryRegistrationUploadProgress(1.0, "Đang hoàn tất đăng ký..."),
       );
