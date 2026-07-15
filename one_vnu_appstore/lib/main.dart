@@ -14,7 +14,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:students/firebase_options.dart';
+
 import 'package:vnu_core/common/log.dart';
+import 'package:vnu_core/common/guide/guide.dart';
+import 'package:vnu_core/common/guide/global/app_guide_global_initializer.dart';
 import 'package:vnu_core/globals.dart';
 import 'package:vnu_core/modules/sync/views/vcore_sync_view.dart';
 import 'package:vnu_core/modules/sync/vneid_deep_link_service.dart';
@@ -22,7 +25,9 @@ import 'package:vnu_core/modules/tabbar/views/vcore_tabbar_view.dart';
 import 'package:vnu_core/services/services_url.dart';
 import 'package:vnu_core/vnu_core.dart';
 import 'package:vnu_noi_tru/vnu_noi_tru.dart';
-import 'package:device_preview/device_preview.dart';
+
+// Nếu cần bật DevicePreview thì mở lại import này.
+// import 'package:device_preview/device_preview.dart';
 
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   try {
@@ -34,6 +39,28 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   }
 
   logInfo('Handling a background message: ${message.messageId}');
+}
+
+/// Bọc một screen bằng guide scope.
+///
+/// Lý do cần helper này:
+/// - VnuCore().runVnuApp(mainScreen: ...)
+/// - VnuCore().gotoMainScreen(...)
+///
+/// đều có thể tạo lại main screen sau login / logout / navigation.
+/// Nếu truyền thẳng `const VcoreTabbarView()` thì màn Home sau đó có thể không còn
+/// nằm dưới AppGuideRegistryScope, gây lỗi:
+///
+/// AppGuideRegistryScope not found.
+Widget _buildGuideHost({required Widget child}) {
+  return AppGuideRegistryScope(
+    registry: globalAppGuideRegistry,
+    child: AppShowcaseScope(child: child),
+  );
+}
+
+Widget _buildMainScreen() {
+  return _buildGuideHost(child: const VcoreTabbarView());
 }
 
 Future<void> main() async {
@@ -58,27 +85,27 @@ Future<void> main() async {
   HttpOverrides.global = MyHttpOverrides();
 
   PlatformDispatcher.instance.onError = (error, stack) {
-    FirebaseCrashlytics.instance.recordError(
-      error,
-      stack,
-      fatal: true,
-    );
+    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+
     return true;
   };
 
   await ServicesUrl().init();
 
-  final RemoteMessage? message =
-  await FirebaseMessaging.instance.getInitialMessage();
+  final RemoteMessage? message = await FirebaseMessaging.instance
+      .getInitialMessage();
 
-  // Để sử dụng device_preview, hãy mở comment import ở đầu file và đoạn code dưới đây,
-  // đồng thời comment lại dòng `runApp(MyApp(message: message));` phía dưới.
+  AppGuideGlobalInitializer.ensureInitialized();
+
+  // Nếu cần dùng DevicePreview, dùng dạng này:
+  //
   // runApp(
   //   DevicePreview(
   //     enabled: !kReleaseMode,
   //     builder: (context) => MyApp(message: message),
   //   ),
   // );
+
   runApp(MyApp(message: message));
 }
 
@@ -92,10 +119,7 @@ class MyHttpOverrides extends HttpOverrides {
 }
 
 class MyApp extends StatefulHookWidget {
-  const MyApp({
-    super.key,
-    this.message,
-  });
+  const MyApp({super.key, this.message});
 
   final RemoteMessage? message;
 
@@ -106,8 +130,11 @@ class MyApp extends StatefulHookWidget {
 class _MyAppState extends State<MyApp> {
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
   FlutterLocalNotificationsPlugin();
+
   final AppLinks _appLinks = AppLinks();
+
   StreamSubscription<Uri>? _appLinksSubscription;
+
   bool _isOpeningVneidSyncView = false;
 
   @override
@@ -131,28 +158,28 @@ class _MyAppState extends State<MyApp> {
     VnuCore().loginSucces = (token) async {
       logInfo('Login success');
 
-      VnuCore().gotoMainScreen(
-        const VcoreTabbarView(),
-      );
+      /// Quan trọng:
+      /// Không truyền thẳng `const VcoreTabbarView()` nữa.
+      /// Phải truyền screen đã được bọc AppGuideRegistryScope + AppShowcaseScope.
+      VnuCore().gotoMainScreen(_buildMainScreen());
 
       _openPendingVneidCallback();
 
       if (widget.message != null) {
-        _handleNotificationTapped(
-          context,
-          widget.message?.data,
-        );
+        _handleNotificationTapped(context, widget.message?.data);
       }
     };
 
-    return VnuCore().runVnuApp(
-      mainScreen: const VcoreTabbarView(),
-    );
+    /// Quan trọng:
+    /// mainScreen cũng phải dùng `_buildMainScreen()`.
+    /// Không dùng `const VcoreTabbarView()` trực tiếp.
+    return VnuCore().runVnuApp(mainScreen: _buildMainScreen());
   }
 
   Future<void> _initVneidDeepLinks() async {
     try {
       final initialLink = await _appLinks.getInitialLink();
+
       if (initialLink != null) {
         _handleVneidDeepLink(initialLink);
       }
@@ -196,8 +223,10 @@ class _MyAppState extends State<MyApp> {
     }
 
     _isOpeningVneidSyncView = true;
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final context = navigatorKey.currentContext;
+
       if (!mounted ||
           context == null ||
           !VneidDeepLinkService().hasPendingCallback ||
@@ -206,9 +235,9 @@ class _MyAppState extends State<MyApp> {
         return;
       }
 
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const VcoreSyncView()),
-      ).whenComplete(() {
+      Navigator.of(context)
+          .push(MaterialPageRoute(builder: (_) => const VcoreSyncView()))
+          .whenComplete(() {
         _isOpeningVneidSyncView = false;
       });
     });
@@ -229,6 +258,7 @@ class _MyAppState extends State<MyApp> {
     logInfo('_initRemoteConfig');
 
     final Map<String, RemoteConfigValue> configValue = remoteConfig.getAll();
+
     logError(configValue.keys.toString());
 
     VnuCore().checkUpdateNewVersion(
@@ -261,10 +291,7 @@ class _MyAppState extends State<MyApp> {
         try {
           final Map<String, dynamic> payload = jsonDecode(details.payload!);
 
-          _handleNotificationTapped(
-            context,
-            payload,
-          );
+          _handleNotificationTapped(context, payload);
         } catch (e) {
           logError(e.toString());
         }
@@ -288,10 +315,7 @@ class _MyAppState extends State<MyApp> {
     });
 
     FirebaseMessaging.onMessageOpenedApp.listen((event) {
-      _handleNotificationTapped(
-        context,
-        event.data,
-      );
+      _handleNotificationTapped(context, event.data);
     });
   }
 
@@ -299,10 +323,7 @@ class _MyAppState extends State<MyApp> {
       BuildContext context,
       Map<String, dynamic>? message,
       ) {
-    VnuCore().handleNotificationTapped(
-      context,
-      message,
-    );
+    VnuCore().handleNotificationTapped(context, message);
 
     VNUNoiTru().handleNotificationTapped(message);
   }

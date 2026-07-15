@@ -2,21 +2,22 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:vnu_core/common/log.dart';
-import 'package:vnu_core/modules/admission/views/vcore_admission_view.dart';
+import 'package:vnu_core/screens/vcore_admission_view.dart';
 import 'package:vnu_core/repository/app_repository.dart';
 import 'package:vnu_core/repository/data_repository.dart';
 import 'package:vnu_core/services/services_url.dart';
 import 'package:vnu_core/vnu_core.dart';
 
 import '../globals.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vnu_core/modules/admission/views/applicant_home_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class VCoreSplashScreen extends StatefulWidget {
   final Widget mainScreen;
 
-  const VCoreSplashScreen({
-    Key? key,
-    required this.mainScreen,
-  }) : super(key: key);
+  const VCoreSplashScreen({Key? key, required this.mainScreen})
+    : super(key: key);
 
   @override
   State<VCoreSplashScreen> createState() => _VCoreSplashScreenState();
@@ -56,12 +57,37 @@ class _VCoreSplashScreenState extends State<VCoreSplashScreen> {
 
     if (!mounted) return;
 
+    // Trường hợp token sinh viên (kLoginToken) không tồn tại hoặc refresh token rỗng
+    // Kiểm tra token của thí sinh đã được lưu trong SharedPreferences (key: 'accessToken').
     if (token.isEmpty || refreshToken.isEmpty) {
+      // Trường hợp không có token sinh viên, kiểm tra token thí sinh (được lưu dưới key riêng).
+      final prefs = await SharedPreferences.getInstance();
+      const applicantTokenKey = 'applicant_access_token';
+      final applicantToken = prefs.getString(applicantTokenKey) ?? '';
+      if (applicantToken.isNotEmpty) {
+        // Đặt token chung để các request có thể dùng (Globals & ApiRepository)
+        Globals().token = applicantToken;
+        ApiRepository().setToken(applicantToken);
+        // Lấy thông tin hiển thị (fullname) nếu có, rồi chuyển tới màn home của thí sinh.
+        final fullName = prefs.getString('applicant_fullname') ?? 'Thí sinh';
+        if (mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(
+              builder: (_) => ApplicantHomeScreen(fullName: fullName),
+            ),
+            (route) => false,
+          );
+        }
+        return;
+      }
+
+      // Không có token nào → xóa session và chuyển tới Admission (đăng ký/login sinh viên)
       await _clearLoginSession();
       _goToAdmission();
       return;
     }
 
+    // Token sinh viên hợp lệ → tiếp tục quy trình refresh token như hiện tại
     Globals().token = token;
     Globals().refreshToken = refreshToken;
 
@@ -89,8 +115,9 @@ class _VCoreSplashScreenState extends State<VCoreSplashScreen> {
 
   Future<void> _refreshTokenAndGoMain(String? firebaseToken) async {
     try {
-      final responseRefreshToken =
-      await ApiRepository().refreshToken(Globals().refreshToken);
+      final responseRefreshToken = await ApiRepository().refreshToken(
+        Globals().refreshToken,
+      );
 
       final newToken = responseRefreshToken.accessToken ?? '';
       final newRefreshToken = responseRefreshToken.refreshToken ?? '';
@@ -149,10 +176,8 @@ class _VCoreSplashScreenState extends State<VCoreSplashScreen> {
     _hasNavigated = true;
 
     Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(
-        builder: (_) => const VcoreAdmissionView(),
-      ),
-          (route) => false,
+      MaterialPageRoute(builder: (_) => const VcoreAdmissionView()),
+      (route) => false,
     );
   }
 
@@ -167,10 +192,8 @@ class _VCoreSplashScreenState extends State<VCoreSplashScreen> {
     }
 
     Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(
-        builder: (_) => widget.mainScreen,
-      ),
-          (route) => false,
+      MaterialPageRoute(builder: (_) => widget.mainScreen),
+      (route) => false,
     );
   }
 
@@ -192,12 +215,7 @@ class _VCoreSplashScreenState extends State<VCoreSplashScreen> {
       backgroundColor: Colors.white,
       body: Center(
         child: Padding(
-          padding: EdgeInsets.only(
-            top: 36,
-            bottom: 40,
-            left: 30,
-            right: 30,
-          ),
+          padding: EdgeInsets.only(top: 36, bottom: 40, left: 30, right: 30),
           child: Image(
             image: AssetImage(
               'assets/images/ic_logo_vnu_full.png',

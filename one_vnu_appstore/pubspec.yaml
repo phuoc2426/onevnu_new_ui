@@ -7,7 +7,7 @@ description: A new Flutter project.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 
 #version: 1.1.0+1038
-version: 2.0.7+1050
+version: 2.0.8+1051
 
 environment:
   sdk: ">=3.8.0 <4.0.0"
@@ -57,6 +57,7 @@ dependencies:
   barcode_widget: ^2.0.4
   salomon_bottom_bar: ^3.3.2
   shadcn_ui: ^0.54.0
+  video_player: ^2.8.6
   file_picker: ^11.0.2
   timezone: ^0.11.0
   page_flip: ^0.2.5+1
@@ -66,6 +67,9 @@ dependencies:
   app_links: ^6.3.0
   flutter_image_compress: ^2.4.0
   path_provider: ^2.1.6
+  showcaseview: ^5.1.0
+  google_sign_in: ^6.2.1
+  visibility_detector: ^0.4.0+2
 #  liquid_glass_easy: ^1.1.1
 #  glass: ^2.0.0
   # #API
@@ -115,6 +119,7 @@ flutter:
   # To add assets to your application, add an assets section, like this:
   assets:
     - assets/images/
+    - assets/videos/
 
   fonts:
     - family: OpenSans

@@ -526,6 +526,7 @@ class _DRWizardFlowState extends State<DRWizardFlow> {
   }
 
   Future<void> _submitRegistration() async {
+    print("===== submitRegistration =====");
     final reviewState = _step4Key.currentState;
     if (reviewState != null && !reviewState.isCommitted) {
       _showSnackbarError(
@@ -563,10 +564,12 @@ class _DRWizardFlowState extends State<DRWizardFlow> {
           ).format(student.ngayCapCmtCccd!.toUtc())
         : '';
 
+
     final payload = await _cubit.buildRegistrationPayload(
       status: 'pending',
       reason: _cubit.tempReason ?? 'Đăng ký nội trú',
     );
+    debugPrint('PAYLOAD gui ktx: $payload');
 
     await _cubit.submitRegistration(payload);
     _cubit.registerDormitory(payload);

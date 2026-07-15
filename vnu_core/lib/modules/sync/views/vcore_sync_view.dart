@@ -94,7 +94,7 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
       // API này có nhiệm vụ validate dữ liệu và gắn cờ để VNeID mở popup consent.
       // await ApiRepository().shareVneidInfo();
       //test
-      await ApiRepository().shareVneidInfo(
+      var ressponseShareVneid=await ApiRepository().shareVneidInfo(
         configName: _configNameController.text.trim(),
       );
 

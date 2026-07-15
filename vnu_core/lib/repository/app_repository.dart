@@ -13,6 +13,7 @@ import '../data/api_response.dart';
 import '../data/app_api.dart';
 import '../globals.dart';
 import '../models/model.dart';
+import '../models/admitted_student.dart';
 import '../services/dio_options.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vnu_core/modules/sync/vneid_sync_ticket.dart';
@@ -146,6 +147,23 @@ class ApiRepository {
 
   Future<CurrentUserModel> getCurrentUser() {
     return _apiClient.getCurrentUser();
+  }
+
+  // -----------------------------------------------------------------
+  /// Lấy danh sách sinh viên trúng tuyển từ backend.
+  ///
+  /// Backend cung cấp endpoint GET /api/applicant/admitted trả về danh sách
+  /// `AdmittedStudent` dưới dạng JSON. Phương thức này gọi endpoint và
+  /// chuyển đổi dữ liệu thành danh sách các model Flutter.
+  /// -----------------------------------------------------------------
+  Future<List<AdmittedStudent>> getAdmittedStudents() async {
+    // Đảm bảo token đã được thiết lập trong header của Dio (được thực hiện
+    // trong ApiRepository.setToken).
+    final response = await _dio.get<List<dynamic>>('/api/applicant/admitted');
+    final List<dynamic> rawList = response.data ?? [];
+    return rawList
+        .map((e) => AdmittedStudent.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   Future<StudentInfoModel> getSinhVienInfo() {
@@ -817,11 +835,7 @@ class ApiRepository {
       try {
         final configResponse = await Dio().get<Map<String, dynamic>>(
           'http://112.137.132.211/cccd-config/configs/$normalizedConfigName',
-          options: Options(
-            headers: {
-              'Accept': 'application/json',
-            },
-          ),
+          options: Options(headers: {'Accept': 'application/json'}),
         );
 
         final rawConfigData = configResponse.data?['data'];
@@ -830,7 +844,7 @@ class ApiRepository {
           final configData = Map<String, dynamic>.from(rawConfigData);
 
           configData.removeWhere(
-                (key, value) => value == null || value.toString().trim().isEmpty,
+            (key, value) => value == null || value.toString().trim().isEmpty,
           );
 
           body.addAll(configData);
@@ -841,7 +855,6 @@ class ApiRepository {
         logError('Load VNeID test config error: $e');
         rethrow;
       }
-
     }
     final response = await Dio().post<Map<String, dynamic>>(
       'https://residence.sohatech.vn/residence/api/vneid/share-info',
@@ -858,17 +871,13 @@ class ApiRepository {
   }
 
   Future<VneidShareInfoStatusModel> getVneidShareInfoStatus(
-      String transactionCode,
-      ) async {
+    String transactionCode,
+  ) async {
     final encodedTransactionCode = Uri.encodeComponent(transactionCode);
 
     final response = await Dio().get<Map<String, dynamic>>(
       'https://residence.sohatech.vn/residence/api/vneid/share-info/status/$encodedTransactionCode',
-      options: Options(
-        headers: {
-          'Accept': 'application/json',
-        },
-      ),
+      options: Options(headers: {'Accept': 'application/json'}),
     );
 
     final data = response.data ?? <String, dynamic>{};
@@ -877,6 +886,7 @@ class ApiRepository {
 
     return VneidShareInfoStatusModel.fromJson(data);
   }
+
   Future<T?> _firstOrNull<T>(Future<List<T>> future) async {
     try {
       final data = await future;
@@ -1185,6 +1195,53 @@ class ApiRepository {
 
   // --- ---
 
+  // ========== APPLICANT ==========
+  Future<Map<String, dynamic>> applicantRegister(String cccd) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/api/applicant/auth/register',
+      data: {'cccd': cccd},
+      options: Options(
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      ),
+    );
+    return response.data!;
+  }
+
+  Future<Map<String, dynamic>> applicantLogin(
+    String cccd,
+    String password,
+  ) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/api/applicant/auth/login',
+      data: {'cccd': cccd, 'password': password},
+      options: Options(
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      ),
+    );
+    return response.data!;
+  }
+  Future<Map<String, dynamic>> applicantChangePassword(
+      String oldPassword,
+      String newPassword,
+      ) async {
+    final response = await _dio.put<Map<String, dynamic>>(
+      '/api/applicant/auth/change-password',
+      data: {'oldPassword': oldPassword, 'newPassword': newPassword},
+      options: Options(
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      ),
+    );
+    return response.data!;
+  }
   void dispose() {
     this.dispose();
   }

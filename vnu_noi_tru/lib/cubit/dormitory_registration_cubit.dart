@@ -7,6 +7,7 @@ import 'package:vnu_noi_tru/models/model.dart';
 import 'package:vnu_noi_tru/repository/dormitory_registration_repository.dart';
 import 'package:dio/dio.dart';
 import 'package:vnu_core/repository/app_repository.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // thêm dòng này
 part 'dormitory_registration_state.dart';
 
 class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
@@ -20,6 +21,7 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
   RoomTypeModel? selectedRoomType;
   PriorityObjectModel? selectedPriorityObject;
   List<UploadedAttachmentModel> uploadedAttachments = [];
+  String? tempFullName;
   String? tempPhone;
   String? tempEmail;
   String? tempCccd;
@@ -27,6 +29,7 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
   String? tempHometown;
   String? tempTemporaryAddress;
   String? tempReason;
+  String? tempDOB;
 
   List<RegistrationPeriodModel> periods = [];
   List<DormitoryModel> dormitories = [];
@@ -50,7 +53,6 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
     'accommodations': [],
     'histories': [],
   };
-
 
   bool _isStudentRegistrationNotFound(Object error) {
     if (error is! DioException) return false;
@@ -84,13 +86,22 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
     collect(responseData);
 
     final text = parts.join(' ').toLowerCase();
-    final mentionsStudent =
+    final mentionsIdentity =
         text.contains('student') ||
         text.contains('student_code') ||
         text.contains('mã sinh viên') ||
         text.contains('ma sinh vien') ||
         text.contains('sinh viên') ||
-        text.contains('sinh vien');
+        text.contains('sinh vien') ||
+        text.contains('cccd') ||
+        text.contains('căn cước') ||
+        text.contains('can cuoc') ||
+        text.contains('căn cước công dân') ||
+        text.contains('can cuoc cong dan') ||
+        text.contains('citizen') ||
+        text.contains('citizen_id') ||
+        text.contains('identity') ||
+        text.contains('identity_number');
     final mentionsNotFound =
         text.contains('not found') ||
         text.contains('không tồn tại') ||
@@ -98,9 +109,9 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
         text.contains('không tìm thấy') ||
         text.contains('khong tim thay');
 
-    return (statusCode == 404 && mentionsStudent) ||
-        (statusCode == 422 && mentionsStudent && mentionsNotFound) ||
-        (mentionsStudent && mentionsNotFound);
+    return (statusCode == 404 && mentionsIdentity) ||
+        (statusCode == 422 && mentionsIdentity && mentionsNotFound) ||
+        (mentionsIdentity && mentionsNotFound);
   }
 
   Future<bool> checkAnyOpenRegistrationPeriod() async {
@@ -146,7 +157,9 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
             return true;
           }
         } catch (e) {
-          logError('Check registration period error for dormitory $dormitoryId: $e');
+          logError(
+            'Check registration period error for dormitory $dormitoryId: $e',
+          );
         }
       }
 
@@ -202,6 +215,7 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
       student: studentPayload,
     );
   }
+
   void _emitEmptyMyRegistrations() {
     emit(DormitoryRegistrationMyRegistrationsLoaded(_emptyMyRegistrationsData));
   }
@@ -217,9 +231,9 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
   }
 
   Future<T?> _firstOrNullWhen<T>(
-      String? key,
-      Future<List<T>> Function() futureBuilder,
-      ) {
+    String? key,
+    Future<List<T>> Function() futureBuilder,
+  ) {
     if (key == null || key.trim().isEmpty) {
       return Future.value(null);
     }
@@ -261,27 +275,60 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
   }
 
   Future<void> _ensureStudentCache() async {
+    // Nếu đã có thông tin sinh viên (Google login) thì không cần làm gì
+    if (Globals().thongTinSinhVienModel.value != null) return;
+
+    // Kiểm tra nếu là thí sinh (có cache applicant_cccd) thì không gọi API
+    final prefs = await SharedPreferences.getInstance();
+    final applicantCccd = prefs.getString('applicant_cccd');
+    if (applicantCccd != null && applicantCccd.isNotEmpty) {
+      // Không cần refresh student info từ server
+      return;
+    }
+
     if (Globals().thongTinSinhVienModel.value == null ||
         Globals().lopDaoTaoModel.value == null ||
         Globals().nienKhoaDaoTaoModel.value == null) {
       await Globals().refreshStudentInfo();
     }
   }
+
   Future<RegistrationStudentPayload> _buildStudentPayload() async {
     await _ensureStudentCache();
 
+    final prefs = await SharedPreferences.getInstance();
     final repo = ApiRepository();
+    final applicantCccd = prefs.getString('applicant_cccd');
 
     final student = Globals().thongTinSinhVienModel.value;
     final cachedClassInfo = Globals().lopDaoTaoModel.value;
     final cachedAcademicYear = Globals().nienKhoaDaoTaoModel.value;
+    final bool isApplicant =
+        (applicantCccd != null && applicantCccd.isNotEmpty) ||
+        (Globals().thongTinSinhVienModel.value?.maSinhVien == null ||
+            Globals().thongTinSinhVienModel.value?.maSinhVien?.isEmpty == true);
+    if (isApplicant) {
+      final fullName =
+          tempFullName ?? prefs.getString('applicant_fullname') ?? '';
+      final dob = tempDOB ?? prefs.getString('applicant_dob') ?? '';
+      final phone = tempPhone ?? prefs.getString('applicant_phone') ?? '';
+      final email = tempEmail ?? prefs.getString('applicant_email') ?? '';
+      final cccd = tempCccd ?? applicantCccd ?? '';
 
-    if (student == null) {
+      String dobFormatted = '';
+      if (dob.isNotEmpty) {
+        try {
+          final parsed = DateTime.parse(dob);
+          dobFormatted = parsed.toUtc().toIso8601String();
+        } catch (_) {
+          dobFormatted = dob; // fallback nếu không parse được
+        }
+      }
       return RegistrationStudentPayload(
         studentCode: '',
-        fullName: '',
-        dob: '',
-        cccd: tempCccd ?? '',
+        fullName: fullName,
+        dob: dobFormatted,
+        cccd: cccd,
         cccdIssueDate: tempCccdIssueDate ?? '',
         hometown: tempHometown ?? '',
         className: '',
@@ -293,18 +340,21 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
         univId: null,
         priorityObjectName: selectedPriorityObject?.name,
         temporaryAddress: tempTemporaryAddress ?? '',
-        gender: 'male',
-        phone: tempPhone ?? '',
-        email: tempEmail ?? '',
+        gender: 'male', // có thể thêm radio giới tính sau, tạm để male
+        phone: phone,
+        email: email,
       );
     }
-
+    if (student == null) {
+      throw Exception('Thông tin sinh viên chính quy không tồn tại');
+    }
     final guidDonVi = student.guidDonVi;
 
-    final classInfo = cachedClassInfo ??
+    final classInfo =
+        cachedClassInfo ??
         await _firstOrNullWhen(
           student.idLopDaoTao,
-              () => repo.getDataLopDaoTao(
+          () => repo.getDataLopDaoTao(
             student.idLopDaoTao,
             guidDonVi,
             student.idBacDaoTao,
@@ -317,17 +367,18 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
 
     final major = await _firstOrNullWhen(
       student.idNganhDaoTao,
-          () => repo.getDataNganhDaoTao(
+      () => repo.getDataNganhDaoTao(
         student.idNganhDaoTao,
         guidDonVi,
         student.idBacDaoTao,
       ),
     );
 
-    final academicYear = cachedAcademicYear ??
+    final academicYear =
+        cachedAcademicYear ??
         await _firstOrNullWhen(
           student.idNienKhoaDaoTao,
-              () => repo.getDataNienKhoaDaoTao(
+          () => repo.getDataNienKhoaDaoTao(
             student.idNienKhoaDaoTao,
             guidDonVi,
             student.idBacDaoTao,
@@ -336,7 +387,7 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
 
     final system = await _firstOrNullWhen(
       student.idHeDaoTao,
-          () => repo.getDataHeDaoTao(
+      () => repo.getDataHeDaoTao(
         student.idHeDaoTao,
         guidDonVi,
         student.idBacDaoTao,
@@ -345,18 +396,12 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
 
     final level = await _firstOrNullWhen(
       student.idBacDaoTao,
-          () => repo.getDataBacDaoTao(
-        student.idBacDaoTao,
-        guidDonVi,
-      ),
+      () => repo.getDataBacDaoTao(student.idBacDaoTao, guidDonVi),
     );
 
     final priorityObject = await _firstOrNullWhen(
       student.idDoiTuongUuTien,
-          () => repo.getDataDoiTuongUuTien(
-        student.idDoiTuongUuTien,
-        guidDonVi,
-      ),
+      () => repo.getDataDoiTuongUuTien(student.idDoiTuongUuTien, guidDonVi),
     );
 
     final university = guidDonVi == null || guidDonVi.trim().isEmpty
@@ -365,7 +410,7 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
 
     final permanentProvince = await _firstOrNullWhen(
       student.idHoKhauThuongTruTinhThanhPho,
-          () => repo.getDataTinhThanhPho(
+      () => repo.getDataTinhThanhPho(
         student.idHoKhauThuongTruTinhThanhPho,
         guidDonVi,
       ),
@@ -373,7 +418,7 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
 
     final permanentDistrict = await _firstOrNullWhen(
       student.idHoKhauThuongTruQuanHuyen,
-          () => repo.getDataQuanHuyen(
+      () => repo.getDataQuanHuyen(
         student.idHoKhauThuongTruQuanHuyen,
         guidDonVi,
         student.idHoKhauThuongTruTinhThanhPho,
@@ -382,15 +427,13 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
 
     final temporaryProvince = await _firstOrNullWhen(
       student.diaChiTamTruTinhThanhPho,
-          () => repo.getDataTinhThanhPho(
-        student.diaChiTamTruTinhThanhPho,
-        guidDonVi,
-      ),
+      () =>
+          repo.getDataTinhThanhPho(student.diaChiTamTruTinhThanhPho, guidDonVi),
     );
 
     final temporaryDistrict = await _firstOrNullWhen(
       student.diaChiTamTruQuanHuyen,
-          () => repo.getDataQuanHuyen(
+      () => repo.getDataQuanHuyen(
         student.diaChiTamTruQuanHuyen,
         guidDonVi,
         student.diaChiTamTruTinhThanhPho,
@@ -399,7 +442,7 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
 
     final currentProvince = await _firstOrNullWhen(
       student.idNoiOHienNayTinhThanhPho,
-          () => repo.getDataTinhThanhPho(
+      () => repo.getDataTinhThanhPho(
         student.idNoiOHienNayTinhThanhPho,
         guidDonVi,
       ),
@@ -407,7 +450,7 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
 
     final currentDistrict = await _firstOrNullWhen(
       student.idNoiOHienNayQuanHuyen,
-          () => repo.getDataQuanHuyen(
+      () => repo.getDataQuanHuyen(
         student.idNoiOHienNayQuanHuyen,
         guidDonVi,
         student.idNoiOHienNayTinhThanhPho,
@@ -450,17 +493,17 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
       dob: _dateOnly(student.ngaySinh),
       cccd: tempCccd ?? student.soCmtCccd ?? '',
       cccdIssueDate: tempCccdIssueDate ?? _dateOnly(student.ngayCapCmtCccd),
-      hometown: tempHometown ??
+      hometown:
+          tempHometown ??
           (permanentAddress.isNotEmpty
               ? permanentAddress
               : student.hoKhauThuongTruPhuongXa ?? ''),
-      className: classInfo?.ten ?? classInfo?.tenVietTat ?? student.idLopDaoTao ?? '',
+      className:
+          classInfo?.ten ?? classInfo?.tenVietTat ?? student.idLopDaoTao ?? '',
       major: major?.ten ?? student.idNganhDaoTao ?? '',
-      academicYear: academicYear?.ten ??
-          _joinAddress([
-            academicYear?.namBatDau,
-            academicYear?.namKetThuc,
-          ]) ??
+      academicYear:
+          academicYear?.ten ??
+          _joinAddress([academicYear?.namBatDau, academicYear?.namKetThuc]) ??
           student.idNienKhoaDaoTao ??
           '',
       system: system?.ten ?? student.idHeDaoTao ?? '',
@@ -468,8 +511,9 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
       universityName: university?.tenDonVi ?? '',
       univId: university?.idHeThongDaoTao,
       priorityObjectName:
-      selectedPriorityObject?.name ?? priorityObject?.ten ?? '',
-      temporaryAddress: tempTemporaryAddress ??
+          selectedPriorityObject?.name ?? priorityObject?.ten ?? '',
+      temporaryAddress:
+          tempTemporaryAddress ??
           (temporaryAddress.isNotEmpty
               ? temporaryAddress
               : currentAddress.isNotEmpty
@@ -644,21 +688,33 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
     }
   }
 
-  Future<void> getMyRegistrations({String? studentCode}) async {
+  Future<void> getMyRegistrations({
+    String? studentCode,
+    String? identityNo,
+  }) async {
     try {
       final code =
           studentCode ??
           Globals().thongTinSinhVienModel.value?.maSinhVien ??
           '';
-
-      if (code.isEmpty) {
+      final effectiveIdentityNo =
+          identityNo ??
+          (code.isEmpty
+              ? (await SharedPreferences.getInstance()).getString(
+                  'applicant_cccd',
+                )
+              : null);
+      if (code.isEmpty &&
+          (effectiveIdentityNo == null || effectiveIdentityNo.isEmpty)) {
         emit(DormitoryRegistrationDismissHub());
         _emitEmptyMyRegistrations();
         return;
       }
 
-      final res = await _repository.getMyRegistrations(studentCode: code);
-
+      final res = await _repository.getMyRegistrations(
+        studentCode: code.isNotEmpty ? code : null,
+        identityNo: effectiveIdentityNo,
+      );
       emit(DormitoryRegistrationDismissHub());
 
       emit(
@@ -870,7 +926,11 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
       );
 
       final finalPayload = payload.copyWith(attachmentFileIds: attachmentIds);
-
+      debugPrint('=== PAYLOAD GỬI ĐI ===');
+      debugPrint(
+        'Payload fields: ${finalPayload.toJson()}',
+      ); // nếu RegistrationPayloadModel có toJson()
+      debugPrint('Attachment IDs: $attachmentIds');
       final res = await _repository.registerDormitory(finalPayload);
       if (res.data != null) {
         draftRecord = res.data;

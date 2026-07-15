@@ -4,9 +4,10 @@ import 'package:uuid/uuid.dart';
 import 'package:vnu_core/common/app_text_styles.dart';
 import 'package:vnu_core/common/space_widget.dart';
 import 'package:vnu_core/common/utils.dart';
+import 'package:vnu_core/common/guide/guide.dart';
 import 'package:vnu_core/constants/constant.dart';
 import 'package:vnu_core/globals.dart';
-import 'package:vnu_core/modules/admission/views/vcore_admission_view.dart';
+import 'package:vnu_core/screens/vcore_admission_view.dart';
 import 'package:vnu_core/modules/bookmark/views/vcore_bookmark_view.dart';
 import 'package:vnu_core/modules/profile/views/vcore_profile_avatar_widget.dart';
 import 'package:vnu_core/modules/profile/views/vcore_profile_change_pass_view_v2.dart';
@@ -16,7 +17,7 @@ import 'package:vnu_core/modules/profile/views/vcore_profile_setup_bio_view.dart
 
 import '../controllers/vcore_profile_controller.dart';
 import 'vcore_profile_change_pass_view.dart';
-import 'vcore_profile_photos_view.dart';
+// import 'vcore_profile_photos_view.dart';
 import 'package:flutter/foundation.dart';
 
 class VcoreProfileView extends GetView<VcoreProfileController> {
@@ -32,147 +33,215 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
         return Scaffold(
           backgroundColor: const Color(0xFFF6F8FA),
           body: Obx(
-            () => SingleChildScrollView(
+                () => SingleChildScrollView(
               child: Column(
                 children: [
-                  SafeArea(
-                    bottom: false,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  Globals()
-                                          .thongTinSinhVienModel
-                                          .value
-                                          ?.hoVaTen ??
-                                      '',
-                                  style: const TextStyle(
-                                    fontSize: AppFontSizes.large,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xff1e293b),
+                  AppGuideAnchor(
+                    id: 'profile.header',
+                    child: SafeArea(
+                      bottom: false,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    Globals()
+                                        .thongTinSinhVienModel
+                                        .value
+                                        ?.hoVaTen ??
+                                        '',
+                                    style: const TextStyle(
+                                      fontSize: AppFontSizes.large,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xff1e293b),
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(height: 8),
-                                Row(
-                                  children: [
-                                    const Text(
-                                      "MSV: ",
-                                      style: TextStyle(
-                                        fontSize: AppFontSizes.mediumSmall,
-                                        color: Color(0xff64748b),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      const Text(
+                                        "MSV: ",
+                                        style: TextStyle(
+                                          fontSize: AppFontSizes.mediumSmall,
+                                          color: Color(0xff64748b),
+                                        ),
                                       ),
-                                    ),
-                                    Text(
-                                      Globals()
-                                              .thongTinSinhVienModel
-                                              .value
-                                              ?.maSinhVien ??
-                                          '',
-                                      style: const TextStyle(
-                                        fontSize: AppFontSizes.mediumSmall,
-                                        fontWeight: FontWeight.w600,
-                                        color: Color(0xff334155),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 4),
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text(
-                                      "Lớp: ",
-                                      style: TextStyle(
-                                        fontSize: AppFontSizes.mediumSmall,
-                                        color: Color(0xff64748b),
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: Text(
-                                        Globals().lopDaoTaoModel.value?.ten ??
+                                      Text(
+                                        Globals()
+                                            .thongTinSinhVienModel
+                                            .value
+                                            ?.maSinhVien ??
                                             '',
                                         style: const TextStyle(
                                           fontSize: AppFontSizes.mediumSmall,
                                           fontWeight: FontWeight.w600,
                                           color: Color(0xff334155),
                                         ),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        "Lớp: ",
+                                        style: TextStyle(
+                                          fontSize: AppFontSizes.mediumSmall,
+                                          color: Color(0xff64748b),
+                                        ),
+                                      ),
+                                      Expanded(
+                                        child: Text(
+                                          Globals().lopDaoTaoModel.value?.ten ??
+                                              '',
+                                          style: const TextStyle(
+                                            fontSize: AppFontSizes.mediumSmall,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xff334155),
+                                          ),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            AppGuideAnchor(
+                              id: 'profile.avatar',
+                              child: GestureDetector(
+                                onTap: () {
+                                  controller.pickAndPreviewAvatar(context);
+                                },
+                                child: Stack(
+                                  children: [
+                                    // Luôn hiển thị hình tròn
+                                    Container(
+                                      width: 76,
+                                      height: 76,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: Colors.grey.shade300,
+                                          width: 2,
+                                        ),
+                                      ),
+                                      child: Obx(
+                                            () => ClipOval(
+                                          child: controller.isChangingAvatar.value
+                                              ? Container(
+                                            color: Colors.grey.shade200,
+                                            child: const Center(
+                                              child: SizedBox(
+                                                width: 24,
+                                                height: 24,
+                                                child: CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF1E293B)),
+                                                ),
+                                              ),
+                                            ),
+                                          )
+                                              : VcoreProfileAvatarWidget(
+                                            url: controller.avatarUrl,
+                                            size: 76,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    // Badge camera
+                                    Positioned(
+                                      bottom: 0,
+                                      right: 0,
+                                      child: Container(
+                                        width: 24,
+                                        height: 24,
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF1E293B),
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: Colors.white,
+                                            width: 2,
+                                          ),
+                                        ),
+                                        child: const Icon(
+                                          Icons.camera_alt,
+                                          color: Colors.white,
+                                          size: 12,
+                                        ),
                                       ),
                                     ),
                                   ],
                                 ),
-                              ],
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 16),
-                          const SizedBox(
-                            width: 76,
-                            height: 76,
-                            child: VcoreProfileAvatarWidget(
-                              url:
-                                  'https://vnu.edu.vn/upload/2014/11/17202/image/Logo-VNU-1995.jpg',
-                              size: 76,
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
 
                   if (controller.tongket.value != null)
-                    Container(
-                      height: 64,
-                      margin: const EdgeInsets.symmetric(
-                        vertical: 12,
-                        horizontal: 20,
-                      ),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [Color(0xFF16A34A), Color(0xFF15803D)],
+                    AppGuideAnchor(
+                      id: 'profile.academic_summary',
+                      child: Container(
+                        height: 64,
+                        margin: const EdgeInsets.symmetric(
+                          vertical: 12,
+                          horizontal: 20,
                         ),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        children: [
-                          const Spacer(),
-                          itemPointProfile(
-                            'Kỳ đã học',
-                            '${controller.tongket.value?.soKyDaHoc ?? ''}',
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [Color(0xFF16A34A), Color(0xFF15803D)],
                           ),
-                          const Spacer(),
-                          Container(
-                            height: 40,
-                            width: 1,
-                            color: Colors.white.withOpacity(0.3),
-                          ),
-                          const Spacer(),
-                          itemPointProfile(
-                            'Tín chỉ tích luỹ',
-                            controller.tongket.value?.tongSoTinChiTichLuy ?? '',
-                          ),
-                          const Spacer(),
-                          Container(
-                            height: 40,
-                            width: 1,
-                            color: Colors.white.withOpacity(0.3),
-                          ),
-                          const Spacer(),
-                          itemPointProfile(
-                            'Điểm tích luỹ',
-                            controller.tongket.value?.diemTrungBinhHe4TichLuy ??
-                                '',
-                          ),
-                          const Spacer(),
-                        ],
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            const Spacer(),
+                            itemPointProfile(
+                              'Kỳ đã học',
+                              '${controller.tongket.value?.soKyDaHoc ?? ''}',
+                              guideId: 'profile.summary.semesters',
+                            ),
+                            const Spacer(),
+                            Container(
+                              height: 40,
+                              width: 1,
+                              color: Colors.white.withOpacity(0.3),
+                            ),
+                            const Spacer(),
+                            itemPointProfile(
+                              'Tín chỉ tích luỹ',
+                              controller.tongket.value?.tongSoTinChiTichLuy ?? '',
+                              guideId: 'profile.summary.credits',
+                            ),
+                            const Spacer(),
+                            Container(
+                              height: 40,
+                              width: 1,
+                              color: Colors.white.withOpacity(0.3),
+                            ),
+                            const Spacer(),
+                            itemPointProfile(
+                              'Điểm tích luỹ',
+                              controller.tongket.value?.diemTrungBinhHe4TichLuy ??
+                                  '',
+                              guideId: 'profile.summary.gpa',
+                            ),
+                            const Spacer(),
+                          ],
+                        ),
                       ),
                     )
                   else
@@ -180,6 +249,7 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
 
                   VcoreProfileItemWidget(
                     title: "Thông tin cá nhân",
+                    guideId: 'profile.personal_info',
                     icon: 'assets/images/ic_profile_person.svg',
                     action: () {
                       Get.to(() => const VcoreProfilePersonInfoView());
@@ -189,6 +259,7 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
 
                   VcoreProfileItemWidget(
                     title: "Thông tin gia đình",
+                    guideId: 'profile.family_info',
                     icon: 'assets/images/ic_profile_family.svg',
                     action: () {
                       Get.to(() => const VcoreProfileFamilyInfoView());
@@ -196,17 +267,28 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
                   ),
                   const SizedBox(height: 12),
 
+                  // VcoreProfileItemWidget(
+                  //   title: "Quản lý ảnh cá nhân",
+                  //   guideId: 'profile.photo_manager',
+                  //   icon: 'assets/images/ic_profile_photo_manager.svg',
+                  //   action: () {
+                  //     Get.to(() => const VcoreProfilePhotosView());
+                  //   },
+                  // ),
+                  // const SizedBox(height: 12),
                   VcoreProfileItemWidget(
-                    title: "Quản lý ảnh cá nhân",
+                    title: "Đổi ảnh đại diện",
+                    guideId: 'profile.change_avatar',
                     icon: 'assets/images/ic_profile_photo_manager.svg',
                     action: () {
-                      Get.to(() => const VcoreProfilePhotosView());
+                      controller.pickAndPreviewAvatar(context);
                     },
                   ),
                   const SizedBox(height: 12),
 
                   VcoreProfileItemWidget(
                     title: "Liên kết đánh dấu",
+                    guideId: 'profile.bookmark',
                     icon: 'assets/images/ic_profile_bookmark.svg',
                     action: () {
                       Get.to(() => const VcoreBookmarkView());
@@ -216,6 +298,7 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
 
                   VcoreProfileItemWidget(
                     title: "Cài đặt sinh trắc học",
+                    guideId: 'profile.biometric',
                     icon: 'assets/images/ic_profile_setup_bio.svg',
                     action: () {
                       Get.to(() => const VcoreProfileSetupBioView());
@@ -225,6 +308,7 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
 
                   VcoreProfileItemWidget(
                     title: "Quản lý mật khẩu",
+                    guideId: 'profile.password',
                     icon: 'assets/images/ic_password.svg',
                     action: () {
                       Get.to(() => const VcoreProfileChangePassViewV2());
@@ -237,6 +321,7 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
                     builder: (context, snapshot) {
                       return VcoreProfileItemWidget(
                         title: "Phiên bản: ${snapshot.data ?? '1.0.0'}",
+                        guideId: 'profile.version',
                         icon: 'assets/images/logo-vnu.png',
                         action: () {
                           if (kDebugMode) {
@@ -250,6 +335,7 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
 
                   VcoreProfileItemWidget(
                     title: "Đăng xuất",
+                    guideId: 'profile.logout',
                     icon: 'assets/images/ic_profile_logout.svg',
                     action: () {
                       Utils.showAlertDialog(
@@ -266,7 +352,7 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
                             MaterialPageRoute(
                               builder: (_) => const VcoreAdmissionView(),
                             ),
-                            (route) => false,
+                                (route) => false,
                           );
                         },
                       );
@@ -283,8 +369,12 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
     );
   }
 
-  Widget itemPointProfile(String title, String point) {
-    return Column(
+  Widget itemPointProfile(
+      String title,
+      String point, {
+        String? guideId,
+      }) {
+    final content = Column(
       mainAxisAlignment: MainAxisAlignment.center,
       mainAxisSize: MainAxisSize.max,
       children: [
@@ -310,6 +400,13 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
         ),
       ],
     );
+
+    if (guideId == null) return content;
+
+    return AppGuideAnchor(
+      id: guideId,
+      child: content,
+    );
   }
 }
 
@@ -317,17 +414,19 @@ class VcoreProfileItemWidget extends StatelessWidget {
   final String title;
   final String icon;
   final VoidCallback action;
+  final String? guideId;
 
   const VcoreProfileItemWidget({
     super.key,
     required this.title,
     required this.icon,
     required this.action,
+    this.guideId,
   });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    final content = GestureDetector(
       onTap: action,
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 20),
@@ -374,6 +473,13 @@ class VcoreProfileItemWidget extends StatelessWidget {
           ],
         ),
       ),
+    );
+
+    if (guideId == null) return content;
+
+    return AppGuideAnchor(
+      id: guideId!,
+      child: content,
     );
   }
 }

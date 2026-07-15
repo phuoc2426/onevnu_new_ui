@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'dart:ui';
 import 'package:vnu_hoc_bong/vnu_hoc_bong.dart';
-import 'package:vnu_noi_tru/modules/boarding/views/nt_boading_register_view.dart';
+// import 'package:vnu_noi_tru/modules/boarding/views/nt_boading_register_view.dart';
 import 'package:vnu_noi_tru/vnu_noi_tru.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -39,13 +39,15 @@ import 'package:table_calendar/table_calendar.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:vnu_core/common/app_text_styles.dart';
 import 'package:vnu_core/modules/question/views/vcore_question_view.dart';
+
+import 'package:vnu_core/common/guide/guide.dart';
 /* -------------------------------------------------------------------------- */
 /*                       LOCAL NOTIFICATION SERVICE                           */
 /* -------------------------------------------------------------------------- */
 
 class _LocalNotificationService {
   static final FlutterLocalNotificationsPlugin _plugin =
-      FlutterLocalNotificationsPlugin();
+  FlutterLocalNotificationsPlugin();
 
   static bool _initialized = false;
 
@@ -83,8 +85,8 @@ class _LocalNotificationService {
 
     await _plugin
         .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >()
+        AndroidFlutterLocalNotificationsPlugin
+    >()
         ?.requestNotificationsPermission();
 
     _initialized = true;
@@ -168,6 +170,10 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
   int scheduleTabIndex = 0;
   int newsTabIndex = 0;
 
+  bool _startedFirstGuide = false;
+  bool _guideActionsRegistered = false;
+  AppGuideRegistry? _guideRegistryForActions;
+
   final PageController schedulePageController = PageController(
     viewportFraction: 0.82,
   );
@@ -218,37 +224,37 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
     'Học tập': _allAvailableFunctions
         .where(
           (e) => [
-            'Lịch học & thi',
-            'Điểm',
-            'Đăng ký môn',
-            'Điểm danh',
-          ].contains(e.label),
-        )
+        'Lịch học & thi',
+        'Điểm',
+        'Đăng ký môn',
+        'Điểm danh',
+      ].contains(e.label),
+    )
         .toList(),
     'Dịch vụ': _allAvailableFunctions
         .where(
           (e) => [
-            'Học phí',
-            'Học bổng',
-            'Thủ tục',
-            'Nội trú',
-            'Phản ánh',
-            'Đồng bộ',
-            'Hỏi đáp',
-          ].contains(e.label),
-        )
+        'Học phí',
+        'Học bổng',
+        'Thủ tục',
+        'Nội trú',
+        'Phản ánh',
+        'Đồng bộ',
+        'Hỏi đáp',
+      ].contains(e.label),
+    )
         .toList(),
     'Tiện ích': _allAvailableFunctions
         .where(
           (e) => [
-            'Tài liệu',
-            'Thư viện',
-            'Bản đồ',
-            'Việc làm',
-            'Phòng trọ',
-            'Cẩm nang',
-          ].contains(e.label),
-        )
+        'Tài liệu',
+        'Thư viện',
+        'Bản đồ',
+        'Việc làm',
+        'Phòng trọ',
+        'Cẩm nang',
+      ].contains(e.label),
+    )
         .toList(),
   };
 
@@ -258,14 +264,344 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
     _loadPinnedFunctions();
     _startNewsAutoScroll();
     _LocalNotificationService.init();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _runHomeInitialGuide();
+    });
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _registerGuideActionsIfNeeded();
+  }
+
+  void _registerGuideActionsIfNeeded() {
+    if (_guideActionsRegistered) return;
+    _guideActionsRegistered = true;
+
+    final registry = AppGuideRegistryScope.of(context);
+    _guideRegistryForActions = registry;
+
+    registry.registerAction(
+      id: 'home.show_study_tab',
+      action: () async {
+        if (!mounted) return;
+
+        if (scheduleTabIndex != 0) {
+          setState(() => scheduleTabIndex = 0);
+        }
+
+        await _waitGuideUiReady();
+      },
+    );
+
+    registry.registerAction(
+      id: 'home.show_exam_tab',
+      action: () async {
+        if (!mounted) return;
+
+        if (scheduleTabIndex != 1) {
+          setState(() => scheduleTabIndex = 1);
+        }
+
+        await _waitGuideUiReady();
+      },
+    );
+
+    registry.registerAction(
+      id: 'home.show_school_news_tab',
+      action: () async {
+        if (!mounted) return;
+
+        if (newsTabIndex != 0) {
+          setState(() => newsTabIndex = 0);
+        }
+
+        if (newsPageController.hasClients) {
+          newsPageController.jumpToPage(1000);
+        }
+
+        await _waitGuideUiReady();
+      },
+    );
+
+    registry.registerAction(
+      id: 'home.show_vnu_news_tab',
+      action: () async {
+        if (!mounted) return;
+
+        if (newsTabIndex != 1) {
+          setState(() => newsTabIndex = 1);
+        }
+
+        if (newsPageController.hasClients) {
+          newsPageController.jumpToPage(1000);
+        }
+
+        await _waitGuideUiReady();
+      },
+    );
+    registry.registerAction(
+      id: '',
+      action: () async {
+        if (!mounted) return;
+
+        if (newsTabIndex != 1) {
+          setState(() => newsTabIndex = 1);
+        }
+
+        if (newsPageController.hasClients) {
+          newsPageController.jumpToPage(1000);
+        }
+
+        await _waitGuideUiReady();
+      },
+    );
+  }
+
+  Future<void> _waitGuideUiReady() async {
+    await WidgetsBinding.instance.endOfFrame;
+    await Future<void>.delayed(const Duration(milliseconds: 220));
+    await WidgetsBinding.instance.endOfFrame;
+  }
+
+  Future<void> _runHomeInitialGuide() async {
+    if (_startedFirstGuide) return;
+    _startedFirstGuide = true;
+
+    await Future<void>.delayed(const Duration(milliseconds: 900));
+
+    if (!mounted) return;
+
+    final cache = const AppGuideCacheService();
+    final hasSeen = await cache.hasSeenGroup('home.intro');
+
+    if (hasSeen) {
+      debugPrint('[GUIDE_STARTUP] home.intro already seen');
+      return;
+    }
+
+    final registry = AppGuideRegistryScope.of(context);
+
+    final ok = await const AppGuideNavigationService().openGroup(
+      context: context,
+      registry: registry,
+      groupId: 'home.intro',
+    );
+
+    debugPrint('[GUIDE_STARTUP] home.intro started = $ok');
+
+    if (ok) {
+      await cache.markGroupSeen('home.intro');
+    }
+  }
+  Future<void> _previewHomeGuide() async {
+    if (!mounted) return;
+
+    final registry = AppGuideRegistryScope.of(context);
+
+    final ok = await const AppGuideNavigationService().openGroup(
+      context: context,
+      registry: registry,
+      groupId: 'home.intro',
+    );
+
+    if (!ok) {
+      snackBarWarning('Không chạy được onboarding Home');
+      return;
+    }
+
+    snackBarSuccess('Đang chạy preview onboarding Home');
+  }
+
+  Future<void> _debugHomeGuideCache() async {
+    final cache = const AppGuideCacheService();
+    final hasSeen = await cache.hasSeenGroup('home.intro');
+
+    snackBarWarning(
+      'Guide cache:\nhome.intro hasSeen = $hasSeen',
+    );
+
+    debugPrint('[GUIDE_CACHE] home.intro hasSeen = $hasSeen');
+  }
+  Future<void> _previewHomeIntroGroup() async {
+    if (!mounted) return;
+
+    final registry = AppGuideRegistryScope.of(context);
+
+    await const AppGuideNavigationService().openGroup(
+      context: context,
+      registry: registry,
+      groupId: 'home.intro',
+    );
+  }
+
+  Future<void> _previewGuideItem(String itemId) async {
+    if (!mounted) return;
+
+    final registry = AppGuideRegistryScope.of(context);
+    final item = registry.itemById(itemId);
+
+    if (item == null) {
+      snackBarWarning('Không tìm thấy guide item: $itemId');
+      return;
+    }
+
+    await const AppGuideNavigationService().openItem(
+      context: context,
+      registry: registry,
+      item: item,
+    );
+  }
+
+  Widget _guidePreviewTile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Future<void> Function() onTap,
+  }) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: AppColors.brandGreen.withOpacity(0.10),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Icon(
+          icon,
+          color: AppColors.brandGreen,
+          size: 21,
+        ),
+      ),
+      title: Text(
+        title,
+        style: const TextStyle(
+          fontSize: AppFontSizes.mediumSmall,
+          fontWeight: FontWeight.w800,
+          color: AppColors.homeTextTitle,
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: const TextStyle(
+          fontSize: AppFontSizes.font11_5,
+          color: AppColors.homeTextSub,
+        ),
+      ),
+      trailing: const Icon(
+        Icons.chevron_right_rounded,
+        color: AppColors.brandGreen,
+      ),
+      onTap: onTap,
+    );
+  }
+  @override
   void dispose() {
+    _guideRegistryForActions?.unregisterAction('home.show_study_tab');
+    _guideRegistryForActions?.unregisterAction('home.show_exam_tab');
+    _guideRegistryForActions?.unregisterAction('home.show_school_news_tab');
+    _guideRegistryForActions?.unregisterAction('home.show_vnu_news_tab');
+
     newsAutoScrollTimer?.cancel();
     schedulePageController.dispose();
     newsPageController.dispose();
     super.dispose();
+  }
+
+  Future<void> _showFeatureSearch() async {
+    final pageContext = context;
+    final registry = AppGuideRegistryScope.of(pageContext);
+
+    final searchService = AppGuideSearchService(
+      items: registry.items,
+      predictor: const AppGuideLightAiPredictor(),
+    );
+
+    await showModalBottomSheet<void>(
+      context: pageContext,
+      isScrollControlled: true,
+      useSafeArea: true,
+      useRootNavigator: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withOpacity(0.45),
+      builder: (sheetContext) {
+        return AppGuideSearchSheet(
+          searchService: searchService,
+          onOpenGuide: (result) async {
+            Navigator.of(sheetContext, rootNavigator: true).pop();
+
+            await Future<void>.delayed(const Duration(milliseconds: 260));
+
+            if (!mounted || !pageContext.mounted) return;
+
+            await const AppGuideNavigationService().openItem(
+              context: pageContext,
+              registry: registry,
+              item: result.item,
+            );
+          },
+        );
+      },
+    );
+  }
+
+  String _overviewGuideId(int index) {
+    switch (index) {
+      case 0:
+        return 'home.overview.today_classes';
+      case 1:
+        return 'home.overview.upcoming_exams';
+      case 2:
+        return 'home.overview.unread_notifications';
+      case 3:
+        return 'home.overview.manual_reminder';
+      default:
+        return 'home.overview';
+    }
+  }
+
+  String _homeFunctionGuideId(String label) {
+    switch (label) {
+      case 'Lịch học & thi':
+        return 'home.function.exam_schedule';
+      case 'Điểm':
+        return 'home.function.course_points';
+      case 'Đăng ký môn':
+        return 'home.function.course_register';
+      case 'Việc làm':
+        return 'home.function.jobs';
+      case 'Đồng bộ':
+        return 'home.function.sync';
+      case 'Học phí':
+        return 'home.function.tuition';
+      case 'Tài liệu':
+        return 'home.function.documents';
+      case 'Điểm danh':
+        return 'home.function.attendance';
+      case 'Học bổng':
+        return 'home.function.scholarship';
+      case 'Phản ánh':
+        return 'home.function.paht';
+      case 'Nội trú':
+        return 'home.function.boarding';
+      case 'Phòng trọ':
+        return 'home.function.motel';
+      case 'Thủ tục':
+        return 'home.function.one_door';
+      case 'Thư viện':
+        return 'home.function.library';
+      case 'Bản đồ':
+        return 'home.function.map';
+      case 'Hỏi đáp':
+        return 'home.function.question';
+      case 'Cẩm nang':
+        return 'home.function.handbook';
+      default:
+        return 'home.quick_access';
+    }
   }
 
   void _startNewsAutoScroll() {
@@ -344,7 +680,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
         Get.to(() => const VcorePahtViewV2());
         break;
       case 'Nội trú':
-        // snackBarWarning('Chức năng đang hoàn thiện');
+      // snackBarWarning('Chức năng đang hoàn thiện');
         Get.to(() => const DRMyRegistrationScreen());
         break;
       case 'Phòng trọ':
@@ -366,7 +702,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
         Get.to(() => const VcoreJobsViewV2());
         break;
       case 'Đồng bộ':
-        // snackBarWarning('Chức năng đang hoàn thiện');
+      // snackBarWarning('Chức năng đang hoàn thiện');
         Get.to(() => VcoreSyncView());
         break;
       case 'Hỏi đáp':
@@ -402,8 +738,6 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
         return Icons.rate_review_rounded;
       case 'Nội trú':
         return Icons.home_work_rounded;
-      case 'Phòng trọ':
-        return Icons.home_outlined;
       case 'Phòng trọ':
         return Icons.home_outlined;
       case 'Thủ tục':
@@ -848,17 +1182,35 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
               padding: const EdgeInsets.fromLTRB(14, 14, 14, 110),
               child: Column(
                 children: [
-                  Obx(() => _buildHeader()),
+                  AppGuideAnchor(
+                    id: 'home.header',
+                    child: Obx(() => _buildHeader()),
+                  ),
                   const SizedBox(height: 22),
-                  _buildOverview(),
+                  AppGuideAnchor(
+                    id: 'home.overview',
+                    child: _buildOverview(),
+                  ),
                   const SizedBox(height: 14),
-                  _buildScheduleBlock(),
+                  AppGuideAnchor(
+                    id: 'home.schedule',
+                    child: _buildScheduleBlock(),
+                  ),
                   const SizedBox(height: 14),
-                  _buildQuickAccess(),
+                  AppGuideAnchor(
+                    id: 'home.quick_access',
+                    child: _buildQuickAccess(),
+                  ),
                   const SizedBox(height: 14),
-                  _buildImportantNotice(),
+                  AppGuideAnchor(
+                    id: 'home.notice',
+                    child: _buildImportantNotice(),
+                  ),
                   const SizedBox(height: 14),
-                  _buildNewsBlock(),
+                  AppGuideAnchor(
+                    id: 'home.news',
+                    child: _buildNewsBlock(),
+                  ),
                 ],
               ),
             ),
@@ -883,6 +1235,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
 
     final nienKhoa = Globals().nienKhoaDaoTaoModel.value;
     String khoaHocText = '';
+
     if (nienKhoa != null) {
       if (nienKhoa.ten != null && nienKhoa.ten!.isNotEmpty) {
         khoaHocText = nienKhoa.ten!;
@@ -890,6 +1243,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
         khoaHocText = '${nienKhoa.namBatDau} - ${nienKhoa.namKetThuc}';
       }
     }
+
     if (khoaHocText.isEmpty) {
       khoaHocText = student?.idNienKhoaDaoTao ?? '';
     }
@@ -902,7 +1256,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
             children: [
               const SizedBox(height: 4),
               Text(
-                '${student?.hoVaTen ?? 'Sinh viên'}',
+                student?.hoVaTen ?? 'Sinh viên',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
@@ -924,7 +1278,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
               ),
               const SizedBox(height: 3),
               Text(
-                'Khóa học: ${khoaHocText.isNotEmpty == true ? khoaHocText : '--'}',
+                'Khóa học: ${khoaHocText.isNotEmpty ? khoaHocText : '--'}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
@@ -936,28 +1290,89 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
             ],
           ),
         ),
-        GestureDetector(
-          onTap: () {
-            Get.to(() => const VcoreNotifyViewV3())?.then((_) {
-              widget.controller.updateUnreadCounts();
-            });
-          },
-          child: _headerButton(
-            Icons.notifications_none_rounded,
-            badge:
-                (widget.controller.unreadSystemCount.value +
-                        widget.controller.unreadTrainingCount.value) >
-                    0
-                ? (widget.controller.unreadSystemCount.value +
-                          widget.controller.unreadTrainingCount.value)
-                      .toString()
-                : null,
+
+        AppGuideAnchor(
+          id: 'home.search',
+          child: GestureDetector(
+            onTap: _showFeatureSearch,
+            child: _headerButton(Icons.search_rounded),
           ),
         ),
+
         const SizedBox(width: 8),
-        _headerButton(Icons.qr_code_2_rounded),
+
+        AppGuideAnchor(
+          id: 'home.notification',
+          child: GestureDetector(
+            onTap: () {
+              Get.to(() => const VcoreNotifyViewV3())?.then((_) {
+                widget.controller.updateUnreadCounts();
+              });
+            },
+            child: _headerButton(
+              Icons.notifications_none_rounded,
+              badge:
+              (widget.controller.unreadSystemCount.value +
+                  widget.controller.unreadTrainingCount.value) >
+                  0
+                  ? (widget.controller.unreadSystemCount.value +
+                  widget.controller.unreadTrainingCount.value)
+                  .toString()
+                  : null,
+            ),
+          ),
+        ),
+
+        const SizedBox(width: 8),
+
+        AppGuideAnchor(
+          id: 'home.qr',
+          child: _headerButton(Icons.qr_code_2_rounded),
+        ),
       ],
     );
+  }
+  void _debugGuideState() {
+    try {
+      final registry = AppGuideRegistryScope.of(context);
+
+      final homeHeader = registry.anchorById('home.header');
+      final homeSchedule = registry.anchorById('home.schedule');
+      final homeIntro = registry.groupById('home.intro');
+      final homeHeaderItem = registry.itemById('home.header');
+      final homeScheduleItem = registry.itemById('home.schedule');
+      final nextExamItem = registry.itemById('home.schedule.next_exam');
+      final newsCarouselItem = registry.itemById('home.news.carousel');
+      final profileHeaderItem = registry.itemById('profile.header');
+
+      final message = [
+        'Guide debug:',
+        'items = ${registry.items.length}',
+        'groups = ${registry.groups.length}',
+        'home.intro exists = ${homeIntro != null}',
+        'home.intro targets = ${homeIntro?.targetIds.length ?? 0}',
+        '',
+        'home.header item = ${homeHeaderItem != null}',
+        'home.header anchor = ${homeHeader != null}',
+        'home.header key context = ${homeHeader?.key.currentContext != null}',
+        'home.header stored context mounted = ${homeHeader?.context.mounted}',
+        '',
+        'home.schedule item = ${homeScheduleItem != null}',
+        'home.schedule anchor = ${homeSchedule != null}',
+        'home.schedule key context = ${homeSchedule?.key.currentContext != null}',
+        'home.schedule stored context mounted = ${homeSchedule?.context.mounted}',
+        '',
+        'home.schedule.next_exam item = ${nextExamItem != null}',
+        'home.news.carousel item = ${newsCarouselItem != null}',
+        'profile.header item = ${profileHeaderItem != null}',
+      ].join('\n');
+
+      debugPrint(message);
+      snackBarWarning(message);
+    } catch (e) {
+      debugPrint('Guide debug error: $e');
+      snackBarWarning('Guide debug error: $e');
+    }
   }
 
   Widget _headerButton(IconData icon, {String? badge}) {
@@ -1015,9 +1430,9 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
       final todayCount = widget.controller.getTodayTotalSubjects().toString();
       final examCount = widget.controller.getUpcomingExamCount().toString();
       final notifyCount =
-          (widget.controller.unreadSystemCount.value +
-                  widget.controller.unreadTrainingCount.value)
-              .toString();
+      (widget.controller.unreadSystemCount.value +
+          widget.controller.unreadTrainingCount.value)
+          .toString();
 
       String getVietnameseWeekday() {
         final weekday = DateTime.now().weekday;
@@ -1064,103 +1479,108 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
             final item = items[index];
 
             return Expanded(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5),
-                decoration: BoxDecoration(
-                  border: index == items.length - 1
-                      ? null
-                      : Border(
-                          right: BorderSide(
-                            color: Colors.grey.withOpacity(0.18),
+              child: AppGuideAnchor(
+                id: _overviewGuideId(index),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5),
+                  decoration: BoxDecoration(
+                    border: index == items.length - 1
+                        ? null
+                        : Border(
+                      right: BorderSide(
+                        color: Colors.grey.withOpacity(0.18),
+                      ),
+                    ),
+                  ),
+                  child: GestureDetector(
+                    onTap: () {
+                      if (index == 0) {
+                        Get.to(
+                              () => VcoreExamScheduleView(
+                            initialDate: DateTime.now(),
                           ),
-                        ),
-                ),
-                child: GestureDetector(
-                  onTap: () {
-                    if (index == 0) {
-                      // Tiết học hôm nay → mở lịch học & thi, scroll đến hôm nay
-                      Get.to(
-                        () =>
-                            VcoreExamScheduleView(initialDate: DateTime.now()),
-                      );
-                    } else if (index == 1) {
-                      // Lịch thi sắp tới → scroll đến ngày thi gần nhất
-                      final upcomingExams = widget.controller
-                          .getUpcomingExams();
-                      DateTime? targetDate;
-                      if (upcomingExams.isNotEmpty) {
-                        final ngayThi = upcomingExams.first.ngayThi;
-                        if (ngayThi != null && ngayThi.isNotEmpty) {
-                          try {
-                            final parts = ngayThi.split('/');
-                            if (parts.length == 3) {
-                              targetDate = DateTime(
-                                int.parse(parts[2]),
-                                int.parse(parts[1]),
-                                int.parse(parts[0]),
-                              );
-                            }
-                          } catch (_) {}
+                        );
+                      } else if (index == 1) {
+                        final upcomingExams = widget.controller.getUpcomingExams();
+                        DateTime? targetDate;
+                        if (upcomingExams.isNotEmpty) {
+                          final ngayThi = upcomingExams.first.ngayThi;
+                          if (ngayThi != null && ngayThi.isNotEmpty) {
+                            try {
+                              final parts = ngayThi.split('/');
+                              if (parts.length == 3) {
+                                targetDate = DateTime(
+                                  int.parse(parts[2]),
+                                  int.parse(parts[1]),
+                                  int.parse(parts[0]),
+                                );
+                              }
+                            } catch (_) {}
+                          }
                         }
-                      }
-                      Get.to(
-                        () => VcoreExamScheduleView(
-                          initialDate: targetDate ?? DateTime.now(),
-                        ),
-                      );
-                    } else if (index == 2) {
-                      Get.to(() => const VcoreNotifyViewV3())?.then((_) {
-                        widget.controller.updateUnreadCounts();
-                      });
-                    } else if (index == 3) {
-                      _showCreateCalendarReminderSheet();
-                    }
-                  },
-                  behavior: HitTestBehavior.opaque,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            width: 28,
-                            height: 28,
-                            decoration: BoxDecoration(
-                              color: item.color.withOpacity(0.10),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Icon(item.icon, color: item.color, size: 16),
+                        Get.to(
+                              () => VcoreExamScheduleView(
+                            initialDate: targetDate ?? DateTime.now(),
                           ),
-                          const SizedBox(width: 5),
-                          Flexible(
-                            child: Text(
-                              item.value,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: AppFontSizes.font15_5,
-                                fontWeight: FontWeight.w900,
-                                color: AppColors.homeTextTitle,
+                        );
+                      } else if (index == 2) {
+                        Get.to(() => const VcoreNotifyViewV3())?.then((_) {
+                          widget.controller.updateUnreadCounts();
+                        });
+                      } else if (index == 3) {
+                        _showCreateCalendarReminderSheet();
+                      }
+                    },
+                    behavior: HitTestBehavior.opaque,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 28,
+                              height: 28,
+                              decoration: BoxDecoration(
+                                color: item.color.withOpacity(0.10),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(
+                                item.icon,
+                                color: item.color,
+                                size: 16,
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        item.label,
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: AppFontSizes.font10_5,
-                          height: 1.15,
-                          color: AppColors.homeTextBody,
-                          fontWeight: FontWeight.w600,
+                            const SizedBox(width: 5),
+                            Flexible(
+                              child: Text(
+                                item.value,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: AppFontSizes.font15_5,
+                                  fontWeight: FontWeight.w900,
+                                  color: AppColors.homeTextTitle,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 6),
+                        Text(
+                          item.label,
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: AppFontSizes.font10_5,
+                            height: 1.15,
+                            color: AppColors.homeTextBody,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -1179,30 +1599,48 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildScheduleTabs(),
+          AppGuideAnchor(
+            id: 'home.schedule.tabs',
+            child: _buildScheduleTabs(),
+          ),
           const SizedBox(height: 10),
-          SizedBox(
-            height: 245,
-            child: Obx(() {
-              return PageView(
-                controller: schedulePageController,
-                padEnds: false,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(right: 10),
-                    child: isStudyTab
-                        ? _buildNextStudyCard()
-                        : _buildNextExamCard(),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(right: 10),
-                    child: isStudyTab
-                        ? _buildTodayStudyTimeline()
-                        : _buildTodayExamTimeline(),
-                  ),
-                ],
-              );
-            }),
+          AppGuideAnchor(
+            id: 'home.schedule.cards',
+            child: SizedBox(
+              height: 245,
+              child: Obx(() {
+                return PageView(
+                  controller: schedulePageController,
+                  padEnds: false,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(right: 10),
+                      child: isStudyTab
+                          ? AppGuideAnchor(
+                        id: 'home.schedule.next_study',
+                        child: _buildNextStudyCard(),
+                      )
+                          : AppGuideAnchor(
+                        id: 'home.schedule.next_exam',
+                        child: _buildNextExamCard(),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(right: 10),
+                      child: isStudyTab
+                          ? AppGuideAnchor(
+                        id: 'home.schedule.study_timeline',
+                        child: _buildTodayStudyTimeline(),
+                      )
+                          : AppGuideAnchor(
+                        id: 'home.schedule.exam_timeline',
+                        child: _buildTodayExamTimeline(),
+                      ),
+                    ),
+                  ],
+                );
+              }),
+            ),
           ),
         ],
       ),
@@ -1349,36 +1787,36 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
           Expanded(
             child: upcomingSchedule.isEmpty
                 ? const Center(
-                    child: Text(
-                      'Không có lịch học sắp tới',
-                      style: TextStyle(
-                        color: Colors.grey,
-                        fontSize: AppFontSizes.small,
-                      ),
-                    ),
-                  )
+              child: Text(
+                'Không có lịch học sắp tới',
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontSize: AppFontSizes.small,
+                ),
+              ),
+            )
                 : ListView.builder(
-                    itemCount: min(upcomingSchedule.length, 3),
-                    padding: EdgeInsets.zero,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemBuilder: (context, index) {
-                      final item = upcomingSchedule[index];
-                      final data = item.data;
+              itemCount: min(upcomingSchedule.length, 3),
+              padding: EdgeInsets.zero,
+              physics: const NeverScrollableScrollPhysics(),
+              itemBuilder: (context, index) {
+                final item = upcomingSchedule[index];
+                final data = item.data;
 
-                      return _timelineItem(
-                        time:
-                            '${item.ngayHocShortText} • Tiết ${data.tietBatDau ?? '--'}',
-                        title: data.tenHocPhan ?? '',
-                        room: data.tenPhong ?? '--',
-                        color: index == 0
-                            ? const Color(0xFF059669)
-                            : index == 1
-                            ? const Color(0xFF3B82F6)
-                            : const Color(0xFFF59E0B),
-                        isLast: index == min(upcomingSchedule.length, 3) - 1,
-                      );
-                    },
-                  ),
+                return _timelineItem(
+                  time:
+                  '${item.ngayHocShortText} • Tiết ${data.tietBatDau ?? '--'}',
+                  title: data.tenHocPhan ?? '',
+                  room: data.tenPhong ?? '--',
+                  color: index == 0
+                      ? const Color(0xFF059669)
+                      : index == 1
+                      ? const Color(0xFF3B82F6)
+                      : const Color(0xFFF59E0B),
+                  isLast: index == min(upcomingSchedule.length, 3) - 1,
+                );
+              },
+            ),
           ),
         ],
       ),
@@ -1397,35 +1835,35 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
           Expanded(
             child: upcomingExams.isEmpty
                 ? const Center(
-                    child: Text(
-                      'Không có lịch thi sắp tới',
-                      style: TextStyle(
-                        color: Colors.grey,
-                        fontSize: AppFontSizes.small,
-                      ),
-                    ),
-                  )
+              child: Text(
+                'Không có lịch thi sắp tới',
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontSize: AppFontSizes.small,
+                ),
+              ),
+            )
                 : ListView.builder(
-                    itemCount: min(upcomingExams.length, 3),
-                    padding: EdgeInsets.zero,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemBuilder: (context, index) {
-                      final item = upcomingExams[index];
+              itemCount: min(upcomingExams.length, 3),
+              padding: EdgeInsets.zero,
+              physics: const NeverScrollableScrollPhysics(),
+              itemBuilder: (context, index) {
+                final item = upcomingExams[index];
 
-                      return _timelineItem(
-                        time:
-                            '${_formatShortDate(item.ngayThi)} • ${item.gioBatDauThi ?? '--:--'}',
-                        title: item.tenHocPhan ?? '',
-                        room: item.phongThi ?? '--',
-                        color: index == 0
-                            ? const Color(0xFF2563EB)
-                            : index == 1
-                            ? const Color(0xFF7C3AED)
-                            : const Color(0xFFF97316),
-                        isLast: index == min(upcomingExams.length, 3) - 1,
-                      );
-                    },
-                  ),
+                return _timelineItem(
+                  time:
+                  '${_formatShortDate(item.ngayThi)} • ${item.gioBatDauThi ?? '--:--'}',
+                  title: item.tenHocPhan ?? '',
+                  room: item.phongThi ?? '--',
+                  color: index == 0
+                      ? const Color(0xFF2563EB)
+                      : index == 1
+                      ? const Color(0xFF7C3AED)
+                      : const Color(0xFFF97316),
+                  isLast: index == min(upcomingExams.length, 3) - 1,
+                );
+              },
+            ),
           ),
         ],
       ),
@@ -1453,34 +1891,40 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _sectionHeader('Truy cập nhanh', 'Ghim', onTap: _showPinDialog),
+          AppGuideAnchor(
+            id: 'home.quick_access.pin',
+            child: _sectionHeader('Truy cập nhanh', 'Ghim', onTap: _showPinDialog),
+          ),
           const SizedBox(height: 14),
-          orderedPinned.isEmpty
-              ? const Center(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(vertical: 20),
-                    child: Text(
-                      'Chưa có chức năng nào được ghim.\nNhấn "Ghim" để thêm.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.grey,
-                        fontSize: AppFontSizes.mediumSmall,
-                      ),
-                    ),
-                  ),
-                )
-              : SizedBox(
-                  height: 98,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: orderedPinned.length,
-                    padding: EdgeInsets.zero,
-                    separatorBuilder: (_, __) => const SizedBox(width: 8),
-                    itemBuilder: (context, index) {
-                      return _functionItem(orderedPinned[index]);
-                    },
+          AppGuideAnchor(
+            id: 'home.quick_access.list',
+            child: orderedPinned.isEmpty
+                ? const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 20),
+                child: Text(
+                  'Chưa có chức năng nào được ghim.\nNhấn "Ghim" để thêm.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.grey,
+                    fontSize: AppFontSizes.mediumSmall,
                   ),
                 ),
+              ),
+            )
+                : SizedBox(
+              height: 98,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: orderedPinned.length,
+                padding: EdgeInsets.zero,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (context, index) {
+                  return _functionItem(orderedPinned[index]);
+                },
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -1497,57 +1941,63 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          _sectionHeader(
-            'Thông báo quan trọng',
-            'Xem tất cả',
-            onTap: () {
-              Get.to(() => const VcoreNotifyViewV3())?.then((_) {
-                widget.controller.updateUnreadCounts();
-              });
-            },
+          AppGuideAnchor(
+            id: 'home.notice.header',
+            child: _sectionHeader(
+              'Thông báo quan trọng',
+              'Xem tất cả',
+              onTap: () {
+                Get.to(() => const VcoreNotifyViewV3())?.then((_) {
+                  widget.controller.updateUnreadCounts();
+                });
+              },
+            ),
           ),
           const SizedBox(height: 8),
-          Obx(() {
-            final list = widget.controller.listThongBaoDaoTao;
+          AppGuideAnchor(
+            id: 'home.notice.list',
+            child: Obx(() {
+              final list = widget.controller.listThongBaoDaoTao;
 
-            if (list.isEmpty) {
-              return const SizedBox(
-                height: 80,
-                child: Center(
-                  child: Text(
-                    'Chưa có thông báo đào tạo',
-                    style: TextStyle(
-                      color: Colors.grey,
-                      fontSize: AppFontSizes.mediumSmall,
+              if (list.isEmpty) {
+                return const SizedBox(
+                  height: 80,
+                  child: Center(
+                    child: Text(
+                      'Chưa có thông báo đào tạo',
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontSize: AppFontSizes.mediumSmall,
+                      ),
                     ),
                   ),
-                ),
-              );
-            }
-
-            return Column(
-              children: list.take(3).map((item) {
-                return _noticeItem(
-                  title: item.tieuDe ?? 'Thông báo',
-                  subtitle: 'Thông báo đào tạo',
-                  time: 'Xem',
-                  color: Colors.red,
-                  onTap: () {
-                    Get.to(
-                      () => VcoreNotifyDetailViewV3(
-                        title: item.tieuDe ?? 'Thông báo đào tạo',
-                        htmlContent: item.noiDung ?? '',
-                        sender: 'Phòng Đào tạo',
-                        date: DateTime.now(),
-                        category: 'Tin đào tạo',
-                        showMetadata: false,
-                      ),
-                    );
-                  },
                 );
-              }).toList(),
-            );
-          }),
+              }
+
+              return Column(
+                children: list.take(3).map((item) {
+                  return _noticeItem(
+                    title: item.tieuDe ?? 'Thông báo',
+                    subtitle: 'Thông báo đào tạo',
+                    time: 'Xem',
+                    color: Colors.red,
+                    onTap: () {
+                      Get.to(
+                            () => VcoreNotifyDetailViewV3(
+                          title: item.tieuDe ?? 'Thông báo đào tạo',
+                          htmlContent: item.noiDung ?? '',
+                          sender: 'Phòng Đào tạo',
+                          date: DateTime.now(),
+                          category: 'Tin đào tạo',
+                          showMetadata: false,
+                        ),
+                      );
+                    },
+                  );
+                }).toList(),
+              );
+            }),
+          ),
         ],
       ),
     );
@@ -1561,124 +2011,133 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _sectionHeader(
-            'Tin tức nổi bật',
-            'Xem tất cả',
-            onTap: () {
-              Get.to(() => const VcoreNewsViewV3());
-            },
-          ),
-          const SizedBox(height: 12),
-          _whiteBox(
-            radius: 99,
-            variant: _BoxVariant.chip,
-            padding: const EdgeInsets.all(4),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _tabButton(
-                  title: 'Tin Trường',
-                  active: newsTabIndex == 0,
-                  onTap: () {
-                    setState(() => newsTabIndex = 0);
-
-                    if (newsPageController.hasClients) {
-                      newsPageController.jumpToPage(1000);
-                    }
-                  },
-                ),
-                const SizedBox(width: 6),
-                _tabButton(
-                  title: 'Tin VNU',
-                  active: newsTabIndex == 1,
-                  onTap: () {
-                    setState(() => newsTabIndex = 1);
-
-                    if (newsPageController.hasClients) {
-                      newsPageController.jumpToPage(1000);
-                    }
-                  },
-                ),
-              ],
+          AppGuideAnchor(
+            id: 'home.news.header',
+            child: _sectionHeader(
+              'Tin tức nổi bật',
+              'Xem tất cả',
+              onTap: () {
+                Get.to(() => const VcoreNewsViewV3());
+              },
             ),
           ),
           const SizedBox(height: 12),
-          Obx(() {
-            final schoolItems = widget.controller.listTinTuc2;
-            final vnuItems = widget.controller.listTinTuc;
-            final count = isSchoolNewsTab
-                ? schoolItems.length
-                : vnuItems.length;
+          AppGuideAnchor(
+            id: 'home.news.tabs',
+            child: _whiteBox(
+              radius: 99,
+              variant: _BoxVariant.chip,
+              padding: const EdgeInsets.all(4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _tabButton(
+                    title: 'Tin Trường',
+                    active: newsTabIndex == 0,
+                    onTap: () {
+                      setState(() => newsTabIndex = 0);
 
-            if (count == 0) {
-              return const SizedBox(
-                height: 120,
-                child: Center(
-                  child: Text(
-                    'Chưa có tin tức',
-                    style: TextStyle(
-                      color: Colors.grey,
-                      fontSize: AppFontSizes.mediumSmall,
+                      if (newsPageController.hasClients) {
+                        newsPageController.jumpToPage(1000);
+                      }
+                    },
+                  ),
+                  const SizedBox(width: 6),
+                  _tabButton(
+                    title: 'Tin VNU',
+                    active: newsTabIndex == 1,
+                    onTap: () {
+                      setState(() => newsTabIndex = 1);
+
+                      if (newsPageController.hasClients) {
+                        newsPageController.jumpToPage(1000);
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          AppGuideAnchor(
+            id: 'home.news.carousel',
+            child: Obx(() {
+              final schoolItems = widget.controller.listTinTuc2;
+              final vnuItems = widget.controller.listTinTuc;
+              final count = isSchoolNewsTab
+                  ? schoolItems.length
+                  : vnuItems.length;
+
+              if (count == 0) {
+                return const SizedBox(
+                  height: 120,
+                  child: Center(
+                    child: Text(
+                      'Chưa có tin tức',
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontSize: AppFontSizes.mediumSmall,
+                      ),
                     ),
                   ),
-                ),
-              );
-            }
+                );
+              }
 
-            return SizedBox(
-              height: 165,
-              child: PageView.builder(
-                controller: newsPageController,
-                physics: const BouncingScrollPhysics(),
-                itemBuilder: (context, index) {
-                  final realIndex = index % count;
+              return SizedBox(
+                height: 165,
+                child: PageView.builder(
+                  controller: newsPageController,
+                  physics: const BouncingScrollPhysics(),
+                  itemBuilder: (context, index) {
+                    final realIndex = index % count;
 
-                  if (isSchoolNewsTab) {
-                    final tinTuc = schoolItems[realIndex];
-                    final guid = tinTuc.guidFileAnhDaiDiens?.isNotEmpty == true
-                        ? tinTuc.guidFileAnhDaiDiens!.first
-                        : '';
+                    if (isSchoolNewsTab) {
+                      final tinTuc = schoolItems[realIndex];
+                      final guid = tinTuc.guidFileAnhDaiDiens?.isNotEmpty == true
+                          ? tinTuc.guidFileAnhDaiDiens!.first
+                          : '';
 
-                    final imageUrl = guid.isNotEmpty
-                        ? '${ServicesUrl().baseUrlFileDownload}$guid'
-                        : '';
+                      final imageUrl = guid.isNotEmpty
+                          ? '${ServicesUrl().baseUrlFileDownload}$guid'
+                          : '';
 
-                    final cacheKey = 'school_${tinTuc.guid ?? realIndex}_$guid';
+                      final cacheKey = 'school_${tinTuc.guid ?? realIndex}_$guid';
+
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 12),
+                        child: _newsCard(
+                          title: tinTuc.tieuDe ?? '',
+                          imageUrl: imageUrl,
+                          cacheKey: cacheKey,
+                          accentColor: const Color(0xFF059669),
+                          onTap: () {
+                            Get.to(
+                                  () => VcoreNewsDetailView(tinTucModel: tinTuc),
+                            );
+                          },
+                        ),
+                      );
+                    }
+
+                    final tinTuc = vnuItems[realIndex];
 
                     return Padding(
                       padding: const EdgeInsets.only(right: 12),
                       child: _newsCard(
                         title: tinTuc.tieuDe ?? '',
-                        imageUrl: imageUrl,
-                        cacheKey: cacheKey,
-                        accentColor: const Color(0xFF059669),
+                        imageUrl: tinTuc.anhDaiDien ?? '',
+                        cacheKey: tinTuc.anhDaiDien ?? 'vnu_$realIndex',
+                        accentColor: const Color(0xFF2563EB),
                         onTap: () {
-                          Get.to(
-                            () => VcoreNewsDetailView(tinTucModel: tinTuc),
-                          );
+                          widget.controller.viewDetailTopTinTucModel(tinTuc);
                         },
                       ),
                     );
-                  }
-
-                  final tinTuc = vnuItems[realIndex];
-
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 12),
-                    child: _newsCard(
-                      title: tinTuc.tieuDe ?? '',
-                      imageUrl: tinTuc.anhDaiDien ?? '',
-                      cacheKey: tinTuc.anhDaiDien ?? 'vnu_$realIndex',
-                      accentColor: const Color(0xFF2563EB),
-                      onTap: () {
-                        widget.controller.viewDetailTopTinTucModel(tinTuc);
-                      },
-                    ),
-                  );
-                },
-              ),
-            );
-          }),
+                  },
+                ),
+              );
+            }),
+          ),
         ],
       ),
     );
@@ -1701,12 +2160,12 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
           borderRadius: BorderRadius.circular(99),
           boxShadow: active
               ? [
-                  BoxShadow(
-                    color: AppColors.brandGreen.withOpacity(0.12),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
+            BoxShadow(
+              color: AppColors.brandGreen.withOpacity(0.12),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ]
               : [],
         ),
         child: Text(
@@ -1955,61 +2414,64 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
   }
 
   Widget _functionItem(_FunctionItem item) {
-    return SizedBox(
-      width: 82,
-      child: GestureDetector(
-        onTap: () => _handleFunctionTap(item.label),
-        behavior: HitTestBehavior.opaque,
-        child: Column(
-          children: [
-            Container(
-              width: 58,
-              height: 58,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(18),
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    item.color.withOpacity(0.08),
-                    item.color.withOpacity(0.18),
+    return AppGuideAnchor(
+      id: _homeFunctionGuideId(item.label),
+      child: SizedBox(
+        width: 82,
+        child: GestureDetector(
+          onTap: () => _handleFunctionTap(item.label),
+          behavior: HitTestBehavior.opaque,
+          child: Column(
+            children: [
+              Container(
+                width: 58,
+                height: 58,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(18),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      item.color.withOpacity(0.08),
+                      item.color.withOpacity(0.18),
+                    ],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.white.withOpacity(0.8),
+                      blurRadius: 6,
+                      offset: const Offset(-2, -2),
+                    ),
+                    BoxShadow(
+                      color: item.color.withOpacity(0.18),
+                      blurRadius: 12,
+                      offset: const Offset(3, 5),
+                    ),
                   ],
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.white.withOpacity(0.8),
-                    blurRadius: 6,
-                    offset: const Offset(-2, -2),
+                child: Center(
+                  child: Icon(
+                    _getIconForLabel(item.label),
+                    size: 26,
+                    color: item.color,
                   ),
-                  BoxShadow(
-                    color: item.color.withOpacity(0.18),
-                    blurRadius: 12,
-                    offset: const Offset(3, 5),
-                  ),
-                ],
-              ),
-              child: Center(
-                child: Icon(
-                  _getIconForLabel(item.label),
-                  size: 26,
-                  color: item.color,
                 ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              item.label,
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: AppColors.darkNavy,
-                fontSize: AppFontSizes.font11_5,
-                fontWeight: FontWeight.w600,
-                height: 1.25,
+              const SizedBox(height: 8),
+              Text(
+                item.label,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppColors.darkNavy,
+                  fontSize: AppFontSizes.font11_5,
+                  fontWeight: FontWeight.w600,
+                  height: 1.25,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -2115,27 +2577,27 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                 ),
                 child: imageUrl.isNotEmpty
                     ? CachedNetworkImage(
-                        imageUrl: imageUrl,
-                        cacheKey: cacheKey,
-                        fit: BoxFit.cover,
-                        httpHeaders: Globals().headerToken(),
-                        placeholder: (_, __) =>
-                            Container(color: Colors.grey.shade200),
-                        errorWidget: (_, __, ___) => Container(
-                          color: const Color(0xFFD9E5E2),
-                          child: const Icon(
-                            Icons.article_outlined,
-                            color: Colors.grey,
-                          ),
-                        ),
-                      )
+                  imageUrl: imageUrl,
+                  cacheKey: cacheKey,
+                  fit: BoxFit.cover,
+                  httpHeaders: Globals().headerToken(),
+                  placeholder: (_, __) =>
+                      Container(color: Colors.grey.shade200),
+                  errorWidget: (_, __, ___) => Container(
+                    color: const Color(0xFFD9E5E2),
+                    child: const Icon(
+                      Icons.article_outlined,
+                      color: Colors.grey,
+                    ),
+                  ),
+                )
                     : Container(
-                        color: const Color(0xFFD9E5E2),
-                        child: const Icon(
-                          Icons.article_outlined,
-                          color: Colors.grey,
-                        ),
-                      ),
+                  color: const Color(0xFFD9E5E2),
+                  child: const Icon(
+                    Icons.article_outlined,
+                    color: Colors.grey,
+                  ),
+                ),
               ),
             ),
             Padding(
@@ -2563,7 +3025,7 @@ class _RadialPinOverlayState extends State<_RadialPinOverlay>
                             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                             children: List.generate(
                               widget.groupedFunctions.length,
-                              (idx) {
+                                  (idx) {
                                 final catName = widget.groupedFunctions.keys
                                     .elementAt(idx);
                                 final isActive = activeCategoryIndex == idx;
@@ -2665,7 +3127,7 @@ class _RadialPinOverlayState extends State<_RadialPinOverlay>
                                       height: 90,
                                       child: Column(
                                         mainAxisAlignment:
-                                            MainAxisAlignment.center,
+                                        MainAxisAlignment.center,
                                         children: [
                                           Stack(
                                             clipBehavior: Clip.none,
@@ -2680,30 +3142,30 @@ class _RadialPinOverlayState extends State<_RadialPinOverlay>
                                                   shape: BoxShape.circle,
                                                   color: isPinned
                                                       ? item.color.withOpacity(
-                                                          0.2,
-                                                        )
+                                                    0.2,
+                                                  )
                                                       : Colors.white
-                                                            .withOpacity(0.12),
+                                                      .withOpacity(0.12),
                                                   border: Border.all(
                                                     color: isPinned
                                                         ? item.color
                                                         : Colors.white
-                                                              .withOpacity(
-                                                                0.25,
-                                                              ),
+                                                        .withOpacity(
+                                                      0.25,
+                                                    ),
                                                     width: isPinned ? 2.5 : 1.5,
                                                   ),
                                                   boxShadow: isPinned
                                                       ? [
-                                                          BoxShadow(
-                                                            color: item.color
-                                                                .withOpacity(
-                                                                  0.4,
-                                                                ),
-                                                            blurRadius: 12,
-                                                            spreadRadius: 1,
-                                                          ),
-                                                        ]
+                                                    BoxShadow(
+                                                      color: item.color
+                                                          .withOpacity(
+                                                        0.4,
+                                                      ),
+                                                      blurRadius: 12,
+                                                      spreadRadius: 1,
+                                                    ),
+                                                  ]
                                                       : [],
                                                 ),
                                                 child: Center(
@@ -2714,7 +3176,7 @@ class _RadialPinOverlayState extends State<_RadialPinOverlay>
                                                     color: isPinned
                                                         ? item.color
                                                         : Colors.white
-                                                              .withOpacity(0.9),
+                                                        .withOpacity(0.9),
                                                     size: 24,
                                                   ),
                                                 ),
@@ -2727,13 +3189,13 @@ class _RadialPinOverlayState extends State<_RadialPinOverlay>
                                                     width: 18,
                                                     height: 18,
                                                     decoration:
-                                                        const BoxDecoration(
-                                                          color: Color(
-                                                            0xFF07964B,
-                                                          ),
-                                                          shape:
-                                                              BoxShape.circle,
-                                                        ),
+                                                    const BoxDecoration(
+                                                      color: Color(
+                                                        0xFF07964B,
+                                                      ),
+                                                      shape:
+                                                      BoxShape.circle,
+                                                    ),
                                                     child: const Icon(
                                                       Icons.check,
                                                       color: Colors.white,
@@ -2753,8 +3215,8 @@ class _RadialPinOverlayState extends State<_RadialPinOverlay>
                                               color: isPinned
                                                   ? Colors.white
                                                   : Colors.white.withOpacity(
-                                                      0.85,
-                                                    ),
+                                                0.85,
+                                              ),
                                               fontSize: AppFontSizes.font11,
                                               fontWeight: isPinned
                                                   ? FontWeight.bold

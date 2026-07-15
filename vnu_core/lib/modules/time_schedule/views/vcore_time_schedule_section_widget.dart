@@ -13,8 +13,11 @@ import '../../../common/utils.dart';
 class VcoreTimeScheduleSectionWidget extends StatefulWidget {
   final String date;
   final List<LichThiHocKyModel> lichThi;
-  const VcoreTimeScheduleSectionWidget(
-      {super.key, required this.date, required this.lichThi});
+  const VcoreTimeScheduleSectionWidget({
+    super.key,
+    required this.date,
+    required this.lichThi,
+  });
 
   @override
   State<VcoreTimeScheduleSectionWidget> createState() =>
@@ -58,8 +61,9 @@ class _VcoreTimeScheduleSectionWidgetState
                   onTap: () {
                     Get.dialog(
                       Dialog(
-                        insetPadding:
-                            const EdgeInsets.symmetric(horizontal: 20),
+                        insetPadding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                        ),
                         child: VcoreTimeScheduleDetailWidget(
                           lichThiHocKyModel: widget.lichThi[index],
                         ),
@@ -74,7 +78,7 @@ class _VcoreTimeScheduleSectionWidgetState
               separatorBuilder: (ctx, index) => spaceHeight(16),
               itemCount: widget.lichThi.length,
             ),
-          )
+          ),
         ],
       ),
     );
@@ -89,14 +93,18 @@ class TimeScheduleItemWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-          color: Colors.white, borderRadius: BorderRadius.circular(8)),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+      ),
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             lichThiHocKyModel.tenHocPhan ?? '',
-            style: TextStyles.semiBold.copyWith(fontSize: AppFontSizes.mediumLarge),
+            style: TextStyles.semiBold.copyWith(
+              fontSize: AppFontSizes.mediumLarge,
+            ),
           ),
           spaceHeight(10),
           Padding(
@@ -106,12 +114,14 @@ class TimeScheduleItemWidget extends StatelessWidget {
                 svgAsset('assets/images/ic_time.svg'),
                 spaceWidth(10),
                 Expanded(
-                    child: Text(
-                        'Ca: ${lichThiHocKyModel.caThi}. Bắt đầu thi: ${lichThiHocKyModel.gioBatDauThi}',
-                        style: TextStyles.regular.copyWith(
-                          fontSize: AppFontSizes.mediumSmall,
-                          color: const Color(0xff637392),
-                        )))
+                  child: Text(
+                    'Ca: ${lichThiHocKyModel.caThi}. Bắt đầu thi: ${lichThiHocKyModel.gioBatDauThi}',
+                    style: TextStyles.regular.copyWith(
+                      fontSize: AppFontSizes.mediumSmall,
+                      color: const Color(0xff637392),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -128,11 +138,14 @@ class TimeScheduleItemWidget extends StatelessWidget {
           svgAsset('assets/images/ic_time.svg'),
           spaceWidth(10),
           Expanded(
-              child: Text('Ca: 1. Bắt đầu thi: 08:00. Thời gian thi: 90 Phút',
-                  style: TextStyles.regular.copyWith(
-                    fontSize: AppFontSizes.mediumSmall,
-                    color: const Color(0xff637392),
-                  )))
+            child: Text(
+              'Ca: 1. Bắt đầu thi: 08:00. Thời gian thi: 90 Phút',
+              style: TextStyles.regular.copyWith(
+                fontSize: AppFontSizes.mediumSmall,
+                color: const Color(0xff637392),
+              ),
+            ),
+          ),
         ],
       ),
     );

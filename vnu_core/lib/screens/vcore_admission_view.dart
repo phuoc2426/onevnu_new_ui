@@ -2,15 +2,26 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vnu_core/common/app_text_styles.dart';
 import 'package:vnu_core/common/space_widget.dart';
-// import 'package:vnu_core/modules/admission/widgets/cinematic_3d_book_widget.dart';
 import 'package:vnu_core/modules/browser/views/vcore_browser_view.dart';
 import 'package:vnu_core/modules/cam_nang/views/vcore_cam_nang_view.dart';
 import 'package:vnu_core/modules/inmapz/vcore_immap_view.dart';
 import 'package:vnu_core/modules/motel/vcore_motel_webview.dart';
 import 'package:vnu_core/screens/vcore_login_screen_v3.dart';
+
+// Thay thế màn hình cũ bằng màn hình đăng nhập thí sinh mới
+import 'package:vnu_core/modules/admission/views/applicant_login_screen.dart';
+
+// Các import không còn sử dụng đã được xoá:
+// import 'package:vnu_core/modules/admission/views/admitted_student_page.dart';
+// import 'package:vnu_core/screens/cccd_registration_screen.dart';
+// import 'package:vnu_noi_tru/screens/dormitory_registration/dr_my_registration_screen.dart';
+// import 'package:vnu_core/providers/applicant/applicant_auth_provider.dart';
+// import 'package:vnu_core/services/applicant/applicant_api_service.dart';
+// import 'package:provider/provider.dart';
 
 class VcoreAdmissionView extends StatefulWidget {
   const VcoreAdmissionView({super.key});
@@ -60,29 +71,23 @@ class _VcoreAdmissionViewState extends State<VcoreAdmissionView> {
   Future<String> _getMobileApiBaseUrl() async {
     final prefs = await SharedPreferences.getInstance();
     final domain = prefs.getString('domain');
-
     if (domain == null || domain.trim().isEmpty) {
       return _defaultMobileApiBase;
     }
-
     return domain.trim();
   }
 
   Future<List<_CmsVnuItem>> _getCmsPublicItems(
-      String path, {
-        Map<String, dynamic>? queryParameters,
-      }) async {
+    String path, {
+    Map<String, dynamic>? queryParameters,
+  }) async {
     final baseUrl = await _getMobileApiBaseUrl();
-
     final response = await Dio().get(
       '$baseUrl$path',
       queryParameters: queryParameters,
     );
-
     final raw = response.data;
-
     List<dynamic> items = [];
-
     if (raw is List) {
       items = raw;
     } else if (raw is Map<String, dynamic>) {
@@ -91,7 +96,6 @@ class _VcoreAdmissionViewState extends State<VcoreAdmissionView> {
         items = data;
       }
     }
-
     return items
         .whereType<Map>()
         .map((e) => _CmsVnuItem.fromJson(Map<String, dynamic>.from(e)))
@@ -104,16 +108,13 @@ class _VcoreAdmissionViewState extends State<VcoreAdmissionView> {
         _tinTucPath,
         queryParameters: {'limit': 20},
       );
-
       if (!mounted) return;
-
       setState(() {
         _listTinTucVNU = data;
         _isLoadingTinTucVNU = false;
       });
     } catch (_) {
       if (!mounted) return;
-
       setState(() {
         _isLoadingTinTucVNU = false;
       });
@@ -124,21 +125,15 @@ class _VcoreAdmissionViewState extends State<VcoreAdmissionView> {
     try {
       final data = await _getCmsPublicItems(
         _viecLamPath,
-        queryParameters: {
-          'pageIndex': 1,
-          'pageSize': 20,
-        },
+        queryParameters: {'pageIndex': 1, 'pageSize': 20},
       );
-
       if (!mounted) return;
-
       setState(() {
         _listJobs = data;
         _isLoadingJobs = false;
       });
     } catch (_) {
       if (!mounted) return;
-
       setState(() {
         _isLoadingJobs = false;
       });
@@ -149,13 +144,13 @@ class _VcoreAdmissionViewState extends State<VcoreAdmissionView> {
     Get.to(() => const VCoreLoginScreenV3());
   }
 
+  // Hàm mới: chuyển đến màn hình đăng nhập dành cho thí sinh
+  void _goToApplicantLogin() {
+    Get.to(() => const ApplicantLoginScreen());
+  }
+
   void _openWebUrl(String title, String url) {
-    Get.to(
-          () => VcoreBrowserView(
-        title: title,
-        url: url,
-      ),
-    );
+    Get.to(() => VcoreBrowserView(title: title, url: url));
   }
 
   void _openAdmissionUnit(_AdmissionUnit item) {
@@ -164,18 +159,12 @@ class _VcoreAdmissionViewState extends State<VcoreAdmissionView> {
 
   void _openCmsItem(_CmsVnuItem item, String fallbackTitle) {
     final url = item.openUrl;
-
     if (url.isEmpty) return;
-
-    _openWebUrl(
-      item.tieuDe.isNotEmpty ? item.tieuDe : fallbackTitle,
-      url,
-    );
+    _openWebUrl(item.tieuDe.isNotEmpty ? item.tieuDe : fallbackTitle, url);
   }
 
   void _scrollToAdmissionUnits() {
     if (!_scrollController.hasClients) return;
-
     _scrollController.animateTo(
       330,
       duration: const Duration(milliseconds: 420),
@@ -185,15 +174,14 @@ class _VcoreAdmissionViewState extends State<VcoreAdmissionView> {
 
   String _resolveImageUrl(_CmsVnuItem item) {
     final image = item.imageUrl;
-
     if (image.isEmpty) return '';
     if (image.startsWith('http')) return image;
-
     return '$_defaultMobileApiBase$image';
   }
 
   @override
   Widget build(BuildContext context) {
+    // Không còn dùng Provider cho auth nữa, các màn hình con tự quản lý
     return Scaffold(
       backgroundColor: pageBg,
       body: SafeArea(
@@ -214,10 +202,11 @@ class _VcoreAdmissionViewState extends State<VcoreAdmissionView> {
     );
   }
 
+  // ========== Hero section đã được sửa đổi ==========
   Widget _buildHero() {
     return Container(
       width: double.infinity,
-      height: 252,
+      height: 260,
       decoration: const BoxDecoration(
         image: DecorationImage(
           image: AssetImage('assets/images/admission_bg.png'),
@@ -226,103 +215,219 @@ class _VcoreAdmissionViewState extends State<VcoreAdmissionView> {
         ),
       ),
       child: Container(
-        padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+        padding: const EdgeInsets.fromLTRB(20, 28, 20, 16),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
               lightGreen.withOpacity(0.96),
-              lightGreen.withOpacity(0.70),
-              lightGreen.withOpacity(0.06),
+              lightGreen.withOpacity(0.82),
+              lightGreen.withOpacity(0.15),
             ],
-            stops: const [0.0, 0.44, 1.0],
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
         ),
         child: Row(
           children: [
-            SizedBox(
-              width: 265,
+            Expanded(
+              flex: 13,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Tuyển sinh VNU',
+                    'Trang thông tin sinh viên',
                     style: TextStyles.bold.copyWith(
-                      fontSize: 22,
-                      height: 1.12,
+                      fontSize: 19.5,
+                      height: 1.1,
                       color: primaryGreen,
-                    ),
-                  ),
-                  spaceHeight(6),
-                  Text(
-                    'Đại học & Sau đại học',
-                    style: TextStyles.bold.copyWith(
-                      fontSize: 12,
-                      height: 1.2,
-                      color: primaryGreen,
-                    ),
-                  ),
-                  spaceHeight(12),
-                  Text(
-                    'Khám phá thông tin tuyển sinh, tin tức và tiện ích dành cho tân sinh viên.',
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyles.regular.copyWith(
-                      fontSize: 12,
-                      height: 1.42,
-                      color: const Color(0xFF374151),
                     ),
                   ),
                   spaceHeight(8),
-                  InkWell(
-                    onTap: _scrollToAdmissionUnits,
-                    borderRadius: BorderRadius.circular(18),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 3),
-                      child: Text(
-                        'Xem các đơn vị tuyển sinh  ›',
-                        style: TextStyles.semiBold.copyWith(
-                          color: primaryGreen,
-                          fontSize: 11,
-                        ),
-                      ),
+                  Text(
+                    'Đăng nhập dành cho sinh viên và đăng ký dành cho thí sinh',
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.35,
+                      color: const Color(0xFF6B7280),
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
-                  spaceHeight(10),
-                  InkWell(
-                    onTap: _goToLogin,
-                    borderRadius: BorderRadius.circular(26),
-                    child: Container(
-                      width: 180,
-                      padding: const EdgeInsets.symmetric(vertical: 11),
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: primaryGreen,
-                        borderRadius: BorderRadius.circular(15),
-                        boxShadow: [
-                          BoxShadow(
-                            color: primaryGreen.withOpacity(0.22),
-                            blurRadius: 12,
-                            offset: const Offset(0, 5),
-                          ),
-                        ],
-                      ),
-                      child: Text(
-                        'Đăng nhập hệ thống',
-                        style: TextStyles.semiBold.copyWith(
-                          color: Colors.white,
-                          fontSize: 12,
+                  const Spacer(),
+                  // ===== Hai nút hành động đã chỉnh sửa =====
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildActionCard(
+                          icon: Icons.login_rounded,
+                          title: 'Đăng nhập',
+                          subtitle: 'Sinh viên',
+                          gradientColors: const [
+                            Color(0xFF2E7D32),
+                            Color(0xFF4CAF50),
+                          ],
+                          onTap: _goToLogin,
                         ),
                       ),
-                    ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildActionCard(
+                          icon: Icons.person_add_rounded,
+                          title: 'Thí sinh', // ← đổi tiêu đề
+                          subtitle: 'Đăng nhập / ĐK', // ← đổi phụ đề
+                          gradientColors: const [
+                            Color(0xFF1565C0),
+                            Color(0xFF2196F3),
+                          ],
+                          onTap: _goToApplicantLogin, // ← điều hướng mới
+                        ),
+                      ),
+                    ],
                   ),
-
+                  // Nút "Xem danh sách sinh viên trúng tuyển" đã bị xoá bỏ hoàn toàn
                 ],
               ),
             ),
-            const Expanded(child: SizedBox()),
+            const Expanded(flex: 3, child: SizedBox()),
           ],
+        ),
+      ),
+    );
+  }
+
+  // Các widget giao diện còn lại giữ nguyên hoàn toàn
+  // ... (giữ nguyên toàn bộ phần dưới đây, không thay đổi gì thêm)
+
+  Widget _buildActionCard({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required List<Color> gradientColors,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: gradientColors,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: gradientColors.first.withOpacity(0.4),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 22, color: Colors.white),
+            const SizedBox(height: 6),
+            Text(
+              title,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              subtitle,
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 10,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCustomButton({
+    required String text,
+    required IconData icon,
+    required List<Color> colors,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: colors,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: colors.first.withOpacity(0.4),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 20, color: Colors.white),
+            const SizedBox(width: 8),
+            Text(
+              text,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGradientButton({
+    required String text,
+    required List<Color> colors,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 13),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: colors,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: colors.first.withOpacity(0.35),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          text,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 13.5,
+          ),
         ),
       ),
     );
@@ -349,7 +454,6 @@ class _VcoreAdmissionViewState extends State<VcoreAdmissionView> {
               separatorBuilder: (_, __) => spaceWidth(8),
               itemBuilder: (context, index) {
                 final item = _admissionUnits[index];
-
                 return _AdmissionUnitCard(
                   item: item,
                   onTap: () => _openAdmissionUnit(item),
@@ -377,7 +481,6 @@ class _VcoreAdmissionViewState extends State<VcoreAdmissionView> {
         title: 'Cẩm nang tân sinh viên',
         description: 'Hành trang vững vàng cho hành trình đại học',
         image: 'assets/images/state_0_manual.png',
-        // onTap: (){},
         onTap: () => Get.to(() => const VcoreCamNangView()),
         showBook: true,
       ),
@@ -391,7 +494,8 @@ class _VcoreAdmissionViewState extends State<VcoreAdmissionView> {
         title: 'Nhà trọ',
         description: 'Tìm kiếm nhà trọ an toàn, tiện lợi',
         image: 'assets/images/state_0_dormitory.png',
-        onTap: openMotelWebView,
+        onTap: () =>
+            _openWebUrl('Nhà trọ', 'https://hostel.mytourvietnam.com/'),
       ),
       _UtilityItem(
         title: 'Bản đồ số',
@@ -415,7 +519,6 @@ class _VcoreAdmissionViewState extends State<VcoreAdmissionView> {
                 const gap = 10.0;
                 final itemWidth = (constraints.maxWidth - gap) / 2;
                 final itemHeight = itemWidth / 1.16;
-
                 return Wrap(
                   spacing: gap,
                   runSpacing: gap,
@@ -462,7 +565,6 @@ class _VcoreAdmissionViewState extends State<VcoreAdmissionView> {
                 separatorBuilder: (_, __) => spaceWidth(10),
                 itemBuilder: (context, index) {
                   final item = _listTinTucVNU[index];
-
                   return _AdmissionNewsCard(
                     tag: 'VNU',
                     imageUrl: _resolveImageUrl(item),
@@ -505,7 +607,6 @@ class _VcoreAdmissionViewState extends State<VcoreAdmissionView> {
                 separatorBuilder: (_, __) => spaceWidth(10),
                 itemBuilder: (context, index) {
                   final item = _listJobs[index];
-
                   return _AdmissionNewsCard(
                     tag: 'VIỆC LÀM',
                     imageUrl: _resolveImageUrl(item),
@@ -521,6 +622,7 @@ class _VcoreAdmissionViewState extends State<VcoreAdmissionView> {
     );
   }
 
+  // ================== DỮ LIỆU TĨNH ==================
   static final List<_AdmissionUnit> _admissionUnits = [
     _AdmissionUnit(
       shortName: 'HUS',
@@ -528,7 +630,7 @@ class _VcoreAdmissionViewState extends State<VcoreAdmissionView> {
       fullName: 'Trường Đại học Khoa học Tự nhiên',
       url: 'https://tuyensinh.hus.vnu.edu.vn/',
       logoUrl:
-      'https://cdnportal.vnu.edu.vn/data/0/images/2025/06/16/upload_2/logo-hus-final-01-1.png?w=1920&dpi=72',
+          'https://cdnportal.vnu.edu.vn/data/0/images/2025/06/16/upload_2/logo-hus-final-01-1.png?w=1920&dpi=72',
     ),
     _AdmissionUnit(
       shortName: 'USSH',
@@ -536,7 +638,7 @@ class _VcoreAdmissionViewState extends State<VcoreAdmissionView> {
       fullName: 'Trường Đại học Khoa học Xã hội & Nhân văn',
       url: 'https://tuyensinh.ussh.edu.vn/',
       logoUrl:
-      'https://cdnportal.vnu.edu.vn/data/0/images/2025/06/16/upload_2/vnu-ussh-1-s.png?w=1920&dpi=72',
+          'https://cdnportal.vnu.edu.vn/data/0/images/2025/06/16/upload_2/vnu-ussh-1-s.png?w=1920&dpi=72',
     ),
     _AdmissionUnit(
       shortName: 'ULIS',
@@ -544,7 +646,7 @@ class _VcoreAdmissionViewState extends State<VcoreAdmissionView> {
       fullName: 'Trường Đại học Ngoại ngữ',
       url: 'https://ulis.vnu.edu.vn/tuyensinh2026/',
       logoUrl:
-      'https://cdnportal.vnu.edu.vn/data/0/images/2025/06/16/upload_2/vnu-ulis.png?w=1920&dpi=72',
+          'https://cdnportal.vnu.edu.vn/data/0/images/2025/06/16/upload_2/vnu-ulis.png?w=1920&dpi=72',
     ),
     _AdmissionUnit(
       shortName: 'UET',
@@ -552,7 +654,7 @@ class _VcoreAdmissionViewState extends State<VcoreAdmissionView> {
       fullName: 'Trường Đại học Công nghệ',
       url: 'https://uet.vnu.edu.vn/category/tuyen-sinh/',
       logoUrl:
-      'https://cdnportal.vnu.edu.vn/data/0/images/2025/06/16/upload_2/vnu-uet.png?w=1920&dpi=72',
+          'https://cdnportal.vnu.edu.vn/data/0/images/2025/06/16/upload_2/vnu-uet.png?w=1920&dpi=72',
     ),
     _AdmissionUnit(
       shortName: 'UEB',
@@ -560,7 +662,7 @@ class _VcoreAdmissionViewState extends State<VcoreAdmissionView> {
       fullName: 'Trường Đại học Kinh tế',
       url: 'https://ueb.vnu.edu.vn/Tuyen-Sinh',
       logoUrl:
-      'https://cdnportal.vnu.edu.vn/data/0/images/2025/06/16/upload_2/truong-dh-kinh-te.png?w=1920&dpi=72',
+          'https://cdnportal.vnu.edu.vn/data/0/images/2025/06/16/upload_2/truong-dh-kinh-te.png?w=1920&dpi=72',
     ),
     _AdmissionUnit(
       shortName: 'UEd',
@@ -568,7 +670,7 @@ class _VcoreAdmissionViewState extends State<VcoreAdmissionView> {
       fullName: 'Trường Đại học Giáo dục',
       url: 'https://education.vnu.edu.vn/',
       logoUrl:
-      'https://cdnportal.vnu.edu.vn/data/0/images/2025/06/16/upload_2/logo-vnu-ued-1.png?w=1920&dpi=72',
+          'https://cdnportal.vnu.edu.vn/data/0/images/2025/06/16/upload_2/logo-vnu-ued-1.png?w=1920&dpi=72',
     ),
     _AdmissionUnit(
       shortName: 'VJU',
@@ -576,7 +678,7 @@ class _VcoreAdmissionViewState extends State<VcoreAdmissionView> {
       fullName: 'Trường Đại học Việt - Nhật',
       url: 'https://vju.ac.vn/tuyensinhdaihoc/thong-tin-tuyen-sinh-2026/',
       logoUrl:
-      'https://cdnportal.vnu.edu.vn/data/0/images/2025/06/16/upload_2/1200px-logo-vju-svg.png?w=1920&dpi=72',
+          'https://cdnportal.vnu.edu.vn/data/0/images/2025/06/16/upload_2/1200px-logo-vju-svg.png?w=1920&dpi=72',
     ),
     _AdmissionUnit(
       shortName: 'UMP',
@@ -584,7 +686,7 @@ class _VcoreAdmissionViewState extends State<VcoreAdmissionView> {
       fullName: 'Trường Đại học Y Dược',
       url: 'https://ump.vnu.edu.vn/index.html',
       logoUrl:
-      'https://cdnportal.vnu.edu.vn/data/0/images/2025/06/16/upload_2/vnu-ump-1.png?w=1920&dpi=72',
+          'https://cdnportal.vnu.edu.vn/data/0/images/2025/06/16/upload_2/vnu-ump-1.png?w=1920&dpi=72',
     ),
     _AdmissionUnit(
       shortName: 'UL',
@@ -592,7 +694,7 @@ class _VcoreAdmissionViewState extends State<VcoreAdmissionView> {
       fullName: 'Trường Đại học Luật',
       url: 'https://law.vnu.edu.vn/tuyen-sinh/',
       logoUrl:
-      'https://cdnportal.vnu.edu.vn/data/0/images/2025/06/16/upload_2/vnu-ul-1.png?w=1920&dpi=72',
+          'https://cdnportal.vnu.edu.vn/data/0/images/2025/06/16/upload_2/vnu-ul-1.png?w=1920&dpi=72',
     ),
     _AdmissionUnit(
       shortName: 'HSB',
@@ -600,44 +702,41 @@ class _VcoreAdmissionViewState extends State<VcoreAdmissionView> {
       fullName: 'Trường Quản trị và Kinh doanh',
       url: 'https://www.hsb.edu.vn/admissions',
       logoUrl:
-      'https://cdnportal.vnu.edu.vn/data/0/images/2025/06/16/upload_2/z3820263481061-a5913e95067524e958b051f5ac42e874.jpg?w=1920&dpi=72',
+          'https://cdnportal.vnu.edu.vn/data/0/images/2025/06/16/upload_2/z3820263481061-a5913e95067524e958b051f5ac42e874.jpg?w=1920&dpi=72',
     ),
     _AdmissionUnit(
       shortName: 'IS',
       name: 'Trường\nQuốc tế',
       fullName: 'Trường Quốc tế',
       url:
-      'https://www.is.vnu.edu.vn/chuyen-trang-tuyen-sinh-dai-hoc-nam-2026/',
+          'https://www.is.vnu.edu.vn/chuyen-trang-tuyen-sinh-dai-hoc-nam-2026/',
       logoUrl:
-      'https://cdnportal.vnu.edu.vn/data/0/images/2025/06/16/upload_2/vnu-is.png?w=1920&dpi=72',
+          'https://cdnportal.vnu.edu.vn/data/0/images/2025/06/16/upload_2/vnu-is.png?w=1920&dpi=72',
     ),
     _AdmissionUnit(
       shortName: 'SIS',
       name: 'Liên ngành &\nNghệ thuật',
       fullName: 'Trường Khoa học liên ngành và Nghệ thuật',
       url:
-      'https://sis.vnu.edu.vn/Tuyen-sinh-bac-Dai-hoc/danh-sach-tin-tuc_146.html',
+          'https://sis.vnu.edu.vn/Tuyen-sinh-bac-Dai-hoc/danh-sach-tin-tuc_146.html',
       logoUrl:
-      'https://cdnportal.vnu.edu.vn/data/0/images/2025/06/16/upload_2/logo-vnu-sis-2024.png?w=1920&dpi=72',
+          'https://cdnportal.vnu.edu.vn/data/0/images/2025/06/16/upload_2/logo-vnu-sis-2024.png?w=1920&dpi=72',
     ),
   ];
 }
+
+// ====================== CÁC WIDGET CON (KHÔNG THAY ĐỔI) ======================
 
 class _SectionTitle extends StatelessWidget {
   final String title;
   final String? actionText;
   final VoidCallback? onTapAction;
 
-  const _SectionTitle({
-    required this.title,
-    this.actionText,
-    this.onTapAction,
-  });
+  const _SectionTitle({required this.title, this.actionText, this.onTapAction});
 
   @override
   Widget build(BuildContext context) {
     final action = actionText;
-
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14),
       child: Row(
@@ -656,10 +755,7 @@ class _SectionTitle extends StatelessWidget {
               onTap: onTapAction,
               borderRadius: BorderRadius.circular(8),
               child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 4,
-                  vertical: 4,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
                 child: Text(
                   '$action  ›',
                   style: TextStyles.semiBold.copyWith(
@@ -679,10 +775,7 @@ class _AdmissionUnitCard extends StatelessWidget {
   final _AdmissionUnit item;
   final VoidCallback onTap;
 
-  const _AdmissionUnitCard({
-    required this.item,
-    required this.onTap,
-  });
+  const _AdmissionUnitCard({required this.item, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -753,25 +846,14 @@ class _AdmissionUnitCard extends StatelessWidget {
 
 class _UtilityCard extends StatefulWidget {
   final _UtilityItem item;
-
-  const _UtilityCard({
-    required this.item,
-  });
+  const _UtilityCard({required this.item});
 
   @override
   State<_UtilityCard> createState() => _UtilityCardState();
 }
 
 class _UtilityCardState extends State<_UtilityCard> {
-  // final GlobalKey<CinematicBookState> _bookKey =
-  // GlobalKey<CinematicBookState>();
-
   void _handleTap() {
-    // if (widget.item.showBook) {
-    //   _bookKey.currentState?.openBook();
-    //   return;
-    // }
-
     widget.item.onTap();
   }
 
@@ -779,7 +861,6 @@ class _UtilityCardState extends State<_UtilityCard> {
   Widget build(BuildContext context) {
     final item = widget.item;
     final isBookCard = item.showBook;
-
     return InkWell(
       onTap: _handleTap,
       borderRadius: BorderRadius.circular(16),
@@ -817,45 +898,6 @@ class _UtilityCardState extends State<_UtilityCard> {
                 ),
               ),
             ),
-
-            // if (isBookCard)
-            //   Positioned(
-            //     top: 12,
-            //     left: 0,
-            //     right: 0,
-            //     bottom: 22,
-            //     child: Center(
-            //       child: SizedBox(
-            //         width: 64,
-            //         height: 82,
-            //         child: FittedBox(
-            //           fit: BoxFit.contain,
-            //           child: CinematicBook(
-            //             key: _bookKey,
-            //             scale: 0.24,
-            //             coverAsset: 'assets/images/cover.png',
-            //             spineAsset: 'assets/images/spine.png',
-            //             pages: const [
-            //               BookPage(
-            //                 title: 'Cẩm nang tân sinh viên',
-            //                 content: 'Chào mừng bạn đến với Đại học Quốc gia Hà Nội. '
-            //                     'Cuốn cẩm nang này tổng hợp những thông tin quan trọng giúp tân sinh viên làm quen với môi trường học tập, sinh hoạt và các dịch vụ hỗ trợ trong trường.',
-            //               ),
-            //               BookPage(
-            //                 title: 'Hành trang nhập học',
-            //                 content: 'Sinh viên cần theo dõi thông báo chính thức của đơn vị đào tạo, chuẩn bị hồ sơ nhập học, tài khoản hệ thống, lịch học, lịch sinh hoạt công dân và các kênh liên hệ cần thiết.',
-            //               ),
-            //               BookPage(
-            //                 title: 'Tiện ích dành cho sinh viên',
-            //                 content: 'Bạn có thể sử dụng các tiện ích như bản đồ số, thông tin nhà trọ, tin tức VNU, cơ hội việc làm và các dịch vụ hỗ trợ học tập để bắt đầu hành trình đại học thuận lợi hơn.',
-            //               ),
-            //             ],
-            //           ),
-            //         ),
-            //       ),
-            //     ),
-            //   ),
-
             Positioned(
               left: 10,
               right: 10,
@@ -904,7 +946,6 @@ class _UtilityCardState extends State<_UtilityCard> {
                 ),
               ),
             ),
-
             Positioned(
               right: 10,
               bottom: 10,
@@ -957,7 +998,6 @@ class _AdmissionNewsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasImage = imageUrl.trim().isNotEmpty;
-
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(14),
@@ -987,11 +1027,11 @@ class _AdmissionNewsCard extends StatelessWidget {
                   Positioned.fill(
                     child: hasImage
                         ? CachedNetworkImage(
-                      imageUrl: imageUrl,
-                      fit: BoxFit.cover,
-                      placeholder: (_, __) => _buildImageFallback(),
-                      errorWidget: (_, __, ___) => _buildImageFallback(),
-                    )
+                            imageUrl: imageUrl,
+                            fit: BoxFit.cover,
+                            placeholder: (_, __) => _buildImageFallback(),
+                            errorWidget: (_, __, ___) => _buildImageFallback(),
+                          )
                         : _buildImageFallback(),
                   ),
                   Positioned.fill(
@@ -1073,10 +1113,7 @@ class _AdmissionNewsCard extends StatelessWidget {
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            Color(0xFFEAF7EF),
-            Color(0xFFD6EBDD),
-          ],
+          colors: [Color(0xFFEAF7EF), Color(0xFFD6EBDD)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -1094,7 +1131,6 @@ class _AdmissionNewsCard extends StatelessWidget {
 
 class _LoadingHorizontalSection extends StatelessWidget {
   const _LoadingHorizontalSection();
-
   @override
   Widget build(BuildContext context) {
     return const SizedBox(
@@ -1112,11 +1148,7 @@ class _LoadingHorizontalSection extends StatelessWidget {
 
 class _EmptyHorizontalSection extends StatelessWidget {
   final String text;
-
-  const _EmptyHorizontalSection({
-    required this.text,
-  });
-
+  const _EmptyHorizontalSection({required this.text});
   @override
   Widget build(BuildContext context) {
     return SizedBox(
@@ -1140,13 +1172,10 @@ class _EmptyHorizontalSection extends StatelessWidget {
 
 class _LogoFallback extends StatelessWidget {
   final String text;
-
   const _LogoFallback({required this.text});
-
   @override
   Widget build(BuildContext context) {
     final fallbackText = text.isNotEmpty ? text.substring(0, 1) : 'V';
-
     return Container(
       width: 40,
       height: 40,
@@ -1173,7 +1202,6 @@ class _AdmissionUnit {
   final String fullName;
   final String url;
   final String logoUrl;
-
   const _AdmissionUnit({
     required this.shortName,
     required this.name,
@@ -1189,7 +1217,6 @@ class _UtilityItem {
   final String image;
   final VoidCallback onTap;
   final bool showBook;
-
   const _UtilityItem({
     required this.title,
     required this.description,

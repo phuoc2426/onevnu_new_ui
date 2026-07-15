@@ -53,7 +53,7 @@ class _VCoreLoginScreenState extends State<VCoreLoginScreen> {
     'assets/images/ic_logo_khoa_hoc_tu_nhien.png',
     'assets/images/ic_logo_cong_nghe.png',
     'assets/images/ic_logo_dai_hoc_1.png',
-    'assets/images/ic_logo_dai_hoc_2.png'
+    'assets/images/ic_logo_dai_hoc_2.png',
   ];
 
   final LocalAuthentication auth = LocalAuthentication();
@@ -99,8 +99,8 @@ class _VCoreLoginScreenState extends State<VCoreLoginScreen> {
               .isNotEmpty;
     } catch (e) {}
 
-    final List<BiometricType> availableBiometrics =
-        await auth.getAvailableBiometrics();
+    final List<BiometricType> availableBiometrics = await auth
+        .getAvailableBiometrics();
 
     if (availableBiometrics.isEmpty) {
       // NO biometrics are enrolled.
@@ -187,13 +187,17 @@ class _VCoreLoginScreenState extends State<VCoreLoginScreen> {
                             // Logo
                             Container(
                               margin: const EdgeInsets.only(
-                                  top: 36, bottom: 40, left: 30, right: 30),
+                                top: 36,
+                                bottom: 40,
+                                left: 30,
+                                right: 30,
+                              ),
                               child: GestureDetector(
                                 onTap: () {
                                   final now = VCoreLoginScreen.timeNow;
                                   final userExceededTapDuration =
                                       now - startTap >
-                                          VCoreLoginScreen.tapDurationInMs;
+                                      VCoreLoginScreen.tapDurationInMs;
 
                                   if (userExceededTapDuration) {
                                     consecutiveTaps = 0;
@@ -209,14 +213,15 @@ class _VCoreLoginScreenState extends State<VCoreLoginScreen> {
                                       context: context,
                                       builder: (context) =>
                                           VcoreProfileDomainDialog(
-                                        openTalker: () {
-                                          _openTalker();
-                                        },
-                                      ),
+                                            openTalker: () {
+                                              _openTalker();
+                                            },
+                                          ),
                                     ).then((v) async {
                                       await VnuCore()
                                           .addFirebaseTokenSwitchDomain(
-                                              ServicesUrl().firebaseToken);
+                                            ServicesUrl().firebaseToken,
+                                          );
                                     });
                                   }
                                 },
@@ -253,9 +258,7 @@ class _VCoreLoginScreenState extends State<VCoreLoginScreen> {
                             //   ),
                             // ),
                             //
-                            const SizedBox(
-                              height: 40,
-                            ),
+                            const SizedBox(height: 40),
                             // -- Login - van tay
                             Row(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -266,24 +269,28 @@ class _VCoreLoginScreenState extends State<VCoreLoginScreen> {
                                     FocusManager.instance.primaryFocus
                                         ?.unfocus();
                                     _authCubit.loginMobile(
-                                        _emailController.text,
-                                        _paswordController.text,
-                                        '',
-                                        '');
+                                      _emailController.text,
+                                      _paswordController.text,
+                                      '',
+                                      '',
+                                    );
                                   },
                                   child: Container(
                                     height: 48,
                                     width: 230,
                                     decoration: BoxDecoration(
-                                        color: const Color(0xff007F3E),
-                                        borderRadius: BorderRadius.circular(8)),
+                                      color: const Color(0xff007F3E),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
                                     child: const Center(
-                                        child: Text(
-                                      'Đăng nhập',
-                                      style: TextStyle(
+                                      child: Text(
+                                        'Đăng nhập',
+                                        style: TextStyle(
                                           color: Colors.white,
-                                          fontWeight: FontWeight.bold),
-                                    )),
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
                                   ),
                                 ),
 
@@ -305,31 +312,34 @@ class _VCoreLoginScreenState extends State<VCoreLoginScreen> {
                                         if (userNameLocal.isEmpty ||
                                             passwordLocal.isEmpty) {
                                           snackBarWarning(
-                                              'Bạn cần đăng nhập trước khi sử dụng tính năng này.');
+                                            'Bạn cần đăng nhập trước khi sử dụng tính năng này.',
+                                          );
                                           return;
                                         }
 
                                         if (!isEnableLoginBio) {
                                           snackBarWarning(
-                                              'Bạn cần đăng nhập và bật tính năng trong mục Cá nhân');
+                                            'Bạn cần đăng nhập và bật tính năng trong mục Cá nhân',
+                                          );
                                           return;
                                         }
                                         try {
-                                          var response =
-                                              await auth.authenticate(
+                                          var response = await auth.authenticate(
                                             localizedReason:
                                                 'Scan your fingerprint (or face or whatever) to authenticate',
-                                            options: const AuthenticationOptions(
-                                              stickyAuth: true,
-                                              biometricOnly: true,
-                                            ),
+                                            options:
+                                                const AuthenticationOptions(
+                                                  stickyAuth: true,
+                                                  biometricOnly: true,
+                                                ),
                                           );
                                           if (response) {
                                             _authCubit.loginMobile(
-                                                userNameLocal,
-                                                passwordLocal,
-                                                '',
-                                                '');
+                                              userNameLocal,
+                                              passwordLocal,
+                                              '',
+                                              '',
+                                            );
                                           }
                                           print(response);
                                         } catch (e) {
@@ -359,9 +369,7 @@ class _VCoreLoginScreenState extends State<VCoreLoginScreen> {
                                   ),
                               ],
                             ),
-                            const SizedBox(
-                              height: 32,
-                            ),
+                            const SizedBox(height: 32),
 
                             spaceHeight(20),
 
@@ -377,7 +385,8 @@ class _VCoreLoginScreenState extends State<VCoreLoginScreen> {
                                   child: Column(
                                     children: [
                                       svgAsset(
-                                          'assets/images/ic_login_motel.svg'),
+                                        'assets/images/ic_login_motel.svg',
+                                      ),
                                       spaceHeight(10),
                                       Text(
                                         'Phòng trọ',
@@ -394,7 +403,8 @@ class _VCoreLoginScreenState extends State<VCoreLoginScreen> {
                                   child: Column(
                                     children: [
                                       svgAsset(
-                                          'assets/images/ic_login_map.svg'),
+                                        'assets/images/ic_login_map.svg',
+                                      ),
                                       spaceHeight(10),
                                       Text(
                                         'Xem bản đồ',
@@ -407,7 +417,8 @@ class _VCoreLoginScreenState extends State<VCoreLoginScreen> {
                                 InkWell(
                                   onTap: () {
                                     Utils.openUrl(
-                                        'https://www.facebook.com/supportdangkyhocvnu');
+                                      'https://www.facebook.com/supportdangkyhocvnu',
+                                    );
                                   },
                                   child: Column(
                                     children: [
@@ -458,7 +469,7 @@ class _VCoreLoginScreenState extends State<VCoreLoginScreen> {
                             // )
                           ],
                         ),
-                      )
+                      ),
                     ],
                   );
                 },
@@ -476,14 +487,22 @@ class _VCoreLoginScreenState extends State<VCoreLoginScreen> {
       children: [
         const Text(
           'Tài khoản',
-          style: TextStyle(fontSize: AppFontSizes.medium, color: Color(0xff2A3556)),
+          style: TextStyle(
+            fontSize: AppFontSizes.medium,
+            color: Color(0xff2A3556),
+          ),
         ),
         Container(
           margin: const EdgeInsets.only(top: 6),
           decoration: BoxDecoration(
-              color: Colors.white, borderRadius: BorderRadius.circular(8)),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+          ),
           child: TextField(
-            style: const TextStyle(fontSize: AppFontSizes.medium, color: Color(0xff2A3556)),
+            style: const TextStyle(
+              fontSize: AppFontSizes.medium,
+              color: Color(0xff2A3556),
+            ),
             controller: _emailController,
             decoration: const InputDecoration(
               hintText: 'Nhập tài khoản',
@@ -493,7 +512,7 @@ class _VCoreLoginScreenState extends State<VCoreLoginScreen> {
               enabledBorder: OutlineInputBorder(borderSide: BorderSide.none),
             ),
           ),
-        )
+        ),
       ],
     );
   }
@@ -506,14 +525,22 @@ class _VCoreLoginScreenState extends State<VCoreLoginScreen> {
         children: [
           const Text(
             'Mật khẩu',
-            style: TextStyle(fontSize: AppFontSizes.medium, color: Color(0xff2A3556)),
+            style: TextStyle(
+              fontSize: AppFontSizes.medium,
+              color: Color(0xff2A3556),
+            ),
           ),
           Container(
             margin: const EdgeInsets.only(top: 6),
             decoration: BoxDecoration(
-                color: Colors.white, borderRadius: BorderRadius.circular(8)),
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+            ),
             child: TextField(
-              style: const TextStyle(fontSize: AppFontSizes.medium, color: Color(0xff2A3556)),
+              style: const TextStyle(
+                fontSize: AppFontSizes.medium,
+                color: Color(0xff2A3556),
+              ),
               controller: _paswordController,
               obscureText: true,
               decoration: const InputDecoration(
@@ -524,7 +551,7 @@ class _VCoreLoginScreenState extends State<VCoreLoginScreen> {
                 enabledBorder: OutlineInputBorder(borderSide: BorderSide.none),
               ),
             ),
-          )
+          ),
         ],
       ),
     );
@@ -535,73 +562,72 @@ class _VCoreLoginScreenState extends State<VCoreLoginScreen> {
     var password = "";
     final buttonWidth = MediaQuery.of(context).size.width / 4;
     showDialog(
-        barrierDismissible: false,
-        context: context,
-        builder: (context) {
-          return Dialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            backgroundColor: Colors.transparent,
-            child: Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  VcoreProfileTextFieldWidget(
-                    title: 'Mật khẩu',
-                    hintText: 'Nhập mật khẩu',
-                    value: password,
-                    autoFocus: true,
-                    onChange: (text) {
-                      password = text;
-                    },
-                    onSubmitted: (text) {
-                      password = text;
-                    },
-                  ),
-                  const SizedBox(height: 24),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      WhiteButton(
-                        width: buttonWidth,
-                        title: "Hủy",
-                        action: () {
-                          Navigator.pop(context);
-                        },
-                      ),
-                      const SizedBox(width: 12),
-                      BlueButton(
-                        width: buttonWidth,
-                        title: "Xác nhận",
-                        bgColor: AppColors.greenAccent,
-                        action: () {
-                          Navigator.pop(context);
-                        },
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+      barrierDismissible: false,
+      context: context,
+      builder: (context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          backgroundColor: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
             ),
-          );
-        }).then(
-      (v) async {
-        if (password.isEmpty) {
-          return;
-        }
-        if (password == kLogPass) {
-          Get.to(
-            () => TalkerScreen(talker: Globals().talker),
-          );
-        } else {
-          snackBarError('Mật khẩu không đúng.');
-        }
-        //
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                VcoreProfileTextFieldWidget(
+                  title: 'Mật khẩu',
+                  hintText: 'Nhập mật khẩu',
+                  value: password,
+                  autoFocus: true,
+                  onChange: (text) {
+                    password = text;
+                  },
+                  onSubmitted: (text) {
+                    password = text;
+                  },
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    WhiteButton(
+                      width: buttonWidth,
+                      title: "Hủy",
+                      action: () {
+                        Navigator.pop(context);
+                      },
+                    ),
+                    const SizedBox(width: 12),
+                    BlueButton(
+                      width: buttonWidth,
+                      title: "Xác nhận",
+                      bgColor: AppColors.greenAccent,
+                      action: () {
+                        Navigator.pop(context);
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
       },
-    );
+    ).then((v) async {
+      if (password.isEmpty) {
+        return;
+      }
+      if (password == kLogPass) {
+        Get.to(() => TalkerScreen(talker: Globals().talker));
+      } else {
+        snackBarError('Mật khẩu không đúng.');
+      }
+      //
+    });
   }
 }

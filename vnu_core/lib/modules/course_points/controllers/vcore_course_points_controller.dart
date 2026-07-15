@@ -573,12 +573,10 @@ class VcoreCoursePointsController extends GetxController {
           uniqueCourses[key] = course;
         } else {
           final existingGrade =
-              double.tryParse(existing.diemHe10?.replaceAll(',', '.') ?? '') ??
-              0.0;
+              double.tryParse(existing.diemHe4?.replaceAll(',', '.') ?? '') ?? 0.0;
 
           final currentGrade =
-              double.tryParse(course.diemHe10?.replaceAll(',', '.') ?? '') ??
-              0.0;
+              double.tryParse(course.diemHe4?.replaceAll(',', '.') ?? '') ?? 0.0;
 
           if (currentGrade > existingGrade) {
             uniqueCourses[key] = course;
@@ -693,11 +691,11 @@ class VcoreCoursePointsController extends GetxController {
   String buildCourseSignature(List<DiemThiHocKyModel> list) {
     return list
         .map((e) {
-          final name = e.tenHocPhan?.trim() ?? '';
-          final grade = e.diemHe10?.trim() ?? '';
-          final credits = e.soTinChi?.trim() ?? '';
-          return '${name}_${grade}_$credits';
-        })
+      final name = e.tenHocPhan?.trim() ?? '';
+      final grade4 = e.diemHe4?.trim() ?? '';
+      final credits = e.soTinChi?.trim() ?? '';
+      return '${name}_${grade4}_$credits';
+    })
         .join('|');
   }
 
@@ -727,16 +725,16 @@ class VcoreCoursePointsController extends GetxController {
       await Future.delayed(const Duration(milliseconds: 500));
 
       final academicCourses = deduplicatedList.map((e) {
-        final grade =
-            double.tryParse(e.diemHe10?.replaceAll(',', '.') ?? '') ?? 0.0;
+        final grade4 =
+            double.tryParse(e.diemHe4?.replaceAll(',', '.') ?? '') ?? 0.0;
 
         final credits =
             double.tryParse(e.soTinChi?.replaceAll(',', '.') ?? '') ?? 3.0;
 
         return AcademicCourse(
           name: e.tenHocPhan ?? 'Học phần không tên',
-          grade: grade,
-          credits: credits,
+          grade4: grade4.clamp(0.0, 4.0),
+          credits: credits.clamp(1.0, 10.0),
           description: e.maHocPhan != null
               ? 'Mã học phần: ${e.maHocPhan}'
               : null,

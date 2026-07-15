@@ -119,16 +119,7 @@ class SemanticAxisDiscoveryEngine {
           expectedEvidenceVi: 'Yêu cầu các học phần trí tuệ nhân tạo (AI), học máy (Machine Learning), khai phá dữ liệu lớn (Big Data).',
           seedText: 'trí tuệ nhân tạo ai học máy machine learning deep learning data mining khai phá dữ liệu lớn big data',
         ),
-        RadarAxis(
-          code: 'UIX',
-          nameVi: 'Thiết kế Giao diện UI/UX',
-          nameEn: 'UI/UX Design',
-          sectorRoleVi: 'Đảm bảo tính thẩm mỹ, trực quan và tối ưu hóa trải nghiệm người dùng cuối.',
-          axisImportance: 0.75,
-          axisDefinitionVi: 'Thiết kế wireframe, prototype tương tác, nghiên cứu thói quen người dùng trên ứng dụng.',
-          expectedEvidenceVi: 'Yêu cầu các học phần tương tác người máy, thiết kế đồ họa, thiết kế UI/UX.',
-          seedText: 'thiết kế giao diện ui ux figma đồ họa tương tác người máy photoshop frontend',
-        ),
+
         RadarAxis(
           code: 'LOG',
           nameVi: 'Toán học & Tư duy thuật toán',

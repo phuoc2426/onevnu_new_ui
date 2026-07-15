@@ -5,7 +5,9 @@ import 'package:vnu_noi_tru/cubit/dormitory_registration_cubit.dart';
 import 'package:path/path.dart' as p;
 import 'package:vnu_core/common/app_text_styles.dart';
 import 'dart:io';
-
+import 'package:vnu_core/models/student_info_model.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // thêm dòng này
+import 'package:intl/intl.dart';
 class DRStep4ReviewScreen extends StatefulWidget {
   const DRStep4ReviewScreen({super.key});
 
@@ -17,8 +19,54 @@ class DRStep4ReviewScreen extends StatefulWidget {
 
 class DRStep4ReviewScreenState extends State<DRStep4ReviewScreen> {
   bool _isCommitted = true;
-
   bool get isCommitted => _isCommitted;
+  @override
+  void initState() {
+    super.initState();
+    _loadApplicantCacheIfNeeded(); // ← gọi khi khởi tạo
+  }
+
+  // ========== THÊM TOÀN BỘ HÀM NÀY ==========
+  Future<void> _loadApplicantCacheIfNeeded() async {
+    // Chỉ áp dụng khi chưa có sinh viên chính thống (thí sinh)
+    if (Globals().thongTinSinhVienModel.value != null) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    final cccd = prefs.getString('applicant_cccd');
+    if (cccd == null || cccd.isEmpty) return;
+
+    final fullName = prefs.getString('applicant_fullname') ?? '';
+    final email = prefs.getString('applicant_email') ?? '';
+
+    final cubit = context.read<DormitoryRegistrationCubit>();
+    final dob = prefs.getString('applicant_dob');
+    if (cubit.tempDOB == null || cubit.tempDOB!.isEmpty) {
+      cubit.tempDOB = dob;
+    }
+    // Đồng bộ vào cubit (phòng trường hợp chưa qua step 3)
+    if (cubit.tempFullName == null || cubit.tempFullName!.isEmpty) {
+      cubit.tempFullName = fullName;
+    }
+    if (cubit.tempCccd == null || cubit.tempCccd!.isEmpty) {
+      cubit.tempCccd = cccd;
+    }
+    if (cubit.tempEmail == null || cubit.tempEmail!.isEmpty) {
+      cubit.tempEmail = email;
+    }
+
+    // Tạo StudentInfoModel giả để Globals không null
+    final fakeStudent = StudentInfoModel(
+      hoVaTen: fullName,
+      soCmtCccd: cccd,
+      email: email,
+      // Các trường khác có thể null hoặc để mặc định
+    );
+
+    Globals().thongTinSinhVienModel.value = fakeStudent;
+
+    if (mounted) setState(() {});
+  }
+  // =============================================
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +77,19 @@ class DRStep4ReviewScreenState extends State<DRStep4ReviewScreen> {
     final dormName = cubit.selectedDormitory?.name ?? '-';
     final roomName = cubit.selectedRoomType?.name ?? '-';
     final priorityName = cubit.selectedPriorityObject?.name ?? 'Không có';
-
+    String dobDisplay = '-';
+    final rawDob = cubit.tempDOB ??
+        (student?.ngaySinh != null
+            ? DateFormat('yyyy-MM-dd').format(student!.ngaySinh!)
+            : null);
+    if (rawDob != null && rawDob.isNotEmpty) {
+      try {
+        final parsed = DateTime.parse(rawDob);
+        dobDisplay = DateFormat('dd/MM/yyyy').format(parsed);
+      } catch (_) {
+        dobDisplay = rawDob;
+      }
+    }
     // List of files to display as chips (local files + uploaded files)
     final List<String> fileNames = [];
     if (cubit.cccdFrontFile != null) {
@@ -133,6 +193,7 @@ class DRStep4ReviewScreenState extends State<DRStep4ReviewScreen> {
                   const SizedBox(height: 12),
                   _buildSummaryRow('Mã SV', student?.maSinhVien ?? '-'),
                   _buildSummaryRow('Họ tên', student?.hoVaTen ?? '-'),
+                  _buildSummaryRow('Ngày sinh', dobDisplay),
                   _buildSummaryRow('Lớp', Globals().lopDaoTaoModel.value?.ten ?? '-'),
                   _buildSummaryRow('Ngành', Globals().lopDaoTaoModel.value?.ten ?? '-'),
                   _buildSummaryRow('SĐT', cubit.tempPhone ?? '-'),

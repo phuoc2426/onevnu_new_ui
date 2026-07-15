@@ -1,21 +1,23 @@
 import 'dart:ui';
+
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:salomon_bottom_bar/salomon_bottom_bar.dart';
+
+import 'package:vnu_core/common/app_text_styles.dart';
 import 'package:vnu_core/common/events.dart';
+import 'package:vnu_core/common/guide/guide.dart';
+import 'package:vnu_core/common/guide/configs/profile_guide_config.dart';
 import 'package:vnu_core/common/log.dart';
 import 'package:vnu_core/globals.dart';
-import 'package:vnu_core/modules/notify/views/vcore_notify_view.dart';
 import 'package:vnu_core/repository/app_repository.dart';
 import 'package:vnu_core/services/services_url.dart';
 import 'package:vnu_core/vnu_core.dart';
 
 import '../../home/vcore_home_view_v3.dart';
-// import '../../home/home_v4.dart';
 import '../../news/views/vcore_news_view_v3.dart';
 import '../../profile/views/vcore_profile_view.dart';
 import '../../system_news/views/vcore_system_news_view.dart';
-import 'package:vnu_core/common/app_text_styles.dart';
 
 class VcoreTabbarView extends StatefulWidget {
   const VcoreTabbarView({super.key});
@@ -25,12 +27,17 @@ class VcoreTabbarView extends StatefulWidget {
 }
 
 class _VcoreTabbarViewState extends State<VcoreTabbarView> {
-  int _selectedIndex = 0;
+  static const int _homeTabIndex = 0;
+  static const int _newsTabIndex = 1;
+  static const int _systemNewsTabIndex = 2;
+  static const int _profileTabIndex = 3;
+
+  int _selectedIndex = _homeTabIndex;
+
   final GlobalKey<ScaffoldState> _key = GlobalKey();
 
   static List<Widget> get _widgetOptions => const <Widget>[
     VcoreHomeViewV3(),
-    // VcoreHomeViewV4(),
     VcoreNewsViewV3(),
     VcoreSystemNewsView(),
     VcoreProfileView(),
@@ -38,17 +45,48 @@ class _VcoreTabbarViewState extends State<VcoreTabbarView> {
 
   void _onItemTapped(int index) {
     if (index == _selectedIndex) return;
-    setState(() => _selectedIndex = index);
+
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
+
+  Future<void> _openProfileTabForGuide() async {
+    if (!mounted) return;
+
+    if (_selectedIndex != _profileTabIndex) {
+      setState(() {
+        _selectedIndex = _profileTabIndex;
+      });
+    }
+
+    await WidgetsBinding.instance.endOfFrame;
+    await Future<void>.delayed(const Duration(milliseconds: 320));
+    await WidgetsBinding.instance.endOfFrame;
+  }
+
+  void _registerGuideActions() {
+    globalAppGuideRegistry.registerAction(
+      id: ProfileGuideConfig.actionOpenProfileTab,
+      action: _openProfileTabForGuide,
+    );
+  }
+
+  void _unregisterGuideActions() {
+    globalAppGuideRegistry.unregisterAction(
+      ProfileGuideConfig.actionOpenProfileTab,
+    );
   }
 
   @override
   void initState() {
     super.initState();
 
-    // Firebase token
+    _registerGuideActions();
+
     try {
       FirebaseMessaging.instance.getToken().then(
-        (firebaseToken) => VnuCore().addFirebaseToken(firebaseToken),
+            (firebaseToken) => VnuCore().addFirebaseToken(firebaseToken),
       );
     } catch (e) {
       logError(e.toString());
@@ -68,10 +106,16 @@ class _VcoreTabbarViewState extends State<VcoreTabbarView> {
     });
   }
 
+  @override
+  void dispose() {
+    _unregisterGuideActions();
+    super.dispose();
+  }
+
   Future<void> _loadAndRefreshStartInfo() async {
     try {
       ApiRepository().getConfig().then(
-        (domain) => ServicesUrl().baseUrlFileDownload = domain,
+            (domain) => ServicesUrl().baseUrlFileDownload = domain,
       );
     } catch (e) {
       logError(e.toString());
@@ -94,9 +138,10 @@ class _VcoreTabbarViewState extends State<VcoreTabbarView> {
     }
 
     await Globals().refreshStudentInfo();
+
     try {
       if (Globals().thongTinSinhVienModel.value != null) {
-        var response = await ApiRepository().getDataLopDaoTao(
+        final response = await ApiRepository().getDataLopDaoTao(
           Globals().thongTinSinhVienModel.value?.idLopDaoTao,
           Globals().thongTinSinhVienModel.value?.guidDonVi,
           Globals().thongTinSinhVienModel.value?.idBacDaoTao,
@@ -105,6 +150,7 @@ class _VcoreTabbarViewState extends State<VcoreTabbarView> {
           Globals().thongTinSinhVienModel.value?.idNienKhoaDaoTao,
           Globals().thongTinSinhVienModel.value?.idChuongTrinhDaoTao,
         );
+
         if (response.isNotEmpty) {
           Globals().lopDaoTaoModel.value = response.first;
         } else {
@@ -118,11 +164,12 @@ class _VcoreTabbarViewState extends State<VcoreTabbarView> {
 
     try {
       if (Globals().thongTinSinhVienModel.value != null) {
-        var response = await ApiRepository().getDataNienKhoaDaoTao(
+        final response = await ApiRepository().getDataNienKhoaDaoTao(
           Globals().thongTinSinhVienModel.value?.idNienKhoaDaoTao,
           Globals().thongTinSinhVienModel.value?.guidDonVi,
           Globals().thongTinSinhVienModel.value?.idBacDaoTao,
         );
+
         if (response.isNotEmpty) {
           Globals().nienKhoaDaoTaoModel.value = response.first;
         } else {
@@ -153,7 +200,10 @@ class _VcoreTabbarViewState extends State<VcoreTabbarView> {
       key: _key,
       extendBody: true,
       backgroundColor: Colors.white,
-      body: IndexedStack(index: _selectedIndex, children: _widgetOptions),
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: _widgetOptions,
+      ),
       bottomNavigationBar: _buildSalomonBottomNavBar(),
     );
   }
@@ -176,19 +226,18 @@ class _VcoreTabbarViewState extends State<VcoreTabbarView> {
         ),
         child: SalomonBottomBar(
           currentIndex: _selectedIndex,
-          itemPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
-          onTap: (index) {
-            if (index != _selectedIndex) {
-              setState(() => _selectedIndex = index);
-            }
-          },
+          itemPadding: const EdgeInsets.symmetric(
+            vertical: 8,
+            horizontal: 10,
+          ),
+          onTap: _onItemTapped,
           selectedItemColor: const Color(0xFF16A34A),
           unselectedItemColor: Colors.grey.shade400,
           items: [
             SalomonBottomBarItem(
               icon: const Icon(Icons.home_rounded, size: 22),
               title: const Text(
-                "Trang chủ",
+                'Trang chủ',
                 style: TextStyle(
                   fontSize: AppFontSizes.small,
                   fontWeight: FontWeight.bold,
@@ -196,11 +245,10 @@ class _VcoreTabbarViewState extends State<VcoreTabbarView> {
               ),
               selectedColor: const Color(0xFF16A34A),
             ),
-
             SalomonBottomBarItem(
               icon: const Icon(Icons.newspaper, size: 22),
               title: const Text(
-                "Tin tức",
+                'Tin tức',
                 style: TextStyle(
                   fontSize: AppFontSizes.small,
                   fontWeight: FontWeight.bold,
@@ -211,7 +259,7 @@ class _VcoreTabbarViewState extends State<VcoreTabbarView> {
             SalomonBottomBarItem(
               icon: const Icon(Icons.campaign, size: 22),
               title: const Text(
-                "Tin hệ thống",
+                'Tin hệ thống',
                 style: TextStyle(
                   fontSize: AppFontSizes.small,
                   fontWeight: FontWeight.bold,
@@ -222,7 +270,7 @@ class _VcoreTabbarViewState extends State<VcoreTabbarView> {
             SalomonBottomBarItem(
               icon: const Icon(Icons.person_outline_rounded, size: 22),
               title: const Text(
-                "Cá nhân",
+                'Cá nhân',
                 style: TextStyle(
                   fontSize: AppFontSizes.small,
                   fontWeight: FontWeight.bold,

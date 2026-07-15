@@ -3,7 +3,12 @@ import 'package:dio/dio.dart';
 import 'package:path/path.dart' as path;
 import 'package:vnu_core/constants/config.dart';
 import 'package:vnu_core/services/dio_options.dart';
+import 'package:vnu_core/globals.dart';
+import 'package:vnu_core/repository/data_repository.dart';
+import 'package:vnu_core/repository/app_repository.dart';
+import 'package:vnu_core/common/log.dart';
 import 'package:vnu_noi_tru/models/model.dart';
+import 'package:flutter/foundation.dart';
 
 class DormitoryRegistrationRepository {
   DormitoryRegistrationRepository._internal() {
@@ -26,6 +31,7 @@ class DormitoryRegistrationRepository {
   Future<RegistrationPeriodResponse> getRegistrationPeriods({
     required int dormitoryId,
   }) async {
+    await _loadTokenIfNeeded();
     final response = await _dio.get<Map<String, dynamic>>(
       '$dormitoryId/registration-periods',
       options: _jsonOptions(),
@@ -34,6 +40,7 @@ class DormitoryRegistrationRepository {
   }
 
   Future<DormitoryListResponse> getDormitories() async {
+    await _loadTokenIfNeeded();
     final response = await _dio.get<Map<String, dynamic>>(
       'list',
       options: _jsonOptions(),
@@ -42,6 +49,7 @@ class DormitoryRegistrationRepository {
   }
 
   Future<RoomTypeListResponse> getRoomTypes() async {
+    await _loadTokenIfNeeded();
     final response = await _dio.get<Map<String, dynamic>>(
       'room-types',
       options: _jsonOptions(),
@@ -50,6 +58,7 @@ class DormitoryRegistrationRepository {
   }
 
   Future<PriorityObjectListResponse> getPriorityObjects() async {
+    await _loadTokenIfNeeded();
     final response = await _dio.get<Map<String, dynamic>>(
       'priority-objects',
       options: _jsonOptions(),
@@ -58,17 +67,27 @@ class DormitoryRegistrationRepository {
   }
 
   Future<MyRegistrationResponse> getMyRegistrations({
-    required String studentCode,
+    String? studentCode,
+    String? identityNo,
   }) async {
+    final queryParams = <String, dynamic>{};
+    if (studentCode != null && studentCode.isNotEmpty) {
+      queryParams['student_code'] = studentCode;
+    }
+    if (identityNo != null && identityNo.isNotEmpty) {
+      queryParams['identity_no'] = identityNo;
+    }
+    await _loadTokenIfNeeded();
     final response = await _studentDio.get<Map<String, dynamic>>(
-      'students/${Uri.encodeComponent(studentCode)}',
+      'dormitory/me',
+      queryParameters: queryParams.isNotEmpty ? queryParams : null,
       options: _jsonOptions(),
     );
-
     return MyRegistrationResponse.fromJson(response.data ?? {});
   }
 
   Future<SingleRegistrationResponse> getRegistrationDetail(Object id) async {
+    await _loadTokenIfNeeded();
     final response = await _dio.get<Map<String, dynamic>>(
       'registrations/$id',
       options: _jsonOptions(),
@@ -106,11 +125,18 @@ class DormitoryRegistrationRepository {
       );
     }
 
+    // Include Authorization token for the upload request if available.
+    final uploadHeaders = <String, String>{'Accept': 'application/json'};
+    final token = Globals().token;
+    if (token.isNotEmpty) {
+      uploadHeaders['Authorization'] = 'Bearer $token';
+    }
+
     final response = await _dio.post<Map<String, dynamic>>(
       'attachments/upload',
       data: formData,
       options: Options(
-        headers: {'Accept': 'application/json'},
+        headers: uploadHeaders,
         contentType: 'multipart/form-data',
       ),
     );
@@ -121,6 +147,7 @@ class DormitoryRegistrationRepository {
   Future<SingleRegistrationResponse> registerDormitory(
     RegistrationPayloadModel payload,
   ) async {
+    await _loadTokenIfNeeded();
     final response = await _dio.post<Map<String, dynamic>>(
       'registrations',
       data: payload.toJson(),
@@ -130,6 +157,7 @@ class DormitoryRegistrationRepository {
   }
 
   Future<dynamic> submitDraft(Object id) async {
+    await _loadTokenIfNeeded();
     final response = await _dio.post<Map<String, dynamic>>(
       'registrations/$id/submit',
       data: <String, dynamic>{},
@@ -141,6 +169,7 @@ class DormitoryRegistrationRepository {
   Future<RegistrationHistoryResponse> getRegistrationHistories(
     Object id,
   ) async {
+    await _loadTokenIfNeeded();
     final response = await _dio.get<Map<String, dynamic>>(
       'registrations/$id/histories',
       options: _jsonOptions(),
@@ -149,12 +178,56 @@ class DormitoryRegistrationRepository {
   }
 
   Options _jsonOptions() {
-    return Options(
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-      },
+    // Base headers for JSON requests. Include Authorization token if available.
+    final headers = <String, String>{
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+    };
+    // Add Bearer token when user is authenticated.
+    final token = Globals().token;
+    // -------------------------------------------------
+    // LOG: Kiểm tra token hiện tại của repository
+    // -------------------------------------------------
+    logInfo(
+      '🔎 DormitoryRepo _jsonOptions – token '
+      '${token.isNotEmpty ? "present (${token.substring(0, 8)}…)" : "EMPTY"}',
     );
+    if (token.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+    return Options(headers: headers);
+  }
+
+  // Ensure token is loaded from secure storage if not already in Globals.
+  Future<void> _loadTokenIfNeeded() async {
+    if (Globals().token.isEmpty) {
+      final stored = await DataRepository().getSecureSaveKey(kLoginToken);
+      if (stored != null && stored.isNotEmpty) {
+        Globals().token = stored;
+        // Also set token for ApiRepository if needed.
+        ApiRepository().setToken(stored);
+        // -------------------------------------------------
+        // LOG: Token được tải từ secure storage
+        // -------------------------------------------------
+        logInfo(
+          '🔐 _loadTokenIfNeeded – token loaded from secure storage: '
+          '${stored.substring(0, 8)}…',
+        );
+      } else {
+        // -------------------------------------------------
+        // LOG: Không tìm thấy token trong secure storage
+        // -------------------------------------------------
+        logWarning('_loadTokenIfNeeded – secure storage token NOT found');
+      }
+    } else {
+      // -------------------------------------------------
+      // LOG: Token đã có trong Globals, không cần load lại
+      // -------------------------------------------------
+      logInfo(
+        '✅ _loadTokenIfNeeded – token already present in Globals: '
+        '${Globals().token.substring(0, 8)}…',
+      );
+    }
   }
 
   List<File> _deduplicateFiles(List<File> files) {

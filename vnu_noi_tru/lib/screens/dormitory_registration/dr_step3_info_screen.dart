@@ -11,9 +11,11 @@ import 'package:vnu_core/common/app_text_styles.dart';
 import 'package:vnu_noi_tru/widgets/nt_custom_dropdown.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class DRStep3InfoScreen extends StatefulWidget {
   final GlobalKey<FormState> formKey;
+
   const DRStep3InfoScreen({super.key, required this.formKey});
 
   @override
@@ -30,6 +32,7 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
 
   static const int _defaultImageQuality = 82;
   static const int _minImageQuality = 55;
+
   // Controllers for all form inputs
   late TextEditingController _studentCodeController;
   late TextEditingController _fullNameController;
@@ -50,6 +53,7 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
   late TextEditingController _reasonController;
 
   String _genderValue = 'male';
+  bool _isApplicant = false;
 
   @override
   void initState() {
@@ -59,7 +63,8 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
     final cohortInfo = Globals().nienKhoaDaoTaoModel.value;
     final cubit = context.read<DormitoryRegistrationCubit>();
 
-    _studentCodeController = TextEditingController(text: student?.maSinhVien ?? '');
+    _studentCodeController =
+        TextEditingController(text: student?.maSinhVien ?? '');
     _fullNameController = TextEditingController(text: student?.hoVaTen ?? '');
 
     String dobStr = '';
@@ -67,36 +72,49 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
       dobStr = DateFormat('yyyy-MM-dd').format(student!.ngaySinh!);
     }
     _dobController = TextEditingController(text: dobStr);
+    _isApplicant = student == null;
 
     _genderValue = student?.gioiTinh?.toLowerCase() == 'nữ' ? 'female' : 'male';
     _genderController = TextEditingController(text: _genderValue);
 
-    _cccdController = TextEditingController(text: cubit.tempCccd ?? student?.soCmtCccd ?? '');
+    _cccdController =
+        TextEditingController(text: cubit.tempCccd ?? student?.soCmtCccd ?? '');
 
     String issueDateStr = '';
     if (student?.ngayCapCmtCccd != null) {
       issueDateStr = DateFormat('yyyy-MM-dd').format(student!.ngayCapCmtCccd!);
     }
-    _cccdIssueDateController = TextEditingController(text: cubit.tempCccdIssueDate ?? issueDateStr);
+    _cccdIssueDateController =
+        TextEditingController(text: cubit.tempCccdIssueDate ?? issueDateStr);
 
     _hometownController = TextEditingController(
-      text: cubit.tempHometown ?? student?.hoKhauThuongTruDuongThon ?? student?.hoKhauThuongTruPhuongXa ?? '',
+      text: cubit.tempHometown ?? student?.hoKhauThuongTruDuongThon ??
+          student?.hoKhauThuongTruPhuongXa ?? '',
     );
 
     _classNameController = TextEditingController(text: classInfo?.ten ?? '');
     _majorController = TextEditingController(text: classInfo?.ten ?? '');
-    _academicYearController = TextEditingController(text: cohortInfo?.ten ?? '');
-    _systemController = TextEditingController(text: student != null ? 'Chính quy' : '');
-    _levelController = TextEditingController(text: student != null ? 'Đại học' : '');
-    _universityNameController = TextEditingController(text: student != null ? 'Đại học Quốc gia Hà Nội' : '');
+    _academicYearController =
+        TextEditingController(text: cohortInfo?.ten ?? '');
+    _systemController =
+        TextEditingController(text: student != null ? 'Chính quy' : '');
+    _levelController =
+        TextEditingController(text: student != null ? 'Đại học' : '');
+    _universityNameController = TextEditingController(
+        text: student != null ? 'Đại học Quốc gia Hà Nội' : '');
 
     _temporaryAddressController = TextEditingController(
-      text: cubit.tempTemporaryAddress ?? student?.noiOHienNayDuongThon ?? student?.noiOHienNayPhuongXa ?? '',
+      text: cubit.tempTemporaryAddress ?? student?.noiOHienNayDuongThon ??
+          student?.noiOHienNayPhuongXa ?? '',
     );
 
-    _phoneController = TextEditingController(text: cubit.tempPhone ?? student?.mobile ?? student?.tel ?? '');
-    _emailController = TextEditingController(text: cubit.tempEmail ?? student?.email ?? '');
+    _phoneController = TextEditingController(
+        text: cubit.tempPhone ?? student?.mobile ?? student?.tel ?? '');
+    _emailController =
+        TextEditingController(text: cubit.tempEmail ?? student?.email ?? '');
     _reasonController = TextEditingController(text: cubit.tempReason ?? '');
+
+    _loadApplicantCacheIfAvailable();
   }
 
   @override
@@ -131,7 +149,8 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
 
     if (sizeMb > _maxUploadMb) {
       throw Exception(
-        'Ảnh ${p.basename(file.path)} có dung lượng ${sizeMb.toStringAsFixed(2)}MB, '
+        'Ảnh ${p.basename(file.path)} có dung lượng ${sizeMb.toStringAsFixed(
+            2)}MB, '
             'vượt quá giới hạn $_maxUploadMb MB. Vui lòng chọn ảnh rõ hơn nhưng dung lượng nhỏ hơn.',
       );
     }
@@ -153,7 +172,9 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
     while (quality >= _minImageQuality) {
       final targetPath = p.join(
         tempDir.path,
-        'noi_tru_${DateTime.now().microsecondsSinceEpoch}_q$quality.jpg',
+        'noi_tru_${DateTime
+            .now()
+            .microsecondsSinceEpoch}_q$quality.jpg',
       );
 
       final compressed = await FlutterImageCompress.compressAndGetFile(
@@ -188,10 +209,66 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
     return currentFile;
   }
 
+  Future<void> _loadApplicantCacheIfAvailable() async {
+    final prefs = await SharedPreferences.getInstance();
+    final applicantCccd = prefs.getString('applicant_cccd');
+    if (applicantCccd == null || applicantCccd.isEmpty) return;
+
+    final cubit = context.read<DormitoryRegistrationCubit>();
+
+    // 1. Ưu tiên giá trị từ Cubit (nếu có) → SharedPreferences → rỗng
+    final emailFromCache = prefs.getString('applicant_email') ?? '';
+
+    if (cubit.tempEmail != null && cubit.tempEmail!.isNotEmpty) {
+      _emailController.text = cubit.tempEmail!;
+    } else if (emailFromCache.isNotEmpty) {
+      _emailController.text = emailFromCache;
+      cubit.tempEmail = emailFromCache;   // đồng bộ ngược vào Cubit
+    } else {
+      _emailController.text = '';         // hoặc giữ nguyên giá trị cũ của controller
+    }
+
+    // Tương tự cho họ tên, CCCD, ngày sinh...
+    final fullNameFromCache = prefs.getString('applicant_fullname') ?? '';
+    if (cubit.tempFullName != null && cubit.tempFullName!.isNotEmpty) {
+      _fullNameController.text = cubit.tempFullName!;
+    } else if (fullNameFromCache.isNotEmpty) {
+      _fullNameController.text = fullNameFromCache;
+      cubit.tempFullName = fullNameFromCache;
+    } else {
+      _fullNameController.text = '';
+    }
+
+    // CCCD
+    if (cubit.tempCccd != null && cubit.tempCccd!.isNotEmpty) {
+      _cccdController.text = cubit.tempCccd!;
+    } else {
+      _cccdController.text = applicantCccd;  // applicant_cccd luôn có
+      cubit.tempCccd = applicantCccd;
+    }
+
+    // DOB
+    final dobFromCache = prefs.getString('applicant_dob') ?? '';
+    if (cubit.tempDOB != null && cubit.tempDOB!.isNotEmpty) {
+      _dobController.text = cubit.tempDOB!;
+    } else if (dobFromCache.isNotEmpty) {
+      _dobController.text = dobFromCache;
+      cubit.tempDOB = dobFromCache;
+    } else {
+      _dobController.text = '';
+    }
+
+    // Sau khi đồng bộ, không cần gọi setState vì controller.text đã thay đổi,
+    // nhưng nếu có UI phụ thuộc thì nên gọi setState.
+    if (mounted) setState(() {});
+  }
+
   void saveDataToCubit() {
     final cubit = context.read<DormitoryRegistrationCubit>();
+    cubit.tempFullName = _fullNameController.text.trim();   // ← THÊM DÒNG NÀY
     cubit.tempPhone = _phoneController.text.trim();
     cubit.tempEmail = _emailController.text.trim();
+    cubit.tempDOB = _dobController.text.trim();
     cubit.tempCccd = _cccdController.text.trim();
     cubit.tempCccdIssueDate = _cccdIssueDateController.text.trim();
     cubit.tempHometown = _hometownController.text.trim();
@@ -199,11 +276,10 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
     cubit.tempReason = _reasonController.text.trim();
   }
 
-  Future<void> _selectDate(
-      BuildContext context,
-      TextEditingController controller,
-      ) async {
-    DateTime selectedDate = DateTime.tryParse(controller.text) ?? DateTime.now();
+  Future<void> _selectDate(BuildContext context,
+      TextEditingController controller,) async {
+    DateTime selectedDate = DateTime.tryParse(controller.text) ??
+        DateTime.now();
 
     final picked = await showModalBottomSheet<DateTime>(
       context: context,
@@ -254,7 +330,10 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
                     const SizedBox(height: 12),
                     Theme(
                       data: Theme.of(context).copyWith(
-                        colorScheme: Theme.of(context).colorScheme.copyWith(
+                        colorScheme: Theme
+                            .of(context)
+                            .colorScheme
+                            .copyWith(
                           primary: AppTheme.colorMain,
                           secondary: AppTheme.colorMain,
                         ),
@@ -325,7 +404,18 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
       setState(() {
         controller.text = DateFormat('yyyy-MM-dd').format(picked);
       });
+      if (controller == _dobController) {
+        _saveApplicantCache();  // cập nhật cache ngay
+      }
     }
+  }
+  Future<void> _saveApplicantCache() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('applicant_cccd', _cccdController.text.trim());
+    await prefs.setString('applicant_fullname', _fullNameController.text.trim());
+    await prefs.setString('applicant_email', _emailController.text.trim());
+    await prefs.setString('applicant_dob', _dobController.text.trim());
+    await prefs.setString('applicant_phone', _phoneController.text.trim()); // thêm
   }
   Future<void> _pickImageLocal(String uploadSlot) async {
     final cubit = context.read<DormitoryRegistrationCubit>();
@@ -423,20 +513,27 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
                     children: [
                       const Row(
                         children: [
-                          Icon(Icons.person_outline, color: Color(0xFF078B3E), size: 20),
+                          Icon(Icons.person_outline, color: Color(0xFF078B3E),
+                              size: 20),
                           SizedBox(width: 8),
                           Text(
                             'Thông tin sinh viên',
-                            style: TextStyle(fontSize: AppFontSizes.font11, fontWeight: FontWeight.bold, color: Color(0xFF111318)),
+                            style: TextStyle(fontSize: AppFontSizes.font11,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF111318)),
                           ),
                         ],
                       ),
                       const SizedBox(height: 12),
                       Row(
                         children: [
-                          Expanded(child: _buildField('Mã sinh viên', _studentCodeController, readOnly: true)),
+                          Expanded(child: _buildField(
+                              'Mã sinh viên', _studentCodeController,
+                              readOnly: true)),
                           const SizedBox(width: 8),
-                          Expanded(child: _buildField('Họ và tên', _fullNameController, readOnly: true)),
+                          Expanded(child: _buildField(
+                              'Họ và tên', _fullNameController,
+                              readOnly: true)),
                         ],
                       ),
                       const SizedBox(height: 8),
@@ -444,16 +541,20 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
                         children: [
                           Expanded(
                             child: _buildField(
-                              'Ngày sinh',
+                              'Ngày sinh *',
                               _dobController,
-                              readOnly: true,
+                              readOnly: false,
                               icon: Icons.calendar_today_outlined,
-                              onTap: () => _selectDate(context, _dobController),
+                              onTap: _isApplicant ? () => _selectDate(context, _dobController) : null,
+                              validator: (v) => v == null || v.trim().isEmpty
+                                  ? 'Vui lòng chọn ngày sinh'
+                                  : null,
                             ),
                           ),
                           const SizedBox(width: 8),
                           Expanded(
-                            child: _buildDropdownField('Giới tính', _genderValue, (val) {
+                            child: _buildDropdownField(
+                                'Giới tính', _genderValue, (val) {
                               if (val != null) {
                                 setState(() {
                                   _genderValue = val;
@@ -484,11 +585,14 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
                     children: [
                       const Row(
                         children: [
-                          Icon(Icons.badge_outlined, color: Color(0xFF078B3E), size: 20),
+                          Icon(Icons.badge_outlined, color: Color(0xFF078B3E),
+                              size: 20),
                           SizedBox(width: 8),
                           Text(
                             'Giấy tờ tùy thân',
-                            style: TextStyle(fontSize: AppFontSizes.font11, fontWeight: FontWeight.bold, color: Color(0xFF111318)),
+                            style: TextStyle(fontSize: AppFontSizes.font11,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF111318)),
                           ),
                         ],
                       ),
@@ -499,7 +603,10 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
                             child: _buildField(
                               'Số CCCD *',
                               _cccdController,
-                              validator: (v) => v == null || v.isEmpty ? 'Nhập số CCCD' : null,
+                              validator: (v) =>
+                              v == null || v.isEmpty
+                                  ? 'Nhập số CCCD'
+                                  : null,
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -509,8 +616,12 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
                               _cccdIssueDateController,
                               readOnly: true,
                               icon: Icons.calendar_today_outlined,
-                              onTap: () => _selectDate(context, _cccdIssueDateController),
-                              validator: (v) => v == null || v.isEmpty ? 'Chọn ngày cấp' : null,
+                              onTap: () => _selectDate(
+                                  context, _cccdIssueDateController),
+                              validator: (v) =>
+                              v == null || v.isEmpty
+                                  ? 'Chọn ngày cấp'
+                                  : null,
                             ),
                           ),
                         ],
@@ -519,7 +630,10 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
                       _buildField(
                         'Quê quán *',
                         _hometownController,
-                        validator: (v) => v == null || v.isEmpty ? 'Nhập quê quán' : null,
+                        validator: (v) =>
+                        v == null || v.isEmpty
+                            ? 'Nhập quê quán'
+                            : null,
                       ),
                     ],
                   ),
@@ -541,34 +655,44 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
                     children: [
                       const Row(
                         children: [
-                          Icon(Icons.school_outlined, color: Color(0xFF078B3E), size: 20),
+                          Icon(Icons.school_outlined, color: Color(0xFF078B3E),
+                              size: 20),
                           SizedBox(width: 8),
                           Text(
                             'Thông tin học tập',
-                            style: TextStyle(fontSize: AppFontSizes.font11, fontWeight: FontWeight.bold, color: Color(0xFF111318)),
+                            style: TextStyle(fontSize: AppFontSizes.font11,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF111318)),
                           ),
                         ],
                       ),
                       const SizedBox(height: 12),
                       Row(
                         children: [
-                          Expanded(child: _buildField('Lớp', _classNameController, readOnly: true)),
+                          Expanded(child: _buildField(
+                              'Lớp', _classNameController, readOnly: true)),
                           const SizedBox(width: 6),
-                          Expanded(child: _buildField('Ngành', _majorController, readOnly: true)),
+                          Expanded(child: _buildField(
+                              'Ngành', _majorController, readOnly: true)),
                           const SizedBox(width: 6),
-                          Expanded(child: _buildField('Năm học', _academicYearController, readOnly: true)),
+                          Expanded(child: _buildField(
+                              'Năm học', _academicYearController,
+                              readOnly: true)),
                         ],
                       ),
                       const SizedBox(height: 8),
                       Row(
                         children: [
-                          Expanded(child: _buildField('Hệ đào tạo', _systemController, readOnly: true)),
+                          Expanded(child: _buildField(
+                              'Hệ đào tạo', _systemController, readOnly: true)),
                           const SizedBox(width: 8),
-                          Expanded(child: _buildField('Bậc đào tạo', _levelController, readOnly: true)),
+                          Expanded(child: _buildField(
+                              'Bậc đào tạo', _levelController, readOnly: true)),
                         ],
                       ),
                       const SizedBox(height: 8),
-                      _buildField('Trường', _universityNameController, readOnly: true),
+                      _buildField(
+                          'Trường', _universityNameController, readOnly: true),
                     ],
                   ),
                 ),
@@ -589,11 +713,14 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
                     children: [
                       const Row(
                         children: [
-                          Icon(Icons.phone_outlined, color: Color(0xFF078B3E), size: 20),
+                          Icon(Icons.phone_outlined, color: Color(0xFF078B3E),
+                              size: 20),
                           SizedBox(width: 8),
                           Text(
                             'Liên hệ & ưu tiên',
-                            style: TextStyle(fontSize: AppFontSizes.font11, fontWeight: FontWeight.bold, color: Color(0xFF111318)),
+                            style: TextStyle(fontSize: AppFontSizes.font11,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF111318)),
                           ),
                         ],
                       ),
@@ -601,7 +728,10 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
                       _buildField(
                         'Địa chỉ tạm trú *',
                         _temporaryAddressController,
-                        validator: (v) => v == null || v.isEmpty ? 'Nhập địa chỉ tạm trú' : null,
+                        validator: (v) =>
+                        v == null || v.isEmpty
+                            ? 'Nhập địa chỉ tạm trú'
+                            : null,
                       ),
                       const SizedBox(height: 8),
                       Row(
@@ -611,7 +741,10 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
                               'Số điện thoại *',
                               _phoneController,
                               keyboardType: TextInputType.phone,
-                              validator: (v) => v == null || v.isEmpty ? 'Nhập số điện thoại' : null,
+                              validator: (v) =>
+                              v == null || v.isEmpty
+                                  ? 'Nhập số điện thoại'
+                                  : null,
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -620,7 +753,10 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
                               'Email *',
                               _emailController,
                               keyboardType: TextInputType.emailAddress,
-                              validator: (v) => v == null || v.isEmpty ? 'Nhập email' : null,
+                              validator: (v) =>
+                              v == null || v.isEmpty
+                                  ? 'Nhập email'
+                                  : null,
                             ),
                           ),
                         ],
@@ -628,7 +764,9 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
                       const SizedBox(height: 8),
                       _buildField(
                         'Đối tượng ưu tiên',
-                        TextEditingController(text: cubit.selectedPriorityObject?.name ?? 'Không'),
+                        TextEditingController(
+                            text: cubit.selectedPriorityObject?.name ??
+                                'Không'),
                         readOnly: true,
                       ),
                     ],
@@ -651,16 +789,19 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
                     children: [
                       const Row(
                         children: [
-                          Icon(Icons.attach_file, color: Color(0xFF078B3E), size: 20),
+                          Icon(Icons.attach_file, color: Color(0xFF078B3E),
+                              size: 20),
                           SizedBox(width: 8),
                           Text(
                             'Minh chứng & lý do',
-                            style: TextStyle(fontSize: AppFontSizes.font11, fontWeight: FontWeight.bold, color: Color(0xFF111318)),
+                            style: TextStyle(fontSize: AppFontSizes.font11,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF111318)),
                           ),
                         ],
                       ),
                       const SizedBox(height: 12),
-                       // CCCD mặt trước
+                      // CCCD mặt trước
                       // CCCD mặt trước
                       _buildSingleImageUploadRow(
                         title: 'CCCD mặt trước *',
@@ -707,7 +848,9 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
                       // Lý do đăng ký
                       const Text(
                         'Lý do đăng ký nội trú',
-                        style: TextStyle(color: Color(0xFF666B75), fontSize: AppFontSizes.font11, fontWeight: FontWeight.bold),
+                        style: TextStyle(color: Color(0xFF666B75),
+                            fontSize: AppFontSizes.font11,
+                            fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 6),
                       Container(
@@ -727,7 +870,9 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
                               onChanged: (text) {
                                 setState(() {});
                               },
-                              style: const TextStyle(fontSize: AppFontSizes.mediumSmall, color: Color(0xFF111318)),
+                              style: const TextStyle(
+                                  fontSize: AppFontSizes.mediumSmall,
+                                  color: Color(0xFF111318)),
                               decoration: const InputDecoration(
                                 hintText: 'Nhập lý do...',
                                 border: InputBorder.none,
@@ -739,7 +884,8 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
                               bottom: 4,
                               child: Text(
                                 '${_reasonController.text.length}/500',
-                                style: const TextStyle(color: Colors.grey, fontSize: AppFontSizes.font11),
+                                style: const TextStyle(color: Colors.grey,
+                                    fontSize: AppFontSizes.font11),
                               ),
                             ),
                           ],
@@ -758,15 +904,14 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
     );
   }
 
-  Widget _buildField(
-    String label,
-    TextEditingController controller, {
-    bool readOnly = false,
-    IconData? icon,
-    VoidCallback? onTap,
-    TextInputType? keyboardType,
-    String? Function(String?)? validator,
-  }) {
+  Widget _buildField(String label,
+      TextEditingController controller, {
+        bool readOnly = false,
+        IconData? icon,
+        VoidCallback? onTap,
+        TextInputType? keyboardType,
+        String? Function(String?)? validator,
+      }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
@@ -779,7 +924,8 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
         children: [
           Text(
             label,
-            style: const TextStyle(color: Color(0xFF666B75), fontSize: AppFontSizes.font11),
+            style: const TextStyle(
+                color: Color(0xFF666B75), fontSize: AppFontSizes.font11),
           ),
           Row(
             children: [
@@ -814,7 +960,8 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
     );
   }
 
-  Widget _buildDropdownField(String label, String value, Function(String?) onChanged) {
+  Widget _buildDropdownField(String label, String value,
+      Function(String?) onChanged) {
     return NtCustomDropdown<String>(
       label: label,
       hintText: 'Chọn giới tính',
@@ -824,6 +971,7 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
       onChanged: onChanged,
     );
   }
+
   Widget _buildLocalImagePreview(File file) {
     return GestureDetector(
       onTap: () => _showImagePreview(file),
@@ -842,47 +990,49 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
   void _showImagePreview(File file) {
     showDialog(
       context: context,
-      builder: (_) => Dialog(
-        insetPadding: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Stack(
-          children: [
-            ClipRRect(
+      builder: (_) =>
+          Dialog(
+            insetPadding: const EdgeInsets.all(16),
+            shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
-              child: InteractiveViewer(
-                child: Image.file(
-                  file,
-                  fit: BoxFit.contain,
-                ),
-              ),
             ),
-            Positioned(
-              top: 8,
-              right: 8,
-              child: GestureDetector(
-                onTap: () => Navigator.pop(context),
-                child: Container(
-                  width: 32,
-                  height: 32,
-                  decoration: const BoxDecoration(
-                    color: Colors.black54,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.close_rounded,
-                    color: Colors.white,
-                    size: 20,
+            child: Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: InteractiveViewer(
+                    child: Image.file(
+                      file,
+                      fit: BoxFit.contain,
+                    ),
                   ),
                 ),
-              ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: const BoxDecoration(
+                        color: Colors.black54,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.close_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
     );
   }
+
   Widget _buildSingleImageUploadRow({
     required String title,
     required File? file,
@@ -892,7 +1042,9 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
     required VoidCallback onRemove,
   }) {
     final hasLocalFile = file != null;
-    final hasUploadedFile = uploadedName != null && uploadedName.trim().isNotEmpty;
+    final hasUploadedFile = uploadedName != null && uploadedName
+        .trim()
+        .isNotEmpty;
 
     final displayName = hasLocalFile
         ? p.basename(file.path)
@@ -1181,7 +1333,10 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
                       )
                     else
                       SizedBox(
-                        height: MediaQuery.of(context).size.height * 0.55,
+                        height: MediaQuery
+                            .of(context)
+                            .size
+                            .height * 0.55,
                         child: GridView.builder(
                           itemCount: localFiles.length + uploadedFiles.length,
                           gridDelegate:
@@ -1233,6 +1388,7 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
       },
     );
   }
+
   Widget _buildUploadedProofGridItem({
     required String name,
     required VoidCallback onRemove,

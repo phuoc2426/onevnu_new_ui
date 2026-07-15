@@ -27,7 +27,7 @@ import '../exam_schedule/views/vcore_exam_schedule_view.dart';
 import '../hdsd/views/vcore_hdsd_view.dart';
 import '../one_door/views/vcore_one_door_view.dart';
 import '../question/views/vcore_question_view.dart';
-import 'package:vnu_noi_tru/vnu_noi_tru.dart';
+import 'package:vnu_noi_tru/screens/dormitory_registration/dr_my_registration_screen.dart';
 
 const kCacheKeyListDichVu = 'listDichVu.json';
 

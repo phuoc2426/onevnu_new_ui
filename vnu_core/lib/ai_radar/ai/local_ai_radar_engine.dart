@@ -62,32 +62,38 @@ class LocalAiRadarEngine {
       courses: courses,
     );
 
+    final avgScore = dimensions.isEmpty
+        ? 0.0
+        : dimensions.fold<double>(0.0, (sum, e) => sum + e.score) /
+        dimensions.length;
+
     final dominant = dimensions
-        .where((e) => e.score >= 65.0)
+        .where((e) => e.score >= 75.0 && e.score >= avgScore + 8.0)
         .take(3)
         .map(
           (e) => RadarSpike(
-            code: e.code,
-            nameVi: e.nameVi,
-            score: e.score,
-            explanationVi:
-                '${e.nameVi} là vùng nổi bật vì có nhiều học phần liên quan đạt kết quả tốt.',
-          ),
-        )
+        code: e.code,
+        nameVi: e.nameVi,
+        score: e.score,
+        explanationVi:
+        '${e.nameVi} là vùng nổi bật vì điểm cao hơn rõ rệt so với mặt bằng năng lực chung và có bằng chứng học phần đủ mạnh.',
+      ),
+    )
         .toList();
 
     final weakList = [...dimensions]..sort((a, b) => a.score.compareTo(b.score));
     final weak = weakList
+        .where((e) => e.score <= 55.0 || e.score <= avgScore - 8.0)
         .take(3)
         .map(
           (e) => RadarSpike(
-            code: e.code,
-            nameVi: e.nameVi,
-            score: e.score,
-            explanationVi:
-                '${e.nameVi} còn yếu hoặc chưa ổn định do điểm học phần liên quan chưa cao hoặc thiếu học phần chứng minh.',
-          ),
-        )
+        code: e.code,
+        nameVi: e.nameVi,
+        score: e.score,
+        explanationVi:
+        '${e.nameVi} là vùng cần cải thiện do điểm thấp hơn mặt bằng chung, thiếu học phần lõi hoặc có học phần lõi kết quả chưa tốt.',
+      ),
+    )
         .toList();
 
     return AiRadarAnalysis(
@@ -108,7 +114,7 @@ class LocalAiRadarEngine {
       dominantSpikes: dominant,
       weakSpikes: weak,
       overallInterpretationVi: _overall(profile.inferredDomain, dimensions),
-      confidence: _confidence(courses.length, dimensions.length, usedCache),
+      confidence: _confidence(courses.length, dimensions, usedCache),
       usedCache: usedCache,
     );
   }
@@ -125,8 +131,30 @@ class LocalAiRadarEngine {
         'Các khía cạnh cần tập trung cải thiện hoặc bổ sung học phần tích lũy gồm: $weak.';
   }
 
-  double _confidence(int courseCount, int axisCount, bool usedCache) {
-    final base = 50.0 + courseCount.clamp(0, 30) * 1.0 + axisCount * 2.0;
-    return (base + (usedCache ? 5.0 : 0.0)).clamp(40.0, 95.0);
+  double _confidence(
+      int courseCount,
+      List<RadarDimension> dimensions,
+      bool usedCache,
+      ) {
+    if (dimensions.isEmpty) return 35.0;
+
+    final axesWithEvidence =
+        dimensions.where((e) => e.evidenceCourses.isNotEmpty).length;
+
+    final axesWithCoreEvidence = dimensions.where((e) {
+      return e.evidenceCourses.any((c) => c.coreWeight >= 1.5);
+    }).length;
+
+    final evidenceCoverage = axesWithEvidence / dimensions.length;
+    final coreCoverage = axesWithCoreEvidence / dimensions.length;
+
+    final base = 40.0;
+    final courseBonus = courseCount.clamp(0, 30) * 0.7;
+    final evidenceBonus = evidenceCoverage * 20.0;
+    final coreBonus = coreCoverage * 25.0;
+    final cacheBonus = usedCache ? 3.0 : 0.0;
+
+    return (base + courseBonus + evidenceBonus + coreBonus + cacheBonus)
+        .clamp(30.0, 95.0);
   }
 }
