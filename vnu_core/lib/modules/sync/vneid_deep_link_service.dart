@@ -7,10 +7,7 @@ class VneidDeepLinkEvent {
   final Uri uri;
   final VneidCallbackData? data;
 
-  const VneidDeepLinkEvent({
-    required this.uri,
-    required this.data,
-  });
+  const VneidDeepLinkEvent({required this.uri, required this.data});
 }
 
 class VneidDeepLinkService {
@@ -38,12 +35,22 @@ class VneidDeepLinkService {
   }
 
   bool handleUri(Uri uri) {
-    logInfo('VNeID raw callback URI: $uri');
+    logInfo('🔧 VneidDeepLinkService.handleUri called');
+    logInfo('🔧 VneidDeepLinkService.handleUri - URI: $uri');
+    logInfo(
+      '🔧 VneidDeepLinkService.handleUri - queryParameters: ${uri.queryParameters}',
+    );
 
     if (!isVneidCallbackUri(uri)) {
+      logWarning(
+        '🔧 VneidDeepLinkService.handleUri - NOT a VNeID callback URI',
+      );
       return false;
     }
 
+    logInfo(
+      '🔧 VneidDeepLinkService.handleUri - IS a VNeID callback URI, parsing...',
+    );
     final data = parseVneidCallback(uri);
     if (data == null) {
       logWarning('VNeID callback data is invalid.');

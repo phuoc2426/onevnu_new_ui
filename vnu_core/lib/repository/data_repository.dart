@@ -7,6 +7,13 @@ const kLoginUserName = 'kLoginUserName';
 const kLoginPassword = 'kLoginPassword';
 const kLoginToken = 'kLoginToken';
 const kLoginRefreshToken = 'kLoginRefreshToken';
+
+const kSessionPrincipalType = 'kSessionPrincipalType';
+const kPrincipalTypeUser = 'USER';
+const kPrincipalTypeApplicant = 'APPLICANT';
+
+const kApplicantAccessToken = 'kApplicantAccessToken';
+const kApplicantRefreshToken = 'kApplicantRefreshToken';
 const kLoginEnableBio = 'kLoginEnableBio';
 const kMaKhuVuc = 'kMaKhuVuc';
 
@@ -23,20 +30,22 @@ class DataRepository {
   }
 
   // Local storage
-  saveSecureUserLogin(String username, String password) {
-    _secureStorage.write(key: kLoginUserName, value: username);
-    _secureStorage.write(key: kLoginPassword, value: password);
+  Future<void> saveSecureUserLogin(String username, String password) async {
+    await Future.wait<void>([
+      _secureStorage.write(key: kLoginUserName, value: username),
+      _secureStorage.write(key: kLoginPassword, value: password),
+    ]);
   }
 
-  saveSecureKey(String key, String value) {
+  Future<void> saveSecureKey(String key, String value) async {
     dlog('DataRepository -------------> saveSecureKey -| $key |-');
-    _secureStorage.write(key: key, value: value);
+    await _secureStorage.write(key: key, value: value);
   }
 
-  deleteSecureKey(String? key) {
+  Future<void> deleteSecureKey(String? key) async {
     dlog('DataRepository -------------> deleteSecureKey -| $key |-');
     if (key != null && key.isNotEmpty) {
-      _secureStorage.delete(key: key);
+      await _secureStorage.delete(key: key);
     }
   }
 

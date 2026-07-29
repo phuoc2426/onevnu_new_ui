@@ -14,6 +14,7 @@ import '../data/app_api.dart';
 import '../globals.dart';
 import '../models/model.dart';
 import '../models/admitted_student.dart';
+import '../models/applicant_signin_response.dart';
 import '../services/dio_options.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vnu_core/modules/sync/vneid_sync_ticket.dart';
@@ -38,7 +39,11 @@ class ApiRepository {
 
   void setToken(String token) {
     Globals().token = token;
-    ApiRepository._internal();
+    if (token.trim().isEmpty) {
+      _dio.options.headers.remove('Authorization');
+    } else {
+      _dio.options.headers['Authorization'] = 'Bearer ${token.trim()}';
+    }
   }
 
   void setDomain(String baseUrl) {
@@ -137,8 +142,24 @@ class ApiRepository {
     String oldDeviceToken,
     String newDeviceToken,
     String deviceInfo,
-  ) {
-    return _apiClient.deviceToken(oldDeviceToken, newDeviceToken, deviceInfo);
+  ) async {
+    await _dio.post<void>(
+      '/api/auth/devicetoken',
+      data: {
+        'oldDeviceToken': oldDeviceToken,
+        'newDeviceToken': newDeviceToken,
+        'deviceInfo': deviceInfo,
+        'accessToken': Globals().token,
+      },
+      options: Options(
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          if (Globals().token.isNotEmpty)
+            'Authorization': 'Bearer ${Globals().token}',
+        },
+      ),
+    );
   }
 
   Future<BaseResponse> signOut() {
@@ -1196,53 +1217,60 @@ class ApiRepository {
   // --- ---
 
   // ========== APPLICANT ==========
-  Future<Map<String, dynamic>> applicantRegister(String cccd) async {
-    final response = await _dio.post<Map<String, dynamic>>(
-      '/api/applicant/auth/register',
-      data: {'cccd': cccd},
-      options: Options(
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-      ),
-    );
-    return response.data!;
-  }
-
-  Future<Map<String, dynamic>> applicantLogin(
-    String cccd,
-    String password,
-  ) async {
+  Future<ApplicantSigninResponse> applicantLogin({
+    required String cccd,
+    required String phoneNumber,
+    String? deviceToken,
+    String? deviceInfo,
+  }) async {
     final response = await _dio.post<Map<String, dynamic>>(
       '/api/applicant/auth/login',
-      data: {'cccd': cccd, 'password': password},
+      data: {
+        'cccd': cccd,
+        'phoneNumber': phoneNumber,
+        if ((deviceToken ?? '').isNotEmpty) 'deviceToken': deviceToken,
+        if ((deviceInfo ?? '').isNotEmpty) 'deviceInfo': deviceInfo,
+      },
       options: Options(
-        headers: {
+        headers: const {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
       ),
     );
-    return response.data!;
+    return ApplicantSigninResponse.fromJson(response.data ?? <String, dynamic>{});
   }
-  Future<Map<String, dynamic>> applicantChangePassword(
-      String oldPassword,
-      String newPassword,
-      ) async {
-    final response = await _dio.put<Map<String, dynamic>>(
-      '/api/applicant/auth/change-password',
-      data: {'oldPassword': oldPassword, 'newPassword': newPassword},
+
+  Future<ApplicantSigninResponse> applicantRefreshToken(
+    String refreshToken,
+  ) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/api/applicant/auth/refresh',
+      data: {'refreshToken': refreshToken},
       options: Options(
-        headers: {
+        headers: const {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
       ),
     );
-    return response.data!;
+    return ApplicantSigninResponse.fromJson(response.data ?? <String, dynamic>{});
   }
+
+  Future<void> applicantSignout() async {
+    await _dio.post<void>(
+      '/api/applicant/auth/signout',
+      options: Options(
+        headers: {
+          'Accept': 'application/json',
+          if (Globals().token.isNotEmpty)
+            'Authorization': 'Bearer ${Globals().token}',
+        },
+      ),
+    );
+  }
+
   void dispose() {
-    this.dispose();
+    _dio.close(force: true);
   }
 }

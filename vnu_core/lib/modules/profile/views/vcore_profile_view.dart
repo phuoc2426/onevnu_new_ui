@@ -33,7 +33,7 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
         return Scaffold(
           backgroundColor: const Color(0xFFF6F8FA),
           body: Obx(
-                () => SingleChildScrollView(
+            () => SingleChildScrollView(
               child: Column(
                 children: [
                   AppGuideAnchor(
@@ -51,9 +51,9 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
                                 children: [
                                   Text(
                                     Globals()
-                                        .thongTinSinhVienModel
-                                        .value
-                                        ?.hoVaTen ??
+                                            .thongTinSinhVienModel
+                                            .value
+                                            ?.hoVaTen ??
                                         '',
                                     style: const TextStyle(
                                       fontSize: AppFontSizes.large,
@@ -73,9 +73,9 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
                                       ),
                                       Text(
                                         Globals()
-                                            .thongTinSinhVienModel
-                                            .value
-                                            ?.maSinhVien ??
+                                                .thongTinSinhVienModel
+                                                .value
+                                                ?.maSinhVien ??
                                             '',
                                         style: const TextStyle(
                                           fontSize: AppFontSizes.mediumSmall,
@@ -87,7 +87,8 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
                                   ),
                                   const SizedBox(height: 4),
                                   Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       const Text(
                                         "Lớp: ",
@@ -118,49 +119,64 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
                             AppGuideAnchor(
                               id: 'profile.avatar',
                               child: GestureDetector(
-                                onTap: () {
-                                  controller.pickAndPreviewAvatar(context);
-                                },
+                                onTap: controller.isChangingAvatar.value
+                                    ? null
+                                    : () {
+                                        controller.pickAndPreviewAvatar(
+                                          context,
+                                        );
+                                      },
                                 child: Stack(
+                                  clipBehavior: Clip.none,
                                   children: [
-                                    // Luôn hiển thị hình tròn
-                                    Container(
-                                      width: 76,
-                                      height: 76,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        border: Border.all(
-                                          color: Colors.grey.shade300,
-                                          width: 2,
+                                    Obx(
+                                      () => AnimatedSwitcher(
+                                        duration: const Duration(
+                                          milliseconds: 200,
                                         ),
-                                      ),
-                                      child: Obx(
-                                            () => ClipOval(
-                                          child: controller.isChangingAvatar.value
-                                              ? Container(
-                                            color: Colors.grey.shade200,
-                                            child: const Center(
-                                              child: SizedBox(
-                                                width: 24,
-                                                height: 24,
-                                                child: CircularProgressIndicator(
-                                                  strokeWidth: 2,
-                                                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF1E293B)),
+                                        child: controller.isChangingAvatar.value
+                                            ? Container(
+                                                key: const ValueKey(
+                                                  'avatar-loading',
                                                 ),
+                                                width: 76,
+                                                height: 76,
+                                                decoration: BoxDecoration(
+                                                  color: Colors.grey.shade200,
+                                                  shape: BoxShape.circle,
+                                                  border: Border.all(
+                                                    color: Colors.grey.shade300,
+                                                    width: 2,
+                                                  ),
+                                                ),
+                                                child: const Center(
+                                                  child: SizedBox(
+                                                    width: 24,
+                                                    height: 24,
+                                                    child:
+                                                        CircularProgressIndicator(
+                                                          strokeWidth: 2,
+                                                          color: Color(
+                                                            0xFF1E293B,
+                                                          ),
+                                                        ),
+                                                  ),
+                                                ),
+                                              )
+                                            : VcoreProfileAvatarWidget(
+                                                key: ValueKey(
+                                                  controller.avatarUrl,
+                                                ),
+                                                url: controller.avatarUrl,
+                                                size: 76,
+                                                showStatus: false,
                                               ),
-                                            ),
-                                          )
-                                              : VcoreProfileAvatarWidget(
-                                            url: controller.avatarUrl,
-                                            size: 76,
-                                          ),
-                                        ),
                                       ),
                                     ),
-                                    // Badge camera
+
                                     Positioned(
-                                      bottom: 0,
                                       right: 0,
+                                      bottom: 0,
                                       child: Container(
                                         width: 24,
                                         height: 24,
@@ -223,7 +239,8 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
                             const Spacer(),
                             itemPointProfile(
                               'Tín chỉ tích luỹ',
-                              controller.tongket.value?.tongSoTinChiTichLuy ?? '',
+                              controller.tongket.value?.tongSoTinChiTichLuy ??
+                                  '',
                               guideId: 'profile.summary.credits',
                             ),
                             const Spacer(),
@@ -235,7 +252,10 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
                             const Spacer(),
                             itemPointProfile(
                               'Điểm tích luỹ',
-                              controller.tongket.value?.diemTrungBinhHe4TichLuy ??
+                              controller
+                                      .tongket
+                                      .value
+                                      ?.diemTrungBinhHe4TichLuy ??
                                   '',
                               guideId: 'profile.summary.gpa',
                             ),
@@ -352,7 +372,7 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
                             MaterialPageRoute(
                               builder: (_) => const VcoreAdmissionView(),
                             ),
-                                (route) => false,
+                            (route) => false,
                           );
                         },
                       );
@@ -369,11 +389,7 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
     );
   }
 
-  Widget itemPointProfile(
-      String title,
-      String point, {
-        String? guideId,
-      }) {
+  Widget itemPointProfile(String title, String point, {String? guideId}) {
     final content = Column(
       mainAxisAlignment: MainAxisAlignment.center,
       mainAxisSize: MainAxisSize.max,
@@ -403,10 +419,7 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
 
     if (guideId == null) return content;
 
-    return AppGuideAnchor(
-      id: guideId,
-      child: content,
-    );
+    return AppGuideAnchor(id: guideId, child: content);
   }
 }
 
@@ -477,9 +490,6 @@ class VcoreProfileItemWidget extends StatelessWidget {
 
     if (guideId == null) return content;
 
-    return AppGuideAnchor(
-      id: guideId!,
-      child: content,
-    );
+    return AppGuideAnchor(id: guideId!, child: content);
   }
 }

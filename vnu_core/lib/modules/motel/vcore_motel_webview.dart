@@ -9,6 +9,7 @@ void openMotelWebView() {
     () => const VcoreBrowserView(
       title: kMotelWebTitle,
       url: kMotelWebUrl,
+      useFloatingBackButton: true,
     ),
   );
 }

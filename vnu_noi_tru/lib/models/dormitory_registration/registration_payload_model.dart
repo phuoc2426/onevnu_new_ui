@@ -2,33 +2,44 @@ class RegistrationPayloadModel {
   final int registrationPeriodId;
   final List<int> priorityObjectIds;
   final int dormitoryId;
-  final int roomTypeId;
-  final String status; // "draft" hoặc "pending"
+  final int? roomTypeId;
+  final String status;
   final String reason;
+  final int termType;
+  final String? startDate;
+  final String? endDate;
   final List<Object> attachmentFileIds;
   final RegistrationStudentPayload student;
 
-  RegistrationPayloadModel({
+  const RegistrationPayloadModel({
     required this.registrationPeriodId,
-    this.priorityObjectIds = const [],
+    this.priorityObjectIds = const <int>[],
     required this.dormitoryId,
-    required this.roomTypeId,
+    this.roomTypeId,
     required this.status,
     required this.reason,
+    required this.termType,
+    this.startDate,
+    this.endDate,
     required this.attachmentFileIds,
     required this.student,
   });
 
-  Map<String, dynamic> toJson() => {
-    'registration_period_id': registrationPeriodId,
-    'priority_object_ids': priorityObjectIds,
-    'dormitory_id': dormitoryId,
-    'room_type_id': roomTypeId,
-    'status': status,
-    'reason': reason,
-    'attachment_file_ids': attachmentFileIds,
-    'student': student.toJson(),
-  };
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'registration_period_id': registrationPeriodId,
+        'priority_object_ids': priorityObjectIds,
+        'dormitory_id': dormitoryId,
+        // Loại phòng do cán bộ KTX phân lúc duyệt.
+        'room_type_id': roomTypeId,
+        'status': status,
+        'reason': reason,
+        'term_type': termType,
+        // Chỉ có giá trị khi term_type = 5 (Khác).
+        'start_date': startDate,
+        'end_date': endDate,
+        'attachment_file_ids': attachmentFileIds,
+        'student': student.toJson(),
+      };
 
   RegistrationPayloadModel copyWith({
     int? registrationPeriodId,
@@ -37,17 +48,26 @@ class RegistrationPayloadModel {
     int? roomTypeId,
     String? status,
     String? reason,
+    int? termType,
+    String? startDate,
+    String? endDate,
     List<Object>? attachmentFileIds,
     RegistrationStudentPayload? student,
   }) {
     return RegistrationPayloadModel(
-      registrationPeriodId: registrationPeriodId ?? this.registrationPeriodId,
-      priorityObjectIds: priorityObjectIds ?? this.priorityObjectIds,
+      registrationPeriodId:
+          registrationPeriodId ?? this.registrationPeriodId,
+      priorityObjectIds:
+          priorityObjectIds ?? this.priorityObjectIds,
       dormitoryId: dormitoryId ?? this.dormitoryId,
       roomTypeId: roomTypeId ?? this.roomTypeId,
       status: status ?? this.status,
       reason: reason ?? this.reason,
-      attachmentFileIds: attachmentFileIds ?? this.attachmentFileIds,
+      termType: termType ?? this.termType,
+      startDate: startDate ?? this.startDate,
+      endDate: endDate ?? this.endDate,
+      attachmentFileIds:
+          attachmentFileIds ?? this.attachmentFileIds,
       student: student ?? this.student,
     );
   }

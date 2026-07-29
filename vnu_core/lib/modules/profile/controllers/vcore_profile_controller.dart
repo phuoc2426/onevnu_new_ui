@@ -87,133 +87,167 @@ class VcoreProfileController extends GetxController {
     await _showAvatarCropDialog(context, File(image.path));
   }
 
-  final GlobalKey<AvatarCropWidgetState> _cropWidgetKey = GlobalKey<AvatarCropWidgetState>();
+  // final GlobalKey<AvatarCropWidgetState> _cropWidgetKey = GlobalKey<AvatarCropWidgetState>();
 
-  Future<void> _showAvatarCropDialog(BuildContext context, File imageFile) async {
+  Future<void> _showAvatarCropDialog(
+    BuildContext context,
+    File imageFile,
+  ) async {
+    final cropWidgetKey = GlobalKey<AvatarCropWidgetState>();
+
     File? croppedFile;
+    bool isSaving = false;
 
     final confirmed = await showDialog<bool>(
       context: context,
-      barrierDismissible: true,
+      barrierDismissible: false,
       barrierColor: Colors.black.withOpacity(0.8),
-      builder: (_) {
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.all(16),
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Header
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: const BoxDecoration(
-                    border: Border(
-                      bottom: BorderSide(
-                        color: Color(0xFFE2E8F0),
-                        width: 1,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              insetPadding: const EdgeInsets.all(16),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 14,
                       ),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, false),
-                        child: const Text(
-                          'Hủy',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                            color: Color(0xFF64748B),
-                          ),
+                      decoration: const BoxDecoration(
+                        border: Border(
+                          bottom: BorderSide(color: Color(0xFFE2E8F0)),
                         ),
                       ),
-                      const Text(
-                        'Điều chỉnh ảnh',
+                      child: Row(
+                        children: [
+                          TextButton(
+                            onPressed: isSaving
+                                ? null
+                                : () {
+                                    Navigator.of(dialogContext).pop(false);
+                                  },
+                            child: const Text(
+                              'Hủy',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Color(0xFF64748B),
+                              ),
+                            ),
+                          ),
+                          const Expanded(
+                            child: Text(
+                              'Điều chỉnh ảnh',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF1E293B),
+                              ),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: isSaving
+                                ? null
+                                : () async {
+                                    final cropState =
+                                        cropWidgetKey.currentState;
+
+                                    if (cropState == null) {
+                                      return;
+                                    }
+
+                                    setDialogState(() {
+                                      isSaving = true;
+                                    });
+
+                                    try {
+                                      croppedFile = await cropState.cropImage();
+
+                                      if (dialogContext.mounted) {
+                                        Navigator.of(dialogContext).pop(true);
+                                      }
+                                    } catch (error) {
+                                      setDialogState(() {
+                                        isSaving = false;
+                                      });
+
+                                      if (dialogContext.mounted) {
+                                        ScaffoldMessenger.of(
+                                          dialogContext,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              'Không thể cắt ảnh: $error',
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    }
+                                  },
+                            child: isSaving
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Text(
+                                    'Lưu',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF2563EB),
+                                    ),
+                                  ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: AspectRatio(
+                        aspectRatio: 1,
+                        child: AvatarCropWidget(
+                          key: cropWidgetKey,
+                          imageFile: imageFile,
+                          cropSize: 300,
+                          outputSize: 500,
+                        ),
+                      ),
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.fromLTRB(24, 0, 24, 20),
+                      child: Text(
+                        'Kéo để chọn vị trí. Dùng hai ngón tay để phóng to hoặc thu nhỏ.',
+                        textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF1E293B),
+                          fontSize: 13,
+                          color: Color(0xFF94A3B8),
                         ),
                       ),
-                      TextButton(
-                        onPressed: () async {
-                          // Gọi crop ảnh từ state của AvatarCropWidget
-                          final state = _cropWidgetKey.currentState;
-                          if (state != null) {
-                            try {
-                              croppedFile = await state.cropImage();
-                              Navigator.pop(context, true);
-                            } catch (e) {
-                              // Nếu crop lỗi, vẫn cho phép lưu với ảnh gốc
-                              Navigator.pop(context, true);
-                            }
-                          } else {
-                            Navigator.pop(context, true);
-                          }
-                        },
-                        child: const Text(
-                          'Lưu',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF2563EB),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Avatar crop area
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  constraints: BoxConstraints(
-                    maxWidth: MediaQuery.of(context).size.width - 80,
-                    maxHeight: 400,
-                  ),
-                  child: AspectRatio(
-                    aspectRatio: 1,
-                    child: AvatarCropWidget(
-                      key: _cropWidgetKey, // Gán key để tham chiếu
-                      imageFile: imageFile,
-                      cropSize: 300,
                     ),
-                  ),
+                  ],
                 ),
-
-                // Instructions
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(24, 0, 24, 20),
-                  child: Text(
-                    'Dùng 2 ngón tay để phóng to/thu nhỏ và kéo để di chuyển ảnh',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF94A3B8),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         );
       },
     );
 
-    // Sử dụng ảnh đã crop hoặc ảnh gốc
-    if (confirmed == true) {
-      if (croppedFile != null) {
-        await changeAvatar(context, croppedFile!);
-      } else {
-        // Nếu không crop được, dùng ảnh gốc
-        await changeAvatar(context, imageFile);
-      }
+    // Chỉ upload ảnh đã crop.
+    // Tuyệt đối không fallback sang ảnh gốc.
+    if (confirmed == true && croppedFile != null) {
+      await changeAvatar(context, croppedFile!);
     }
   }
 
@@ -235,7 +269,7 @@ class VcoreProfileController extends GetxController {
         for (final avatar in allAvatars) {
           if (avatar.guid != newAvatar.guid) {
             try {
-              await ApiRepository().deleteAnhCanNhan(avatar?.guid??'');
+              await ApiRepository().deleteAnhCanNhan(avatar?.guid ?? '');
             } catch (e) {
               // Log lỗi nhưng không dừng quá trình
             }
@@ -286,10 +320,7 @@ class VcoreProfileController extends GetxController {
           const SizedBox(height: 8),
           const Text(
             'Chọn ảnh từ thư viện hoặc chụp mới',
-            style: TextStyle(
-              fontSize: 14,
-              color: Color(0xFF64748B),
-            ),
+            style: TextStyle(fontSize: 14, color: Color(0xFF64748B)),
           ),
           const SizedBox(height: 24),
           Row(
@@ -329,11 +360,11 @@ class VcoreProfileController extends GetxController {
   }
 
   Widget _buildSourceOption(
-      BuildContext context, {
-        required IconData icon,
-        required String label,
-        required VoidCallback onTap,
-      }) {
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -345,11 +376,7 @@ class VcoreProfileController extends GetxController {
         ),
         child: Column(
           children: [
-            Icon(
-              icon,
-              size: 32,
-              color: const Color(0xFF1E293B),
-            ),
+            Icon(icon, size: 32, color: const Color(0xFF1E293B)),
             const SizedBox(height: 8),
             Text(
               label,
@@ -382,10 +409,7 @@ class VcoreProfileController extends GetxController {
               padding: const EdgeInsets.all(20),
               decoration: const BoxDecoration(
                 border: Border(
-                  bottom: BorderSide(
-                    color: Color(0xFFE2E8F0),
-                    width: 1,
-                  ),
+                  bottom: BorderSide(color: Color(0xFFE2E8F0), width: 1),
                 ),
               ),
               child: Row(
@@ -434,10 +458,7 @@ class VcoreProfileController extends GetxController {
               ),
               child: AspectRatio(
                 aspectRatio: 1,
-                child: AvatarCropWidget(
-                  imageFile: imageFile,
-                  cropSize: 300,
-                ),
+                child: AvatarCropWidget(imageFile: imageFile, cropSize: 300),
               ),
             ),
 
@@ -447,10 +468,7 @@ class VcoreProfileController extends GetxController {
               child: Text(
                 'Dùng 2 ngón tay để phóng to/thu nhỏ và kéo để di chuyển ảnh',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Color(0xFF94A3B8),
-                ),
+                style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
               ),
             ),
           ],
@@ -472,9 +490,7 @@ class VcoreProfileController extends GetxController {
 
   countVersionOpenLog(BuildContext context) {
     if (kDebugMode) {
-      Get.to(
-            () => TalkerScreen(talker: Globals().talker),
-      );
+      Get.to(() => TalkerScreen(talker: Globals().talker));
     }
     final now = timeNow;
     final userExceededTapDuration = now - startTap > tapDurationInMs;
@@ -490,56 +506,53 @@ class VcoreProfileController extends GetxController {
       var password = "";
       final buttonWidth = MediaQuery.of(context).size.width / 4;
       showDialog(
-          barrierDismissible: false,
-          context: context,
-          builder: (context) {
-            return AlertDialog(
-              actionsAlignment: MainAxisAlignment.center,
-              contentPadding: const EdgeInsets.fromLTRB(30.0, 30.0, 30.0, 30.0),
-              buttonPadding: const EdgeInsets.fromLTRB(0.0, 0.0, 40.0, 30.0),
-              content: VcoreProfileTextFieldWidget(
-                title: 'Mật khẩu',
-                hintText: 'Nhập mật khẩu',
-                value: password,
-                autoFocus: true,
-                onChange: (text) {
-                  password = text;
-                },
-                onSubmitted: (text) {
-                  password = text;
+        barrierDismissible: false,
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            actionsAlignment: MainAxisAlignment.center,
+            contentPadding: const EdgeInsets.fromLTRB(30.0, 30.0, 30.0, 30.0),
+            buttonPadding: const EdgeInsets.fromLTRB(0.0, 0.0, 40.0, 30.0),
+            content: VcoreProfileTextFieldWidget(
+              title: 'Mật khẩu',
+              hintText: 'Nhập mật khẩu',
+              value: password,
+              autoFocus: true,
+              onChange: (text) {
+                password = text;
+              },
+              onSubmitted: (text) {
+                password = text;
+              },
+            ),
+            actions: [
+              WhiteButton(
+                width: buttonWidth,
+                title: "Hủy",
+                action: () {
+                  Navigator.pop(context);
                 },
               ),
-              actions: [
-                WhiteButton(
-                  width: buttonWidth,
-                  title: "Hủy",
-                  action: () {
-                    Navigator.pop(context);
-                  },
-                ),
-                BlueButton(
-                  width: buttonWidth,
-                  title: "Xác nhận",
-                  action: () {
-                    Navigator.pop(context);
-                  },
-                ),
-              ],
-            );
-          }).then(
-            (v) async {
-          if (password.isEmpty) {
-            return;
-          }
-          if (password == kLogPass) {
-            Get.to(
-                  () => TalkerScreen(talker: Globals().talker),
-            );
-          } else {
-            snackBarError('Mật khẩu không đúng.');
-          }
+              BlueButton(
+                width: buttonWidth,
+                title: "Xác nhận",
+                action: () {
+                  Navigator.pop(context);
+                },
+              ),
+            ],
+          );
         },
-      );
+      ).then((v) async {
+        if (password.isEmpty) {
+          return;
+        }
+        if (password == kLogPass) {
+          Get.to(() => TalkerScreen(talker: Globals().talker));
+        } else {
+          snackBarError('Mật khẩu không đúng.');
+        }
+      });
     }
   }
 }

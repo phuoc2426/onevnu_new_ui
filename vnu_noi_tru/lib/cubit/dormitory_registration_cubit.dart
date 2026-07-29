@@ -7,7 +7,7 @@ import 'package:vnu_noi_tru/models/model.dart';
 import 'package:vnu_noi_tru/repository/dormitory_registration_repository.dart';
 import 'package:dio/dio.dart';
 import 'package:vnu_core/repository/app_repository.dart';
-import 'package:shared_preferences/shared_preferences.dart'; // thêm dòng này
+import 'package:shared_preferences/shared_preferences.dart';
 part 'dormitory_registration_state.dart';
 
 class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
@@ -15,11 +15,56 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
 
   final _repository = DormitoryRegistrationRepository();
 
-  MyRegistrationModel? draftRecord;
   RegistrationPeriodModel? selectedPeriod;
   DormitoryModel? selectedDormitory;
   RoomTypeModel? selectedRoomType;
-  PriorityObjectModel? selectedPriorityObject;
+  /// Cho phép người dùng chọn đồng thời nhiều đối tượng ưu tiên.
+  final List<PriorityObjectModel> selectedPriorityObjects =
+      <PriorityObjectModel>[];
+
+  /// Giữ tương thích với các màn hình/đoạn code cũ chỉ đọc một đối tượng.
+  PriorityObjectModel? get selectedPriorityObject =>
+      selectedPriorityObjects.isEmpty ? null : selectedPriorityObjects.first;
+
+  set selectedPriorityObject(PriorityObjectModel? value) {
+    selectedPriorityObjects.clear();
+    if (value != null) {
+      selectedPriorityObjects.add(value);
+    }
+  }
+
+  bool isPriorityObjectSelected(PriorityObjectModel item) {
+    return selectedPriorityObjects.any((PriorityObjectModel selected) {
+      if (item.id != null && selected.id != null) {
+        return item.id == selected.id;
+      }
+
+      return (item.name ?? '').trim() == (selected.name ?? '').trim();
+    });
+  }
+
+  void togglePriorityObject(PriorityObjectModel item) {
+    final int index = selectedPriorityObjects.indexWhere(
+      (PriorityObjectModel selected) {
+        if (item.id != null && selected.id != null) {
+          return item.id == selected.id;
+        }
+
+        return (item.name ?? '').trim() == (selected.name ?? '').trim();
+      },
+    );
+
+    if (index >= 0) {
+      selectedPriorityObjects.removeAt(index);
+    } else {
+      selectedPriorityObjects.add(item);
+    }
+  }
+
+  String get selectedPriorityObjectNames => selectedPriorityObjects
+      .map((PriorityObjectModel item) => (item.name ?? '').trim())
+      .where((String name) => name.isNotEmpty)
+      .join(', ');
   List<UploadedAttachmentModel> uploadedAttachments = [];
   String? tempFullName;
   String? tempPhone;
@@ -31,10 +76,20 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
   String? tempReason;
   String? tempDOB;
 
+  /// 1: Kỳ 1, 2: Kỳ 2, 3: Hè, 4: Giữa kỳ, 5: Khác.
+  int selectedTermType = 1;
+
+  /// Chỉ dùng khi [selectedTermType] = 5.
+  DateTime? customStartDate;
+  DateTime? customEndDate;
+
   List<RegistrationPeriodModel> periods = [];
   List<DormitoryModel> dormitories = [];
   List<RoomTypeModel> roomTypes = [];
   List<PriorityObjectModel> priorityObjects = [];
+
+  /// Thông báo khi API không trả về ký túc xá khả dụng.
+  String? dormitoryFilterMessage;
 
   bool hasAnyOpenRegistrationPeriod = false;
   bool isCheckingOpenRegistrationPeriod = false;
@@ -124,12 +179,12 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
 
     try {
       if (dormitories.isEmpty) {
-        final dormitoryRes = await _repository.getDormitories();
-        dormitories = dormitoryRes.data?.items ?? [];
+        dormitories = await _loadAllDormitories();
       }
 
       if (dormitories.isEmpty) {
-        openPeriodMessage = 'Không có ký túc xá khả dụng';
+        openPeriodMessage =
+            dormitoryFilterMessage ?? 'Không có ký túc xá khả dụng';
         emit(DormitoryRegistrationOpenPeriodChecked(false));
         return false;
       }
@@ -183,34 +238,133 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
     }
   }
 
+  DateTime _normalizeDateOnly(DateTime value) {
+    return DateTime(value.year, value.month, value.day);
+  }
+
+  String get selectedTermTypeLabel {
+    switch (selectedTermType) {
+      case 1:
+        return 'Kỳ 1';
+      case 2:
+        return 'Kỳ 2';
+      case 3:
+        return 'Hè';
+      case 4:
+        return 'Giữa kỳ';
+      case 5:
+        return 'Khác';
+      default:
+        return 'Không xác định';
+    }
+  }
+
+  void selectTermType(int value) {
+    if (value < 1 || value > 5) {
+      throw ArgumentError.value(value, 'value', 'term_type phải từ 1 đến 5');
+    }
+
+    selectedTermType = value;
+
+    if (value != 5) {
+      customStartDate = null;
+      customEndDate = null;
+      return;
+    }
+
+    // Khi chọn "Khác", tạo sẵn một khoảng hợp lệ để người dùng điều chỉnh.
+    final DateTime today = _normalizeDateOnly(DateTime.now());
+    customStartDate ??= today.add(const Duration(days: 1));
+    customEndDate ??= customStartDate!.add(const Duration(days: 1));
+  }
+
+  void setCustomStartDate(DateTime value) {
+    customStartDate = _normalizeDateOnly(value);
+
+    if (customEndDate == null || !customEndDate!.isAfter(customStartDate!)) {
+      customEndDate = customStartDate!.add(const Duration(days: 1));
+    }
+  }
+
+  void setCustomEndDate(DateTime value) {
+    customEndDate = _normalizeDateOnly(value);
+  }
+
+  String? validateStayPeriod() {
+    if (selectedTermType < 1 || selectedTermType > 5) {
+      return 'Vui lòng chọn kỳ ở ký túc xá';
+    }
+
+    if (selectedTermType != 5) {
+      return null;
+    }
+
+    if (customStartDate == null) {
+      return 'Vui lòng chọn ngày bắt đầu';
+    }
+
+    if (customEndDate == null) {
+      return 'Vui lòng chọn ngày kết thúc';
+    }
+
+    final DateTime today = _normalizeDateOnly(DateTime.now());
+    final DateTime start = _normalizeDateOnly(customStartDate!);
+    final DateTime end = _normalizeDateOnly(customEndDate!);
+
+    if (!start.isAfter(today)) {
+      return 'Ngày bắt đầu phải lớn hơn ngày hiện tại';
+    }
+
+    if (!end.isAfter(start)) {
+      return 'Ngày kết thúc phải lớn hơn ngày bắt đầu';
+    }
+
+    return null;
+  }
+
+  String _dateToApi(DateTime value) {
+    // Dùng UTC 00:00 để ngày gửi lên không bị lệch do múi giờ thiết bị.
+    return DateTime.utc(value.year, value.month, value.day).toIso8601String();
+  }
+
   Future<RegistrationPayloadModel> buildRegistrationPayload({
     required String status,
     String? reason,
-    List<Object> attachmentFileIds = const [],
+    List<Object> attachmentFileIds = const <Object>[],
   }) async {
     if (selectedPeriod?.id == null) {
-      throw Exception('Vui lòng chọn đợt đăng ký');
+      throw Exception('Không tìm thấy đợt đăng ký đang hoạt động');
     }
 
     if (selectedDormitory?.id == null) {
       throw Exception('Vui lòng chọn ký túc xá');
     }
 
-    if (selectedRoomType?.id == null) {
-      throw Exception('Vui lòng chọn loại phòng');
+    final String? stayPeriodError = validateStayPeriod();
+    if (stayPeriodError != null) {
+      throw Exception(stayPeriodError);
     }
 
-    final studentPayload = await _buildStudentPayload();
+    final RegistrationStudentPayload studentPayload =
+        await _buildStudentPayload();
+
+    final bool isCustomTerm = selectedTermType == 5;
 
     return RegistrationPayloadModel(
       registrationPeriodId: selectedPeriod!.id!,
-      priorityObjectIds: [
-        if (selectedPriorityObject?.id != null) selectedPriorityObject!.id!,
-      ],
+      priorityObjectIds: selectedPriorityObjects
+          .map((PriorityObjectModel item) => item.id)
+          .whereType<int>()
+          .toSet()
+          .toList(),
       dormitoryId: selectedDormitory!.id!,
-      roomTypeId: selectedRoomType!.id!,
+      // Sinh viên không chọn loại phòng.
+      roomTypeId: null,
       status: status,
       reason: reason ?? tempReason ?? 'Đăng ký nội trú',
+      termType: selectedTermType,
+      startDate: isCustomTerm ? _dateToApi(customStartDate!) : null,
+      endDate: isCustomTerm ? _dateToApi(customEndDate!) : null,
       attachmentFileIds: attachmentFileIds,
       student: studentPayload,
     );
@@ -303,17 +457,31 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
     final student = Globals().thongTinSinhVienModel.value;
     final cachedClassInfo = Globals().lopDaoTaoModel.value;
     final cachedAcademicYear = Globals().nienKhoaDaoTaoModel.value;
+    // ONEVNU_STALE_STUDENT_FIX_20260725_APPLICANT
+    final String currentStudentCode = student?.maSinhVien?.trim() ?? '';
+    final bool hasRegularStudent = currentStudentCode.isNotEmpty;
     final bool isApplicant =
-        (applicantCccd != null && applicantCccd.isNotEmpty) ||
-        (Globals().thongTinSinhVienModel.value?.maSinhVien == null ||
-            Globals().thongTinSinhVienModel.value?.maSinhVien?.isEmpty == true);
+        !hasRegularStudent &&
+        applicantCccd != null &&
+        applicantCccd.trim().isNotEmpty;
     if (isApplicant) {
       final fullName =
           tempFullName ?? prefs.getString('applicant_fullname') ?? '';
       final dob = tempDOB ?? prefs.getString('applicant_dob') ?? '';
-      final phone = tempPhone ?? prefs.getString('applicant_phone') ?? '';
+      final phone =
+          tempPhone ??
+          prefs.getString('applicant_phone_number') ??
+          // Fallback cho bản mobile cũ đã từng lưu sai key.
+          prefs.getString('applicant_phone') ??
+          '';
       final email = tempEmail ?? prefs.getString('applicant_email') ?? '';
       final cccd = tempCccd ?? applicantCccd ?? '';
+
+      // Tên trường chỉ được gửi kèm nếu phiên Applicant đã có dữ liệu.
+      // Không dùng trường để lọc KTX và không chặn đăng ký khi tên trường trống.
+      final String universityName =
+          prefs.getString('applicant_university_name')?.trim() ?? '';
+      const int? univId = null;
 
       String dobFormatted = '';
       if (dob.isNotEmpty) {
@@ -336,9 +504,11 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
         academicYear: '',
         system: '',
         level: '',
-        universityName: '',
-        univId: null,
-        priorityObjectName: selectedPriorityObject?.name,
+        universityName: universityName,
+        univId: univId,
+        priorityObjectName: selectedPriorityObjectNames.isEmpty
+            ? null
+            : selectedPriorityObjectNames,
         temporaryAddress: tempTemporaryAddress ?? '',
         gender: 'male', // có thể thêm radio giới tính sau, tạm để male
         phone: phone,
@@ -510,8 +680,9 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
       level: level?.ten ?? student.idBacDaoTao ?? '',
       universityName: university?.tenDonVi ?? '',
       univId: university?.idHeThongDaoTao,
-      priorityObjectName:
-          selectedPriorityObject?.name ?? priorityObject?.ten ?? '',
+      priorityObjectName: selectedPriorityObjectNames.isNotEmpty
+          ? selectedPriorityObjectNames
+          : priorityObject?.ten ?? '',
       temporaryAddress:
           tempTemporaryAddress ??
           (temporaryAddress.isNotEmpty
@@ -526,11 +697,10 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
   }
 
   void clearWizardData() {
-    draftRecord = null;
     selectedPeriod = null;
     selectedDormitory = null;
     selectedRoomType = null;
-    selectedPriorityObject = null;
+    selectedPriorityObjects.clear();
     uploadedAttachments.clear();
     cccdFrontAttachment = null;
     cccdBackAttachment = null;
@@ -538,6 +708,11 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
     cccdFrontFile = null;
     cccdBackFile = null;
     proofFiles.clear();
+    tempFullName = null;
+    tempDOB = null;
+    selectedTermType = 1;
+    customStartDate = null;
+    customEndDate = null;
     tempPhone = null;
     tempEmail = null;
     tempCccd = null;
@@ -547,104 +722,58 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
     tempReason = null;
   }
 
-  void loadDraftData(MyRegistrationModel draft) {
-    draftRecord = draft;
-    if (periods.isNotEmpty) {
-      selectedPeriod = periods.firstWhere(
-        (p) => p.id == draft.registrationPeriodId,
-        orElse: () => periods.first,
-      );
-    }
-    if (dormitories.isNotEmpty) {
-      selectedDormitory = dormitories.firstWhere(
-        (d) => d.id == draft.dormitoryId,
-        orElse: () => dormitories.first,
-      );
-    }
-    if (roomTypes.isNotEmpty) {
-      selectedRoomType = roomTypes.firstWhere(
-        (r) => r.id == draft.roomTypeId,
-        orElse: () => roomTypes.first,
-      );
-    }
-    if (priorityObjects.isNotEmpty) {
-      final matching = priorityObjects.where(
-        (p) => p.id == draft.priorityObjectId,
-      );
-      selectedPriorityObject = matching.isNotEmpty ? matching.first : null;
-    }
-    tempReason = draft.note;
-
-    // Load student info from draft
-    if (draft.student != null) {
-      tempPhone = draft.student!.phone;
-      tempEmail = draft.student!.email;
-      tempCccd = draft.student!.cccd;
-      tempCccdIssueDate = draft.student!.cccdIssueDate;
-      tempHometown = draft.student!.hometown;
-      tempTemporaryAddress = draft.student!.temporaryAddress;
-    }
-
-    // Load documents from draft
-    if (draft.documents != null) {
-      for (final doc in draft.documents!) {
-        final type = doc.type?.toLowerCase();
-        if (type == 'cccd_front') {
-          cccdFrontAttachment = doc;
-        } else if (type == 'cccd_back') {
-          cccdBackAttachment = doc;
-        } else if (type == 'proof') {
-          if (!proofAttachments.any((e) => e.id == doc.id)) {
-            proofAttachments.add(doc);
-          }
-        }
-      }
-    }
-  }
-
-  Future<void> getRegistrationPeriods({int? dormitoryId}) async {
+  /// Lấy đợt đăng ký active mới nhất của KTX và tự động chọn đợt đó.
+  ///
+  /// API: GET /api/dormitory/{dormitory}/registration-periods
+  /// Người dùng không còn phải chọn đợt trên giao diện.
+  Future<RegistrationPeriodModel?> getRegistrationPeriods({
+    int? dormitoryId,
+  }) async {
     emit(DormitoryRegistrationLoading());
+
     try {
       final selectedDormitoryId = dormitoryId ?? selectedDormitory?.id;
+
       if (selectedDormitoryId == null) {
         periods = [];
         selectedPeriod = null;
         emit(DormitoryRegistrationPeriodsLoaded(periods));
-        return;
+        return null;
       }
 
       final res = await _repository.getRegistrationPeriods(
         dormitoryId: selectedDormitoryId,
       );
+
+      // API trả về đợt active mới nhất của KTX hoặc null.
       periods = res.data?.items ?? [];
-      if (selectedPeriod != null &&
-          !periods.any((p) => p.id == selectedPeriod!.id)) {
-        selectedPeriod = null;
-      }
-      if (draftRecord != null && periods.isNotEmpty) {
-        selectedPeriod = periods.firstWhere(
-          (p) => p.id == draftRecord!.registrationPeriodId,
-          orElse: () => periods.first,
-        );
-      }
+      selectedPeriod = periods.isNotEmpty ? periods.first : null;
+
       emit(DormitoryRegistrationPeriodsLoaded(periods));
+      return selectedPeriod;
     } catch (e) {
-      logError(e.toString());
+      periods = [];
+      selectedPeriod = null;
+      logError('Get active registration period error: $e');
       emit(DormitoryRegistrationError(e.toString()));
+      return null;
     }
   }
 
   Future<void> getDormitories() async {
     emit(DormitoryRegistrationLoading());
     try {
-      final res = await _repository.getDormitories();
-      dormitories = res.data?.items ?? [];
-      if (draftRecord != null && dormitories.isNotEmpty) {
-        selectedDormitory = dormitories.firstWhere(
-          (d) => d.id == draftRecord!.dormitoryId,
-          orElse: () => dormitories.first,
-        );
+      dormitories = await _loadAllDormitories();
+
+      if (selectedDormitory != null &&
+          !dormitories.any(
+            (DormitoryModel item) => item.id == selectedDormitory?.id,
+          )) {
+        selectedDormitory = null;
+        selectedPeriod = null;
+        periods = <RegistrationPeriodModel>[];
       }
+
       emit(DormitoryRegistrationDormitoriesLoaded(dormitories));
     } catch (e) {
       logError(e.toString());
@@ -652,17 +781,31 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
     }
   }
 
+  /// Lấy toàn bộ ký túc xá từ API.
+  ///
+  /// Không lọc theo trường/đơn vị đào tạo. Mọi tài khoản đều được phép
+  /// xem và lựa chọn tất cả ký túc xá mà API trả về.
+  Future<List<DormitoryModel>> _loadAllDormitories() async {
+    final res = await _repository.getDormitories();
+    final List<DormitoryModel> allDormitories =
+        res.data?.items ?? const <DormitoryModel>[];
+
+    dormitoryFilterMessage = allDormitories.isEmpty
+        ? 'Hiện chưa có ký túc xá khả dụng.'
+        : null;
+
+    logInfo(
+      '[DORMITORY_ALL] total=${allDormitories.length}',
+    );
+
+    return allDormitories;
+  }
+
   Future<void> getRoomTypes() async {
     emit(DormitoryRegistrationLoading());
     try {
       final res = await _repository.getRoomTypes();
       roomTypes = res.data?.items ?? [];
-      if (draftRecord != null && roomTypes.isNotEmpty) {
-        selectedRoomType = roomTypes.firstWhere(
-          (r) => r.id == draftRecord!.roomTypeId,
-          orElse: () => roomTypes.first,
-        );
-      }
       emit(DormitoryRegistrationRoomTypesLoaded(roomTypes));
     } catch (e) {
       logError(e.toString());
@@ -675,12 +818,6 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
     try {
       final res = await _repository.getPriorityObjects();
       priorityObjects = res.data?.items ?? [];
-      if (draftRecord != null && priorityObjects.isNotEmpty) {
-        final matching = priorityObjects.where(
-          (p) => p.id == draftRecord!.priorityObjectId,
-        );
-        selectedPriorityObject = matching.isNotEmpty ? matching.first : null;
-      }
       emit(DormitoryRegistrationPriorityObjectsLoaded(priorityObjects));
     } catch (e) {
       logError(e.toString());
@@ -877,35 +1014,6 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
     }
   }
 
-  Future<void> submitDraft(Object id) async {
-    // emit(DormitoryRegistrationShowHub());
-    try {
-      await _repository.submitDraft(id);
-      emit(DormitoryRegistrationDismissHub());
-      emit(DormitoryRegistrationSavedSuccess('Gửi đăng ký thành công!'));
-    } catch (e) {
-      logError(e.toString());
-      emit(DormitoryRegistrationDismissHub());
-      emit(DormitoryRegistrationError(e.toString()));
-    }
-  }
-
-  Future<void> registerDormitory(RegistrationPayloadModel payload) async {
-    // emit(DormitoryRegistrationShowHub());
-    try {
-      final res = await _repository.registerDormitory(payload);
-      if (res.data != null) {
-        draftRecord = res.data;
-      }
-      emit(DormitoryRegistrationDismissHub());
-      emit(DormitoryRegistrationSavedSuccess('Đăng ký nội trú thành công!'));
-    } catch (e) {
-      logError(e.toString());
-      emit(DormitoryRegistrationDismissHub());
-      emit(DormitoryRegistrationError(e.toString()));
-    }
-  }
-
   Future<void> submitRegistration(RegistrationPayloadModel payload) async {
     // emit(DormitoryRegistrationShowHub());
     try {
@@ -931,10 +1039,7 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
         'Payload fields: ${finalPayload.toJson()}',
       ); // nếu RegistrationPayloadModel có toJson()
       debugPrint('Attachment IDs: $attachmentIds');
-      final res = await _repository.registerDormitory(finalPayload);
-      if (res.data != null) {
-        draftRecord = res.data;
-      }
+      await _repository.registerDormitory(finalPayload);
 
       emit(DormitoryRegistrationDismissHub());
       emit(DormitoryRegistrationSavedSuccess('Đăng ký nội trú thành công!'));

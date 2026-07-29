@@ -13,74 +13,150 @@ class VcoreBrowserController extends GetxController {
   final RxInt loadingProgess = 0.obs;
   final RxBool canGoBack = false.obs;
   final RxBool canGoForward = false.obs;
-
   final RxBool isBookmarked = false.obs;
 
   WebViewController webController = WebViewController();
 
+  /// Ngăn WebView tải lại URL mỗi khi widget rebuild.
+  bool _hasLoadedInitialContent = false;
+
   @override
   void onInit() {
     super.onInit();
-
     initWebview();
   }
 
-  initWebview() {
+  void initWebview() {
     webController = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(AppColor.bgColor)
       ..setNavigationDelegate(
         NavigationDelegate(
           onProgress: (int progress) {
-            // Update loading bar.
-            logSuccess(progress.toString());
             loadingProgess.value = progress;
+
+            logSuccess('WebView progress: $progress');
+
             _updateStatusBackForward();
           },
           onPageStarted: (String url) {
+            loadingProgess.value = 0;
+
             logSuccess('Start load -> $url');
+
             _checkBookmark();
           },
           onPageFinished: (String url) {
+            loadingProgess.value = 100;
+
             logSuccess('Finished load -> $url');
+
+            _updateStatusBackForward();
           },
-          onWebResourceError: (WebResourceError error) {},
+          onWebResourceError: (WebResourceError error) {
+            logSuccess(
+              'WebView error: '
+              '${error.errorCode} - ${error.description}',
+            );
+          },
+
+          // Có thể mở lại nếu cần chặn một số đường dẫn.
           // onNavigationRequest: (NavigationRequest request) {
           //   if (request.url.startsWith('https://www.youtube.com/')) {
           //     return NavigationDecision.prevent;
           //   }
+          //
           //   return NavigationDecision.navigate;
           // },
         ),
       );
   }
 
-  loadUrl(String url) {
+  /// Chỉ tải URL hoặc HTML ban đầu một lần.
+  void loadInitialContent({String? url, String? html}) {
+    if (_hasLoadedInitialContent) {
+      return;
+    }
+
+    final bool hasUrl = url != null && url.trim().isNotEmpty;
+
+    final bool hasHtml = html != null && html.trim().isNotEmpty;
+
+    if (!hasUrl && !hasHtml) {
+      return;
+    }
+
+    _hasLoadedInitialContent = true;
+
+    if (hasUrl) {
+      loadUrl(url!);
+      return;
+    }
+
+    loadHtml(html!);
+  }
+
+  /// Giữ nguyên hàm load URL cũ.
+  void loadUrl(String url) {
     webController.loadRequest(Uri.parse(url));
   }
 
-  loadHtml(String html) {
+  /// Giữ nguyên hàm load HTML cũ.
+  void loadHtml(String html) {
     webController.loadHtmlString(html);
   }
 
-  //
-  goBack() async {
-    if (await webController.canGoBack()) {
-      webController.goBack();
+  /// Quay lại trang trước trong WebView.
+  Future<void> goBack() async {
+    final bool canBack = await webController.canGoBack();
+
+    if (!canBack) {
+      return;
     }
+
+    await webController.goBack();
+    await _updateStatusBackForward();
   }
 
-  goForward() async {
-    if (await webController.canGoForward()) {
-      webController.goForward();
+  /// Đi tới trang tiếp theo trong WebView.
+  Future<void> goForward() async {
+    final bool canForward = await webController.canGoForward();
+
+    if (!canForward) {
+      return;
     }
+
+    await webController.goForward();
+    await _updateStatusBackForward();
   }
 
-  createBookMark() async {
-    String title = await webController.getTitle() ?? '';
-    String url = await webController.currentUrl() ?? '';
+  /// Dùng cho nút back dạng bong bóng.
+  ///
+  /// WebView có lịch sử:
+  /// - Quay lại trang trước.
+  ///
+  /// WebView không có lịch sử:
+  /// - Đóng màn hình WebView.
+  Future<void> goBackOrClose() async {
+    final bool canBack = await webController.canGoBack();
+
+    if (canBack) {
+      await webController.goBack();
+      await _updateStatusBackForward();
+      return;
+    }
+
+    Get.back();
+  }
+
+  Future<void> createBookMark() async {
+    final String title = await webController.getTitle() ?? '';
+
+    final String url = await webController.currentUrl() ?? '';
+
     logSuccess(title);
     logSuccess(url);
+
     if (title.isEmpty || url.isEmpty) {
       snackBarWarning('Không tìm thấy thông tin liên kết.');
       return;
@@ -88,9 +164,11 @@ class VcoreBrowserController extends GetxController {
 
     try {
       Utils.showProgress(context);
-      var response = await ApiRepository().createLienKetDanhDau(title, url);
+
+      await ApiRepository().createLienKetDanhDau(title, url);
 
       Utils.dismissProgress(context);
+
       snackBarSuccess('Tạo liên kết đánh dấu thành công');
     } catch (e) {
       Utils.dismissProgress(context);
@@ -98,13 +176,19 @@ class VcoreBrowserController extends GetxController {
     }
   }
 
-  //Private
-  _updateStatusBackForward() async {
+  Future<void> _updateStatusBackForward() async {
     canGoBack.value = await webController.canGoBack();
+
     canGoForward.value = await webController.canGoForward();
   }
 
-  _checkBookmark() {
-    //
+  void _checkBookmark() {
+    // Kiểm tra trạng thái bookmark tại đây.
+  }
+
+  @override
+  void onClose() {
+    context = null;
+    super.onClose();
   }
 }

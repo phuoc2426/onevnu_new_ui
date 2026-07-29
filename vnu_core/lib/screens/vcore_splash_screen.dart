@@ -2,22 +2,22 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:vnu_core/common/log.dart';
-import 'package:vnu_core/screens/vcore_admission_view.dart';
+import 'package:vnu_core/globals.dart';
+import 'package:vnu_core/modules/admission/views/applicant_home_screen.dart';
 import 'package:vnu_core/repository/app_repository.dart';
+import 'package:vnu_core/repository/applicant_session_repository.dart';
 import 'package:vnu_core/repository/data_repository.dart';
+import 'package:vnu_core/screens/vcore_admission_view.dart';
 import 'package:vnu_core/services/services_url.dart';
 import 'package:vnu_core/vnu_core.dart';
-
-import '../globals.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:vnu_core/modules/admission/views/applicant_home_screen.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class VCoreSplashScreen extends StatefulWidget {
   final Widget mainScreen;
 
-  const VCoreSplashScreen({Key? key, required this.mainScreen})
-    : super(key: key);
+  const VCoreSplashScreen({
+    super.key,
+    required this.mainScreen,
+  });
 
   @override
   State<VCoreSplashScreen> createState() => _VCoreSplashScreenState();
@@ -29,161 +29,203 @@ class _VCoreSplashScreenState extends State<VCoreSplashScreen> {
   @override
   void initState() {
     super.initState();
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _initSplash();
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _initSplash());
   }
 
   Future<void> _initSplash() async {
     await _initDateFormatting();
-
     final firebaseToken = await _getFirebaseToken();
 
-    String token = '';
-    String refreshToken = '';
-
     try {
-      final results = await Future.wait([
-        DataRepository().getSecureSaveKey(kLoginToken),
-        DataRepository().getSecureSaveKey(kLoginRefreshToken),
-      ]);
+      final principalType =
+          (await DataRepository().getSecureSaveKey(kSessionPrincipalType))
+                  ?.trim()
+                  .toUpperCase() ??
+              '';
 
-      token = results[0] ?? '';
-      refreshToken = results[1] ?? '';
-    } catch (e) {
-      logError(e.toString());
-    }
-
-    if (!mounted) return;
-
-    // Trường hợp token sinh viên (kLoginToken) không tồn tại hoặc refresh token rỗng
-    // Kiểm tra token của thí sinh đã được lưu trong SharedPreferences (key: 'accessToken').
-    if (token.isEmpty || refreshToken.isEmpty) {
-      // Trường hợp không có token sinh viên, kiểm tra token thí sinh (được lưu dưới key riêng).
-      final prefs = await SharedPreferences.getInstance();
-      const applicantTokenKey = 'applicant_access_token';
-      final applicantToken = prefs.getString(applicantTokenKey) ?? '';
-      if (applicantToken.isNotEmpty) {
-        // Đặt token chung để các request có thể dùng (Globals & ApiRepository)
-        Globals().token = applicantToken;
-        ApiRepository().setToken(applicantToken);
-        // Lấy thông tin hiển thị (fullname) nếu có, rồi chuyển tới màn home của thí sinh.
-        final fullName = prefs.getString('applicant_fullname') ?? 'Thí sinh';
-        if (mounted) {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(
-              builder: (_) => ApplicantHomeScreen(fullName: fullName),
-            ),
-            (route) => false,
-          );
-        }
+      if (principalType == kPrincipalTypeApplicant) {
+        await _restoreApplicantSession(firebaseToken);
         return;
       }
 
-      // Không có token nào → xóa session và chuyển tới Admission (đăng ký/login sinh viên)
-      await _clearLoginSession();
+      if (principalType == kPrincipalTypeUser) {
+        await _restoreUserSession(firebaseToken);
+        return;
+      }
+
+      // Tương thích dữ liệu đã lưu trước khi bổ sung principalType.
+      final applicantSession = await ApplicantSessionRepository().load();
+      if (applicantSession != null) {
+        await DataRepository().saveSecureKey(
+          kSessionPrincipalType,
+          kPrincipalTypeApplicant,
+        );
+        await _restoreApplicantSession(firebaseToken);
+        return;
+      }
+
+      final userValues = await Future.wait<String?>([
+        DataRepository().getSecureSaveKey(kLoginToken),
+        DataRepository().getSecureSaveKey(kLoginRefreshToken),
+      ]);
+      if ((userValues[0] ?? '').trim().isNotEmpty &&
+          (userValues[1] ?? '').trim().isNotEmpty) {
+        await DataRepository().saveSecureKey(
+          kSessionPrincipalType,
+          kPrincipalTypeUser,
+        );
+        await _restoreUserSession(firebaseToken);
+        return;
+      }
+
+      await _clearAllSessions();
       _goToAdmission();
-      return;
+    } catch (error) {
+      logError('Khởi tạo phiên đăng nhập lỗi: $error');
+      await _clearAllSessions();
+      _goToAdmission();
     }
+  }
 
-    // Token sinh viên hợp lệ → tiếp tục quy trình refresh token như hiện tại
-    Globals().token = token;
-    Globals().refreshToken = refreshToken;
+  Future<void> _restoreApplicantSession(String? firebaseToken) async {
+    try {
+      final session = await ApplicantSessionRepository().load();
+      if (session == null) {
+        throw StateError('Không tìm thấy refresh token của Applicant');
+      }
 
-    await _refreshTokenAndGoMain(firebaseToken);
+      Globals().token = session.accessToken;
+      Globals().refreshToken = session.refreshToken;
+      ApiRepository().setToken(session.accessToken);
+
+      final refreshed = await ApiRepository().applicantRefreshToken(
+        session.refreshToken,
+      );
+      await ApplicantSessionRepository().save(refreshed);
+
+      Globals().token = refreshed.accessToken;
+      Globals().refreshToken = refreshed.refreshToken;
+      ApiRepository().setToken(refreshed.accessToken);
+
+      await _syncFirebaseToken(firebaseToken);
+      _goToApplicantHome(refreshed.applicant.fullName);
+    } catch (error) {
+      logError('Khôi phục phiên Applicant lỗi: $error');
+      await _clearAllSessions();
+      _goToAdmission();
+    }
+  }
+
+  Future<void> _restoreUserSession(String? firebaseToken) async {
+    try {
+      final values = await Future.wait<String?>([
+        DataRepository().getSecureSaveKey(kLoginToken),
+        DataRepository().getSecureSaveKey(kLoginRefreshToken),
+      ]);
+      final accessToken = values[0]?.trim() ?? '';
+      final refreshToken = values[1]?.trim() ?? '';
+      if (accessToken.isEmpty || refreshToken.isEmpty) {
+        throw StateError('Không tìm thấy phiên đăng nhập người dùng');
+      }
+
+      Globals().token = accessToken;
+      Globals().refreshToken = refreshToken;
+      ApiRepository().setToken(accessToken);
+
+      final response = await ApiRepository().refreshToken(refreshToken);
+      final newAccessToken = response.accessToken?.trim() ?? '';
+      final newRefreshToken = response.refreshToken?.trim() ?? '';
+      if (newAccessToken.isEmpty || newRefreshToken.isEmpty) {
+        throw StateError('Phản hồi refresh token không hợp lệ');
+      }
+
+      Globals().token = newAccessToken;
+      Globals().refreshToken = newRefreshToken;
+      ApiRepository().setToken(newAccessToken);
+
+      await Future.wait<void>([
+        DataRepository().saveSecureKey(kLoginToken, newAccessToken),
+        DataRepository().saveSecureKey(kLoginRefreshToken, newRefreshToken),
+        DataRepository().saveSecureKey(
+          kSessionPrincipalType,
+          kPrincipalTypeUser,
+        ),
+      ]);
+
+      await _syncFirebaseToken(firebaseToken);
+      _goToMain();
+    } catch (error) {
+      logError('Khôi phục phiên USER lỗi: $error');
+      await _clearAllSessions();
+      _goToAdmission();
+    }
   }
 
   Future<void> _initDateFormatting() async {
     try {
       await initializeDateFormatting();
-    } catch (e) {
-      logError(e.toString());
+    } catch (error) {
+      logError('Khởi tạo định dạng ngày lỗi: $error');
     }
   }
 
   Future<String?> _getFirebaseToken() async {
     try {
-      final firebaseToken = await FirebaseMessaging.instance.getToken();
-      logInfo('FCM token: ${firebaseToken.toString()}');
-      return firebaseToken;
-    } catch (e) {
-      logError('FCM lỗi: ${e.toString()}');
+      final token = await FirebaseMessaging.instance.getToken();
+      if (token != null && token.isNotEmpty) {
+        ServicesUrl().firebaseToken = token;
+        logInfo('Đã lấy FCM token cho thiết bị');
+      }
+      return token;
+    } catch (error) {
+      logError('Không lấy được FCM token: $error');
       return null;
     }
   }
 
-  Future<void> _refreshTokenAndGoMain(String? firebaseToken) async {
+  Future<void> _syncFirebaseToken(String? firebaseToken) async {
+    if (firebaseToken == null || firebaseToken.isEmpty) return;
     try {
-      final responseRefreshToken = await ApiRepository().refreshToken(
-        Globals().refreshToken,
-      );
-
-      final newToken = responseRefreshToken.accessToken ?? '';
-      final newRefreshToken = responseRefreshToken.refreshToken ?? '';
-
-      if (newToken.isEmpty || newRefreshToken.isEmpty) {
-        throw Exception('Refresh token response is empty');
-      }
-
-      Globals().token = newToken;
-      Globals().refreshToken = newRefreshToken;
-
-      await DataRepository().saveSecureKey(kLoginToken, Globals().token);
-      await DataRepository().saveSecureKey(
-        kLoginRefreshToken,
-        Globals().refreshToken,
-      );
-
-      ApiRepository().setToken(Globals().token);
-
-      try {
-        await VnuCore().addFirebaseToken(firebaseToken);
-      } catch (e) {
-        logError('addFirebaseToken lỗi: ${e.toString()}');
-      }
-
-      if (!mounted) return;
-
-      _goToMain();
-    } catch (e) {
-      logError('Refresh token lỗi: ${e.toString()}');
-
-      await _clearLoginSession();
-
-      if (!mounted) return;
-
-      _goToAdmission();
+      await VnuCore().addFirebaseToken(firebaseToken);
+    } catch (error) {
+      // Không chặn đăng nhập nếu cập nhật FCM token tạm thời thất bại.
+      logError('Cập nhật FCM token lỗi: $error');
     }
   }
 
-  Future<void> _clearLoginSession() async {
+  Future<void> _clearAllSessions() async {
     try {
-      Globals().clearSession();
-
-      await DataRepository().saveSecureKey(kLoginToken, '');
-      await DataRepository().saveSecureKey(kLoginRefreshToken, '');
-
+      await Globals().clearSession();
       ApiRepository().setToken('');
-    } catch (e) {
-      logError('Clear session lỗi: ${e.toString()}');
+    } catch (error) {
+      logError('Xóa phiên đăng nhập lỗi: $error');
     }
   }
 
   void _goToAdmission() {
     if (_hasNavigated || !mounted) return;
-
     _hasNavigated = true;
-
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const VcoreAdmissionView()),
-      (route) => false,
+      (_) => false,
+    );
+  }
+
+  void _goToApplicantHome(String fullName) {
+    if (_hasNavigated || !mounted) return;
+    _hasNavigated = true;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(
+        builder: (_) => ApplicantHomeScreen(
+          fullName: fullName.trim().isEmpty ? 'Thí sinh' : fullName,
+        ),
+      ),
+      (_) => false,
     );
   }
 
   void _goToMain() {
     if (_hasNavigated || !mounted) return;
-
     _hasNavigated = true;
 
     if (VnuCore().loginSucces != null) {
@@ -193,20 +235,8 @@ class _VCoreSplashScreenState extends State<VCoreSplashScreen> {
 
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => widget.mainScreen),
-      (route) => false,
+      (_) => false,
     );
-  }
-
-  Future<void> _subscribeTopics(List<String> topics) async {
-    ServicesUrl().topics = topics;
-
-    await Future.forEach(topics, (topic) async {
-      await FirebaseMessaging.instance.unsubscribeFromTopic(topic.toString());
-    });
-
-    await Future.forEach(topics, (topic) async {
-      await FirebaseMessaging.instance.subscribeToTopic(topic.toString());
-    });
   }
 
   @override
@@ -215,7 +245,7 @@ class _VCoreSplashScreenState extends State<VCoreSplashScreen> {
       backgroundColor: Colors.white,
       body: Center(
         child: Padding(
-          padding: EdgeInsets.only(top: 36, bottom: 40, left: 30, right: 30),
+          padding: EdgeInsets.fromLTRB(30, 36, 30, 40),
           child: Image(
             image: AssetImage(
               'assets/images/ic_logo_vnu_full.png',

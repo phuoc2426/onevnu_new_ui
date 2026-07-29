@@ -1,12 +1,10 @@
+import 'package:vnu_core/common/log.dart';
 
 class VneidCallbackData {
   final String transactionCode;
   final String? result;
 
-  const VneidCallbackData({
-    required this.transactionCode,
-    this.result,
-  });
+  const VneidCallbackData({required this.transactionCode, this.result});
 }
 
 VneidCallbackData? parseVneidCallback(Uri uri) {
@@ -14,44 +12,48 @@ VneidCallbackData? parseVneidCallback(Uri uri) {
 
   final rawTransitionCode =
       uri.queryParameters['transitionCode'] ??
-          uri.queryParameters['transition_code'] ??
-          uri.queryParameters['transactionCode'];
+      uri.queryParameters['transition_code'] ??
+      uri.queryParameters['transactionCode'];
 
   if (rawTransitionCode == null || rawTransitionCode.trim().isEmpty) {
+    logWarning('VNeID rawTransitionCode is missing or empty.');
     return null;
   }
 
-  final decodedTransitionCode = Uri.decodeComponent(rawTransitionCode).trim();
+  logInfo('VNeID rawTransitionCode: $rawTransitionCode');
 
-  if (decodedTransitionCode.isEmpty) {
+  // First decode
+  var decoded = Uri.decodeComponent(rawTransitionCode).trim();
+  logInfo('VNeID first decodedTransitionCode: $decoded');
+
+  // If still contains percent-encoded pipe, decode again
+  if (decoded.contains('%7C')) {
+    decoded = Uri.decodeComponent(decoded).trim();
+    logInfo('VNeID second decodedTransitionCode (double decode): $decoded');
+  }
+
+  if (decoded.isEmpty) {
+    logWarning('VNeID decoded transition code is empty after decoding.');
     return null;
   }
 
-  final separatorIndex = decodedTransitionCode.indexOf('|');
+  final separatorIndex = decoded.indexOf('|');
 
   if (separatorIndex == -1) {
-    return VneidCallbackData(
-      transactionCode: decodedTransitionCode,
-      result: null,
-    );
+    return VneidCallbackData(transactionCode: decoded, result: null);
   }
 
-  final transactionCode =
-  decodedTransitionCode.substring(0, separatorIndex).trim();
-
-  final resultCode =
-  decodedTransitionCode.substring(separatorIndex + 1).trim();
+  final transactionCode = decoded.substring(0, separatorIndex).trim();
+  final resultCode = decoded.substring(separatorIndex + 1).trim();
 
   if (transactionCode.isEmpty) {
+    logWarning('VNeID transactionCode is empty after parsing.');
     return null;
   }
-  final String parseUriLog = 'VNeID parse uri: $uri';
-  final String queryParametersLog =
-      'VNeID queryParameters: ${uri.queryParameters}';
-  final String rawTransitionCodeLog =
-      'VNeID rawTransitionCode: $rawTransitionCode';
-  final String decodedTransitionCodeLog =
-      'VNeID decodedTransitionCode: $decodedTransitionCode';
+
+  logInfo('VNeID parsed transactionCode: $transactionCode');
+  logInfo('VNeID parsed resultCode: $resultCode');
+
   return VneidCallbackData(
     transactionCode: transactionCode,
     result: resultCode.isEmpty ? null : resultCode,

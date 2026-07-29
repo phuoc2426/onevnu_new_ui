@@ -75,8 +75,9 @@ class DRStep4ReviewScreenState extends State<DRStep4ReviewScreen> {
 
     final periodName = cubit.selectedPeriod?.name ?? '-';
     final dormName = cubit.selectedDormitory?.name ?? '-';
-    final roomName = cubit.selectedRoomType?.name ?? '-';
-    final priorityName = cubit.selectedPriorityObject?.name ?? 'Không có';
+    final String priorityName = cubit.selectedPriorityObjectNames.isEmpty
+        ? 'Không có'
+        : cubit.selectedPriorityObjectNames;
     String dobDisplay = '-';
     final rawDob = cubit.tempDOB ??
         (student?.ngaySinh != null
@@ -90,28 +91,13 @@ class DRStep4ReviewScreenState extends State<DRStep4ReviewScreen> {
         dobDisplay = rawDob;
       }
     }
-    // List of files to display as chips (local files + uploaded files)
-    final List<String> fileNames = [];
-    if (cubit.cccdFrontFile != null) {
-      fileNames.add(p.basename(cubit.cccdFrontFile!.path));
-    } else if (cubit.cccdFrontAttachment != null) {
-      fileNames.add(cubit.cccdFrontAttachment!.name ?? 'CCCD_Mặt_Trước.jpg');
-    }
-
-    if (cubit.cccdBackFile != null) {
-      fileNames.add(p.basename(cubit.cccdBackFile!.path));
-    } else if (cubit.cccdBackAttachment != null) {
-      fileNames.add(cubit.cccdBackAttachment!.name ?? 'CCCD_Mặt_Sau.jpg');
-    }
-
-    for (var file in cubit.proofFiles) {
-      fileNames.add(p.basename(file.path));
-    }
-    for (var doc in cubit.proofAttachments) {
-      if (doc.name != null) {
-        fileNames.add(doc.name!);
-      }
-    }
+    final bool hasSelectedDocuments =
+        cubit.cccdFrontFile != null ||
+        cubit.cccdFrontAttachment != null ||
+        cubit.cccdBackFile != null ||
+        cubit.cccdBackAttachment != null ||
+        cubit.proofFiles.isNotEmpty ||
+        cubit.proofAttachments.isNotEmpty;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -152,7 +138,6 @@ class DRStep4ReviewScreenState extends State<DRStep4ReviewScreen> {
                   const SizedBox(height: 12),
                   _buildSummaryRow('Đợt đăng ký', periodName),
                   _buildSummaryRow('Ký túc xá', dormName),
-                  _buildSummaryRow('Loại phòng', roomName),
                   _buildSummaryRow('Đối tượng ưu tiên', priorityName),
                 ],
               ),
@@ -198,78 +183,6 @@ class DRStep4ReviewScreenState extends State<DRStep4ReviewScreen> {
                   _buildSummaryRow('Ngành', Globals().lopDaoTaoModel.value?.ten ?? '-'),
                   _buildSummaryRow('SĐT', cubit.tempPhone ?? '-'),
                   _buildSummaryRow('Email', cubit.tempEmail ?? '-'),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          // 3. Minh chứng
-          Card(
-            color: Colors.white,
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(18),
-              side: const BorderSide(color: Color(0xFFE3E6EB)),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 32,
-                        height: 32,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFEAF8EF),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.description_outlined, color: Color(0xFF078B3E), size: 18),
-                      ),
-                      const SizedBox(width: 10),
-                      const Text(
-                        'Minh chứng',
-                        style: TextStyle(fontSize: AppFontSizes.font11, fontWeight: FontWeight.bold, color: Color(0xFF111318)),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  if (fileNames.isEmpty)
-                    const Text('Chưa có tệp minh chứng nào', style: TextStyle(color: Color(0xFF666B75), fontSize: AppFontSizes.medium))
-                  else
-                    Wrap(
-                      spacing: 10,
-                      runSpacing: 8,
-                      children: fileNames.map((name) {
-                        return Container(
-                          constraints: BoxConstraints(
-                            maxWidth: MediaQuery.of(context).size.width - 64,
-                          ),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFBFCFD),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: const Color(0xFFE3E6EB)),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.description_outlined, color: Color(0xFF078B3E), size: 16),
-                              const SizedBox(width: 6),
-                              Flexible(
-                                child: Text(
-                                  name,
-                                  style: const TextStyle(fontSize: AppFontSizes.font11, color: Color(0xFF111318), fontWeight: FontWeight.w500),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }).toList(),
-                    ),
                 ],
               ),
             ),
@@ -322,6 +235,7 @@ class DRStep4ReviewScreenState extends State<DRStep4ReviewScreen> {
             ),
           ),
 
+          const SizedBox(height: 12),
           Card(
             color: Colors.white,
             elevation: 0,
@@ -336,10 +250,14 @@ class DRStep4ReviewScreenState extends State<DRStep4ReviewScreen> {
                 children: [
                   const Row(
                     children: [
-                      Icon(Icons.image_outlined, color: Color(0xFF078B3E), size: 20),
+                      Icon(
+                        Icons.image_outlined,
+                        color: Color(0xFF078B3E),
+                        size: 20,
+                      ),
                       SizedBox(width: 8),
                       Text(
-                        'Minh chứng đã chọn',
+                        'Ảnh và minh chứng đã chọn',
                         style: TextStyle(
                           fontSize: AppFontSizes.font11,
                           fontWeight: FontWeight.bold,
@@ -349,22 +267,48 @@ class DRStep4ReviewScreenState extends State<DRStep4ReviewScreen> {
                     ],
                   ),
                   const SizedBox(height: 12),
-
-                  if (cubit.proofFiles.isEmpty && cubit.proofAttachments.isEmpty)
+                  if (!hasSelectedDocuments)
                     const Text(
-                      'Chưa có minh chứng bổ sung.',
+                      'Chưa có ảnh hoặc tệp minh chứng.',
                       style: TextStyle(color: Color(0xFF666B75)),
                     )
                   else
                     Wrap(
-                      spacing: 10,
-                      runSpacing: 10,
+                      spacing: 12,
+                      runSpacing: 12,
                       children: [
-                        ...cubit.proofFiles.map(_buildLocalImagePreview),
+                        if (cubit.cccdFrontFile != null)
+                          _buildLocalImagePreview(
+                            cubit.cccdFrontFile!,
+                            label: 'CCCD mặt trước',
+                          )
+                        else if (cubit.cccdFrontAttachment != null)
+                          _buildUploadedFileTile(
+                            label: 'CCCD mặt trước',
+                            fileName: cubit.cccdFrontAttachment!.name ??
+                                'CCCD_Mặt_Trước.jpg',
+                          ),
+                        if (cubit.cccdBackFile != null)
+                          _buildLocalImagePreview(
+                            cubit.cccdBackFile!,
+                            label: 'CCCD mặt sau',
+                          )
+                        else if (cubit.cccdBackAttachment != null)
+                          _buildUploadedFileTile(
+                            label: 'CCCD mặt sau',
+                            fileName: cubit.cccdBackAttachment!.name ??
+                                'CCCD_Mặt_Sau.jpg',
+                          ),
+                        ...cubit.proofFiles.map(
+                          (File file) => _buildLocalImagePreview(
+                            file,
+                            label: 'Giấy tờ ưu tiên',
+                          ),
+                        ),
                         ...cubit.proofAttachments.map(
-                              (e) => Chip(
-                            avatar: const Icon(Icons.description_outlined, size: 16),
-                            label: Text(e.name ?? 'Tệp minh chứng'),
+                          (attachment) => _buildUploadedFileTile(
+                            label: 'Giấy tờ ưu tiên',
+                            fileName: attachment.name ?? 'Tệp minh chứng',
                           ),
                         ),
                       ],
@@ -456,39 +400,195 @@ class DRStep4ReviewScreenState extends State<DRStep4ReviewScreen> {
     );
   }
 
-  Widget _buildLocalImagePreview(File file) {
-    return GestureDetector(
-      onTap: () => _showImagePreview(file),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: Image.file(
-          file,
-          width: 72,
-          height: 72,
-          fit: BoxFit.cover,
-        ),
-      ),
-    );
-  }
+  Widget _buildLocalImagePreview(
+    File file, {
+    required String label,
+  }) {
+    final String fileName = p.basename(file.path);
 
-  void _showImagePreview(File file) {
-    showDialog(
-      context: context,
-      builder: (_) => Dialog(
-        insetPadding: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: InteractiveViewer(
-            child: Image.file(
-              file,
-              fit: BoxFit.contain,
-            ),
+    return SizedBox(
+      width: 128,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => _showImagePreview(file, title: label),
+        child: Container(
+          padding: const EdgeInsets.all(7),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFBFCFD),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE3E6EB)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(9),
+                child: Image.file(
+                  file,
+                  width: double.infinity,
+                  height: 92,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
+                    width: double.infinity,
+                    height: 92,
+                    color: const Color(0xFFF0F2F5),
+                    alignment: Alignment.center,
+                    child: const Icon(
+                      Icons.broken_image_outlined,
+                      color: Color(0xFF8A9099),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 7),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: AppFontSizes.font11,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF111318),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                fileName,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: AppFontSizes.extraSmall,
+                  color: Color(0xFF666B75),
+                ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
+
+  Widget _buildUploadedFileTile({
+    required String label,
+    required String fileName,
+  }) {
+    return Container(
+      width: 128,
+      constraints: const BoxConstraints(minHeight: 132),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFBFCFD),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE3E6EB)),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Center(
+            child: Icon(
+              Icons.description_outlined,
+              size: 34,
+              color: Color(0xFF078B3E),
+            ),
+          ),
+          const SizedBox(height: 9),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: AppFontSizes.font11,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF111318),
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            fileName,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: AppFontSizes.extraSmall,
+              color: Color(0xFF666B75),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showImagePreview(
+    File file, {
+    String? title,
+  }) async {
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black87,
+      builder: (BuildContext dialogContext) {
+        return Dialog(
+          insetPadding: EdgeInsets.zero,
+          backgroundColor: Colors.black87,
+          child: SafeArea(
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: Center(
+                    child: InteractiveViewer(
+                      minScale: 0.8,
+                      maxScale: 5,
+                      child: Image.file(
+                        file,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => const Center(
+                          child: Text(
+                            'Không thể hiển thị ảnh',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                if (title != null && title.trim().isNotEmpty)
+                  Positioned(
+                    top: 18,
+                    left: 18,
+                    right: 72,
+                    child: Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: AppFontSizes.mediumSmall,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                Positioned(
+                  top: 12,
+                  right: 12,
+                  child: Material(
+                    color: Colors.black54,
+                    shape: const CircleBorder(),
+                    child: IconButton(
+                      tooltip: 'Đóng',
+                      onPressed: () => Navigator.of(dialogContext).pop(),
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
 }

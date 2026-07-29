@@ -12,6 +12,7 @@ import 'package:vnu_core/services/services_url.dart';
 
 import '../vnu_core.dart';
 
+import 'package:shared_preferences/shared_preferences.dart';
 part 'auth_state.dart';
 
 class AuthCubit extends Cubit<AuthState> {
@@ -52,7 +53,7 @@ class AuthCubit extends Cubit<AuthState> {
       // }
     } catch (e) {
       emit(AuthDismissHub());
-      emit(AuthError('Thông tin đăng nhập không chính xác hoặc lỗi hệ thống, vui lòng liên hệ quản trị viên'));
+      emit(AuthError(e.toString()));
     }
   }
 
@@ -73,7 +74,29 @@ class AuthCubit extends Cubit<AuthState> {
       logSuccess('Start login time --> ${DateTime.now().toIso8601String()}');
       var reponse = await ApiRepository()
           .signin(username, passsword, ServicesUrl().firebaseToken ?? '');
-      if ((reponse.accessToken ?? '').isNotEmpty) {
+      if (reponse.refreshToken != null) {
+        // ONEVNU_STALE_STUDENT_FIX_20260725_LOGIN_CLEAR
+        Globals().thongTinSinhVienModel.value = null;
+        Globals().currentUserModel.value = null;
+        Globals().lopDaoTaoModel.value = null;
+
+                Globals().nienKhoaDaoTaoModel.value = null;
+
+        final SharedPreferences prefs =
+            await SharedPreferences.getInstance();
+
+        const List<String> applicantKeys = <String>[
+          'applicant_cccd',
+          'applicant_fullname',
+          'applicant_email',
+          'applicant_dob',
+          'applicant_phone',
+        ];
+
+        for (final String key in applicantKeys) {
+          await prefs.remove(key);
+        }
+
         //save login info
         DataRepository().saveSecureUserLogin(username, passsword);
 
@@ -83,14 +106,28 @@ class AuthCubit extends Cubit<AuthState> {
 
         ApiRepository().setToken(Globals().token);
         DataRepository().saveSecureKey(kLoginToken, Globals().token);
-        if ((reponse.refreshToken ?? '').isNotEmpty) {
-          Globals().refreshToken = reponse.refreshToken ?? '';
-          DataRepository()
-              .saveSecureKey(kLoginRefreshToken, reponse.refreshToken ?? '');
-        }
+        DataRepository()
+            .saveSecureKey(kLoginRefreshToken, reponse.refreshToken ?? '');
 
         // Cần bỏ để tăng tốc độ login - thời gian chờ đang hơi lâu.
         // Chuyển load async ở tabbar
+
+        
+        // ONEVNU_STALE_STUDENT_FIX_20260725_LOGIN_REFRESH
+        await Globals().refreshStudentInfo();
+
+        if (Globals().thongTinSinhVienModel.value == null) {
+          await Globals().clearSession();
+
+          emit(AuthDismissHub());
+          emit(
+            AuthError(
+              'Không tải được thông tin sinh viên '
+              'của tài khoản vừa đăng nhập.',
+            ),
+          );
+          return;
+        }
 
         emit(AuthDismissHub());
 
@@ -102,11 +139,11 @@ class AuthCubit extends Cubit<AuthState> {
         }
       } else {
         emit(AuthDismissHub());
-        emit(AuthError('Thông tin đăng nhập không chính xác hoặc lỗi hệ thống, vui lòng liên hệ quản trị viên'));
+        emit(AuthError(kMessageError));
       }
     } catch (e) {
       emit(AuthDismissHub());
-      emit(AuthError('Thông tin đăng nhập không chính xác hoặc lỗi hệ thống, vui lòng liên hệ quản trị viên'));
+      emit(AuthError(e.toString()));
     }
   }
 

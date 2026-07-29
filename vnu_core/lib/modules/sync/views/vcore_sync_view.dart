@@ -10,6 +10,8 @@ import 'package:vnu_core/models/model.dart';
 import 'package:vnu_core/modules/sync/vneid_deep_link_service.dart';
 import 'package:vnu_core/repository/app_repository.dart';
 import 'package:vnu_core/widgets/vcore_module_scaffold.dart';
+// Globals chứa token và các biến toàn cục của ứng dụng
+import 'package:vnu_core/globals.dart';
 
 class VcoreSyncView extends StatefulWidget {
   const VcoreSyncView({super.key});
@@ -44,13 +46,30 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
   void initState() {
     super.initState();
 
+    // ------------------------------------------------------------
+    // Đảm bảo token sinh viên đã được gán vào Dio trước khi thực hiện
+    // bất kỳ request nào tới API VNeID (bên thứ 3). Token được lưu trong
+    // Globals().token và được đưa vào header Authorization thông qua
+    // ApiRepository.setToken(). Nếu token rỗng nghĩa là người dùng chưa
+    // đăng nhập hoặc token đã hết hạn, sẽ gây lỗi 401.
+    // ------------------------------------------------------------
+    if (Globals().token.isNotEmpty) {
+      ApiRepository().setToken(Globals().token);
+      logInfo('Token đã được gán cho Dio trong VcoreSyncView.initState');
+    } else {
+      logWarning(
+        'Token rỗng khi khởi tạo VcoreSyncView – người dùng chưa đăng nhập',
+      );
+    }
+
     VneidDeepLinkService().isSyncViewVisible = true;
 
-    _callbackSubscription =
-        VneidDeepLinkService().callbackStream.listen((event) {
-          VneidDeepLinkService().consumeLatestCallback();
-          _handleVneidCallback(event);
-        });
+    _callbackSubscription = VneidDeepLinkService().callbackStream.listen((
+      event,
+    ) {
+      VneidDeepLinkService().consumeLatestCallback();
+      _handleVneidCallback(event);
+    });
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final event = VneidDeepLinkService().consumeLatestCallback();
@@ -78,8 +97,25 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
     _configNameController.dispose();
     super.dispose();
   }
+
   Future<void> _startVneidSync() async {
     if (_isBusy) return;
+
+    // Kiểm tra token trước khi thực hiện đồng bộ
+    if (Globals().token.isEmpty) {
+      // Nếu chưa có token, thông báo cho người dùng đăng nhập lại.
+      snackBarError(
+        'Bạn chưa đăng nhập. Vui lòng đăng nhập trước khi đồng bộ.',
+      );
+      setState(() {
+        _screenMessage = 'Chưa có token xác thực – vui lòng đăng nhập.';
+      });
+      return;
+    }
+
+    // Đảm bảo Dio đã có header Authorization (trường hợp token được cập nhật
+    // sau khi đăng nhập nhưng chưa được gán lại cho Dio).
+    ApiRepository().setToken(Globals().token);
 
     setState(() {
       _isCallingShareInfo = true;
@@ -94,7 +130,7 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
       // API này có nhiệm vụ validate dữ liệu và gắn cờ để VNeID mở popup consent.
       // await ApiRepository().shareVneidInfo();
       //test
-      var ressponseShareVneid=await ApiRepository().shareVneidInfo(
+      var ressponseShareVneid = await ApiRepository().shareVneidInfo(
         configName: _configNameController.text.trim(),
       );
 
@@ -104,7 +140,7 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
         _isCallingShareInfo = false;
         _isOpeningVneid = true;
         _screenMessage =
-        'Đã gửi thông tin. Đang mở VNeID để xác nhận chia sẻ...';
+            'Đã gửi thông tin. Đang mở VNeID để xác nhận chia sẻ...';
       });
 
       // Bước 2: share-info OK thì mới mở VNeID.
@@ -128,7 +164,7 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
 
       setState(() {
         _screenMessage =
-        'Vui lòng hoàn tất xác nhận chia sẻ trên ứng dụng VNeID.';
+            'Vui lòng hoàn tất xác nhận chia sẻ trên ứng dụng VNeID.';
       });
     } catch (e) {
       logError('VNeID share-info error: $e');
@@ -153,11 +189,16 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
   }
 
   Future<void> _handleVneidCallback(VneidDeepLinkEvent event) async {
+    logInfo('==== VNeID CALLBACK HANDLER START ====');
+    logInfo('Callback event URI: ${event.uri}');
+    logInfo('Callback event data: ${event.data}');
+
     if (!mounted) return;
 
     final data = event.data;
 
     if (data == null) {
+      logWarning('VNeID callback data is null');
       setState(() {
         _screenMessage = 'Không nhận được kết quả hợp lệ từ VNeID.';
       });
@@ -168,7 +209,12 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
 
     final transitionCode = data.transactionCode.trim();
     final resultCode = data.result?.trim() ?? '';
+    logInfo('Parsed transitionCode: $transitionCode');
+    logInfo('Parsed resultCode: $resultCode');
     if (transitionCode.isEmpty || !const ['1', '2', '3'].contains(resultCode)) {
+      logWarning(
+        'Invalid VNeID callback: transitionCode=$transitionCode, resultCode=$resultCode',
+      );
       setState(() {
         _screenMessage = 'Không nhận được kết quả hợp lệ từ VNeID.';
       });
@@ -176,6 +222,10 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
       snackBarError('Không nhận được kết quả hợp lệ từ VNeID.');
       return;
     }
+
+    logInfo(
+      'VNeID callback validation passed, proceeding with resultCode=$resultCode',
+    );
 
     setState(() {
       _currentTransitionCode = transitionCode;
@@ -191,17 +241,10 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
         message: _resultLabel(resultCode),
       ),
     );
-    // await ApiRepository().upsertVneidSyncTicket(
-    //   VneidSyncTicket(
-    //     transactionCode: transitionCode,
-    //     result: resultCode,
-    //     status: null,
-    //     message: _resultLabel(resultCode),
-    //     createdAt: DateTime.now(),
-    //   ),
-    // );
+    logInfo('VNeID sync ticket upserted for transactionCode: $transitionCode');
 
     if (resultCode == '2') {
+      logInfo('VNeID resultCode=2 (user declined), showing message');
       setState(() {
         _screenMessage = 'Bạn chưa đồng ý chia sẻ thông tin từ VNeID.';
       });
@@ -211,8 +254,10 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
     }
 
     if (resultCode == '3') {
+      logInfo('VNeID resultCode=3 (expired), showing message');
       setState(() {
-        _screenMessage = 'Phiên chia sẻ thông tin đã hết hạn. Vui lòng thử lại.';
+        _screenMessage =
+            'Phiên chia sẻ thông tin đã hết hạn. Vui lòng thử lại.';
       });
 
       snackBarWarning('Phiên chia sẻ thông tin đã hết hạn.');
@@ -220,10 +265,14 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
     }
 
     // resultCode = 1
+    logInfo('VNeID resultCode=1 (success), calling _checkVneidStatus');
     await _checkVneidStatus(transitionCode);
   }
 
   Future<void> _checkVneidStatus(String transitionCode) async {
+    logInfo('==== VNeID CHECK STATUS START ====');
+    logInfo('Checking status for transactionCode: $transitionCode');
+
     if (_isCheckingStatus) return;
 
     setState(() {
@@ -232,8 +281,13 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
     });
 
     try {
+      logInfo('Calling ApiRepository.getVneidShareInfoStatus...');
       final response = await ApiRepository().getVneidShareInfoStatus(
         transitionCode,
+      );
+
+      logInfo(
+        'VNeID status API response: status=${response.status}, studentCode=${response.studentCode}, fullName=${response.fullName}, message=${response.message}',
       );
 
       if (!mounted) return;
@@ -251,6 +305,7 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
           message: response.message,
         ),
       );
+      logInfo('VNeID sync ticket updated with status: ${response.status}');
       setState(() {
         _currentStatus = response;
         _screenMessage = response.message?.trim().isNotEmpty == true
@@ -259,10 +314,13 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
       });
 
       if (status == 'SUCCESS') {
+        logInfo('VNeID status=SUCCESS, showing success message');
         snackBarSuccess('Đồng bộ thông tin thành công.');
       } else if (status == 'PENDING') {
+        logInfo('VNeID status=PENDING, showing warning');
         snackBarWarning('Phiếu đồng bộ đang được xử lý.');
       } else {
+        logWarning('VNeID status=$status (FAILED/OTHER), showing error');
         snackBarError(response.message ?? 'Đồng bộ thông tin thất bại.');
       }
     } catch (e) {
@@ -283,6 +341,7 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
           _isCheckingStatus = false;
         });
       }
+      logInfo('==== VNeID CHECK STATUS END ====');
     }
   }
 
@@ -419,7 +478,6 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
                       _buildStatusCard(_currentStatus!),
                     ],
                   ],
-
                 ),
               ),
             ),
@@ -438,9 +496,7 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: const Color(0xFFE5E7EB),
-        ),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.035),
@@ -482,15 +538,11 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
               ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(
-                  color: Color(0xFFE5E7EB),
-                ),
+                borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(
-                  color: Color(0xFFE5E7EB),
-                ),
+                borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
@@ -504,10 +556,7 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
           const SizedBox(height: 8),
           const Text(
             'Để trống nếu muốn dùng dữ liệu sinh viên thật trong app.',
-            style: TextStyle(
-              fontSize: 12,
-              color: Color(0xFF94A3B8),
-            ),
+            style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
           ),
         ],
       ),
@@ -521,9 +570,7 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
       decoration: BoxDecoration(
         color: const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: const Color(0xFFE5E7EB),
-        ),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.035),
@@ -617,9 +664,7 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: const Color(0xFFE5E7EB),
-        ),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.035),
@@ -636,14 +681,8 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
             title: 'Kết quả xác nhận từ VNeID',
           ),
           const SizedBox(height: 14),
-          _buildInfoRow(
-            'Mã giao dịch',
-            _currentTransitionCode ?? '',
-          ),
-          _buildInfoRow(
-            'Kết quả',
-            _resultLabel(_currentResultCode),
-          ),
+          _buildInfoRow('Mã giao dịch', _currentTransitionCode ?? ''),
+          _buildInfoRow('Kết quả', _resultLabel(_currentResultCode)),
         ],
       ),
     );
@@ -658,9 +697,7 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: const Color(0xFFE5E7EB),
-        ),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.035),
@@ -730,10 +767,7 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
     );
   }
 
-  Widget _buildSectionHeader({
-    required IconData icon,
-    required String title,
-  }) {
+  Widget _buildSectionHeader({required IconData icon, required String title}) {
     return Row(
       children: [
         Container(
@@ -743,11 +777,7 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
             color: const Color(0xFFF1F5F9),
             borderRadius: BorderRadius.circular(13),
           ),
-          child: Icon(
-            icon,
-            color: const Color(0xFF475569),
-            size: 21,
-          ),
+          child: Icon(icon, color: const Color(0xFF475569), size: 21),
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -766,10 +796,7 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
 
   Widget _buildStatusChip(String? status) {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 10,
-        vertical: 6,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: _statusBackgroundColor(status),
         borderRadius: BorderRadius.circular(999),
@@ -799,10 +826,7 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
             width: 105,
             child: Text(
               label,
-              style: const TextStyle(
-                color: Color(0xFF64748B),
-                fontSize: 13,
-              ),
+              style: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
             ),
           ),
           Expanded(
@@ -827,9 +851,7 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
       decoration: BoxDecoration(
         color: const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: const Color(0xFFE5E7EB),
-        ),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
       ),
       child: Text(
         message,
@@ -860,11 +882,7 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: const Border(
-          top: BorderSide(
-            color: Color(0xFFE5E7EB),
-          ),
-        ),
+        border: const Border(top: BorderSide(color: Color(0xFFE5E7EB))),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -904,17 +922,12 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       ),
                     ] else ...[
-                      const Icon(
-                        Icons.sync_rounded,
-                        size: 18,
-                      ),
+                      const Icon(Icons.sync_rounded, size: 18),
                     ],
                     const SizedBox(width: 8),
                     Text(
                       buttonText,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                      ),
+                      style: const TextStyle(fontWeight: FontWeight.w800),
                     ),
                   ],
                 ),

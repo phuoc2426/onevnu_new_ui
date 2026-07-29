@@ -1,10 +1,10 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:video_player/video_player.dart';
 import 'package:vnu_core/common/app_text_styles.dart';
 import 'package:vnu_core/modules/admission/controllers/applicant_auth_controller.dart';
-import 'package:vnu_core/modules/admission/views/register_screen.dart';
 import 'package:vnu_core/widgets/progress_hub_widget.dart';
 
 class ApplicantLoginScreen extends StatefulWidget {
@@ -113,8 +113,8 @@ class _ApplicantLoginScreenState extends State<ApplicantLoginScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  'Đây là màn hình đăng nhập dành cho thí sinh tuyển sinh. '
-                  'Sau khi trúng tuyển, bạn sẽ được cấp mật khẩu để sử dụng tất cả các chức năng của ứng dụng.',
+                  'Dành cho thí sinh đã có trong danh sách trúng tuyển. '
+                  'Sử dụng CCCD và số điện thoại đã đăng ký với nhà trường để đăng nhập.',
                   style: TextStyles.T14M.copyWith(
                     color: Colors.black87,
                     height: 1.5,
@@ -184,23 +184,28 @@ class _ApplicantLoginScreenState extends State<ApplicantLoginScreen> {
                   fillColor: Colors.white.withOpacity(0.9),
                 ),
                 keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(12),
+                ],
+                textInputAction: TextInputAction.next,
                 cursorColor: Colors.green,
               ),
               const SizedBox(height: 16),
 
-              // Ô Mật khẩu
+              // Số điện thoại đóng vai trò thông tin xác minh đăng nhập.
               TextField(
-                controller: controller.passwordController,
-                obscureText: true,
+                controller: controller.phoneNumberController,
                 style: const TextStyle(
                   color: Colors.black87,
                   fontWeight: FontWeight.w500,
                 ),
                 decoration: InputDecoration(
-                  labelText: 'Mật khẩu',
-                  labelStyle: TextStyle(color: Colors.black54),
+                  labelText: 'Số điện thoại',
+                  hintText: 'Số điện thoại đã đăng ký với trường',
+                  labelStyle: const TextStyle(color: Colors.black54),
                   prefixIcon: const Icon(
-                    Icons.lock_outline,
+                    Icons.phone_outlined,
                     color: Colors.black54,
                   ),
                   enabledBorder: OutlineInputBorder(
@@ -214,6 +219,10 @@ class _ApplicantLoginScreenState extends State<ApplicantLoginScreen> {
                   filled: true,
                   fillColor: Colors.white.withOpacity(0.9),
                 ),
+                keyboardType: TextInputType.phone,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => controller.login(),
                 cursorColor: Colors.green,
               ),
               const SizedBox(height: 24),
@@ -246,15 +255,13 @@ class _ApplicantLoginScreenState extends State<ApplicantLoginScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Đăng ký
-              TextButton(
-                onPressed: () => Get.to(() => const RegisterScreen()),
-                child: Text(
-                  'Chưa có mật khẩu? Đăng ký ngay',
-                  style: TextStyles.T14M.copyWith(
-                    color: Colors.green.shade700,
-                    fontWeight: FontWeight.w700,
-                  ),
+              Text(
+                'Không đăng nhập được? Hãy kiểm tra thông tin trong danh sách '
+                'trúng tuyển hoặc liên hệ bộ phận tuyển sinh của trường.',
+                textAlign: TextAlign.center,
+                style: TextStyles.T14M.copyWith(
+                  color: Colors.black54,
+                  height: 1.4,
                 ),
               ),
             ],

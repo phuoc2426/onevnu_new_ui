@@ -157,28 +157,31 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
   }
 
   Future<File> _compressImageToUploadStandard(File originalFile) async {
-    final originalSize = await originalFile.length();
-
-    if (originalSize <= _maxUploadBytes) {
-      return originalFile;
+    if (!await originalFile.exists()) {
+      throw Exception(
+        'Không tìm thấy ảnh ${p.basename(originalFile.path)} trên thiết bị.',
+      );
     }
 
-    final tempDir = await getTemporaryDirectory();
+    final Directory tempDir = await getTemporaryDirectory();
+    final int originalSize = await originalFile.length();
 
-    File currentFile = originalFile;
     int quality = _defaultImageQuality;
     int maxSide = _defaultMaxImageSide;
+    File? lastCompressedFile;
 
+    // Luôn chuẩn hóa mọi ảnh sang JPEG trước khi upload, kể cả ảnh gốc
+    // đã nhỏ hơn 5 MB. Điều này tránh gửi trực tiếp HEIC/PNG/WEBP lên API.
     while (quality >= _minImageQuality) {
-      final targetPath = p.join(
+      final String targetPath = p.join(
         tempDir.path,
-        'noi_tru_${DateTime
-            .now()
-            .microsecondsSinceEpoch}_q$quality.jpg',
+        'noi_tru_${DateTime.now().microsecondsSinceEpoch}'
+            '_q${quality}_${maxSide}px.jpg',
       );
 
-      final compressed = await FlutterImageCompress.compressAndGetFile(
-        currentFile.absolute.path,
+      final XFile? compressed =
+      await FlutterImageCompress.compressAndGetFile(
+        originalFile.absolute.path,
         targetPath,
         quality: quality,
         minWidth: maxSide,
@@ -188,14 +191,27 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
       );
 
       if (compressed == null) {
-        break;
+        throw Exception(
+          'Không thể xử lý ảnh ${p.basename(originalFile.path)}. '
+              'Vui lòng chọn ảnh JPG hoặc PNG khác.',
+        );
       }
 
-      currentFile = File(compressed.path);
+      lastCompressedFile = File(compressed.path);
+      final int compressedSize = await lastCompressedFile.length();
 
-      final compressedSize = await currentFile.length();
+      debugPrint(
+        '[DORMITORY-IMAGE-COMPRESS] '
+            'source=${p.basename(originalFile.path)}, '
+            'sourceBytes=$originalSize, '
+            'output=${p.basename(lastCompressedFile.path)}, '
+            'outputBytes=$compressedSize, '
+            'quality=$quality, '
+            'maxSide=$maxSide',
+      );
+
       if (compressedSize <= _maxUploadBytes) {
-        return currentFile;
+        return lastCompressedFile;
       }
 
       quality -= 8;
@@ -205,8 +221,14 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
       }
     }
 
-    await _validateImageSize(currentFile);
-    return currentFile;
+    if (lastCompressedFile == null) {
+      throw Exception(
+        'Không thể tạo ảnh tải lên từ ${p.basename(originalFile.path)}.',
+      );
+    }
+
+    await _validateImageSize(lastCompressedFile);
+    return lastCompressedFile;
   }
 
   Future<void> _loadApplicantCacheIfAvailable() async {
@@ -430,11 +452,26 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
 
       if (image == null) return;
 
-      File file = File(image.path);
+      final File originalFile = File(image.path);
+      final double originalSizeMb = await _fileSizeMb(originalFile);
 
-      file = await _compressImageToUploadStandard(file);
+      final File file =
+      await _compressImageToUploadStandard(originalFile);
 
       await _validateImageSize(file);
+
+      final double finalSizeMb = await _fileSizeMb(file);
+
+      debugPrint(
+        '[DORMITORY-IMAGE-READY] '
+            'slot=$uploadSlot, '
+            'source=${p.basename(originalFile.path)}, '
+            'sourceSize=${originalSizeMb.toStringAsFixed(2)}MB, '
+            'output=${p.basename(file.path)}, '
+            'extension=${p.extension(file.path).toLowerCase()}, '
+            'outputSize=${finalSizeMb.toStringAsFixed(2)}MB, '
+            'path=${file.path}',
+      );
 
       if (!mounted) return;
 
@@ -447,20 +484,6 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
           cubit.addProofFile(file);
         }
       });
-
-      final sizeMb = await _fileSizeMb(file);
-
-      if (!mounted) return;
-
-      // ScaffoldMessenger.of(context).showSnackBar(
-      //   SnackBar(
-      //     behavior: SnackBarBehavior.floating,
-      //     backgroundColor: const Color(0xFF078B3E),
-      //     content: Text(
-      //       'Đã chọn ảnh ${sizeMb.toStringAsFixed(2)}MB',
-      //     ),
-      //   ),
-      // );
     } catch (e) {
       if (!mounted) return;
 
@@ -765,8 +788,10 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
                       _buildField(
                         'Đối tượng ưu tiên',
                         TextEditingController(
-                            text: cubit.selectedPriorityObject?.name ??
-                                'Không'),
+                          text: cubit.selectedPriorityObjectNames.isEmpty
+                              ? 'Không'
+                              : cubit.selectedPriorityObjectNames,
+                        ),
                         readOnly: true,
                       ),
                     ],
@@ -987,42 +1012,48 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
     );
   }
 
-  void _showImagePreview(File file) {
-    showDialog(
+  Future<void> _showImagePreview(File file) async {
+    await showDialog<void>(
       context: context,
-      builder: (_) =>
-          Dialog(
-            insetPadding: const EdgeInsets.all(16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
+      barrierDismissible: true,
+      barrierColor: Colors.black87,
+      builder: (BuildContext dialogContext) {
+        return Dialog(
+          insetPadding: EdgeInsets.zero,
+          backgroundColor: Colors.black87,
+          child: SafeArea(
             child: Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: InteractiveViewer(
-                    child: Image.file(
-                      file,
-                      fit: BoxFit.contain,
+              children: <Widget>[
+                Positioned.fill(
+                  child: Center(
+                    child: InteractiveViewer(
+                      minScale: 0.8,
+                      maxScale: 5,
+                      child: Image.file(
+                        file,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => const Center(
+                          child: Text(
+                            'Không thể hiển thị ảnh',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
                 Positioned(
-                  top: 8,
-                  right: 8,
-                  child: GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Container(
-                      width: 32,
-                      height: 32,
-                      decoration: const BoxDecoration(
-                        color: Colors.black54,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
+                  top: 12,
+                  right: 12,
+                  child: Material(
+                    color: Colors.black54,
+                    shape: const CircleBorder(),
+                    child: IconButton(
+                      tooltip: 'Đóng',
+                      onPressed: () => Navigator.of(dialogContext).pop(),
+                      icon: const Icon(
                         Icons.close_rounded,
                         color: Colors.white,
-                        size: 20,
                       ),
                     ),
                   ),
@@ -1030,6 +1061,8 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
               ],
             ),
           ),
+        );
+      },
     );
   }
 

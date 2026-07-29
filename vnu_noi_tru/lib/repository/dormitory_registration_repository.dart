@@ -177,6 +177,53 @@ class DormitoryRegistrationRepository {
     return RegistrationHistoryResponse.fromJson(response.data ?? {});
   }
 
+  /// Ghi nhận hoặc hủy cờ yêu cầu đổi phòng/trả phòng.
+  /// API chỉ cập nhật accommodations.request_status, không tự đổi/trả phòng.
+  Future<Map<String, dynamic>> updateAccommodationRequestStatus({
+    required int registrationId,
+    required String type,
+    int? desiredRoomId,
+    String? note,
+  }) async {
+    const Set<String> allowedTypes = <String>{
+      'change_room',
+      'checkout',
+      'none',
+    };
+
+    if (!allowedTypes.contains(type)) {
+      throw ArgumentError.value(type, 'type', 'Loại yêu cầu không hợp lệ');
+    }
+
+    final String normalizedNote = note?.trim() ?? '';
+    if (normalizedNote.length > 500) {
+      throw ArgumentError('Lý do không được vượt quá 500 ký tự');
+    }
+
+    await _loadTokenIfNeeded();
+
+    final Map<String, dynamic> body = <String, dynamic>{
+      'type': type,
+    };
+
+    if (type == 'change_room' && desiredRoomId != null) {
+      body['desired_room_id'] = desiredRoomId;
+    }
+
+    if (normalizedNote.isNotEmpty) {
+      body['note'] = normalizedNote;
+    }
+
+    final Response<Map<String, dynamic>> response =
+        await _studentDio.post<Map<String, dynamic>>(
+      'dormitory/registrations/$registrationId/request-status',
+      data: body,
+      options: _jsonOptions(),
+    );
+
+    return response.data ?? <String, dynamic>{};
+  }
+
   Options _jsonOptions() {
     // Base headers for JSON requests. Include Authorization token if available.
     final headers = <String, String>{

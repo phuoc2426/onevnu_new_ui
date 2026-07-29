@@ -6,26 +6,34 @@ part 'admitted_student.g.dart';
 class AdmittedStudent {
   final int? id;
   final String cccd;
-  @JsonKey(name: 'full_name')
   final String fullName;
   final DateTime? dob;
-  @JsonKey(name: 'phone_number')
   final String? phoneNumber;
   final String? email;
-  @JsonKey(name: 'created_at')
+  final String? universityName;
+  final bool? isActive;
+  final int? mappedStudentId;
+  final DateTime? lastLoginAt;
   final DateTime? createdAt;
+  final DateTime? updatedAt;
 
-  AdmittedStudent({
+  const AdmittedStudent({
     this.id,
     required this.cccd,
     required this.fullName,
     this.dob,
     this.phoneNumber,
     this.email,
+    this.universityName,
+    this.isActive,
+    this.mappedStudentId,
+    this.lastLoginAt,
     this.createdAt,
+    this.updatedAt,
   });
 
   factory AdmittedStudent.fromJson(Map<String, dynamic> json) =>
       _$AdmittedStudentFromJson(json);
+
   Map<String, dynamic> toJson() => _$AdmittedStudentToJson(this);
 }

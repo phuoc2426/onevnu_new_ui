@@ -8,7 +8,7 @@ part 'dormitory_registration_api.g.dart';
 @RestApi()
 abstract class DormitoryRegistrationApi {
   factory DormitoryRegistrationApi(Dio dio, {String baseUrl}) =
-      _DormitoryRegistrationApi;
+  _DormitoryRegistrationApi;
 
   @GET('registration-periods')
   Future<RegistrationPeriodResponse> getRegistrationPeriods();
@@ -24,8 +24,8 @@ abstract class DormitoryRegistrationApi {
 
   @GET('/api/students/{studentCode}')
   Future<MyRegistrationResponse> getMyRegistrations(
-    @Path('studentCode') String studentCode,
-  );
+      @Path('studentCode') String studentCode,
+      );
 
   @GET('registrations/{id}')
   Future<SingleRegistrationResponse> getRegistrationDetail(@Path('id') int id);
@@ -33,21 +33,19 @@ abstract class DormitoryRegistrationApi {
   @POST('attachments/upload')
   @MultiPart()
   Future<UploadedAttachmentListResponse> uploadAttachment(
-    @Part(name: 'student_id') int studentId,
-    @Part(name: 'type') String type,
-    @Part(name: 'files[]') List<File> files,
-  );
+      @Part(name: 'student_id') int studentId,
+      @Part(name: 'type') String type,
+      @Part(name: 'files[]') List<File> files,
+      );
 
   @POST('registrations')
   Future<SingleRegistrationResponse> registerDormitory(
-    @Body() RegistrationPayloadModel payload,
-  );
+      @Body() RegistrationPayloadModel payload,
+      );
 
-  @POST('registrations/{id}/submit')
-  Future<dynamic> submitDraft(@Path('id') int id);
 
   @GET('registrations/{id}/histories')
   Future<RegistrationHistoryResponse> getRegistrationHistories(
-    @Path('id') int id,
-  );
+      @Path('id') int id,
+      );
 }

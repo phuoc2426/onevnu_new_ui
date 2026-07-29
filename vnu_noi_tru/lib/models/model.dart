@@ -14,6 +14,7 @@ export 'nt_file_da_up_load_model.dart';
 export 'nt_news_file_attach_model.dart';
 export 'nt_item_menu_model.dart';
 export 'nt_danh_sach_menu_model.dart';
+
 export 'dormitory_registration/registration_period_model.dart';
 export 'dormitory_registration/dormitory_model.dart';
 export 'dormitory_registration/room_type_model.dart';
@@ -22,3 +23,6 @@ export 'dormitory_registration/my_registration_model.dart';
 export 'dormitory_registration/registration_history_model.dart';
 export 'dormitory_registration/uploaded_attachment_model.dart';
 export 'dormitory_registration/registration_payload_model.dart';
+
+export 'dormitory_payment/dormitory_invoice_model.dart';
+export 'dormitory_payment/dormitory_payment_method_model.dart';
