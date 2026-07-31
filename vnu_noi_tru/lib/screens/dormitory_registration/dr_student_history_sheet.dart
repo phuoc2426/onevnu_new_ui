@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:vnu_core/common/app_text_styles.dart';
@@ -134,11 +132,11 @@ class DRStudentHistorySheet extends StatelessWidget {
                       const SizedBox(height: 10),
                       _buildRoommateSection(roommates),
                       const SizedBox(height: 10),
-                      _buildReceiptSection(receipts, accommodations),
+                      _buildReceiptSection(receipts),
                       const SizedBox(height: 10),
                       _buildIssueSection(issues),
                       const SizedBox(height: 10),
-                      _buildHistorySection(histories, accommodations),
+                      _buildHistorySection(histories),
                     ],
                   ),
                 ),
@@ -166,19 +164,9 @@ class DRStudentHistorySheet extends StatelessWidget {
         _groupTitle('Thông tin cơ bản'),
         ..._rows(<_DisplayEntry>[
           _entry(
-            'Mã sinh viên',
-            student,
-            const <String>['studentCode', 'student_code'],
-          ),
-          _entry(
             'Họ và tên',
             student,
             const <String>['fullName', 'full_name'],
-          ),
-          _entry(
-            'Ảnh thẻ',
-            student,
-            const <String>['avatar'],
           ),
           _entry(
             'Giới tính',
@@ -189,27 +177,15 @@ class DRStudentHistorySheet extends StatelessWidget {
           _dateEntry(
             'Ngày sinh',
             student,
-            const <String>['dob'],
+            const <String>['dob', 'dateOfBirth', 'date_of_birth'],
             dateOnly: true,
           ),
           _entry(
             'Điện thoại',
             student,
-            const <String>['phoneNumber', 'phone_number'],
+            const <String>['phoneNumber', 'phone_number', 'phone'],
           ),
           _entry('Email', student, const <String>['email']),
-          _entry(
-            'Loại cư trú',
-            student,
-            const <String>[
-              'residenceTypeLabel',
-              'residence_type_label',
-              'residenceType',
-              'residence_type',
-            ],
-            transform: _residenceLabel,
-          ),
-          _entry('Trạng thái', student, const <String>['status']),
         ]),
         const SizedBox(height: 12),
         _groupTitle('Giấy tờ và nhân thân'),
@@ -220,14 +196,10 @@ class DRStudentHistorySheet extends StatelessWidget {
             const <String>['identityType', 'identity_type'],
           ),
           _entry(
-            'Tên trên giấy tờ',
-            student,
-            const <String>['identityName', 'identity_name'],
-          ),
-          _entry(
             'Số giấy tờ',
             student,
             const <String>['identityNo', 'identity_no'],
+            transform: _maskIdentityNumber,
           ),
           _dateEntry(
             'Ngày cấp',
@@ -242,8 +214,11 @@ class DRStudentHistorySheet extends StatelessWidget {
           ),
           _entry('Dân tộc', student, const <String>['ethnicity']),
           _entry('Tôn giáo', student, const <String>['religion']),
-          _entry('Quốc gia', student, const <String>['country']),
-          _entry('Quốc tịch', student, const <String>['national']),
+          _entry(
+            'Quốc tịch',
+            student,
+            const <String>['nationality', 'national', 'country'],
+          ),
         ]),
         const SizedBox(height: 12),
         _groupTitle('Địa chỉ và thông tin lưu trú'),
@@ -251,12 +226,9 @@ class DRStudentHistorySheet extends StatelessWidget {
           _entry(
             'Thường trú',
             student,
-            const <String>['permanentAddress', 'permanent_address'],
-          ),
-          _entry(
-            'Thường trú VNeID',
-            student,
             const <String>[
+              'permanentAddress',
+              'permanent_address',
               'vneidPermanentAddress',
               'vneid_permanent_address',
             ],
@@ -269,12 +241,9 @@ class DRStudentHistorySheet extends StatelessWidget {
           _entry(
             'Tạm trú',
             student,
-            const <String>['temporaryAddress', 'temporary_address'],
-          ),
-          _entry(
-            'Tạm trú VNeID',
-            student,
             const <String>[
+              'temporaryAddress',
+              'temporary_address',
               'vneidTemporaryAddress',
               'vneid_temporary_address',
             ],
@@ -288,14 +257,36 @@ class DRStudentHistorySheet extends StatelessWidget {
         const SizedBox(height: 12),
         _groupTitle('Thông tin học tập'),
         ..._rows(<_DisplayEntry>[
-          _entry('Trường', student, const <String>['university']),
-          _entry('Lớp', student, const <String>['class']),
+          _entry(
+            'Trường',
+            student,
+            const <String>[
+              'universityName',
+              'university_name',
+              'university',
+            ],
+          ),
+          _entry(
+            'Lớp',
+            student,
+            const <String>['className', 'class_name', 'class'],
+          ),
           _entry('Khoa', student, const <String>['faculty']),
           _entry('Ngành', student, const <String>['major']),
           _entry(
             'Niên khóa',
             student,
             const <String>['academicYear', 'academic_year'],
+          ),
+          _entry(
+            'Hệ đào tạo',
+            student,
+            const <String>['educationSystem', 'education_system', 'system'],
+          ),
+          _entry(
+            'Bậc đào tạo',
+            student,
+            const <String>['educationLevel', 'education_level', 'level'],
           ),
         ]),
         if (familyMembers.isNotEmpty) ...<Widget>[
@@ -314,7 +305,11 @@ class DRStudentHistorySheet extends StatelessWidget {
     final Map<String, dynamic> member = _asMap(rawMember);
     final String relationship = _text(
       member,
-      const <String>['relationshipLabel', 'relationship_label', 'relationship'],
+      const <String>[
+        'relationshipLabel',
+        'relationship_label',
+        'relationship',
+      ],
     );
 
     return _itemContainer(
@@ -323,7 +318,11 @@ class DRStudentHistorySheet extends StatelessWidget {
         _entry(
           'Quan hệ',
           member,
-          const <String>['relationship', 'relationshipLabel'],
+          const <String>[
+            'relationshipLabel',
+            'relationship_label',
+            'relationship',
+          ],
           transform: _relationshipLabel,
         ),
         _entry(
@@ -340,7 +339,7 @@ class DRStudentHistorySheet extends StatelessWidget {
         _entry(
           'Điện thoại',
           member,
-          const <String>['phoneNumber', 'phone_number'],
+          const <String>['phoneNumber', 'phone_number', 'phone'],
         ),
       ]),
     );
@@ -356,44 +355,76 @@ class DRStudentHistorySheet extends StatelessWidget {
           ? <Widget>[_emptyText('Chưa có hồ sơ nội trú')]
           : values.asMap().entries.map((MapEntry<int, dynamic> item) {
               final Map<String, dynamic> value = _asMap(item.value);
-              final String dormitoryName = _text(
-                value,
-                const <String>['dormitory', 'dormitoryName', 'dormitory_name'],
-              );
               final String periodName = _text(
                 value,
                 const <String>[
                   'registrationPeriodName',
                   'registration_period_name',
-                  'periodName',
-                  'period_name',
                 ],
               );
-              final String statusLabel = _accommodationStatusLabel(value);
-              final List<String> titleParts = <String>[
-                dormitoryName,
-                periodName,
-              ].where((String part) => part.trim().isNotEmpty).toList();
-
-              final dynamic rawDraft = _firstValue(
+              final String dormitoryName = _text(
                 value,
-                const <String>['isDraft', 'is_draft'],
+                const <String>[
+                  'dormitoryName',
+                  'dormitory_name',
+                  'dormitory',
+                ],
               );
-              final String draftLabel = rawDraft == null
-                  ? ''
-                  : (_asBool(rawDraft) ? 'Bản nháp' : 'Đã gửi');
+              final String title = periodName.isNotEmpty
+                  ? periodName
+                  : dormitoryName.isNotEmpty
+                      ? dormitoryName
+                      : 'Hồ sơ nội trú ${item.key + 1}';
 
               return _itemContainer(
-                title: titleParts.isEmpty
-                    ? 'Hồ sơ nội trú ${item.key + 1}'
-                    : titleParts.join(' · '),
-                badge: statusLabel,
+                title: title,
+                badge: _statusText(
+                  _firstValue(
+                    value,
+                    const <String>[
+                      'statusLabel',
+                      'status_label',
+                      'status',
+                    ],
+                  ),
+                ),
                 children: _rows(<_DisplayEntry>[
-                  _DisplayEntry('Ký túc xá', dormitoryName),
-                  _DisplayEntry('Đợt đăng ký', periodName),
-                  _DisplayEntry('Trạng thái', statusLabel),
-                  _DisplayEntry('Loại hồ sơ', draftLabel),
-                  _entry('Tòa nhà', value, const <String>['building']),
+                  _entry(
+                    'Đợt đăng ký',
+                    value,
+                    const <String>[
+                      'registrationPeriodName',
+                      'registration_period_name',
+                    ],
+                  ),
+                  _entry(
+                    'Trạng thái',
+                    value,
+                    const <String>[
+                      'statusLabel',
+                      'status_label',
+                      'status',
+                    ],
+                    transform: _statusLabel,
+                  ),
+                  _entry(
+                    'Ký túc xá',
+                    value,
+                    const <String>[
+                      'dormitoryName',
+                      'dormitory_name',
+                      'dormitory',
+                    ],
+                  ),
+                  _entry(
+                    'Tòa nhà',
+                    value,
+                    const <String>[
+                      'buildingName',
+                      'building_name',
+                      'building',
+                    ],
+                  ),
                   _entry(
                     'Loại phòng',
                     value,
@@ -407,12 +438,23 @@ class DRStudentHistorySheet extends StatelessWidget {
                   _entry(
                     'Phòng được xếp',
                     value,
-                    const <String>['assignedRoom', 'assigned_room'],
+                    const <String>[
+                      'assignedRoom',
+                      'assigned_room',
+                      'roomNumber',
+                      'room_number',
+                      'room',
+                    ],
                   ),
                   _entry(
                     'Đối tượng ưu tiên',
                     value,
-                    const <String>['priorityObject', 'priority_object'],
+                    const <String>[
+                      'priorityObjectName',
+                      'priority_object_name',
+                      'priorityObject',
+                      'priority_object',
+                    ],
                   ),
                   _dateEntry(
                     'Bắt đầu lưu trú',
@@ -427,7 +469,7 @@ class DRStudentHistorySheet extends StatelessWidget {
                     dateOnly: true,
                   ),
                   _dateEntry(
-                    'Ngày tạo',
+                    'Ngày đăng ký',
                     value,
                     const <String>['createdAt', 'created_at'],
                   ),
@@ -453,20 +495,27 @@ class DRStudentHistorySheet extends StatelessWidget {
               final Map<String, dynamic> value = _asMap(item.value);
               final String name = _text(
                 value,
-                const <String>['studentName', 'student_name'],
+                const <String>[
+                  'studentName',
+                  'student_name',
+                  'fullName',
+                  'full_name',
+                  'student',
+                ],
               );
               return _itemContainer(
-                title: name.isEmpty ? 'Sinh viên ${item.key + 1}' : name,
+                title: name.isEmpty ? 'Bạn cùng phòng ${item.key + 1}' : name,
                 children: _rows(<_DisplayEntry>[
-                  _entry(
-                    'Mã sinh viên',
-                    value,
-                    const <String>['studentCode', 'student_code'],
-                  ),
                   _entry(
                     'Họ và tên',
                     value,
-                    const <String>['studentName', 'student_name'],
+                    const <String>[
+                      'studentName',
+                      'student_name',
+                      'fullName',
+                      'full_name',
+                      'student',
+                    ],
                   ),
                   _dateEntry(
                     'Bắt đầu ở',
@@ -480,10 +529,7 @@ class DRStudentHistorySheet extends StatelessWidget {
     );
   }
 
-  Widget _buildReceiptSection(
-    List<dynamic> values,
-    List<dynamic> accommodations,
-  ) {
+  Widget _buildReceiptSection(List<dynamic> values) {
     return _sectionCard(
       icon: Icons.receipt_long_rounded,
       title: 'Biên lai',
@@ -492,74 +538,80 @@ class DRStudentHistorySheet extends StatelessWidget {
           ? <Widget>[_emptyText('Chưa có biên lai')]
           : values.asMap().entries.map((MapEntry<int, dynamic> item) {
               final Map<String, dynamic> value = _asMap(item.value);
-              final Map<String, dynamic> accommodation =
-                  _findAccommodationForRecord(value, accommodations);
-              final String dormitoryName = _text(
-                accommodation,
-                const <String>['dormitory', 'dormitoryName', 'dormitory_name'],
+              final String kind = _text(
+                value,
+                const <String>['kindLabel', 'kind_label', 'kind'],
               );
-              final String periodName = _text(
-                accommodation,
+              final String period = _text(
+                value,
                 const <String>[
-                  'registrationPeriodName',
-                  'registration_period_name',
-                  'periodName',
-                  'period_name',
+                  'billingPeriodName',
+                  'billing_period_name',
                 ],
               );
-              final String kind = _receiptKindLabel(value);
-              final String statusLabel = _paymentStatusLabel(value);
-              final String dateRange = _dateRange(
-                _firstValue(value, const <String>['start_date', 'startDate']),
-                _firstValue(value, const <String>['end_date', 'endDate']),
-              );
-              final List<String> titleParts = <String>[
-                kind,
-                periodName,
-              ].where((String part) => part.trim().isNotEmpty).toList();
+              final String title = kind.isNotEmpty
+                  ? kind
+                  : period.isNotEmpty
+                      ? period
+                      : 'Biên lai ${item.key + 1}';
 
               return _itemContainer(
-                title: titleParts.isEmpty
-                    ? 'Khoản thu ${item.key + 1}'
-                    : titleParts.join(' · '),
-                badge: statusLabel,
+                title: title,
+                badge: _statusText(
+                  _firstValue(
+                    value,
+                    const <String>[
+                      'statusLabel',
+                      'status_label',
+                      'status',
+                    ],
+                  ),
+                ),
                 children: _rows(<_DisplayEntry>[
-                  _DisplayEntry('Ký túc xá', dormitoryName),
-                  _DisplayEntry('Đợt đăng ký', periodName),
-                  _DisplayEntry('Thời gian áp dụng', dateRange),
+                  _entry(
+                    'Kỳ thu',
+                    value,
+                    const <String>[
+                      'billingPeriodName',
+                      'billing_period_name',
+                    ],
+                  ),
+                  _entry(
+                    'Loại khoản thu',
+                    value,
+                    const <String>['kindLabel', 'kind_label', 'kind'],
+                    transform: _humanize,
+                  ),
                   _moneyEntry(
                     'Tổng tiền',
                     value,
-                    const <String>['total_amount', 'totalAmount'],
+                    const <String>['totalAmount', 'total_amount', 'amount'],
                   ),
-                  _DisplayEntry(
-                    'Loại khoản thu',
-                    kind,
+                  _entry(
+                    'Trạng thái',
+                    value,
+                    const <String>[
+                      'statusLabel',
+                      'status_label',
+                      'status',
+                    ],
+                    transform: _paymentStatusLabel,
                   ),
-                  _DisplayEntry(
-                    'Chiều giao dịch',
-                    _transactionDirectionLabel(value),
-                  ),
-                  _DisplayEntry('Trạng thái', statusLabel),
                   _dateEntry(
                     'Hạn thanh toán',
                     value,
-                    const <String>['due_date', 'dueDate'],
+                    const <String>['dueDate', 'due_date'],
+                    dateOnly: true,
                   ),
                   _dateEntry(
                     'Đã thanh toán lúc',
                     value,
-                    const <String>['paid_at', 'paidAt'],
+                    const <String>['paidAt', 'paid_at'],
                   ),
                   _dateEntry(
                     'Ngày tạo',
                     value,
-                    const <String>['created_at', 'createdAt'],
-                  ),
-                  _dateEntry(
-                    'Ngày cập nhật',
-                    value,
-                    const <String>['updated_at', 'updatedAt'],
+                    const <String>['createdAt', 'created_at'],
                   ),
                 ]),
               );
@@ -577,40 +629,73 @@ class DRStudentHistorySheet extends StatelessWidget {
           : values.asMap().entries.map((MapEntry<int, dynamic> item) {
               final Map<String, dynamic> value = _asMap(item.value);
               final String title = _text(value, const <String>['title']);
-              final String statusLabel = _issueSemanticLabel(
-                value,
-                const <String>['statusLabel', 'status_label'],
-                const <String>['status'],
-              );
-              final String typeLabel = _issueSemanticLabel(
-                value,
-                const <String>['typeLabel', 'type_label'],
-                const <String>['type'],
-              );
-              final String priorityLabel = _issueSemanticLabel(
-                value,
-                const <String>['priorityLabel', 'priority_label'],
-                const <String>['priority'],
-              );
-
               return _itemContainer(
-                title: title.isEmpty ? 'Sự cố ${item.key + 1}' : title,
-                badge: statusLabel,
+                title: title.isEmpty ? 'Phản ánh ${item.key + 1}' : title,
+                badge: _statusText(
+                  _firstValue(
+                    value,
+                    const <String>[
+                      'statusLabel',
+                      'status_label',
+                      'status',
+                    ],
+                  ),
+                ),
                 children: _rows(<_DisplayEntry>[
                   _entry('Tiêu đề', value, const <String>['title']),
-                  _entry('Nội dung', value, const <String>['description']),
-                  _DisplayEntry('Loại', typeLabel),
-                  _DisplayEntry('Mức ưu tiên', priorityLabel),
-                  _DisplayEntry('Trạng thái', statusLabel),
+                  _entry(
+                    'Nội dung',
+                    value,
+                    const <String>['description', 'content'],
+                  ),
+                  _entry(
+                    'Loại phản ánh',
+                    value,
+                    const <String>['typeLabel', 'type_label', 'type'],
+                    transform: _humanize,
+                  ),
+                  _entry(
+                    'Mức ưu tiên',
+                    value,
+                    const <String>[
+                      'priorityLabel',
+                      'priority_label',
+                      'priority',
+                    ],
+                    transform: _humanize,
+                  ),
+                  _entry(
+                    'Trạng thái',
+                    value,
+                    const <String>[
+                      'statusLabel',
+                      'status_label',
+                      'status',
+                    ],
+                    transform: _statusLabel,
+                  ),
+                  _entry(
+                    'Người xử lý',
+                    value,
+                    const <String>[
+                      'assignedToName',
+                      'assigned_to_name',
+                      'handlerName',
+                      'handler_name',
+                      'assignedTo',
+                      'assigned_to',
+                    ],
+                    hideNumericOnly: true,
+                  ),
                   _dateEntry(
                     'Ngày tạo',
                     value,
-                    const <String>['created_at', 'createdAt'],
+                    const <String>['createdAt', 'created_at'],
                   ),
                   _dateEntry(
-                    'Ngày cập nhật',
+                    'Cập nhật gần nhất',
                     value,
-                    const <String>['updated_at', 'updatedAt'],
+                    const <String>['updatedAt', 'updated_at'],
                   ),
                 ]),
               );
@@ -618,10 +703,7 @@ class DRStudentHistorySheet extends StatelessWidget {
     );
   }
 
-  Widget _buildHistorySection(
-    List<dynamic> values,
-    List<dynamic> accommodations,
-  ) {
+  Widget _buildHistorySection(List<dynamic> values) {
     final List<dynamic> sorted = List<dynamic>.from(values)
       ..sort((dynamic first, dynamic second) {
         final DateTime firstDate = _parseDate(
@@ -650,49 +732,11 @@ class DRStudentHistorySheet extends StatelessWidget {
           ? <Widget>[_emptyText('Chưa có lịch sử thay đổi')]
           : sorted.asMap().entries.map((MapEntry<int, dynamic> item) {
               final Map<String, dynamic> value = _asMap(item.value);
-              final Map<String, dynamic> accommodation =
-                  _findAccommodationForRecord(value, accommodations);
               final String action = _text(value, const <String>['action']);
               final String type = _text(value, const <String>['type']);
-              final String dormitoryName = _text(
-                accommodation,
-                const <String>['dormitory', 'dormitoryName', 'dormitory_name'],
-              );
-              final String periodName = _text(
-                accommodation,
-                const <String>[
-                  'registrationPeriodName',
-                  'registration_period_name',
-                  'periodName',
-                  'period_name',
-                ],
-              );
-              final String statusLabel = accommodation.isEmpty
-                  ? _registrationStatusLabel(
-                      _firstValue(
-                        value,
-                        const <String>['statusLabel', 'status_label', 'status'],
-                      ),
-                    )
-                  : _accommodationStatusLabel(accommodation);
-              final String performerName = _firstNonEmpty(<String>[
-                _text(
-                  value,
-                  const <String>[
-                    'performedByName',
-                    'performed_by_name',
-                    'performerName',
-                    'performer_name',
-                  ],
-                ),
-                _nestedText(value, 'performer', const <String>[
-                  'fullName',
-                  'full_name',
-                  'name',
-                  'username',
-                ]),
-              ]);
               final dynamic rawData = _firstValue(value, const <String>['data']);
+              final List<_DisplayEntry> eventDetails =
+                  _eventDetailEntries(rawData);
 
               return _itemContainer(
                 title: action.isNotEmpty
@@ -701,164 +745,143 @@ class DRStudentHistorySheet extends StatelessWidget {
                         ? _eventTypeLabel(type)
                         : 'Cập nhật hồ sơ',
                 badge: _formatDate(
-                  _firstValue(value, const <String>['created_at', 'createdAt']),
+                  _firstValue(
+                    value,
+                    const <String>['created_at', 'createdAt'],
+                  ),
                 ),
                 children: <Widget>[
                   ..._rows(<_DisplayEntry>[
-                    _DisplayEntry('Ký túc xá', dormitoryName),
-                    _DisplayEntry('Đợt đăng ký', periodName),
-                    _DisplayEntry('Trạng thái hồ sơ', statusLabel),
-                    _DisplayEntry('Loại sự kiện', _eventTypeLabel(type)),
-                    _DisplayEntry('Hành động', _actionLabel(action)),
-                    _DisplayEntry('Người thực hiện', performerName),
+                    _entry(
+                      'Loại sự kiện',
+                      value,
+                      const <String>['type'],
+                      transform: _eventTypeLabel,
+                    ),
+                    _entry(
+                      'Hành động',
+                      value,
+                      const <String>['action'],
+                      transform: _actionLabel,
+                    ),
+                    _entry(
+                      'Người thực hiện',
+                      value,
+                      const <String>[
+                        'performedByName',
+                        'performed_by_name',
+                        'performer',
+                        'performedBy',
+                        'performed_by',
+                      ],
+                      hideNumericOnly: true,
+                    ),
                     _entry('Ghi chú', value, const <String>['note']),
                     _dateEntry(
                       'Thời gian',
                       value,
                       const <String>['created_at', 'createdAt'],
                     ),
+                    ...eventDetails,
                   ]),
-                  if (rawData != null) ...<Widget>[
-                    const SizedBox(height: 8),
-                    _groupTitle('Dữ liệu thay đổi'),
-                    _buildDynamicData(
-                      rawData,
-                      accommodation: accommodation,
-                    ),
-                  ],
                 ],
               );
             }).toList(),
     );
   }
 
-  Widget _buildDynamicData(
-    dynamic value, {
-    int depth = 0,
-    Map<String, dynamic>? accommodation,
-  }) {
-    if (value == null) {
-      return _emptyText('Không có dữ liệu chi tiết');
+  List<_DisplayEntry> _eventDetailEntries(dynamic rawData) {
+    final Map<String, dynamic> value = _asMap(rawData);
+    if (value.isEmpty) {
+      return <_DisplayEntry>[];
     }
 
-    if (value is Map) {
-      if (value.isEmpty) return _emptyText('Không có dữ liệu chi tiết');
-      final List<MapEntry<dynamic, dynamic>> entries = value.entries
-          .where(
-            (MapEntry<dynamic, dynamic> item) =>
-                !_isTechnicalIdentifierKey(item.key.toString()),
-          )
-          .toList();
-      if (entries.isEmpty) {
-        return _emptyText('Không có thông tin nghiệp vụ cần hiển thị');
-      }
-
-      final List<Widget> widgets = <Widget>[];
-      for (final MapEntry<dynamic, dynamic> item in entries) {
-        final String key = item.key.toString();
-        final dynamic nested = item.value;
-        final bool complex = nested is Map || nested is List;
-        final String displayValue = complex
-            ? ''
-            : _displayDynamicFieldValue(
-                key,
-                nested,
-                accommodation: accommodation,
-              );
-        if (!complex && displayValue.trim().isEmpty) continue;
-
-        widgets.add(
-          Container(
-            width: double.infinity,
-            margin: const EdgeInsets.only(bottom: 7),
-            padding: const EdgeInsets.all(9),
-            decoration: BoxDecoration(
-              color: depth.isEven ? const Color(0xFFF7F9F8) : Colors.white,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: _borderColor),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  _dynamicFieldLabel(key),
-                  style: const TextStyle(
-                    fontSize: AppFontSizes.extraSmall,
-                    color: Color(0xFF6F756F),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                if (complex)
-                  _buildDynamicData(
-                    nested,
-                    depth: depth + 1,
-                    accommodation: accommodation,
-                  )
-                else
-                  SelectableText(
-                    displayValue,
-                    style: const TextStyle(
-                      fontSize: AppFontSizes.font11,
-                      color: Color(0xFF252A27),
-                      height: 1.35,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        );
-      }
-
-      return widgets.isEmpty
-          ? _emptyText('Không có thông tin nghiệp vụ cần hiển thị')
-          : Column(children: widgets);
-    }
-
-    if (value is List) {
-      if (value.isEmpty) return _emptyText('Danh sách trống');
-      return Column(
-        children: value.asMap().entries.map((MapEntry<int, dynamic> item) {
-          return Container(
-            width: double.infinity,
-            margin: const EdgeInsets.only(bottom: 7),
-            padding: const EdgeInsets.all(9),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF7F9F8),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: _borderColor),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  'Nội dung ${item.key + 1}',
-                  style: const TextStyle(
-                    fontSize: AppFontSizes.extraSmall,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF6F756F),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                _buildDynamicData(
-                  item.value,
-                  depth: depth + 1,
-                  accommodation: accommodation,
-                ),
-              ],
-            ),
-          );
-        }).toList(),
-      );
-    }
-
-    return SelectableText(
-      _displayValue(value),
-      style: const TextStyle(
-        fontSize: AppFontSizes.font11,
-        color: Color(0xFF252A27),
+    return <_DisplayEntry>[
+      _entry(
+        'Trạng thái hồ sơ',
+        value,
+        const <String>[
+          'statusLabel',
+          'status_label',
+          'newStatusLabel',
+          'new_status_label',
+          'toStatusLabel',
+          'to_status_label',
+          'status',
+          'newStatus',
+          'new_status',
+          'toStatus',
+          'to_status',
+        ],
+        transform: _statusLabel,
       ),
-    );
+      _entry(
+        'Ký túc xá',
+        value,
+        const <String>[
+          'dormitoryName',
+          'dormitory_name',
+          'dormitory',
+        ],
+      ),
+      _entry(
+        'Đợt đăng ký',
+        value,
+        const <String>[
+          'registrationPeriodName',
+          'registration_period_name',
+          'periodName',
+          'period_name',
+        ],
+      ),
+      _entry(
+        'Phòng',
+        value,
+        const <String>[
+          'assignedRoom',
+          'assigned_room',
+          'roomNumber',
+          'room_number',
+          'room',
+        ],
+      ),
+      _entry(
+        'Loại phòng',
+        value,
+        const <String>[
+          'roomTypeName',
+          'room_type_name',
+          'roomType',
+          'room_type',
+        ],
+      ),
+      _entry(
+        'Đối tượng ưu tiên',
+        value,
+        const <String>[
+          'priorityObjectName',
+          'priority_object_name',
+          'priorityObject',
+          'priority_object',
+        ],
+      ),
+      _entry(
+        'Trạng thái yêu cầu',
+        value,
+        const <String>[
+          'requestStatusLabel',
+          'request_status_label',
+          'requestStatus',
+          'request_status',
+        ],
+        transform: _requestStatusLabel,
+      ),
+      _entry(
+        'Lý do',
+        value,
+        const <String>['reason', 'reasonStay', 'reason_stay', 'message'],
+      ),
+    ];
   }
 
   Widget _sectionCard({
@@ -1068,9 +1091,15 @@ class DRStudentHistorySheet extends StatelessWidget {
     Map<String, dynamic> source,
     List<String> keys, {
     String Function(String value)? transform,
+    bool hideNumericOnly = false,
   }) {
     String value = _text(source, keys);
-    if (value.isNotEmpty && transform != null) value = transform(value);
+    if (hideNumericOnly && _isNumericText(value)) {
+      value = '';
+    }
+    if (value.isNotEmpty && transform != null) {
+      value = transform(value);
+    }
     return _DisplayEntry(label, value);
   }
 
@@ -1099,7 +1128,9 @@ class DRStudentHistorySheet extends StatelessWidget {
     final num? number = raw is num
         ? raw
         : num.tryParse(raw.toString().replaceAll(',', '').trim());
-    if (number == null) return _DisplayEntry(label, raw.toString());
+    if (number == null) {
+      return _DisplayEntry(label, '');
+    }
 
     return _DisplayEntry(
       label,
@@ -1112,32 +1143,92 @@ class DRStudentHistorySheet extends StatelessWidget {
   }
 
   static Map<String, dynamic> _asMap(dynamic value) {
-    if (value is Map<String, dynamic>) return value;
-    if (value is Map) return Map<String, dynamic>.from(value);
+    if (value is Map<String, dynamic>) {
+      return value;
+    }
+    if (value is Map) {
+      final Map<String, dynamic> result = <String, dynamic>{};
+      value.forEach((dynamic key, dynamic item) {
+        result[key.toString()] = item;
+      });
+      return result;
+    }
     return <String, dynamic>{};
   }
 
   static dynamic _firstValue(Map<String, dynamic> source, List<String> keys) {
     for (final String key in keys) {
-      if (!source.containsKey(key)) continue;
+      if (!source.containsKey(key)) {
+        continue;
+      }
       final dynamic value = source[key];
-      if (value == null) continue;
-      if (value is String && value.trim().isEmpty) continue;
+      if (value == null) {
+        continue;
+      }
+      if (value is String && value.trim().isEmpty) {
+        continue;
+      }
       return value;
     }
     return null;
   }
 
   static String _text(Map<String, dynamic> source, List<String> keys) {
-    final dynamic value = _firstValue(source, keys);
-    if (value == null) return '';
-    if (value is Map || value is List) {
-      try {
-        return const JsonEncoder.withIndent('  ').convert(value);
-      } catch (_) {
-        return value.toString();
-      }
+    return _friendlyValue(_firstValue(source, keys));
+  }
+
+  static String _friendlyValue(dynamic value) {
+    if (value == null) {
+      return '';
     }
+
+    if (value is Map) {
+      final Map<String, dynamic> map = _asMap(value);
+      const List<String> preferredKeys = <String>[
+        'label',
+        'name',
+        'fullName',
+        'full_name',
+        'displayName',
+        'display_name',
+        'title',
+        'roomNumber',
+        'room_number',
+        'statusLabel',
+        'status_label',
+        'kindLabel',
+        'kind_label',
+        'relationshipLabel',
+        'relationship_label',
+        'abbreviation',
+      ];
+
+      for (final String key in preferredKeys) {
+        final dynamic nested = map[key];
+        if (nested == null || identical(nested, value)) {
+          continue;
+        }
+        final String result = _friendlyValue(nested);
+        if (result.isNotEmpty && !_isNumericText(result)) {
+          return result;
+        }
+      }
+      return '';
+    }
+
+    if (value is Iterable && value is! String) {
+      final List<String> items = value
+          .map(_friendlyValue)
+          .where((String item) => item.isNotEmpty)
+          .toSet()
+          .toList();
+      return items.join(', ');
+    }
+
+    if (value is bool) {
+      return value ? 'Có' : 'Không';
+    }
+
     return value.toString().trim();
   }
 
@@ -1146,7 +1237,9 @@ class DRStudentHistorySheet extends StatelessWidget {
     List<String> keys,
   ) {
     final dynamic value = _firstValue(source, keys);
-    if (value is List) return List<dynamic>.from(value);
+    if (value is List) {
+      return List<dynamic>.from(value);
+    }
     if (value is Iterable && value is! String) {
       return List<dynamic>.from(value);
     }
@@ -1154,174 +1247,142 @@ class DRStudentHistorySheet extends StatelessWidget {
   }
 
   static DateTime? _parseDate(dynamic value) {
-    if (value == null) return null;
-    if (value is DateTime) return value;
+    if (value == null) {
+      return null;
+    }
+    if (value is DateTime) {
+      return value;
+    }
     return DateTime.tryParse(value.toString());
   }
 
   static String _formatDate(dynamic value, {bool dateOnly = false}) {
     final DateTime? date = _parseDate(value);
-    if (date == null) return value?.toString().trim() ?? '';
+    if (date == null) {
+      return '';
+    }
     return DateFormat(dateOnly ? 'dd/MM/yyyy' : 'dd/MM/yyyy HH:mm')
         .format(date.toLocal());
   }
 
-  static Map<String, dynamic> _findAccommodationForRecord(
-    Map<String, dynamic> record,
-    List<dynamic> accommodations,
-  ) {
-    final dynamic rawId = _firstValue(
-      record,
-      const <String>['accommodation_id', 'accommodationId'],
-    );
-    final String targetId = rawId?.toString().trim() ?? '';
-    if (targetId.isNotEmpty) {
-      for (final dynamic item in accommodations) {
-        final Map<String, dynamic> mapped = _asMap(item);
-        final String candidate =
-            _firstValue(mapped, const <String>['id'])?.toString().trim() ?? '';
-        if (candidate.isNotEmpty && candidate == targetId) return mapped;
-      }
+  static String _maskIdentityNumber(String value) {
+    final String normalized = value.replaceAll(RegExp(r'\s+'), '');
+    if (normalized.length <= 4) {
+      return normalized;
     }
-
-    if (accommodations.length == 1) return _asMap(accommodations.first);
-    return <String, dynamic>{};
+    return '•••• •••• ${normalized.substring(normalized.length - 4)}';
   }
 
-  static String _accommodationStatusLabel(Map<String, dynamic> value) {
-    final String explicit = _text(
-      value,
-      const <String>['statusLabel', 'status_label'],
-    );
-    if (explicit.isNotEmpty) return explicit;
-    return _registrationStatusLabel(
-      _firstValue(value, const <String>['status']),
-    );
+  static String _statusText(dynamic value) {
+    final String text = _friendlyValue(value);
+    return text.isEmpty ? '' : _statusLabel(text);
   }
 
-  static String _registrationStatusLabel(dynamic value) {
-    final String normalized = value?.toString().trim().toLowerCase() ?? '';
-    switch (normalized) {
-      case '0':
+  static String _statusLabel(String value) {
+    switch (value.trim().toLowerCase()) {
       case 'draft':
         return 'Bản nháp';
-      case '1':
       case 'pending':
+      case 'waiting':
       case 'submitted':
         return 'Chờ duyệt';
-      case '2':
       case 'approved':
         return 'Đã duyệt';
-      case '3':
+      case 'rejected':
+        return 'Từ chối';
       case 'assigned':
       case 'room_assigned':
         return 'Đã xếp phòng';
-      case '4':
       case 'active':
       case 'checked_in':
       case 'checkin':
         return 'Đang lưu trú';
-      case '5':
-      case 'rejected':
-        return 'Từ chối';
-      case '6':
       case 'checkout':
       case 'checked_out':
         return 'Đã trả phòng';
-      case '7':
-      case 'terminated':
       case 'cancelled':
       case 'canceled':
-        return 'Đã chấm dứt';
+        return 'Đã hủy';
+      case 'completed':
+      case 'success':
+        return 'Hoàn thành';
       default:
-        if (normalized.isEmpty || _isNumericText(normalized)) return '';
-        return _humanize(normalized);
+        return _humanize(value);
     }
   }
 
-  static String _paymentStatusLabel(Map<String, dynamic> value) {
-    final String explicit = _text(
-      value,
-      const <String>['statusLabel', 'status_label'],
-    );
-    if (explicit.isNotEmpty) return explicit;
-
-    final String normalized = _text(value, const <String>['status'])
-        .trim()
-        .toLowerCase();
-    switch (normalized) {
-      case 'paid':
-      case 'completed':
-      case 'success':
-        return 'Đã thanh toán';
+  static String _paymentStatusLabel(String value) {
+    switch (value.trim().toLowerCase()) {
       case 'pending':
       case 'waiting':
       case 'submitted':
         return 'Chờ xác nhận';
-      case 'overdue':
-        return 'Quá hạn';
-      case 'cancelled':
-      case 'canceled':
-        return 'Đã hủy';
+      case 'paid':
+      case 'completed':
+      case 'success':
+        return 'Đã thanh toán';
       case 'rejected':
-        return 'Bị từ chối';
+        return 'Minh chứng bị từ chối';
       case 'unpaid':
       case 'new':
         return 'Chưa thanh toán';
+      case 'overdue':
+        return 'Quá hạn';
       default:
-        if (normalized.isEmpty || _isNumericText(normalized)) return '';
-        return _humanize(normalized);
+        return _statusLabel(value);
     }
   }
 
-  static String _receiptKindLabel(Map<String, dynamic> value) {
-    final String explicit = _text(
-      value,
-      const <String>['kindLabel', 'kind_label', 'title'],
-    );
-    if (explicit.isNotEmpty) return explicit;
-    final String raw = _text(value, const <String>['kind']);
-    return raw.isEmpty || _isNumericText(raw) ? '' : _humanize(raw);
-  }
-
-  static String _transactionDirectionLabel(Map<String, dynamic> value) {
-    final String raw = _text(value, const <String>['direction'])
-        .trim()
-        .toLowerCase();
-    switch (raw) {
-      case 'in':
-      case 'income':
-      case 'debit':
-      case 'collect':
-      case 'collection':
-        return 'Khoản thu';
-      case 'out':
-      case 'expense':
-      case 'credit':
-      case 'refund':
-        return 'Hoàn trả / chi';
+  static String _requestStatusLabel(String value) {
+    switch (value.trim().toLowerCase()) {
+      case 'none':
+        return 'Không có yêu cầu';
+      case 'change_room':
+        return 'Yêu cầu chuyển phòng';
+      case 'checkout':
+        return 'Yêu cầu trả phòng';
+      case 'pending':
+        return 'Đang chờ xử lý';
+      case 'approved':
+        return 'Đã chấp thuận';
+      case 'rejected':
+        return 'Đã từ chối';
       default:
-        if (raw.isEmpty || _isNumericText(raw)) return '';
-        return _humanize(raw);
+        return _humanize(value);
     }
   }
 
-  static String _issueSemanticLabel(
-    Map<String, dynamic> value,
-    List<String> labelKeys,
-    List<String> rawKeys,
-  ) {
-    final String label = _text(value, labelKeys);
-    if (label.isNotEmpty) return label;
-    final String raw = _text(value, rawKeys);
-    if (raw.isEmpty || _isNumericText(raw)) return '';
-    return _humanize(raw);
+  static String _genderLabel(String value) {
+    switch (value.trim().toLowerCase()) {
+      case 'male':
+      case 'nam':
+        return 'Nam';
+      case 'female':
+      case 'nữ':
+      case 'nu':
+        return 'Nữ';
+      default:
+        return value;
+    }
+  }
+
+  static String _relationshipLabel(String value) {
+    switch (value.trim().toLowerCase()) {
+      case 'father':
+        return 'Bố';
+      case 'mother':
+        return 'Mẹ';
+      case 'guardian':
+        return 'Người giám hộ';
+      default:
+        return _humanize(value);
+    }
   }
 
   static String _actionLabel(String value) {
     switch (value.trim().toLowerCase()) {
       case 'submitted':
-        return 'Đã nộp hồ sơ đăng ký';
+        return 'Đã nộp hồ sơ';
       case 'approved':
         return 'Hồ sơ đã được duyệt';
       case 'rejected':
@@ -1341,7 +1402,7 @@ class DRStudentHistorySheet extends StatelessWidget {
       case 'canceled':
         return 'Hồ sơ đã bị hủy';
       default:
-        return value.trim().isEmpty ? '' : _humanize(value);
+        return _humanize(value);
     }
   }
 
@@ -1360,214 +1421,7 @@ class DRStudentHistorySheet extends StatelessWidget {
       case 'checkout':
         return 'Trả phòng';
       default:
-        return value.trim().isEmpty ? '' : _humanize(value);
-    }
-  }
-
-  static String _dateRange(dynamic start, dynamic end) {
-    final String startText = _formatDate(start, dateOnly: true);
-    final String endText = _formatDate(end, dateOnly: true);
-    if (startText.isNotEmpty && endText.isNotEmpty) {
-      return '$startText đến $endText';
-    }
-    return startText.isNotEmpty ? startText : endText;
-  }
-
-  static String _nestedText(
-    Map<String, dynamic> source,
-    String parentKey,
-    List<String> keys,
-  ) {
-    final dynamic nested = source[parentKey];
-    return _text(_asMap(nested), keys);
-  }
-
-  static String _firstNonEmpty(List<String> values) {
-    for (final String value in values) {
-      if (value.trim().isNotEmpty) return value.trim();
-    }
-    return '';
-  }
-
-  static bool _asBool(dynamic value) {
-    if (value is bool) return value;
-    if (value is num) return value != 0;
-    final String normalized = value?.toString().trim().toLowerCase() ?? '';
-    return normalized == 'true' || normalized == '1' || normalized == 'yes';
-  }
-
-  static bool _isNumericText(String value) {
-    return num.tryParse(value.trim()) != null;
-  }
-
-  static bool _isTechnicalIdentifierKey(String key) {
-    final String normalized = key
-        .replaceAllMapped(
-          RegExp(r'([a-z0-9])([A-Z])'),
-          (Match match) => '${match.group(1)}_${match.group(2)}',
-        )
-        .toLowerCase();
-
-    if (normalized == 'id' ||
-        normalized.endsWith('_id') ||
-        normalized.endsWith('_ids') ||
-        normalized.endsWith('_code') ||
-        normalized.endsWith('_codes')) {
-      return true;
-    }
-
-    return <String>{
-      'performed_by',
-      'approved_by',
-      'assigned_to',
-      'student_code',
-      'receipt_code',
-      'payment_code',
-      'trace_id',
-    }.contains(normalized);
-  }
-
-  static String _dynamicFieldLabel(String key) {
-    final String normalized = key
-        .replaceAllMapped(
-          RegExp(r'([a-z0-9])([A-Z])'),
-          (Match match) => '${match.group(1)}_${match.group(2)}',
-        )
-        .toLowerCase();
-    const Map<String, String> labels = <String, String>{
-      'dormitory': 'Ký túc xá',
-      'dormitory_name': 'Ký túc xá',
-      'registration_period_name': 'Đợt đăng ký',
-      'period_name': 'Đợt đăng ký',
-      'status': 'Trạng thái hồ sơ',
-      'status_label': 'Trạng thái hồ sơ',
-      'request_status': 'Trạng thái yêu cầu',
-      'room_type_name': 'Loại phòng',
-      'assigned_room': 'Phòng được xếp',
-      'priority_object': 'Đối tượng ưu tiên',
-      'priority_object_name': 'Đối tượng ưu tiên',
-      'start_date': 'Ngày bắt đầu',
-      'end_date': 'Ngày kết thúc',
-      'created_at': 'Ngày tạo',
-      'updated_at': 'Ngày cập nhật',
-      'approved_at': 'Ngày duyệt',
-      'assigned_at': 'Ngày xếp phòng',
-      'checkin_at': 'Ngày nhận phòng',
-      'checkout_at': 'Ngày trả phòng',
-      'reason_stay': 'Lý do lưu trú',
-      'note': 'Ghi chú',
-      'is_draft': 'Loại hồ sơ',
-      'is_room_leader': 'Trưởng phòng',
-    };
-    return labels[normalized] ?? _humanize(normalized);
-  }
-
-  static String _displayDynamicFieldValue(
-    String key,
-    dynamic value, {
-    Map<String, dynamic>? accommodation,
-  }) {
-    final String normalized = key
-        .replaceAllMapped(
-          RegExp(r'([a-z0-9])([A-Z])'),
-          (Match match) => '${match.group(1)}_${match.group(2)}',
-        )
-        .toLowerCase();
-
-    if (normalized == 'status' || normalized == 'status_label') {
-      final String fromAccommodation = accommodation == null
-          ? ''
-          : _accommodationStatusLabel(accommodation);
-      return fromAccommodation.isNotEmpty
-          ? fromAccommodation
-          : _registrationStatusLabel(value);
-    }
-    if (normalized == 'request_status') {
-      final String raw = value?.toString().trim().toLowerCase() ?? '';
-      switch (raw) {
-        case '0':
-        case 'none':
-          return 'Không có yêu cầu';
-        case '1':
-        case 'pending':
-          return 'Đang chờ xử lý';
-        case '2':
-        case 'approved':
-          return 'Đã chấp thuận';
-        case '3':
-        case 'rejected':
-          return 'Từ chối';
-        case 'change_room':
-          return 'Yêu cầu chuyển phòng';
-        case 'checkout':
-          return 'Yêu cầu trả phòng';
-        default:
-          return raw.isEmpty || _isNumericText(raw) ? '' : _humanize(raw);
-      }
-    }
-    if (normalized == 'is_draft') {
-      return _asBool(value) ? 'Bản nháp' : 'Đã gửi';
-    }
-    if (normalized.startsWith('is_')) return _asBool(value) ? 'Có' : 'Không';
-    if (normalized.endsWith('_date') ||
-        normalized.endsWith('_at') ||
-        normalized == 'start_date' ||
-        normalized == 'end_date') {
-      return _formatDate(value);
-    }
-    return _displayValue(value);
-  }
-
-  static String _displayValue(dynamic value) {
-    if (value == null) return '—';
-    if (value is bool) return value ? 'Có' : 'Không';
-    final DateTime? date = _parseDate(value);
-    if (date != null && value.toString().contains(RegExp(r'[-T:]'))) {
-      return DateFormat('dd/MM/yyyy HH:mm').format(date.toLocal());
-    }
-    return value.toString();
-  }
-
-  static String _boolLabel(String value) {
-    final String normalized = value.trim().toLowerCase();
-    return normalized == 'true' || normalized == '1' ? 'Có' : 'Không';
-  }
-
-  static String _genderLabel(String value) {
-    switch (value.trim().toLowerCase()) {
-      case 'male':
-      case 'nam':
-        return 'Nam';
-      case 'female':
-      case 'nữ':
-      case 'nu':
-        return 'Nữ';
-      default:
-        return value;
-    }
-  }
-
-  static String _residenceLabel(String value) {
-    switch (value.trim().toLowerCase()) {
-      case 'noi_tru':
-        return 'Nội trú';
-      case 'ngoai_tru':
-        return 'Ngoại trú';
-      default:
-        return value;
-    }
-  }
-
-  static String _relationshipLabel(String value) {
-    switch (value.trim().toLowerCase()) {
-      case 'father':
-        return 'Bố';
-      case 'mother':
-        return 'Mẹ';
-      case 'guardian':
-        return 'Người giám hộ';
-      default:
-        return value;
+        return _humanize(value);
     }
   }
 
@@ -1580,8 +1434,14 @@ class DRStudentHistorySheet extends StatelessWidget {
         .replaceAll('_', ' ')
         .replaceAll('-', ' ')
         .trim();
-    if (normalized.isEmpty) return value;
+    if (normalized.isEmpty) {
+      return value;
+    }
     return normalized[0].toUpperCase() + normalized.substring(1);
+  }
+
+  static bool _isNumericText(String value) {
+    return value.trim().isNotEmpty && num.tryParse(value.trim()) != null;
   }
 }
 

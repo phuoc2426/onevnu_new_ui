@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:vnu_core/themes/app_theme.dart';
@@ -1098,10 +1096,51 @@ class _DRHistoryBottomSheetState extends State<DRHistoryBottomSheet> {
   }
 
   String _displayDynamicValue(dynamic value) {
-    if (value is Map || value is List) {
-      return const JsonEncoder.withIndent('  ').convert(value);
+    if (value == null) return '';
+
+    if (value is Map) {
+      final Map<String, dynamic> map = <String, dynamic>{};
+      value.forEach((dynamic key, dynamic item) {
+        map[key.toString()] = item;
+      });
+      const List<String> preferredKeys = <String>[
+        'label',
+        'name',
+        'fullName',
+        'full_name',
+        'displayName',
+        'display_name',
+        'title',
+        'roomNumber',
+        'room_number',
+        'statusLabel',
+        'status_label',
+        'kindLabel',
+        'kind_label',
+        'abbreviation',
+      ];
+
+      for (final String key in preferredKeys) {
+        final dynamic nested = map[key];
+        if (nested == null || identical(nested, value)) continue;
+        final String text = _displayDynamicValue(nested).trim();
+        if (text.isNotEmpty && !_isNumericText(text)) return text;
+      }
+
+      // Không hiển thị map dưới dạng JSON/toString vì đây là giao diện người dùng.
+      return '';
     }
-    return value.toString();
+
+    if (value is Iterable && value is! String) {
+      return value
+          .map(_displayDynamicValue)
+          .where((String item) => item.trim().isNotEmpty)
+          .toSet()
+          .join(', ');
+    }
+
+    if (value is bool) return value ? 'Có' : 'Không';
+    return value.toString().trim();
   }
 
   String _fieldLabel(String key) {
@@ -1127,7 +1166,7 @@ class _DRHistoryBottomSheetState extends State<DRHistoryBottomSheet> {
   String _firstText(List<dynamic> values) {
     for (final dynamic value in values) {
       if (value == null) continue;
-      final String text = value.toString().trim();
+      final String text = _displayDynamicValue(value).trim();
       if (text.isEmpty || _isNumericText(text)) continue;
       return text;
     }

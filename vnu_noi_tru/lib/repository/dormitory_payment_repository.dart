@@ -1,6 +1,8 @@
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
+import 'package:http_parser/http_parser.dart';
 import 'package:path/path.dart' as path;
 import 'package:vnu_core/services/dio_options.dart';
 import 'package:vnu_noi_tru/models/dormitory_payment/dormitory_invoice_model.dart';
@@ -117,32 +119,62 @@ class DormitoryPaymentRepository {
       throw ArgumentError('Ghi chú không được vượt quá 500 ký tự');
     }
 
+    final int proofSize = await proofImage.length();
+    final String uploadFileName =
+        'payment_proof_${DateTime.now().millisecondsSinceEpoch}.jpg';
+
+    debugPrint(
+      '[PAYMENT-PROOF-UPLOAD] '
+      'platform=${Platform.operatingSystem}, '
+      'source=${path.basename(proofImage.path)}, '
+      'uploadName=$uploadFileName, '
+      'bytes=$proofSize, '
+      'receipt=$normalizedReceiptId',
+    );
+
     final FormData formData = FormData.fromMap(
       <String, dynamic>{
         'proof_image': await MultipartFile.fromFile(
           proofImage.path,
-          filename: path.basename(proofImage.path),
+          filename: uploadFileName,
+          contentType: MediaType('image', 'jpeg'),
         ),
         if (normalizedNote != null && normalizedNote.isNotEmpty)
           'note': normalizedNote,
       },
     );
 
-    final Response<Map<String, dynamic>> response =
-        await _dio.post<Map<String, dynamic>>(
-      'students/$encodedIdentityNo'
-      '/receipts/$encodedReceiptId'
-      '/payment-proof',
-      data: formData,
-      onSendProgress: onSendProgress,
-      options: Options(
-        headers: <String, dynamic>{
-          'Accept': 'application/json',
-        },
-        contentType: Headers.multipartFormDataContentType,
-      ),
-    );
+    try {
+      final Response<Map<String, dynamic>> response =
+          await _dio.post<Map<String, dynamic>>(
+        'students/$encodedIdentityNo'
+        '/receipts/$encodedReceiptId'
+        '/payment-proof',
+        data: formData,
+        onSendProgress: onSendProgress,
+        options: Options(
+          headers: <String, dynamic>{
+            'Accept': 'application/json',
+          },
+          contentType: Headers.multipartFormDataContentType,
+        ),
+      );
 
-    return response.data ?? const <String, dynamic>{};
+      debugPrint(
+        '[PAYMENT-PROOF-UPLOAD-SUCCESS] '
+        'status=${response.statusCode}, receipt=$normalizedReceiptId',
+      );
+
+      return response.data ?? const <String, dynamic>{};
+    } on DioException catch (error) {
+      debugPrint(
+        '[PAYMENT-PROOF-UPLOAD-ERROR] '
+        'type=${error.type}, '
+        'status=${error.response?.statusCode}, '
+        'message=${error.message}, '
+        'response=${error.response?.data}',
+      );
+      rethrow;
+    }
   }
 }

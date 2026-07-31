@@ -13,6 +13,7 @@ import 'package:vnu_core/widgets/vcore_module_scaffold.dart';
 import 'package:vnu_noi_tru/cubit/dormitory_payment_cubit.dart';
 import 'package:vnu_noi_tru/models/dormitory_payment/dormitory_invoice_model.dart';
 import 'package:vnu_noi_tru/models/dormitory_payment/dormitory_payment_method_model.dart';
+import 'package:vnu_noi_tru/utils/dormitory_image_upload_util.dart';
 
 class DRInvoicesScreen extends StatefulWidget {
   final String identityNo;
@@ -44,6 +45,7 @@ class _DRInvoicesScreenState extends State<DRInvoicesScreen> {
   final DormitoryPaymentCubit _cubit = DormitoryPaymentCubit();
 
   final ImagePicker _imagePicker = ImagePicker();
+  bool _isPickingPaymentProof = false;
 
   final NumberFormat _currencyFormatter = NumberFormat('#,###', 'vi_VN');
 
@@ -1337,22 +1339,33 @@ class _DRInvoicesScreenState extends State<DRInvoicesScreen> {
       return;
     }
 
+    if (_isPickingPaymentProof) {
+      return;
+    }
+
+    _isPickingPaymentProof = true;
+    File? originalFile;
+    File? normalizedProofFile;
+
     try {
       final XFile? selectedImage = await _imagePicker.pickImage(
         source: ImageSource.gallery,
-        imageQuality: 85,
-        maxWidth: 1800,
-        maxHeight: 1800,
+        // Chỉ giảm sơ bộ khi chọn ảnh. Bước chuẩn hóa JPEG phía dưới mới là
+        // bước bắt buộc cho cả Android và iOS, đặc biệt với HEIC/HEIF trên iOS.
+        imageQuality: 100,
       );
 
       if (selectedImage == null) {
         return;
       }
 
-      final File proofFile = File(selectedImage.path);
+      final File selectedFile = File(selectedImage.path);
+      originalFile = selectedFile;
+      final File preparedProofFile =
+          await DormitoryImageUploadUtil.normalizeToJpeg(selectedFile);
+      normalizedProofFile = preparedProofFile;
 
-      final int fileSize = await proofFile.length();
-
+      final int fileSize = await preparedProofFile.length();
       if (fileSize > _maxProofSizeBytes) {
         _showError(
           'Ảnh minh chứng không được vượt quá '
@@ -1366,7 +1379,7 @@ class _DRInvoicesScreenState extends State<DRInvoicesScreen> {
       }
 
       final PaymentProofConfirmResult? confirmResult =
-          await _showProofConfirmDialog(proofFile);
+          await _showProofConfirmDialog(preparedProofFile);
 
       if (confirmResult == null || !confirmResult.confirmed) {
         return;
@@ -1375,12 +1388,20 @@ class _DRInvoicesScreenState extends State<DRInvoicesScreen> {
       await _cubit.uploadProof(
         identityNo: widget.identityNo,
         receiptId: invoice.id!,
-        proofImage: proofFile,
+        proofImage: preparedProofFile,
         note: confirmResult.note,
         dormitoryId: widget.dormitoryId,
       );
     } catch (error) {
-      _showError(error.toString().replaceFirst('Exception: ', ''));
+      if (mounted) {
+        _showError(error.toString().replaceFirst('Exception: ', ''));
+      }
+    } finally {
+      _isPickingPaymentProof = false;
+      await DormitoryImageUploadUtil.deleteTemporaryFile(
+        normalizedFile: normalizedProofFile,
+        originalFile: originalFile,
+      );
     }
   }
 
