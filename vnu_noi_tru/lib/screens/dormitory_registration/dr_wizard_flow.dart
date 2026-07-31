@@ -79,6 +79,11 @@ class _DRWizardFlowState extends State<DRWizardFlow> {
         return;
       }
 
+      if (_cubit.avatarFile == null) {
+        _showSnackbarError('Vui lòng tải lên ảnh thẻ sinh viên');
+        return;
+      }
+
       if (_cubit.cccdFrontFile == null && _cubit.cccdFrontAttachment == null) {
         _showSnackbarError('Vui lòng tải lên CCCD mặt trước');
         return;

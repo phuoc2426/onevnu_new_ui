@@ -75,6 +75,19 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
   String? tempTemporaryAddress;
   String? tempReason;
   String? tempDOB;
+  String? tempGender;
+  String? tempEthnicity;
+  String? tempReligion;
+  String? tempContactAddress;
+  String? tempIdentityIssuePlace;
+  String? tempFaculty;
+
+  /// Ảnh thẻ được upload riêng qua API dùng chung với type=AVATAR.
+  File? avatarFile;
+  bool avatarUploaded = false;
+
+  /// Danh sách bố/mẹ/người giám hộ của sinh viên.
+  final List<FamilyMemberPayload> familyMembers = <FamilyMemberPayload>[];
 
   /// 1: Kỳ 1, 2: Kỳ 2, 3: Hè, 4: Giữa kỳ, 5: Khác.
   int selectedTermType = 1;
@@ -510,9 +523,15 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
             ? null
             : selectedPriorityObjectNames,
         temporaryAddress: tempTemporaryAddress ?? '',
-        gender: 'male', // có thể thêm radio giới tính sau, tạm để male
+        contactAddress: tempContactAddress,
+        identityIssuePlace: tempIdentityIssuePlace,
+        faculty: tempFaculty,
+        gender: tempGender ?? 'male',
+        ethnicity: tempEthnicity,
+        religion: tempReligion,
         phone: phone,
         email: email,
+        familyMembers: List<FamilyMemberPayload>.unmodifiable(familyMembers),
       );
     }
     if (student == null) {
@@ -690,10 +709,53 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
               : currentAddress.isNotEmpty
               ? currentAddress
               : contactAddress),
-      gender: _mapGender(student.gioiTinh),
+      contactAddress: tempContactAddress ?? contactAddress,
+      identityIssuePlace: tempIdentityIssuePlace,
+      faculty: tempFaculty,
+      gender: tempGender ?? _mapGender(student.gioiTinh),
+      ethnicity: tempEthnicity,
+      religion: tempReligion,
       phone: tempPhone ?? student.mobile ?? student.tel ?? '',
       email: tempEmail ?? student.email ?? student.emailKhac ?? '',
+      familyMembers: List<FamilyMemberPayload>.unmodifiable(familyMembers),
     );
+  }
+
+  String _uploadErrorMessage(Object error) {
+    if (error is DioException) {
+      final dynamic responseData = error.response?.data;
+
+      if (responseData is Map) {
+        final dynamic rawErrors = responseData['errors'];
+        if (rawErrors is Map && rawErrors.isNotEmpty) {
+          final List<String> messages = <String>[];
+          rawErrors.forEach((dynamic key, dynamic value) {
+            if (value is Iterable) {
+              for (final dynamic item in value) {
+                final String text = item?.toString().trim() ?? '';
+                if (text.isNotEmpty) messages.add(text);
+              }
+            } else {
+              final String text = value?.toString().trim() ?? '';
+              if (text.isNotEmpty) messages.add(text);
+            }
+          });
+
+          if (messages.isNotEmpty) {
+            return messages.toSet().join('\n');
+          }
+        }
+
+        final String message =
+            responseData['message']?.toString().trim() ?? '';
+        if (message.isNotEmpty) return message;
+      }
+
+      final String dioMessage = error.message?.trim() ?? '';
+      if (dioMessage.isNotEmpty) return dioMessage;
+    }
+
+    return error.toString().replaceFirst('Exception: ', '');
   }
 
   void clearWizardData() {
@@ -720,6 +782,15 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
     tempHometown = null;
     tempTemporaryAddress = null;
     tempReason = null;
+    tempGender = null;
+    tempEthnicity = null;
+    tempReligion = null;
+    tempContactAddress = null;
+    tempIdentityIssuePlace = null;
+    tempFaculty = null;
+    avatarFile = null;
+    avatarUploaded = false;
+    familyMembers.clear();
   }
 
   /// Lấy đợt đăng ký active mới nhất của KTX và tự động chọn đợt đó.
@@ -958,7 +1029,7 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
     } catch (e) {
       logError(e.toString());
       emit(DormitoryRegistrationDismissHub());
-      emit(DormitoryRegistrationUploadError(e.toString()));
+      emit(DormitoryRegistrationUploadError(_uploadErrorMessage(e)));
     }
   }
 
@@ -984,7 +1055,7 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
     } catch (e) {
       logError(e.toString());
       emit(DormitoryRegistrationDismissHub());
-      emit(DormitoryRegistrationUploadError(e.toString()));
+      emit(DormitoryRegistrationUploadError(_uploadErrorMessage(e)));
     }
   }
 
@@ -1010,7 +1081,7 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
     } catch (e) {
       logError(e.toString());
       emit(DormitoryRegistrationDismissHub());
-      emit(DormitoryRegistrationUploadError(e.toString()));
+      emit(DormitoryRegistrationUploadError(_uploadErrorMessage(e)));
     }
   }
 
@@ -1048,6 +1119,25 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
       emit(DormitoryRegistrationDismissHub());
       emit(DormitoryRegistrationError(e.toString()));
     }
+  }
+
+  void selectAvatar(File file) {
+    avatarFile = file;
+    avatarUploaded = false;
+    emit(DormitoryRegistrationFileSelected('avatar', file));
+  }
+
+  void removeAvatar() {
+    avatarFile = null;
+    avatarUploaded = false;
+    emit(DormitoryRegistrationFileChanged('avatar_removed'));
+  }
+
+  void replaceFamilyMembers(List<FamilyMemberPayload> values) {
+    familyMembers
+      ..clear()
+      ..addAll(values);
+    emit(DormitoryRegistrationFileChanged('family_members_changed'));
   }
 
   void selectCCCDFront(File file) {
@@ -1114,6 +1204,8 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
   }
 
   void clearAllSelectedFiles() {
+    avatarFile = null;
+    avatarUploaded = false;
     cccdFrontFile = null;
     cccdBackFile = null;
     cccdFrontAttachment = null;
@@ -1126,20 +1218,49 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
 
   Future<bool> uploadCachedFiles() async {
     int totalSteps = 0;
+    if (avatarFile != null && !avatarUploaded) totalSteps++;
     if (cccdFrontFile != null) totalSteps++;
     if (cccdBackFile != null) totalSteps++;
     if (proofFiles.isNotEmpty) totalSteps++;
 
-    // emit(DormitoryRegistrationShowHub());
-    if (totalSteps == 0) {
-      // emit(DormitoryRegistrationUploadProgress(1.0, "Đang xử lý hồ sơ..."));
-    }
-
     try {
-      final studentPayload = await _buildStudentPayload();
+      final RegistrationStudentPayload studentPayload =
+          await _buildStudentPayload();
       int currentStep = 0;
 
-      // 1. Upload CCCD mặt trước
+      // 1. Upload ảnh thẻ bằng API dùng chung:
+      // type=AVATAR và files[]. Không gửi avatar trong request đăng ký.
+      if (avatarFile != null && !avatarUploaded) {
+        emit(
+          DormitoryRegistrationUploadProgress(
+            totalSteps == 0 ? 0 : currentStep / totalSteps,
+            'Đang tải lên ảnh thẻ sinh viên...',
+          ),
+        );
+
+        final UploadedAttachmentListResponse response =
+            await _repository.uploadAvatar(
+          student: studentPayload,
+          file: avatarFile!,
+        );
+
+        if (response.success != true &&
+            (response.data == null || response.data!.isEmpty)) {
+          throw Exception('Không tải được ảnh thẻ sinh viên');
+        }
+
+        avatarUploaded = true;
+        currentStep++;
+
+        emit(
+          DormitoryRegistrationUploadProgress(
+            totalSteps == 0 ? 1 : currentStep / totalSteps,
+            'Đã tải lên ảnh thẻ sinh viên',
+          ),
+        );
+      }
+
+      // 2. Upload CCCD mặt trước
       if (cccdFrontFile != null) {
         emit(
           DormitoryRegistrationUploadProgress(
@@ -1168,7 +1289,7 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
         }
       }
 
-      // 2. Upload CCCD mặt sau
+      // 3. Upload CCCD mặt sau
       if (cccdBackFile != null) {
         emit(
           DormitoryRegistrationUploadProgress(
@@ -1197,7 +1318,7 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
         }
       }
 
-      // 3. Upload từng giấy tờ ưu tiên, không gom nhiều ảnh vào một request
+      // 4. Upload từng giấy tờ ưu tiên, không gom nhiều ảnh vào một request
       if (proofFiles.isNotEmpty) {
         final filesToUpload = List<File>.from(proofFiles);
 
@@ -1243,7 +1364,7 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
     } catch (e) {
       logError(e.toString());
       emit(DormitoryRegistrationDismissHub());
-      emit(DormitoryRegistrationUploadError(e.toString()));
+      emit(DormitoryRegistrationUploadError(_uploadErrorMessage(e)));
       return false;
     }
   }

@@ -23,7 +23,7 @@ class DormitoryPaymentCubit extends Cubit<DormitoryPaymentState> {
 
   Future<void> loadData({
     required String identityNo,
-    required int dormitoryId,
+    int? dormitoryId,
   }) async {
     if (isClosed) {
       return;
@@ -47,19 +47,25 @@ class DormitoryPaymentCubit extends Cubit<DormitoryPaymentState> {
         }
       }
 
-      try {
-        final DormitoryPaymentMethodResponse response =
-            await _repository.getPaymentMethods(
-          dormitoryId: dormitoryId,
-        );
+      if (dormitoryId != null && dormitoryId > 0) {
+        try {
+          final DormitoryPaymentMethodResponse response =
+              await _repository.getPaymentMethods(
+            dormitoryId: dormitoryId,
+          );
 
-        paymentMethods = response.methods
-            .where(
-              (DormitoryPaymentMethodModel item) => item.active,
-            )
-            .toList();
-      } catch (_) {
-        // API phương thức thanh toán lỗi thì vẫn hiển thị biên lai.
+          paymentMethods = response.methods
+              .where(
+                (DormitoryPaymentMethodModel item) => item.active,
+              )
+              .toList();
+        } catch (_) {
+          // API phương thức thanh toán lỗi thì vẫn hiển thị biên lai.
+          paymentMethods = <DormitoryPaymentMethodModel>[];
+        }
+      } else {
+        // API receipts chỉ cần identityNo. Khi student.show không trả mã KTX,
+        // vẫn hiển thị hóa đơn; chỉ bỏ phần phương thức thanh toán theo KTX.
         paymentMethods = <DormitoryPaymentMethodModel>[];
       }
 
@@ -86,7 +92,7 @@ class DormitoryPaymentCubit extends Cubit<DormitoryPaymentState> {
     required String identityNo,
     required Object receiptId,
     required File proofImage,
-    required int dormitoryId,
+    int? dormitoryId,
     String? note,
   }) async {
     if (isClosed) {

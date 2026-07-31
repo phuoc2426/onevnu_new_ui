@@ -68,12 +68,6 @@ class DormitoryInvoiceModel {
   final String? kindLabel;
   final String? direction;
   final String? billingPeriodName;
-
-  /// Khoảng thời gian mà biên lai áp dụng.
-  /// Hỗ trợ cả snake_case/camelCase và nhiều tên field backend thường dùng.
-  final DateTime? periodStartDate;
-  final DateTime? periodEndDate;
-
   final double totalAmount;
   final double paidAmount;
   final double remainingAmount;
@@ -82,6 +76,12 @@ class DormitoryInvoiceModel {
   final DateTime? dueDate;
   final DateTime? paidAt;
   final DateTime? createdAt;
+
+  /// Ngày bắt đầu/kết thúc kỳ thu nếu API biên lai có trả về.
+  /// Khi API chưa có hai trường này, màn hình hóa đơn dùng ngày của hồ sơ
+  /// nội trú được truyền từ card lịch sử làm dữ liệu dự phòng.
+  final DateTime? periodStartDate;
+  final DateTime? periodEndDate;
   final String? paymentCode;
   final String? bankTransferQrUrl;
   final List<DormitoryPaymentModel> payments;
@@ -95,8 +95,6 @@ class DormitoryInvoiceModel {
     this.kindLabel,
     this.direction,
     this.billingPeriodName,
-    this.periodStartDate,
-    this.periodEndDate,
     this.totalAmount = 0,
     this.paidAmount = 0,
     this.remainingAmount = 0,
@@ -105,6 +103,8 @@ class DormitoryInvoiceModel {
     this.dueDate,
     this.paidAt,
     this.createdAt,
+    this.periodStartDate,
+    this.periodEndDate,
     this.paymentCode,
     this.bankTransferQrUrl,
     this.payments = const <DormitoryPaymentModel>[],
@@ -153,36 +153,6 @@ class DormitoryInvoiceModel {
       billingPeriodName:
           json['billing_period_name']?.toString() ??
           json['billingPeriodName']?.toString(),
-      periodStartDate: _readPeriodDate(
-        json,
-        const <String>[
-          'billing_period_start_date',
-          'billingPeriodStartDate',
-          'billing_start_date',
-          'billingStartDate',
-          'period_start_date',
-          'periodStartDate',
-          'start_date',
-          'startDate',
-          'from_date',
-          'fromDate',
-        ],
-      ),
-      periodEndDate: _readPeriodDate(
-        json,
-        const <String>[
-          'billing_period_end_date',
-          'billingPeriodEndDate',
-          'billing_end_date',
-          'billingEndDate',
-          'period_end_date',
-          'periodEndDate',
-          'end_date',
-          'endDate',
-          'to_date',
-          'toDate',
-        ],
-      ),
       totalAmount: totalAmount,
       paidAmount: paidAmount,
       remainingAmount: remainingAmount,
@@ -193,6 +163,22 @@ class DormitoryInvoiceModel {
       dueDate: _toDateTime(json['due_date'] ?? json['dueDate']),
       paidAt: _toDateTime(json['paid_at'] ?? json['paidAt']),
       createdAt: _toDateTime(json['created_at'] ?? json['createdAt']),
+      periodStartDate: _toDateTime(
+        json['period_start_date'] ??
+            json['periodStartDate'] ??
+            json['start_date'] ??
+            json['startDate'] ??
+            json['from_date'] ??
+            json['fromDate'],
+      ),
+      periodEndDate: _toDateTime(
+        json['period_end_date'] ??
+            json['periodEndDate'] ??
+            json['end_date'] ??
+            json['endDate'] ??
+            json['to_date'] ??
+            json['toDate'],
+      ),
       paymentCode:
           json['payment_code']?.toString() ??
           json['paymentCode']?.toString(),
@@ -215,6 +201,14 @@ class DormitoryInvoiceModel {
   }
 
   bool get isPaid => _isPaidStatus(status);
+
+  /// Ngày áp dụng của biên lai. Ưu tiên trường ngày riêng từ API; nếu API
+  /// chỉ gói khoảng ngày trong billingPeriodName thì thử tách từ chuỗi.
+  DateTime? get resolvedPeriodStartDate =>
+      periodStartDate ?? _extractPeriodDates(billingPeriodName).$1;
+
+  DateTime? get resolvedPeriodEndDate =>
+      periodEndDate ?? _extractPeriodDates(billingPeriodName).$2;
 
   DormitoryPaymentModel? get latestPayment {
     if (payments.isEmpty) {
@@ -278,71 +272,19 @@ class DormitoryInvoiceModel {
     return 'Biên lai ký túc xá';
   }
 
-  /// Ngày bắt đầu kỳ thu. Nếu API chưa trả field riêng thì thử đọc
-  /// hai ngày nằm trong billingPeriodName, ví dụ:
-  /// "10/08/2026 - 10/09/2026".
-  DateTime? get resolvedPeriodStartDate {
-    if (periodStartDate != null) {
-      return periodStartDate;
+  static (DateTime?, DateTime?) _extractPeriodDates(String? value) {
+    final String source = value?.trim() ?? '';
+    if (source.isEmpty) {
+      return (null, null);
     }
 
-    final List<DateTime> dates = _extractDatesFromText(billingPeriodName);
-    return dates.isNotEmpty ? dates.first : null;
-  }
-
-  /// Ngày kết thúc kỳ thu. Nếu API chưa trả field riêng thì thử đọc
-  /// ngày thứ hai trong billingPeriodName.
-  DateTime? get resolvedPeriodEndDate {
-    if (periodEndDate != null) {
-      return periodEndDate;
-    }
-
-    final List<DateTime> dates = _extractDatesFromText(billingPeriodName);
-    return dates.length >= 2 ? dates[1] : null;
-  }
-
-  static DateTime? _readPeriodDate(
-    Map<String, dynamic> json,
-    List<String> aliases,
-  ) {
-    for (final String key in aliases) {
-      final DateTime? value = _toDateTime(json[key]);
-      if (value != null) {
-        return value;
-      }
-    }
-
-    final dynamic nested =
-        json['billing_period'] ?? json['billingPeriod'] ?? json['period'];
-
-    if (nested is Map) {
-      final Map<String, dynamic> nestedMap =
-          Map<String, dynamic>.from(nested);
-
-      for (final String key in aliases) {
-        final DateTime? value = _toDateTime(nestedMap[key]);
-        if (value != null) {
-          return value;
-        }
-      }
-    }
-
-    return null;
-  }
-
-  static List<DateTime> _extractDatesFromText(String? value) {
-    final String text = value?.trim() ?? '';
-    if (text.isEmpty) {
-      return <DateTime>[];
-    }
-
-    final List<DateTime> result = <DateTime>[];
+    final List<DateTime> dates = <DateTime>[];
 
     final RegExp vietnameseDate = RegExp(
       r'\b(\d{1,2})[\/-](\d{1,2})[\/-](\d{2}|\d{4})\b',
     );
 
-    for (final RegExpMatch match in vietnameseDate.allMatches(text)) {
+    for (final RegExpMatch match in vietnameseDate.allMatches(source)) {
       final int? day = int.tryParse(match.group(1) ?? '');
       final int? month = int.tryParse(match.group(2) ?? '');
       int? year = int.tryParse(match.group(3) ?? '');
@@ -357,47 +299,48 @@ class DormitoryInvoiceModel {
 
       final DateTime? parsed = _safeDate(year, month, day);
       if (parsed != null) {
-        result.add(parsed);
+        dates.add(parsed);
       }
     }
 
-    final RegExp isoDate = RegExp(
-      r'\b(\d{4})-(\d{1,2})-(\d{1,2})\b',
+    if (dates.length < 2) {
+      final RegExp isoDate = RegExp(
+        r'\b(\d{4})-(\d{1,2})-(\d{1,2})\b',
+      );
+
+      for (final RegExpMatch match in isoDate.allMatches(source)) {
+        final int? year = int.tryParse(match.group(1) ?? '');
+        final int? month = int.tryParse(match.group(2) ?? '');
+        final int? day = int.tryParse(match.group(3) ?? '');
+
+        if (year == null || month == null || day == null) {
+          continue;
+        }
+
+        final DateTime? parsed = _safeDate(year, month, day);
+        if (parsed != null && !dates.contains(parsed)) {
+          dates.add(parsed);
+        }
+      }
+    }
+
+    return (
+      dates.isNotEmpty ? dates.first : null,
+      dates.length > 1 ? dates[1] : null,
     );
-
-    for (final RegExpMatch match in isoDate.allMatches(text)) {
-      final int? year = int.tryParse(match.group(1) ?? '');
-      final int? month = int.tryParse(match.group(2) ?? '');
-      final int? day = int.tryParse(match.group(3) ?? '');
-
-      if (day == null || month == null || year == null) {
-        continue;
-      }
-
-      final DateTime? parsed = _safeDate(year, month, day);
-      if (parsed != null &&
-          !result.any((DateTime item) =>
-              item.year == parsed.year &&
-              item.month == parsed.month &&
-              item.day == parsed.day)) {
-        result.add(parsed);
-      }
-    }
-
-    return result;
   }
 
   static DateTime? _safeDate(int year, int month, int day) {
-    try {
-      final DateTime value = DateTime(year, month, day);
-      if (value.year == year && value.month == month && value.day == day) {
-        return value;
-      }
-    } catch (_) {
+    if (year < 1900 || month < 1 || month > 12 || day < 1 || day > 31) {
       return null;
     }
 
-    return null;
+    final DateTime value = DateTime(year, month, day);
+    if (value.year != year || value.month != month || value.day != day) {
+      return null;
+    }
+
+    return value;
   }
 
   static bool _isPaidStatus(String? value) {

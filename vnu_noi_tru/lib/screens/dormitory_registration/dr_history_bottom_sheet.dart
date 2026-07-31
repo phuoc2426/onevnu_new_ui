@@ -122,7 +122,6 @@ class _DRHistoryBottomSheetState extends State<DRHistoryBottomSheet> {
                               histories[index],
                               data,
                               isLatest: index == 0,
-                              orderNumber: histories.length - index,
                             );
                           },
                         ),
@@ -244,7 +243,6 @@ class _DRHistoryBottomSheetState extends State<DRHistoryBottomSheet> {
     RegistrationHistoryModel history,
     DormitoryHistoryResolvedData lookup, {
     required bool isLatest,
-    required int orderNumber,
   }) {
     final Color color = _actionColor(history.action);
     final RegistrationHistoryAccommodationModel? accommodation =
@@ -291,14 +289,64 @@ class _DRHistoryBottomSheetState extends State<DRHistoryBottomSheet> {
       lookup.registrationDetail['priorityObjectId'],
     ]);
 
-    final String dormitoryName = lookup.dormitoryNameFor(dormitoryId);
-    final String periodName = lookup.periodNameFor(periodId);
-    final String roomTypeName = lookup.roomTypeNameFor(roomTypeId);
-    final String roomDescription = lookup.roomDescriptionFor(roomId);
-    final String priorityName =
-        lookup.priorityObjectNameFor(priorityObjectId);
+    final String dormitoryName = _firstText(<dynamic>[
+      history.data['dormitory'],
+      history.data['dormitory_name'],
+      history.data['dormitoryName'],
+      history.data['dormitory_label'],
+      history.data['dormitoryLabel'],
+      lookup.registrationDetail['dormitory_name'],
+      lookup.registrationDetail['dormitoryName'],
+      lookup.dormitoryNameFor(dormitoryId),
+    ]);
+    final String periodName = _firstText(<dynamic>[
+      history.data['registration_period_name'],
+      history.data['registrationPeriodName'],
+      history.data['period_name'],
+      history.data['periodName'],
+      lookup.registrationDetail['registration_period_name'],
+      lookup.registrationDetail['registrationPeriodName'],
+      lookup.periodNameFor(periodId),
+    ]);
+    final String roomTypeName = _firstText(<dynamic>[
+      history.data['room_type_name'],
+      history.data['roomTypeName'],
+      lookup.registrationDetail['room_type_name'],
+      lookup.registrationDetail['roomTypeName'],
+      lookup.roomTypeNameFor(roomTypeId),
+    ]);
+    final String roomDescription = _firstText(<dynamic>[
+      history.data['assigned_room'],
+      history.data['assignedRoom'],
+      history.data['room_number'],
+      history.data['roomNumber'],
+      lookup.registrationDetail['assigned_room'],
+      lookup.registrationDetail['assignedRoom'],
+      lookup.roomDescriptionFor(roomId),
+    ]);
+    final String priorityName = _firstText(<dynamic>[
+      history.data['priority_object'],
+      history.data['priorityObject'],
+      history.data['priority_object_name'],
+      history.data['priorityObjectName'],
+      lookup.registrationDetail['priority_object'],
+      lookup.registrationDetail['priorityObject'],
+      lookup.priorityObjectNameFor(priorityObjectId),
+    ]);
 
     final dynamic status = history.data['status'] ?? accommodation?.status;
+    final String statusLabel = _firstText(<dynamic>[
+      history.data['status_label'],
+      history.data['statusLabel'],
+      lookup.statusLabelFor(status),
+    ]);
+    final RegistrationHistoryPerformerModel? performer = history.performer;
+    final String performerName = lookup.performerNameFor(history);
+    final String performerDetail = <String>[
+      if (_hasText(performer?.role)) performer!.role!.trim(),
+      if (_hasText(performer?.position)) performer!.position!.trim(),
+      if (_hasText(performer?.unitName)) performer!.unitName!.trim(),
+    ].join(' · ');
 
     final List<_HistoryField> summary = <_HistoryField>[
       _HistoryField(
@@ -306,6 +354,20 @@ class _DRHistoryBottomSheetState extends State<DRHistoryBottomSheet> {
         lookup.studentNameFor(history.studentId),
         Icons.person_outline_rounded,
       ),
+      if (_hasText(performerName) &&
+          performerName != 'API chưa trả thông tin người thực hiện')
+        _HistoryField(
+          'Người thực hiện',
+          performerName,
+          Icons.badge_outlined,
+          subtitle: performerDetail.isEmpty ? null : performerDetail,
+        ),
+      if (_hasText(performer?.email))
+        _HistoryField(
+          'Email người thực hiện',
+          performer!.email!.trim(),
+          Icons.alternate_email_rounded,
+        ),
       if (dormitoryName.isNotEmpty)
         _HistoryField(
           'Ký túc xá',
@@ -337,10 +399,10 @@ class _DRHistoryBottomSheetState extends State<DRHistoryBottomSheet> {
           roomDescription,
           Icons.meeting_room_outlined,
         ),
-      if (status != null)
+      if (statusLabel.isNotEmpty)
         _HistoryField(
           'Trạng thái hồ sơ',
-          lookup.statusLabelFor(status),
+          statusLabel,
           Icons.fact_check_outlined,
         ),
     ];
@@ -405,7 +467,7 @@ class _DRHistoryBottomSheetState extends State<DRHistoryBottomSheet> {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          '${_typeLabel(history.type)} - Sự kiện #$orderNumber',
+                          _typeLabel(history.type),
                           style: const TextStyle(
                             fontSize: 11,
                             color: Color(0xFF6F747C),
@@ -440,10 +502,21 @@ class _DRHistoryBottomSheetState extends State<DRHistoryBottomSheet> {
               padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
               child: Column(
                 children: summary
-                    .map(( _HistoryField field) => _buildField(field))
+                    .map((_HistoryField field) => _buildField(field))
                     .toList(),
               ),
             ),
+            if (history.data.isNotEmpty || history.accommodation != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    ..._buildResolvedDataFields(history, lookup),
+                    ..._buildSnapshotFields(history, lookup),
+                  ],
+                ),
+              ),
             if (_hasText(history.note))
               Container(
                 width: double.infinity,
@@ -504,6 +577,8 @@ class _DRHistoryBottomSheetState extends State<DRHistoryBottomSheet> {
         lookup,
       );
 
+      if (resolved.value.trim().isEmpty) continue;
+
       result.add(
         _buildDetailRow(
           resolved.label,
@@ -539,20 +614,68 @@ class _DRHistoryBottomSheetState extends State<DRHistoryBottomSheet> {
     );
     add(
       'Ký túc xá',
-      lookup.dormitoryNameFor(item.dormitoryId),
+      _firstText(<dynamic>[
+        history.data['dormitory'],
+        history.data['dormitory_name'],
+        history.data['dormitoryName'],
+        lookup.registrationDetail['dormitory_name'],
+        lookup.registrationDetail['dormitoryName'],
+        lookup.dormitoryNameFor(item.dormitoryId),
+      ]),
       subtitle: lookup.dormitoryAddressFor(item.dormitoryId),
     );
-    add('Đợt đăng ký', lookup.periodNameFor(item.registrationPeriodId));
+    add(
+      'Đợt đăng ký',
+      _firstText(<dynamic>[
+        history.data['registration_period_name'],
+        history.data['registrationPeriodName'],
+        history.data['period_name'],
+        history.data['periodName'],
+        lookup.registrationDetail['registration_period_name'],
+        lookup.registrationDetail['registrationPeriodName'],
+        lookup.periodNameFor(item.registrationPeriodId),
+      ]),
+    );
     add(
       'Đối tượng ưu tiên',
-      lookup.priorityObjectNameFor(item.priorityObjectId),
+      _firstText(<dynamic>[
+        history.data['priority_object'],
+        history.data['priorityObject'],
+        history.data['priority_object_name'],
+        history.data['priorityObjectName'],
+        lookup.priorityObjectNameFor(item.priorityObjectId),
+      ]),
     );
-    add('Loại phòng', lookup.roomTypeNameFor(item.roomTypeId));
-    add('Phòng', lookup.roomDescriptionFor(item.roomId));
-    add('Trạng thái hồ sơ', lookup.statusLabelFor(item.status));
+    add(
+      'Loại phòng',
+      _firstText(<dynamic>[
+        history.data['room_type_name'],
+        history.data['roomTypeName'],
+        lookup.roomTypeNameFor(item.roomTypeId),
+      ]),
+    );
+    add(
+      'Phòng',
+      _firstText(<dynamic>[
+        history.data['assigned_room'],
+        history.data['assignedRoom'],
+        history.data['room_number'],
+        history.data['roomNumber'],
+        lookup.roomDescriptionFor(item.roomId),
+      ]),
+    );
+    add(
+      'Trạng thái hồ sơ',
+      _firstText(<dynamic>[
+        history.data['status_label'],
+        history.data['statusLabel'],
+        lookup.statusLabelFor(item.status),
+      ]),
+    );
 
-    if (item.asmStatus != null) {
-      add('Trạng thái xếp chỗ', item.asmStatus.toString());
+    if (item.asmStatus != null &&
+        !_isNumericText(item.asmStatus.toString())) {
+      add('Trạng thái xếp chỗ', _humanizeValue(item.asmStatus.toString()));
     }
     if (item.requestStatus != null) {
       add(
@@ -643,11 +766,7 @@ class _DRHistoryBottomSheetState extends State<DRHistoryBottomSheet> {
         return _resolvedId('Sinh viên', lookup.studentNameFor(id), id);
       case 'accommodation_id':
       case 'accommodationid':
-        return _ResolvedValue(
-          'Hồ sơ nội trú',
-          'Hồ sơ đăng ký nội trú',
-          subtitle: id == null ? null : 'Mã hồ sơ: $id',
-        );
+        return const _ResolvedValue('', '');
       case 'performed_by':
       case 'performedby':
         return _ResolvedValue(
@@ -662,6 +781,16 @@ class _DRHistoryBottomSheetState extends State<DRHistoryBottomSheet> {
         );
       case 'status':
         return _ResolvedValue('Trạng thái hồ sơ', lookup.statusLabelFor(value));
+      case 'status_label':
+      case 'statuslabel':
+        return _ResolvedValue('Trạng thái hồ sơ', value.toString());
+      case 'asm_status':
+      case 'asmstatus':
+        final String asmText = value.toString().trim();
+        return _ResolvedValue(
+          'Trạng thái xếp chỗ',
+          _isNumericText(asmText) ? '' : _humanizeValue(asmText),
+        );
       case 'request_status':
       case 'requeststatus':
         return _ResolvedValue(
@@ -695,12 +824,12 @@ class _DRHistoryBottomSheetState extends State<DRHistoryBottomSheet> {
       case 'reasonstay':
         return _ResolvedValue('Lý do lưu trú', value.toString());
       default:
+        if (_isTechnicalIdentifierKey(normalized)) {
+          return const _ResolvedValue('', '');
+        }
         return _ResolvedValue(
           _fieldLabel(key),
           _displayDynamicValue(value),
-          subtitle: normalized.endsWith('_id') || normalized.endsWith('id')
-              ? 'Module chưa có API danh mục cho trường này'
-              : null,
         );
     }
   }
@@ -711,24 +840,14 @@ class _DRHistoryBottomSheetState extends State<DRHistoryBottomSheet> {
     int? id, {
     String? subtitle,
   }) {
-    if (resolvedName.trim().isNotEmpty) {
-      final String technical = id == null ? '' : 'Mã: $id';
-      final String mergedSubtitle = <String>[
-        if (_hasText(subtitle)) subtitle!.trim(),
-        if (technical.isNotEmpty) technical,
-      ].join(' - ');
-
-      return _ResolvedValue(
-        label,
-        resolvedName,
-        subtitle: mergedSubtitle.isEmpty ? null : mergedSubtitle,
-      );
+    if (resolvedName.trim().isEmpty) {
+      return const _ResolvedValue('', '');
     }
 
     return _ResolvedValue(
       label,
-      'Chưa lấy được thông tin từ API danh mục',
-      subtitle: id == null ? null : 'Mã dữ liệu: $id',
+      resolvedName,
+      subtitle: _hasText(subtitle) ? subtitle!.trim() : null,
     );
   }
 
@@ -988,7 +1107,6 @@ class _DRHistoryBottomSheetState extends State<DRHistoryBottomSheet> {
   String _fieldLabel(String key) {
     final Map<String, String> known = <String, String>{
       'asm_status': 'Trạng thái xếp chỗ',
-      'submission_log_id': 'Nhật ký gửi hồ sơ',
       'created_at': 'Ngày tạo',
       'updated_at': 'Ngày cập nhật',
       'deleted_at': 'Ngày xóa',
@@ -1004,6 +1122,56 @@ class _DRHistoryBottomSheetState extends State<DRHistoryBottomSheet> {
                   '${part[0].toUpperCase()}${part.substring(1)}',
             )
             .join(' ');
+  }
+
+  String _firstText(List<dynamic> values) {
+    for (final dynamic value in values) {
+      if (value == null) continue;
+      final String text = value.toString().trim();
+      if (text.isEmpty || _isNumericText(text)) continue;
+      return text;
+    }
+    return '';
+  }
+
+  bool _isNumericText(String value) {
+    return num.tryParse(value.trim()) != null;
+  }
+
+  bool _isTechnicalIdentifierKey(String normalizedKey) {
+    final String key = normalizedKey
+        .replaceAllMapped(
+          RegExp(r'([a-z0-9])([A-Z])'),
+          (Match match) => '${match.group(1)}_${match.group(2)}',
+        )
+        .toLowerCase();
+    return key == 'id' ||
+        key.endsWith('_id') ||
+        key.endsWith('_ids') ||
+        key.endsWith('_code') ||
+        key.endsWith('_codes') ||
+        <String>{
+          'performed_by',
+          'approved_by',
+          'assigned_to',
+          'student_code',
+          'receipt_code',
+          'payment_code',
+          'trace_id',
+        }.contains(key);
+  }
+
+  String _humanizeValue(String value) {
+    final String normalized = value
+        .replaceAllMapped(
+          RegExp(r'([a-z0-9])([A-Z])'),
+          (Match match) => '${match.group(1)} ${match.group(2)}',
+        )
+        .replaceAll('_', ' ')
+        .replaceAll('-', ' ')
+        .trim();
+    if (normalized.isEmpty) return '';
+    return '${normalized[0].toUpperCase()}${normalized.substring(1)}';
   }
 
   int? _firstInt(List<dynamic> values) {

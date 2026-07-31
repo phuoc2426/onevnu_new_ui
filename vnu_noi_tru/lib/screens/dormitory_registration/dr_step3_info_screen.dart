@@ -1,11 +1,13 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:vnu_core/globals.dart';
 import 'package:vnu_core/themes/app_theme.dart';
 import 'package:vnu_noi_tru/cubit/dormitory_registration_cubit.dart';
+import 'package:vnu_noi_tru/models/model.dart';
 import 'package:path/path.dart' as p;
 import 'package:vnu_core/common/app_text_styles.dart';
 import 'package:vnu_noi_tru/widgets/nt_custom_dropdown.dart';
@@ -24,6 +26,7 @@ class DRStep3InfoScreen extends StatefulWidget {
 
 class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
   final _picker = ImagePicker();
+  bool _isImagePickerActive = false;
   static const int _maxUploadMb = 5;
   static const int _maxUploadBytes = _maxUploadMb * 1024 * 1024;
 
@@ -54,6 +57,7 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
 
   String _genderValue = 'male';
   bool _isApplicant = false;
+  final List<_FamilyMemberForm> _familyForms = <_FamilyMemberForm>[];
 
   @override
   void initState() {
@@ -62,6 +66,10 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
     final classInfo = Globals().lopDaoTaoModel.value;
     final cohortInfo = Globals().nienKhoaDaoTaoModel.value;
     final cubit = context.read<DormitoryRegistrationCubit>();
+
+    _familyForms.addAll(
+      cubit.familyMembers.map(_FamilyMemberForm.fromPayload),
+    );
 
     _studentCodeController =
         TextEditingController(text: student?.maSinhVien ?? '');
@@ -136,6 +144,9 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
     _phoneController.dispose();
     _emailController.dispose();
     _reasonController.dispose();
+    for (final _FamilyMemberForm form in _familyForms) {
+      form.dispose();
+    }
     super.dispose();
   }
 
@@ -286,16 +297,25 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
   }
 
   void saveDataToCubit() {
-    final cubit = context.read<DormitoryRegistrationCubit>();
-    cubit.tempFullName = _fullNameController.text.trim();   // ← THÊM DÒNG NÀY
+    final DormitoryRegistrationCubit cubit =
+        context.read<DormitoryRegistrationCubit>();
+
+    cubit.tempFullName = _fullNameController.text.trim();
     cubit.tempPhone = _phoneController.text.trim();
     cubit.tempEmail = _emailController.text.trim();
     cubit.tempDOB = _dobController.text.trim();
+    cubit.tempGender = _genderValue;
     cubit.tempCccd = _cccdController.text.trim();
     cubit.tempCccdIssueDate = _cccdIssueDateController.text.trim();
     cubit.tempHometown = _hometownController.text.trim();
     cubit.tempTemporaryAddress = _temporaryAddressController.text.trim();
     cubit.tempReason = _reasonController.text.trim();
+    cubit.replaceFamilyMembers(
+      _familyForms
+          .map((_FamilyMemberForm item) => item.toPayload())
+          .where((FamilyMemberPayload item) => item.fullName.isNotEmpty)
+          .toList(),
+    );
   }
 
   Future<void> _selectDate(BuildContext context,
@@ -440,7 +460,30 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
     await prefs.setString('applicant_phone', _phoneController.text.trim()); // thêm
   }
   Future<void> _pickImageLocal(String uploadSlot) async {
-    final cubit = context.read<DormitoryRegistrationCubit>();
+    final DormitoryRegistrationCubit cubit =
+        context.read<DormitoryRegistrationCubit>();
+
+    if (_isImagePickerActive) {
+      debugPrint(
+        '[DORMITORY-IMAGE-PICKER] ignored duplicate request: slot=$uploadSlot',
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            const SnackBar(
+              behavior: SnackBarBehavior.floating,
+              duration: Duration(seconds: 5),
+              content: Text(
+                'Trình chọn ảnh đang mở. Vui lòng chọn hoặc đóng cửa sổ hiện tại trước.',
+              ),
+            ),
+          );
+      }
+      return;
+    }
+
+    _isImagePickerActive = true;
 
     try {
       final XFile? image = await _picker.pickImage(
@@ -455,8 +498,7 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
       final File originalFile = File(image.path);
       final double originalSizeMb = await _fileSizeMb(originalFile);
 
-      final File file =
-      await _compressImageToUploadStandard(originalFile);
+      final File file = await _compressImageToUploadStandard(originalFile);
 
       await _validateImageSize(file);
 
@@ -464,36 +506,71 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
 
       debugPrint(
         '[DORMITORY-IMAGE-READY] '
-            'slot=$uploadSlot, '
-            'source=${p.basename(originalFile.path)}, '
-            'sourceSize=${originalSizeMb.toStringAsFixed(2)}MB, '
-            'output=${p.basename(file.path)}, '
-            'extension=${p.extension(file.path).toLowerCase()}, '
-            'outputSize=${finalSizeMb.toStringAsFixed(2)}MB, '
-            'path=${file.path}',
+        'slot=$uploadSlot, '
+        'source=${p.basename(originalFile.path)}, '
+        'sourceSize=${originalSizeMb.toStringAsFixed(2)}MB, '
+        'output=${p.basename(file.path)}, '
+        'extension=${p.extension(file.path).toLowerCase()}, '
+        'outputSize=${finalSizeMb.toStringAsFixed(2)}MB, '
+        'path=${file.path}',
       );
 
       if (!mounted) return;
 
-      setState(() {
-        if (uploadSlot == 'cccd_front') {
-          cubit.selectCCCDFront(file);
-        } else if (uploadSlot == 'cccd_back') {
-          cubit.selectCCCDBack(file);
-        } else {
-          cubit.addProofFile(file);
-        }
-      });
-    } catch (e) {
+      if (uploadSlot == 'avatar') {
+        cubit.selectAvatar(file);
+      } else if (uploadSlot == 'cccd_front') {
+        cubit.selectCCCDFront(file);
+      } else if (uploadSlot == 'cccd_back') {
+        cubit.selectCCCDBack(file);
+      } else {
+        cubit.addProofFile(file);
+      }
+    } on PlatformException catch (error, stackTrace) {
+      debugPrint(
+        '[DORMITORY-IMAGE-PICKER-ERROR] '
+        'slot=$uploadSlot, code=${error.code}, message=${error.message}',
+      );
+      debugPrintStack(stackTrace: stackTrace);
+
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: Colors.red,
-          content: Text(e.toString().replaceFirst('Exception: ', '')),
-        ),
+      final String message = error.code == 'already_active'
+          ? 'Trình chọn ảnh đã được mở. Vui lòng đóng cửa sổ chọn ảnh cũ rồi thử lại.'
+          : 'Không thể mở thư viện ảnh: ${error.message ?? error.code}';
+
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 8),
+            backgroundColor: Colors.red,
+            content: Text(message),
+          ),
+        );
+    } catch (error, stackTrace) {
+      debugPrint(
+        '[DORMITORY-IMAGE-PICKER-ERROR] slot=$uploadSlot, error=$error',
       );
+      debugPrintStack(stackTrace: stackTrace);
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 8),
+            backgroundColor: Colors.red,
+            content: Text(
+              error.toString().replaceFirst('Exception: ', ''),
+            ),
+          ),
+        );
+    } finally {
+      _isImagePickerActive = false;
     }
   }
 
@@ -501,7 +578,9 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
   Widget build(BuildContext context) {
     final cubit = context.watch<DormitoryRegistrationCubit>();
 
-    return BlocListener<DormitoryRegistrationCubit, DormitoryRegistrationState>(
+    return Theme(
+      data: _buildGreenFormTheme(context),
+      child: BlocListener<DormitoryRegistrationCubit, DormitoryRegistrationState>(
       listener: (context, state) {
         if (state is DormitoryRegistrationUploadSuccess) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -521,6 +600,8 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              _buildAvatarCard(cubit),
+              const SizedBox(height: 12),
               // 1. Thông tin sinh viên
               Card(
                 color: Colors.white,
@@ -799,6 +880,8 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
                 ),
               ),
               const SizedBox(height: 12),
+              _buildFamilyInformationCard(),
+              const SizedBox(height: 12),
               // 5. Minh chứng & lý do
               Card(
                 color: Colors.white,
@@ -892,14 +975,22 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
                               controller: _reasonController,
                               maxLines: 4,
                               maxLength: 500,
+                              cursorColor: const Color(0xFF078B3E),
                               onChanged: (text) {
                                 setState(() {});
                               },
                               style: const TextStyle(
-                                  fontSize: AppFontSizes.mediumSmall,
-                                  color: Color(0xFF111318)),
+                                fontSize: AppFontSizes.mediumSmall,
+                                fontWeight: FontWeight.w500,
+                                color: Color(0xFF111318),
+                                height: 1.4,
+                              ),
                               decoration: const InputDecoration(
                                 hintText: 'Nhập lý do...',
+                                hintStyle: TextStyle(
+                                  color: Color(0xFF9CA3AF),
+                                  fontSize: AppFontSizes.mediumSmall,
+                                ),
                                 border: InputBorder.none,
                                 counterText: '',
                               ),
@@ -926,61 +1017,419 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
           ),
         ),
       ),
+      ),
     );
   }
 
-  Widget _buildField(String label,
-      TextEditingController controller, {
-        bool readOnly = false,
-        IconData? icon,
-        VoidCallback? onTap,
-        TextInputType? keyboardType,
-        String? Function(String?)? validator,
-      }) {
+  ThemeData _buildGreenFormTheme(BuildContext context) {
+    final ThemeData base = Theme.of(context);
+    const Color green = Color(0xFF078B3E);
+
+    return base.copyWith(
+      colorScheme: base.colorScheme.copyWith(
+        primary: green,
+        secondary: green,
+        surface: Colors.white,
+      ),
+      textSelectionTheme: const TextSelectionThemeData(
+        cursorColor: green,
+        selectionColor: Color(0x33078B3E),
+        selectionHandleColor: green,
+      ),
+      splashColor: const Color(0x14078B3E),
+      highlightColor: const Color(0x0F078B3E),
+    );
+  }
+
+  InputDecoration _formDecoration({
+    required String label,
+    bool readOnly = false,
+    IconData? suffixIcon,
+  }) {
+    final OutlineInputBorder border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: const BorderSide(color: Color(0xFFDCE3DF)),
+    );
+
+    return InputDecoration(
+      labelText: label,
+      isDense: true,
+      filled: true,
+      fillColor: readOnly ? const Color(0xFFF4F6F5) : Colors.white,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      labelStyle: const TextStyle(
+        color: Color(0xFF6B7280),
+        fontSize: AppFontSizes.font11,
+        fontWeight: FontWeight.w600,
+      ),
+      floatingLabelStyle: const TextStyle(
+        color: Color(0xFF078B3E),
+        fontSize: AppFontSizes.font11,
+        fontWeight: FontWeight.w700,
+      ),
+      hintStyle: const TextStyle(
+        color: Color(0xFF9CA3AF),
+        fontSize: AppFontSizes.mediumSmall,
+      ),
+      errorStyle: const TextStyle(
+        color: Color(0xFFDC2626),
+        fontSize: AppFontSizes.extraSmall,
+      ),
+      suffixIcon: suffixIcon == null
+          ? null
+          : Icon(suffixIcon, size: 18, color: const Color(0xFF078B3E)),
+      border: border,
+      enabledBorder: border,
+      disabledBorder: border.copyWith(
+        borderSide: const BorderSide(color: Color(0xFFE7ECE9)),
+      ),
+      focusedBorder: border.copyWith(
+        borderSide: const BorderSide(color: Color(0xFF078B3E), width: 1.6),
+      ),
+      errorBorder: border.copyWith(
+        borderSide: const BorderSide(color: Color(0xFFDC2626)),
+      ),
+      focusedErrorBorder: border.copyWith(
+        borderSide: const BorderSide(color: Color(0xFFDC2626), width: 1.5),
+      ),
+    );
+  }
+
+  Widget _buildAvatarCard(DormitoryRegistrationCubit cubit) {
+    final File? avatar = cubit.avatarFile;
+
+    return Card(
+      color: Colors.white,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: const BorderSide(color: Color(0xFFE3E6EB)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: <Widget>[
+            GestureDetector(
+              onTap: avatar == null ? null : () => _showImagePreview(avatar),
+              child: Container(
+                width: 86,
+                height: 108,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF4F7F5),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFCDEBD7)),
+                ),
+                child: avatar == null
+                    ? const Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: <Widget>[
+                          Icon(
+                            Icons.badge_outlined,
+                            size: 34,
+                            color: Color(0xFF078B3E),
+                          ),
+                          SizedBox(height: 6),
+                          Text(
+                            'Ảnh 3x4',
+                            style: TextStyle(
+                              fontSize: AppFontSizes.extraSmall,
+                              color: Color(0xFF666B75),
+                            ),
+                          ),
+                        ],
+                      )
+                    : ClipRRect(
+                        borderRadius: BorderRadius.circular(13),
+                        child: Image.file(avatar, fit: BoxFit.cover),
+                      ),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  const Text(
+                    'Ảnh thẻ sinh viên *',
+                    style: TextStyle(
+                      fontSize: AppFontSizes.small,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF111318),
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  const Text(
+                    'Ảnh chân dung rõ mặt, nền sáng. Ảnh được chuyển sang JPG, nén dưới 5 MB và tải lên hồ sơ sinh viên.',
+                    style: TextStyle(
+                      fontSize: AppFontSizes.extraSmall,
+                      color: Color(0xFF666B75),
+                      height: 1.35,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: <Widget>[
+                      FilledButton.icon(
+                        onPressed: () => _pickImageLocal('avatar'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF078B3E),
+                          foregroundColor: Colors.white,
+                        ),
+                        icon: Icon(
+                          avatar == null
+                              ? Icons.add_a_photo_outlined
+                              : Icons.refresh_rounded,
+                          size: 18,
+                        ),
+                        label: Text(avatar == null ? 'Chọn ảnh' : 'Chọn lại'),
+                      ),
+                      if (avatar != null)
+                        OutlinedButton.icon(
+                          onPressed: () {
+                            cubit.removeAvatar();
+                            setState(() {});
+                          },
+                          icon: const Icon(Icons.delete_outline_rounded),
+                          label: const Text('Xóa'),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFamilyInformationCard() {
+    return Card(
+      color: Colors.white,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: const BorderSide(color: Color(0xFFE3E6EB)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                const Icon(
+                  Icons.family_restroom_rounded,
+                  color: Color(0xFF078B3E),
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'Thông tin gia đình',
+                    style: TextStyle(
+                      fontSize: AppFontSizes.font11,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF111318),
+                    ),
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: _addFamilyMember,
+                  icon: const Icon(Icons.add_rounded, size: 18),
+                  label: const Text('Thêm người thân'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 5),
+            const Text(
+              'Có thể khai báo bố, mẹ hoặc người giám hộ. Các trường nghề nghiệp và số điện thoại không bắt buộc.',
+              style: TextStyle(
+                fontSize: AppFontSizes.extraSmall,
+                color: Color(0xFF666B75),
+                height: 1.35,
+              ),
+            ),
+            if (_familyForms.isEmpty) ...<Widget>[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(13),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF7F8FA),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  'Chưa khai báo người thân.',
+                  style: TextStyle(
+                    fontSize: AppFontSizes.font11,
+                    color: Color(0xFF666B75),
+                  ),
+                ),
+              ),
+            ] else
+              ..._familyForms.asMap().entries.map(
+                (MapEntry<int, _FamilyMemberForm> entry) =>
+                    _buildFamilyMemberEditor(entry.key, entry.value),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFamilyMemberEditor(
+    int index,
+    _FamilyMemberForm form,
+  ) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: readOnly ? const Color(0xFFF8F9FB) : Colors.white,
-        borderRadius: BorderRadius.circular(7),
+        color: const Color(0xFFFBFCFD),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: const Color(0xFFE3E6EB)),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-                color: Color(0xFF666B75), fontSize: AppFontSizes.font11),
-          ),
+        children: <Widget>[
           Row(
-            children: [
+            children: <Widget>[
               Expanded(
-                child: TextFormField(
-                  controller: controller,
-                  readOnly: readOnly,
-                  onTap: onTap,
-                  keyboardType: keyboardType,
-                  validator: validator,
+                child: DropdownButtonFormField<String>(
+                  value: form.relationship,
+                  isExpanded: true,
+                  dropdownColor: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  menuMaxHeight: 320,
+                  icon: const Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    color: Color(0xFF078B3E),
+                  ),
                   style: const TextStyle(
                     fontSize: AppFontSizes.mediumSmall,
                     fontWeight: FontWeight.w600,
                     color: Color(0xFF111318),
                   ),
-                  decoration: const InputDecoration(
-                    isDense: true,
-                    contentPadding: EdgeInsets.symmetric(vertical: 4),
-                    border: InputBorder.none,
-                  ),
+                  decoration: _formDecoration(label: 'Quan hệ *'),
+                  items: const <DropdownMenuItem<String>>[
+                    DropdownMenuItem(value: 'father', child: Text('Bố')),
+                    DropdownMenuItem(value: 'mother', child: Text('Mẹ')),
+                    DropdownMenuItem(
+                      value: 'guardian',
+                      child: Text('Người giám hộ'),
+                    ),
+                  ],
+                  onChanged: (String? value) {
+                    if (value != null) {
+                      setState(() => form.relationship = value);
+                    }
+                  },
                 ),
               ),
-              if (icon != null)
-                GestureDetector(
-                  onTap: onTap,
-                  child: Icon(icon, size: 16, color: const Color(0xFF666B75)),
-                ),
+              IconButton(
+                tooltip: 'Xóa người thân',
+                onPressed: () => _removeFamilyMember(index),
+                icon: const Icon(Icons.delete_outline_rounded, color: Colors.red),
+              ),
             ],
           ),
+          const SizedBox(height: 10),
+          _buildField(
+            'Họ và tên *',
+            form.fullNameController,
+            validator: (String? value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'Nhập họ tên người thân';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: _buildField(
+                  'Năm sinh',
+                  form.birthYearController,
+                  keyboardType: TextInputType.number,
+                  validator: (String? value) {
+                    final String text = value?.trim() ?? '';
+                    if (text.isEmpty) return null;
+                    final int? year = int.tryParse(text);
+                    final int currentYear = DateTime.now().year;
+                    if (year == null || year < 1900 || year > currentYear) {
+                      return 'Năm sinh không hợp lệ';
+                    }
+                    return null;
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildField(
+                  'Số điện thoại',
+                  form.phoneController,
+                  keyboardType: TextInputType.phone,
+                  validator: (String? value) {
+                    final String text = value?.trim() ?? '';
+                    if (text.isEmpty) return null;
+                    if (text.length > 20) return 'Tối đa 20 ký tự';
+                    return null;
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          _buildField('Nghề nghiệp', form.occupationController),
         ],
+      ),
+    );
+  }
+
+  void _addFamilyMember() {
+    setState(() {
+      _familyForms.add(_FamilyMemberForm.empty());
+    });
+  }
+
+  void _removeFamilyMember(int index) {
+    final _FamilyMemberForm removed = _familyForms.removeAt(index);
+    removed.dispose();
+    setState(() {});
+  }
+
+  Widget _buildField(
+    String label,
+    TextEditingController controller, {
+    bool readOnly = false,
+    IconData? icon,
+    VoidCallback? onTap,
+    TextInputType? keyboardType,
+    String? Function(String?)? validator,
+  }) {
+    return TextFormField(
+      controller: controller,
+      readOnly: readOnly,
+      onTap: onTap,
+      keyboardType: keyboardType,
+      validator: validator,
+      cursorColor: const Color(0xFF078B3E),
+      style: TextStyle(
+        fontSize: AppFontSizes.mediumSmall,
+        fontWeight: FontWeight.w600,
+        color: readOnly
+            ? const Color(0xFF4B5563)
+            : const Color(0xFF111318),
+        height: 1.3,
+      ),
+      decoration: _formDecoration(
+        label: label,
+        readOnly: readOnly,
+        suffixIcon: icon,
       ),
     );
   }
@@ -1526,5 +1975,69 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
         ),
       ],
     );
+  }
+}
+
+
+class _FamilyMemberForm {
+  String relationship;
+  final TextEditingController fullNameController;
+  final TextEditingController birthYearController;
+  final TextEditingController occupationController;
+  final TextEditingController phoneController;
+
+  _FamilyMemberForm({
+    required this.relationship,
+    required this.fullNameController,
+    required this.birthYearController,
+    required this.occupationController,
+    required this.phoneController,
+  });
+
+  factory _FamilyMemberForm.empty() {
+    return _FamilyMemberForm(
+      relationship: 'father',
+      fullNameController: TextEditingController(),
+      birthYearController: TextEditingController(),
+      occupationController: TextEditingController(),
+      phoneController: TextEditingController(),
+    );
+  }
+
+  factory _FamilyMemberForm.fromPayload(FamilyMemberPayload payload) {
+    return _FamilyMemberForm(
+      relationship: payload.relationship,
+      fullNameController: TextEditingController(text: payload.fullName),
+      birthYearController: TextEditingController(
+        text: payload.birthYear?.toString() ?? '',
+      ),
+      occupationController: TextEditingController(
+        text: payload.occupation ?? '',
+      ),
+      phoneController: TextEditingController(
+        text: payload.phoneNumber ?? '',
+      ),
+    );
+  }
+
+  FamilyMemberPayload toPayload() {
+    return FamilyMemberPayload(
+      relationship: relationship,
+      fullName: fullNameController.text.trim(),
+      birthYear: int.tryParse(birthYearController.text.trim()),
+      occupation: occupationController.text.trim().isEmpty
+          ? null
+          : occupationController.text.trim(),
+      phoneNumber: phoneController.text.trim().isEmpty
+          ? null
+          : phoneController.text.trim(),
+    );
+  }
+
+  void dispose() {
+    fullNameController.dispose();
+    birthYearController.dispose();
+    occupationController.dispose();
+    phoneController.dispose();
   }
 }

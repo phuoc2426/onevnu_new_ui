@@ -53,6 +53,38 @@ class RegistrationHistoryResponse {
     return null;
   }
 
+  static Map<String, dynamic> _normalizeHistoryData(dynamic value) {
+    if (value is Map) {
+      return Map<String, dynamic>.from(value);
+    }
+
+    if (value is List) {
+      final Map<String, dynamic> result = <String, dynamic>{};
+
+      for (int index = 0; index < value.length; index++) {
+        final dynamic item = value[index];
+        if (item is Map) {
+          final Map<String, dynamic> mapped = Map<String, dynamic>.from(item);
+          mapped.forEach((String key, dynamic nestedValue) {
+            String resolvedKey = key;
+            int suffix = 2;
+            while (result.containsKey(resolvedKey)) {
+              resolvedKey = '${key}_$suffix';
+              suffix++;
+            }
+            result[resolvedKey] = nestedValue;
+          });
+        } else if (item != null) {
+          result['item_${index + 1}'] = item;
+        }
+      }
+
+      return result;
+    }
+
+    return const <String, dynamic>{};
+  }
+
   static int? _parseInt(dynamic value) {
     if (value == null) return null;
     if (value is int) return value;
@@ -103,9 +135,10 @@ class RegistrationHistoryModel {
       ),
       type: json['type']?.toString(),
       action: json['action']?.toString(),
-      data: rawData is Map
-          ? Map<String, dynamic>.from(rawData)
-          : const <String, dynamic>{},
+      // student.show mô tả data là array|null, trong khi API lịch sử
+      // hồ sơ cũ có thể trả object. Chuẩn hóa cả hai dạng để giao diện không
+      // làm mất dữ liệu chi tiết.
+      data: RegistrationHistoryResponse._normalizeHistoryData(rawData),
       performedBy: _parseInt(json['performed_by'] ?? json['performedBy']),
       note: json['note']?.toString(),
       createdAt: _parseDate(json['created_at'] ?? json['createdAt']),

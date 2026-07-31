@@ -16,18 +16,18 @@ import 'package:vnu_noi_tru/models/dormitory_payment/dormitory_payment_method_mo
 
 class DRInvoicesScreen extends StatefulWidget {
   final String identityNo;
-  final int dormitoryId;
+  final int? dormitoryId;
   final String dormitoryName;
 
-  /// Khoảng thời gian lưu trú đang hiển thị tại card lịch sử bên ngoài.
-  /// Dùng lại chính dữ liệu này để ngày trong card hóa đơn luôn đồng nhất.
+  /// Khoảng ngày đang hiển thị ở card lịch sử nội trú bên ngoài.
+  /// Dùng làm fallback vì API receipts hiện chưa bắt buộc trả ngày kỳ thu.
   final DateTime? accommodationStartDate;
   final DateTime? accommodationEndDate;
 
   const DRInvoicesScreen({
     super.key,
     required this.identityNo,
-    required this.dormitoryId,
+    this.dormitoryId,
     required this.dormitoryName,
     this.accommodationStartDate,
     this.accommodationEndDate,
@@ -300,7 +300,7 @@ class _DRInvoicesScreenState extends State<DRInvoicesScreen> {
                             const SizedBox(width: 5),
                             Expanded(
                               child: Text(
-                                '${periodRange.replaceFirst(' - ', ' - ')}',
+                                periodRange,
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
@@ -402,25 +402,21 @@ class _DRInvoicesScreenState extends State<DRInvoicesScreen> {
   }
 
   String? _invoicePeriodRange(DormitoryInvoiceModel invoice) {
-    // Ưu tiên đúng ngày start_date/end_date của hồ sơ nội trú,
-    // giống phần "Thời gian ở từ/đến" tại card lịch sử bên ngoài.
-    // Chỉ dùng ngày riêng của biên lai làm dự phòng khi màn hình được mở
-    // từ nơi khác và không truyền dữ liệu hồ sơ nội trú.
-    final DateTime? start = widget.accommodationStartDate ??
-        invoice.resolvedPeriodStartDate;
-    final DateTime? end = widget.accommodationEndDate ??
-        invoice.resolvedPeriodEndDate;
+    final DateTime? start =
+        invoice.resolvedPeriodStartDate ?? widget.accommodationStartDate;
+    final DateTime? end =
+        invoice.resolvedPeriodEndDate ?? widget.accommodationEndDate;
 
     if (start != null && end != null) {
-      return '${_formatShortDate(start)} - ${_formatShortDate(end)}';
+      return 'Từ ${_formatShortDate(start)} đến ${_formatShortDate(end)}';
     }
 
     if (start != null) {
-      return _formatShortDate(start);
+      return 'Từ ${_formatShortDate(start)}';
     }
 
     if (end != null) {
-      return _formatShortDate(end);
+      return 'Đến ${_formatShortDate(end)}';
     }
 
     return null;
@@ -1186,9 +1182,8 @@ class _DRInvoicesScreenState extends State<DRInvoicesScreen> {
     IconData icon;
     String title;
 
-    // Trạng thái Receipt là nguồn chính xác cuối cùng.
-    // Khi biên lai đã được xác nhận thanh toán, minh chứng cũng phải
-    // hiển thị là đã xác nhận, kể cả Payment mới nhất còn trả về pending.
+    // Receipt là trạng thái nghiệp vụ cuối cùng. Khi biên lai đã được xác nhận
+    // thanh toán, không tiếp tục hiển thị Payment cũ là pending.
     if (invoice.isPaid) {
       color = AppTheme.colorSuccess;
       icon = Icons.check_circle_rounded;
@@ -1270,7 +1265,7 @@ class _DRInvoicesScreenState extends State<DRInvoicesScreen> {
             ),
           ],
 
-          if (_hasText(payment.rejectionReason)) ...[
+          if (!invoice.isPaid && _hasText(payment.rejectionReason)) ...[
             const SizedBox(height: 6),
             Text(
               'Lý do từ chối: '
@@ -1458,18 +1453,6 @@ class _DRInvoicesScreenState extends State<DRInvoicesScreen> {
 
   String _formatMoney(double amount) {
     return _currencyFormatter.format(amount);
-  }
-
-  String _maskIdentityNo(String value) {
-    final String normalized = value.trim();
-
-    if (normalized.length <= 4) {
-      return normalized;
-    }
-
-    final String suffix = normalized.substring(normalized.length - 4);
-
-    return '${'*' * (normalized.length - 4)}$suffix';
   }
 
   bool _hasText(String? value) {

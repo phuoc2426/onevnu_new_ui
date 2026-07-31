@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vnu_core/globals.dart';
 import 'package:vnu_noi_tru/cubit/dormitory_registration_cubit.dart';
+import 'package:vnu_noi_tru/models/model.dart';
 import 'package:path/path.dart' as p;
 import 'package:vnu_core/common/app_text_styles.dart';
 import 'dart:io';
@@ -92,6 +93,7 @@ class DRStep4ReviewScreenState extends State<DRStep4ReviewScreen> {
       }
     }
     final bool hasSelectedDocuments =
+        cubit.avatarFile != null ||
         cubit.cccdFrontFile != null ||
         cubit.cccdFrontAttachment != null ||
         cubit.cccdBackFile != null ||
@@ -188,6 +190,97 @@ class DRStep4ReviewScreenState extends State<DRStep4ReviewScreen> {
             ),
           ),
           const SizedBox(height: 12),
+          Card(
+            color: Colors.white,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+              side: const BorderSide(color: Color(0xFFE3E6EB)),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  const Row(
+                    children: <Widget>[
+                      Icon(
+                        Icons.family_restroom_rounded,
+                        color: Color(0xFF078B3E),
+                        size: 20,
+                      ),
+                      SizedBox(width: 8),
+                      Text(
+                        'Thông tin gia đình',
+                        style: TextStyle(
+                          fontSize: AppFontSizes.font11,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF111318),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  if (cubit.familyMembers.isEmpty)
+                    const Text(
+                      'Không khai báo người thân.',
+                      style: TextStyle(
+                        fontSize: AppFontSizes.small,
+                        color: Color(0xFF666B75),
+                      ),
+                    )
+                  else
+                    ...cubit.familyMembers.asMap().entries.map(
+                      (MapEntry<int, FamilyMemberPayload> entry) {
+                        final FamilyMemberPayload member = entry.value;
+                        final List<String> details = <String>[
+                          if (member.birthYear != null)
+                            'Năm sinh ${member.birthYear}',
+                          if ((member.occupation ?? '').trim().isNotEmpty)
+                            member.occupation!.trim(),
+                          if ((member.phoneNumber ?? '').trim().isNotEmpty)
+                            member.phoneNumber!.trim(),
+                        ];
+
+                        return Container(
+                          width: double.infinity,
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.all(11),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF7F8FA),
+                            borderRadius: BorderRadius.circular(11),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Text(
+                                '${member.relationshipLabel}: ${member.fullName}',
+                                style: const TextStyle(
+                                  fontSize: AppFontSizes.small,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF111318),
+                                ),
+                              ),
+                              if (details.isNotEmpty) ...<Widget>[
+                                const SizedBox(height: 4),
+                                Text(
+                                  details.join(' • '),
+                                  style: const TextStyle(
+                                    fontSize: AppFontSizes.extraSmall,
+                                    color: Color(0xFF666B75),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
           // 4. Lý do đăng ký
           Card(
             color: Colors.white,
@@ -277,6 +370,11 @@ class DRStep4ReviewScreenState extends State<DRStep4ReviewScreen> {
                       spacing: 12,
                       runSpacing: 12,
                       children: [
+                        if (cubit.avatarFile != null)
+                          _buildLocalImagePreview(
+                            cubit.avatarFile!,
+                            label: 'Ảnh thẻ sinh viên',
+                          ),
                         if (cubit.cccdFrontFile != null)
                           _buildLocalImagePreview(
                             cubit.cccdFrontFile!,

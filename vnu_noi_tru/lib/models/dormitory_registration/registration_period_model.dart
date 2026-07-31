@@ -47,6 +47,7 @@ class RegistrationPeriodModel {
   final String? status;
   final DateTime? startTime;
   final DateTime? endTime;
+  final int? maxApprovalDays;
   final String? description;
 
   RegistrationPeriodModel({
@@ -56,6 +57,7 @@ class RegistrationPeriodModel {
     this.status,
     this.startTime,
     this.endTime,
+    this.maxApprovalDays,
     this.description,
   });
 
@@ -78,6 +80,9 @@ class RegistrationPeriodModel {
       endTime: json['end_time'] != null
           ? DateTime.tryParse(json['end_time'].toString())
           : null,
+      maxApprovalDays: _parseInt(
+        json['max_approval_days'] ?? json['maxApprovalDays'],
+      ),
       description: json['description'] as String?,
     );
   }
@@ -89,6 +94,7 @@ class RegistrationPeriodModel {
     'status': status,
     'start_time': startTime?.toIso8601String(),
     'end_time': endTime?.toIso8601String(),
+    'max_approval_days': maxApprovalDays,
     'description': description,
   };
 }
