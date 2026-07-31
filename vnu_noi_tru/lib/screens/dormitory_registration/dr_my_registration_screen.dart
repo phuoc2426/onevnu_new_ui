@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vnu_core/common/app_text_styles.dart';
 import 'package:vnu_core/common/utils.dart';
 import 'package:vnu_core/globals.dart';
@@ -8,6 +9,8 @@ import 'package:vnu_core/themes/app_theme.dart';
 import 'package:vnu_core/widgets/progress_hub_widget.dart';
 import 'package:vnu_core/widgets/vcore_module_scaffold.dart';
 import 'package:vnu_noi_tru/cubit/dormitory_registration_cubit.dart';
+import 'package:vnu_noi_tru/models/dormitory_payment/dormitory_invoice_model.dart';
+import 'package:vnu_noi_tru/repository/dormitory_payment_repository.dart';
 import 'package:vnu_noi_tru/repository/dormitory_registration_repository.dart';
 
 import 'dr_history_bottom_sheet.dart';
@@ -24,12 +27,16 @@ class DRMyRegistrationScreen extends StatefulWidget {
 class _DRMyRegistrationScreenState
     extends State<DRMyRegistrationScreen> {
   final DormitoryRegistrationCubit _cubit =
-      DormitoryRegistrationCubit();
+  DormitoryRegistrationCubit();
 
   final DormitoryRegistrationRepository _repository =
-      DormitoryRegistrationRepository();
+  DormitoryRegistrationRepository();
+
+  final DormitoryPaymentRepository _paymentRepository =
+  DormitoryPaymentRepository();
 
   List<dynamic> _roomTypes = <dynamic>[];
+  DormitoryInvoiceModel? _latestReceipt;
 
   late BuildContext _hubContext;
 
@@ -74,6 +81,7 @@ class _DRMyRegistrationScreenState
     }
 
     await _cubit.getMyRegistrations();
+    await _loadLatestReceiptFromCurrentState();
   }
 
   Future<void> _refreshData() async {
@@ -86,7 +94,7 @@ class _DRMyRegistrationScreenState
     await _loadRoomTypesForDisplay();
 
     final bool hasOpenPeriod =
-        await _cubit.checkAnyOpenRegistrationPeriod();
+    await _cubit.checkAnyOpenRegistrationPeriod();
 
     if (mounted) {
       setState(() {
@@ -97,6 +105,84 @@ class _DRMyRegistrationScreenState
     }
 
     await _cubit.getMyRegistrations();
+    await _loadLatestReceiptFromCurrentState();
+  }
+
+  Future<void> _loadLatestReceiptFromCurrentState() async {
+    final dynamic data = _readDataFromState(_cubit.state);
+    final dynamic student = _readStudent(data);
+
+    String identityNo = _studentIdentityNo(student).trim();
+
+    if (identityNo.isEmpty) {
+      final SharedPreferences preferences =
+      await SharedPreferences.getInstance();
+      identityNo =
+          preferences.getString('applicant_cccd')?.trim() ?? '';
+    }
+
+    if (identityNo.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _latestReceipt = null;
+        });
+      } else {
+        _latestReceipt = null;
+      }
+      return;
+    }
+
+    try {
+      final DormitoryInvoiceResponse response =
+      await _paymentRepository.getReceipts(identityNo: identityNo);
+
+      final List<DormitoryInvoiceModel> receipts =
+      List<DormitoryInvoiceModel>.from(response.invoices);
+
+      receipts.sort(_compareReceiptNewestFirst);
+
+      final DormitoryInvoiceModel? latest =
+      receipts.isEmpty ? null : receipts.first;
+
+      if (!mounted) {
+        _latestReceipt = latest;
+        return;
+      }
+
+      setState(() {
+        _latestReceipt = latest;
+      });
+    } catch (_) {
+      // Không dùng lại giá phòng cơ bản khi API biên lai lỗi.
+      // Ẩn giá để tránh hiển thị một con số không đúng với khoản thu mới nhất.
+      if (!mounted) {
+        _latestReceipt = null;
+        return;
+      }
+
+      setState(() {
+        _latestReceipt = null;
+      });
+    }
+  }
+
+  int _compareReceiptNewestFirst(
+      DormitoryInvoiceModel first,
+      DormitoryInvoiceModel second,
+      ) {
+    final DateTime firstDate =
+        first.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+    final DateTime secondDate =
+        second.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+
+    final int dateCompare = secondDate.compareTo(firstDate);
+    if (dateCompare != 0) {
+      return dateCompare;
+    }
+
+    final int firstId = int.tryParse(first.id?.toString() ?? '') ?? 0;
+    final int secondId = int.tryParse(second.id?.toString() ?? '') ?? 0;
+    return secondId.compareTo(firstId);
   }
 
   Future<void> _loadRoomTypesForDisplay() async {
@@ -270,7 +356,7 @@ class _DRMyRegistrationScreenState
 
       if (summary is Map && detail is Map) {
         final Map<String, dynamic> merged =
-            Map<String, dynamic>.from(detail);
+        Map<String, dynamic>.from(detail);
 
         // Ưu tiên giá trị tóm tắt khi khác null vì status ở đây
         // đã được backend chuẩn hóa thành PENDING/APPROVED/ASSIGNED...
@@ -514,7 +600,7 @@ class _DRMyRegistrationScreenState
     return _readString(
       student,
       'identity_type',
-      (dynamic object) => object.identityType,
+          (dynamic object) => object.identityType,
       aliases: const <String>['identityType'],
     );
   }
@@ -523,7 +609,7 @@ class _DRMyRegistrationScreenState
     return _readDate(
       student,
       'dob',
-      (dynamic object) => object.dob,
+          (dynamic object) => object.dob,
       aliases: const <String>['dateOfBirth'],
     );
   }
@@ -532,7 +618,7 @@ class _DRMyRegistrationScreenState
     final String value = _readString(
       student,
       'gender',
-      (dynamic object) => object.gender,
+          (dynamic object) => object.gender,
     ).trim().toLowerCase();
 
     if (value == 'male' || value == 'nam') return 'Nam';
@@ -544,7 +630,7 @@ class _DRMyRegistrationScreenState
     return _readString(
       student,
       'academic_year',
-      (dynamic object) => object.academicYear,
+          (dynamic object) => object.academicYear,
       aliases: const <String>['academicYear'],
     );
   }
@@ -553,7 +639,7 @@ class _DRMyRegistrationScreenState
     return _readString(
       student,
       'level',
-      (dynamic object) => object.level,
+          (dynamic object) => object.level,
     );
   }
 
@@ -561,7 +647,7 @@ class _DRMyRegistrationScreenState
     return _readString(
       student,
       'permanent_address',
-      (dynamic object) => object.permanentAddress,
+          (dynamic object) => object.permanentAddress,
       aliases: const <String>[
         'permanentAddress',
         'vneid_permanent_address',
@@ -574,7 +660,7 @@ class _DRMyRegistrationScreenState
     return _readString(
       student,
       'temporary_address',
-      (dynamic object) => object.temporaryAddress,
+          (dynamic object) => object.temporaryAddress,
       aliases: const <String>[
         'temporaryAddress',
         'vneid_temporary_address',
@@ -587,7 +673,7 @@ class _DRMyRegistrationScreenState
     final dynamic rawObjects = _readNested(
       student,
       'priority_objects',
-      (dynamic object) => object.priorityObjects,
+          (dynamic object) => object.priorityObjects,
       aliases: const <String>['priorityObjects'],
     );
 
@@ -608,7 +694,7 @@ class _DRMyRegistrationScreenState
     return _readString(
       student,
       'priority_object_name',
-      (dynamic object) => object.priorityObjectName,
+          (dynamic object) => object.priorityObjectName,
       aliases: const <String>['priorityObjectName'],
     );
   }
@@ -640,7 +726,7 @@ class _DRMyRegistrationScreenState
     final String raw = _readString(
       item,
       'status',
-      (dynamic object) => object.status,
+          (dynamic object) => object.status,
     ).trim().toLowerCase();
 
     if (raw.isNotEmpty && int.tryParse(raw) == null) {
@@ -728,7 +814,7 @@ class _DRMyRegistrationScreenState
     return _readDate(
       item,
       'updated_at',
-      (dynamic object) => object.updatedAt,
+          (dynamic object) => object.updatedAt,
       aliases: const <String>['updatedAt'],
     );
   }
@@ -737,7 +823,7 @@ class _DRMyRegistrationScreenState
     return _readDate(
       item,
       'checkin_at',
-      (dynamic object) => object.checkinAt,
+          (dynamic object) => object.checkinAt,
       aliases: const <String>['checkinAt'],
     );
   }
@@ -746,7 +832,7 @@ class _DRMyRegistrationScreenState
     return _readDate(
       item,
       'checkout_at',
-      (dynamic object) => object.checkoutAt,
+          (dynamic object) => object.checkoutAt,
       aliases: const <String>['checkoutAt'],
     );
   }
@@ -755,7 +841,7 @@ class _DRMyRegistrationScreenState
     return _readString(
       item,
       'reason_stay',
-      (dynamic object) => object.reasonStay,
+          (dynamic object) => object.reasonStay,
       aliases: const <String>['reasonStay', 'reason'],
     );
   }
@@ -764,7 +850,7 @@ class _DRMyRegistrationScreenState
     final dynamic value = _readNested(
       item,
       'is_room_leader',
-      (dynamic object) => object.isRoomLeader,
+          (dynamic object) => object.isRoomLeader,
       aliases: const <String>['isRoomLeader'],
     );
 
@@ -781,7 +867,7 @@ class _DRMyRegistrationScreenState
     final String value = _readString(
       item,
       'request_status',
-      (dynamic object) => object.requestStatus,
+          (dynamic object) => object.requestStatus,
       aliases: const <String>['requestStatus'],
     ).trim().toLowerCase();
 
@@ -838,7 +924,7 @@ class _DRMyRegistrationScreenState
     final int? nestedId = _readInt(
       room,
       'id',
-      (dynamic object) => object.id,
+          (dynamic object) => object.id,
     );
     if (nestedId != null) {
       return nestedId;
@@ -847,7 +933,7 @@ class _DRMyRegistrationScreenState
     return _readInt(
       item,
       'room_id',
-      (dynamic object) => object.roomId,
+          (dynamic object) => object.roomId,
       aliases: const <String>['roomId'],
     );
   }
@@ -860,7 +946,7 @@ class _DRMyRegistrationScreenState
     final String roomNumber = _readString(
       room,
       'room_number',
-      (dynamic object) => object.roomNumber,
+          (dynamic object) => object.roomNumber,
       aliases: const <String>['roomNumber', 'name'],
     ).trim();
 
@@ -868,13 +954,13 @@ class _DRMyRegistrationScreenState
     final String buildingName = _readString(
       building,
       'name',
-      (dynamic object) => object.name,
+          (dynamic object) => object.name,
     ).trim();
 
     final String roomType = _readString(
       room['room_type'] ?? room['roomType'],
       'name',
-      (dynamic object) => object.name,
+          (dynamic object) => object.name,
     ).trim();
 
     final List<String> parts = <String>[
@@ -932,7 +1018,7 @@ class _DRMyRegistrationScreenState
     return _readDate(
       period,
       'start_time',
-      (dynamic object) => object.startTime,
+          (dynamic object) => object.startTime,
       aliases: const <String>['startTime'],
     );
   }
@@ -942,7 +1028,7 @@ class _DRMyRegistrationScreenState
     return _readDate(
       period,
       'end_time',
-      (dynamic object) => object.endTime,
+          (dynamic object) => object.endTime,
       aliases: const <String>['endTime'],
     );
   }
@@ -952,7 +1038,7 @@ class _DRMyRegistrationScreenState
     return _readString(
       period,
       'description',
-      (dynamic object) => object.description,
+          (dynamic object) => object.description,
     );
   }
 
@@ -962,7 +1048,7 @@ class _DRMyRegistrationScreenState
     final dynamic pluralObjects = _readNested(
       item,
       'priority_objects',
-      (dynamic object) => object.priorityObjects,
+          (dynamic object) => object.priorityObjects,
       aliases: const <String>['priorityObjects'],
     );
 
@@ -978,7 +1064,7 @@ class _DRMyRegistrationScreenState
     final dynamic rawIds = _readNested(
       item,
       'priority_object_ids',
-      (dynamic object) => object.priorityObjectIds,
+          (dynamic object) => object.priorityObjectIds,
       aliases: const <String>['priorityObjectIds'],
     );
 
@@ -992,8 +1078,8 @@ class _DRMyRegistrationScreenState
         final int? id = _readInt(priority, 'id', (dynamic object) => object.id);
         if (id == priorityId) {
           final String name =
-              _readString(priority, 'name', (dynamic object) => object.name)
-                  .trim();
+          _readString(priority, 'name', (dynamic object) => object.name)
+              .trim();
           if (name.isNotEmpty && !names.contains(name)) {
             names.add(name);
           }
@@ -1005,12 +1091,12 @@ class _DRMyRegistrationScreenState
     final dynamic nested = _readNested(
       item,
       'priority_object',
-      (dynamic object) => object.priorityObject,
+          (dynamic object) => object.priorityObject,
       aliases: const <String>['priorityObject'],
     );
 
     final String nestedName =
-        _readString(nested, 'name', (dynamic object) => object.name).trim();
+    _readString(nested, 'name', (dynamic object) => object.name).trim();
     if (nestedName.isNotEmpty && !names.contains(nestedName)) {
       names.add(nestedName);
     }
@@ -1018,7 +1104,7 @@ class _DRMyRegistrationScreenState
     final int? singularId = _readInt(
       item,
       'priority_object_id',
-      (dynamic object) => object.priorityObjectId,
+          (dynamic object) => object.priorityObjectId,
       aliases: const <String>['priorityObjectId'],
     );
 
@@ -1027,8 +1113,8 @@ class _DRMyRegistrationScreenState
         final int? id = _readInt(priority, 'id', (dynamic object) => object.id);
         if (id == singularId) {
           final String name =
-              _readString(priority, 'name', (dynamic object) => object.name)
-                  .trim();
+          _readString(priority, 'name', (dynamic object) => object.name)
+              .trim();
           if (name.isNotEmpty && !names.contains(name)) {
             names.add(name);
           }
@@ -1104,7 +1190,7 @@ class _DRMyRegistrationScreenState
     final String nestedName = _readString(
       dormitory,
       'name',
-      (dynamic object) => object.name,
+          (dynamic object) => object.name,
     );
     if (nestedName.isNotEmpty) return nestedName;
 
@@ -1114,7 +1200,7 @@ class _DRMyRegistrationScreenState
         final int? id = _readInt(value, 'id', (dynamic object) => object.id);
         if (id == dormitoryId) {
           final String name =
-              _readString(value, 'name', (dynamic object) => object.name);
+          _readString(value, 'name', (dynamic object) => object.name);
           if (name.isNotEmpty) return name;
         }
       }
@@ -1128,7 +1214,7 @@ class _DRMyRegistrationScreenState
     final String nestedAddress = _readString(
       dormitory,
       'address',
-      (dynamic object) => object.address,
+          (dynamic object) => object.address,
     );
     if (nestedAddress.isNotEmpty) return nestedAddress;
 
@@ -1140,7 +1226,7 @@ class _DRMyRegistrationScreenState
           return _readString(
             value,
             'address',
-            (dynamic object) => object.address,
+                (dynamic object) => object.address,
           );
         }
       }
@@ -1159,14 +1245,14 @@ class _DRMyRegistrationScreenState
     final String nestedName = _readString(
       roomType,
       'name',
-      (dynamic object) => object.name,
+          (dynamic object) => object.name,
     );
     if (nestedName.isNotEmpty) return nestedName;
 
     final int? roomTypeId = _readInt(
       item,
       'room_type_id',
-      (dynamic object) => object.roomTypeId,
+          (dynamic object) => object.roomTypeId,
       aliases: const <String>['roomTypeId'],
     );
 
@@ -1182,32 +1268,38 @@ class _DRMyRegistrationScreenState
     return '';
   }
 
-  String _roomTypePrice(dynamic item) {
-    final dynamic roomType = _roomType(item);
-    final String nestedPrice = _readString(
-      roomType,
-      'price',
-      (dynamic object) => object.price,
-    );
-    if (nestedPrice.isNotEmpty) return nestedPrice;
+  String _latestReceiptPriceText(dynamic item) {
+    final DormitoryInvoiceModel? receipt = _latestReceipt;
 
-    final int? roomTypeId = _readInt(
-      item,
-      'room_type_id',
-      (dynamic object) => object.roomTypeId,
-      aliases: const <String>['roomTypeId'],
-    );
-
-    if (roomTypeId != null) {
-      for (final dynamic value in _roomTypes) {
-        final int? id = _readInt(value, 'id', (dynamic object) => object.id);
-        if (id == roomTypeId) {
-          return _readString(value, 'price', (dynamic object) => object.price);
-        }
-      }
+    if (receipt == null || receipt.totalAmount <= 0) {
+      return '';
     }
 
-    return '';
+    final String amount =
+        '${_formatPrice(receipt.totalAmount.toString())} đ';
+
+    final DateTime? start =
+        receipt.resolvedPeriodStartDate ?? _accommodationStartDate(item);
+    final DateTime? end =
+        receipt.resolvedPeriodEndDate ?? _accommodationEndDate(item);
+
+    if (start != null && end != null) {
+      return '$amount '
+          '(${DateFormat('dd/MM/yy').format(start.toLocal())} - '
+          '${DateFormat('dd/MM/yy').format(end.toLocal())})';
+    }
+
+    if (start != null) {
+      return '$amount '
+          '(từ ${DateFormat('dd/MM/yy').format(start.toLocal())})';
+    }
+
+    if (end != null) {
+      return '$amount '
+          '(đến ${DateFormat('dd/MM/yy').format(end.toLocal())})';
+    }
+
+    return amount;
   }
 
   String _roomNumber(dynamic item) {
@@ -1263,8 +1355,8 @@ class _DRMyRegistrationScreenState
   // =========================================================
 
   bool _hasBlockingRegistration(
-    List<dynamic> accommodations,
-  ) {
+      List<dynamic> accommodations,
+      ) {
     if (accommodations.isEmpty) {
       return false;
     }
@@ -1273,10 +1365,10 @@ class _DRMyRegistrationScreenState
     sorted.sort((dynamic first, dynamic second) {
       final DateTime firstTime =
           _accommodationCreatedAt(first) ??
-          DateTime.fromMillisecondsSinceEpoch(0);
+              DateTime.fromMillisecondsSinceEpoch(0);
       final DateTime secondTime =
           _accommodationCreatedAt(second) ??
-          DateTime.fromMillisecondsSinceEpoch(0);
+              DateTime.fromMillisecondsSinceEpoch(0);
 
       final int timeCompare = secondTime.compareTo(firstTime);
       if (timeCompare != 0) {
@@ -1291,7 +1383,7 @@ class _DRMyRegistrationScreenState
     });
 
     final String latestStatus =
-        _accommodationStatus(sorted.first).trim().toLowerCase();
+    _accommodationStatus(sorted.first).trim().toLowerCase();
 
     // Chỉ ba trạng thái này mới ẩn nút đăng ký mới.
     return latestStatus == 'approved' ||
@@ -1401,9 +1493,9 @@ class _DRMyRegistrationScreenState
           DormitoryRegistrationState>(
         bloc: _cubit,
         builder: (
-          BuildContext context,
-          DormitoryRegistrationState state,
-        ) {
+            BuildContext context,
+            DormitoryRegistrationState state,
+            ) {
           final dynamic data = _readDataFromState(state);
 
           // Chưa tải xong dữ liệu hồ sơ thì chưa kết luận việc hiển thị nút.
@@ -1420,7 +1512,7 @@ class _DRMyRegistrationScreenState
 
           final bool canRegister =
               _hasOpenRegistrationPeriod &&
-              !_isCheckingOpenRegistrationPeriod;
+                  !_isCheckingOpenRegistrationPeriod;
 
           return FloatingActionButton.extended(
             onPressed: canRegister ? _goToRegisterFlow : null,
@@ -1431,18 +1523,18 @@ class _DRMyRegistrationScreenState
             elevation: canRegister ? 4 : 0,
             icon: _isCheckingOpenRegistrationPeriod
                 ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Colors.white,
+              ),
+            )
                 : const Icon(
-                    Icons.app_registration,
-                    size: 18,
-                    color: Colors.white,
-                  ),
+              Icons.app_registration,
+              size: 18,
+              color: Colors.white,
+            ),
             label: Text(
               _isCheckingOpenRegistrationPeriod
                   ? 'Đang kiểm tra'
@@ -1611,12 +1703,13 @@ class _DRMyRegistrationScreenState
                     _buildStudentCard(student),
                     const SizedBox(height: 16),
                     // Giữ nguyên toàn bộ card hồ sơ chi tiết phía dưới.
-                    ...accommodations.map(
-                      (dynamic item) =>
+                    ...accommodations.asMap().entries.map(
+                          (MapEntry<int, dynamic> entry) =>
                           _buildAccommodationCard(
-                        item,
-                        student,
-                      ),
+                            entry.value,
+                            student,
+                            isLatest: entry.key == 0,
+                          ),
                     ),
                   ],
                 ),
@@ -1705,7 +1798,7 @@ class _DRMyRegistrationScreenState
                       const SizedBox(height: 4),
                       Text(
                         'Ngày đăng ký: '
-                        '${DateFormat('dd/MM/yyyy HH:mm').format(createdAt.toLocal())}',
+                            '${DateFormat('dd/MM/yyyy HH:mm').format(createdAt.toLocal())}',
                         style: const TextStyle(
                           fontSize: AppFontSizes.font11,
                           color: Color(0xFF737982),
@@ -1809,9 +1902,10 @@ class _DRMyRegistrationScreenState
   }
 
   Widget _buildAccommodationCard(
-    dynamic item,
-    dynamic student,
-  ) {
+      dynamic item,
+      dynamic student, {
+        required bool isLatest,
+      }) {
     final String status = _accommodationStatus(item);
     final String periodName = _periodName(item);
     final String periodDescription = _periodDescription(item);
@@ -1823,7 +1917,8 @@ class _DRMyRegistrationScreenState
     final String priorityObjectName = _priorityObjectName(item, student);
 
     final String roomTypeName = _roomTypeName(item);
-    final String roomTypePrice = _roomTypePrice(item);
+    final String latestReceiptPrice =
+    isLatest ? _latestReceiptPriceText(item) : '';
     final String roomNumber = _roomNumber(item);
     final String roomCapacity = _roomCapacity(item);
     final String roomCurrentOccupancy = _roomCurrentOccupancy(item);
@@ -1947,7 +2042,9 @@ class _DRMyRegistrationScreenState
                 ),
               if (note.isNotEmpty) _buildInfoRow('Ghi chú:', note),
 
-              if (roomTypeName.isNotEmpty || roomNumber.isNotEmpty) ...<Widget>[
+              if (roomTypeName.isNotEmpty ||
+                  roomNumber.isNotEmpty ||
+                  latestReceiptPrice.isNotEmpty) ...<Widget>[
                 const SizedBox(height: 10),
                 _buildSectionTitle(
                   icon: Icons.meeting_room_outlined,
@@ -1955,10 +2052,10 @@ class _DRMyRegistrationScreenState
                 ),
                 if (roomTypeName.isNotEmpty)
                   _buildInfoRow('Loại phòng:', roomTypeName),
-                if (roomTypePrice.isNotEmpty)
+                if (latestReceiptPrice.isNotEmpty)
                   _buildInfoRow(
                     'Giá phòng:',
-                    '${_formatPrice(roomTypePrice)} đ',
+                    latestReceiptPrice,
                   ),
                 if (roomNumber.isNotEmpty) _buildInfoRow('Phòng:', roomNumber),
                 if (roomCapacity.isNotEmpty)
@@ -2163,7 +2260,7 @@ class _DRMyRegistrationScreenState
                 : Icons.swap_horiz_rounded,
             color: Colors.orange,
             text:
-                '${_requestTypeText(requestType)} đang chờ ban quản lý xử lý.',
+            '${_requestTypeText(requestType)} đang chờ ban quản lý xử lý.',
           ),
           const SizedBox(height: 10),
           SizedBox(
@@ -2461,7 +2558,7 @@ class _DRMyRegistrationScreenState
 
   Future<void> _openChangeRoomRequest(dynamic item) async {
     final int? registrationId =
-        int.tryParse(_accommodationId(item)?.toString() ?? '');
+    int.tryParse(_accommodationId(item)?.toString() ?? '');
 
     if (registrationId == null) {
       snackBarError('Không tìm thấy mã hồ sơ nội trú');
@@ -2475,7 +2572,7 @@ class _DRMyRegistrationScreenState
       color: const Color(0xFF078B3E),
       currentRoom: roomNumber.isEmpty ? null : roomNumber,
       description:
-          'Ứng dụng chỉ ghi nhận yêu cầu chuyển phòng. Ban quản lý '
+      'Ứng dụng chỉ ghi nhận yêu cầu chuyển phòng. Ban quản lý '
           'ký túc xá sẽ kiểm tra và thực hiện việc chuyển phòng sau.',
       noteLabel: 'Lý do chuyển phòng',
       noteHint: 'Nhập lý do hoặc thông tin phòng mong muốn',
@@ -2495,7 +2592,7 @@ class _DRMyRegistrationScreenState
 
   Future<void> _openCheckoutRequest(dynamic item) async {
     final int? registrationId =
-        int.tryParse(_accommodationId(item)?.toString() ?? '');
+    int.tryParse(_accommodationId(item)?.toString() ?? '');
 
     if (registrationId == null) {
       snackBarError('Không tìm thấy mã hồ sơ nội trú');
@@ -2509,7 +2606,7 @@ class _DRMyRegistrationScreenState
       color: Colors.orange.shade700,
       currentRoom: roomNumber.isEmpty ? null : roomNumber,
       description:
-          'Yêu cầu trả phòng sẽ được gửi đến Ban quản lý ký túc xá. '
+      'Yêu cầu trả phòng sẽ được gửi đến Ban quản lý ký túc xá. '
           'Hệ thống chỉ ghi nhận yêu cầu và chưa tự động kết thúc lưu trú.',
       noteLabel: 'Lý do trả phòng',
       noteHint: 'Nhập lý do trả phòng',
@@ -2529,7 +2626,7 @@ class _DRMyRegistrationScreenState
 
   Future<void> _confirmCancelAccommodationRequest(dynamic item) async {
     final int? registrationId =
-        int.tryParse(_accommodationId(item)?.toString() ?? '');
+    int.tryParse(_accommodationId(item)?.toString() ?? '');
     if (registrationId == null) {
       snackBarError('Không tìm thấy mã hồ sơ nội trú');
       return;
@@ -2673,8 +2770,11 @@ class _DRMyRegistrationScreenState
                 return DRInvoicesScreen(
                   identityNo: identityNo,
                   dormitoryId: dormitoryId,
-                  dormitoryName:
-                  _dormitoryName(item),
+                  dormitoryName: _dormitoryName(item),
+                  accommodationStartDate:
+                  _accommodationStartDate(item),
+                  accommodationEndDate:
+                  _accommodationEndDate(item),
                 );
               },
             ),

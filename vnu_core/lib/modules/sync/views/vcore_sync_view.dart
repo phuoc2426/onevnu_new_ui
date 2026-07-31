@@ -6,12 +6,14 @@ import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:vnu_core/common/log.dart';
 import 'package:vnu_core/common/utils.dart';
+import 'package:vnu_core/globals.dart';
 import 'package:vnu_core/models/model.dart';
 import 'package:vnu_core/modules/sync/vneid_deep_link_service.dart';
 import 'package:vnu_core/repository/app_repository.dart';
 import 'package:vnu_core/widgets/vcore_module_scaffold.dart';
-// Globals chứa token và các biến toàn cục của ứng dụng
-import 'package:vnu_core/globals.dart';
+
+// LƯU Ý: ApiRepository.setToken(rawToken) phải gắn header
+// Authorization: Bearer <rawToken> cho Dio dùng trong repository.
 
 class VcoreSyncView extends StatefulWidget {
   const VcoreSyncView({super.key});
@@ -25,9 +27,10 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
     'https://universal.dancuquocgia.com/share',
   );
 
-  StreamSubscription<VneidDeepLinkEvent>? _callbackSubscription;
-  //test
   final TextEditingController _configNameController = TextEditingController();
+  final ApiRepository _repository = ApiRepository();
+
+  StreamSubscription<VneidDeepLinkEvent>? _callbackSubscription;
 
   bool _isCallingShareInfo = false;
   bool _isOpeningVneid = false;
@@ -46,30 +49,26 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
   void initState() {
     super.initState();
 
-    // ------------------------------------------------------------
-    // Đảm bảo token sinh viên đã được gán vào Dio trước khi thực hiện
-    // bất kỳ request nào tới API VNeID (bên thứ 3). Token được lưu trong
-    // Globals().token và được đưa vào header Authorization thông qua
-    // ApiRepository.setToken(). Nếu token rỗng nghĩa là người dùng chưa
-    // đăng nhập hoặc token đã hết hạn, sẽ gây lỗi 401.
-    // ------------------------------------------------------------
-    if (Globals().token.isNotEmpty) {
-      ApiRepository().setToken(Globals().token);
-      logInfo('Token đã được gán cho Dio trong VcoreSyncView.initState');
-    } else {
-      logWarning(
-        'Token rỗng khi khởi tạo VcoreSyncView – người dùng chưa đăng nhập',
-      );
-    }
-
+    _initializeRepositoryToken();
     VneidDeepLinkService().isSyncViewVisible = true;
 
-    _callbackSubscription = VneidDeepLinkService().callbackStream.listen((
-      event,
-    ) {
-      VneidDeepLinkService().consumeLatestCallback();
-      _handleVneidCallback(event);
-    });
+    _callbackSubscription = VneidDeepLinkService().callbackStream.listen(
+          (event) async {
+        VneidDeepLinkService().consumeLatestCallback();
+        await _handleVneidCallback(event);
+      },
+      onError: (Object error, StackTrace stackTrace) {
+        _logBlock(
+          title: 'VNEID CALLBACK STREAM ERROR',
+          isError: true,
+          values: {
+            'errorType': error.runtimeType,
+            'error': error,
+            'stackTrace': stackTrace,
+          },
+        );
+      },
+    );
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final event = VneidDeepLinkService().consumeLatestCallback();
@@ -83,13 +82,6 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
     });
   }
 
-  // @override
-  // void dispose() {
-  //   VneidDeepLinkService().isSyncViewVisible = false;
-  //   _callbackSubscription?.cancel();
-  //   super.dispose();
-  // }
-  //test
   @override
   void dispose() {
     VneidDeepLinkService().isSyncViewVisible = false;
@@ -98,40 +90,153 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
     super.dispose();
   }
 
-  Future<void> _startVneidSync() async {
-    if (_isBusy) return;
 
-    // Kiểm tra token trước khi thực hiện đồng bộ
-    if (Globals().token.isEmpty) {
-      // Nếu chưa có token, thông báo cho người dùng đăng nhập lại.
-      snackBarError(
-        'Bạn chưa đăng nhập. Vui lòng đăng nhập trước khi đồng bộ.',
+  /// Chuẩn hóa token để tránh trường hợp Globals().token đã chứa sẵn
+  /// tiền tố "Bearer ", dẫn tới header bị thành "Bearer Bearer <token>".
+  String _normalizeRawToken(String token) {
+    final normalized = token.trim();
+
+    if (normalized.toLowerCase().startsWith('bearer ')) {
+      return normalized.substring(7).trim();
+    }
+
+    return normalized;
+  }
+
+  /// Gắn token cho ApiRepository.
+  ///
+  /// ApiRepository.setToken(rawToken) phải tạo header:
+  /// Authorization: Bearer <rawToken>
+  ///
+  /// Không truyền chuỗi "Bearer <token>" trực tiếp vào setToken nếu
+  /// setToken đã tự thêm tiền tố Bearer, vì sẽ gây "Bearer Bearer ...".
+  void _applyBearerToken(
+      String token, {
+        required String action,
+      }) {
+    final rawToken = _normalizeRawToken(token);
+
+    if (rawToken.isEmpty) {
+      _logBlock(
+        title: 'VNEID APPLY BEARER TOKEN FAILED',
+        isError: true,
+        values: {
+          'action': action,
+          'reason': 'Token rỗng',
+        },
       );
-      setState(() {
-        _screenMessage = 'Chưa có token xác thực – vui lòng đăng nhập.';
-      });
       return;
     }
 
-    // Đảm bảo Dio đã có header Authorization (trường hợp token được cập nhật
-    // sau khi đăng nhập nhưng chưa được gán lại cho Dio).
-    ApiRepository().setToken(Globals().token);
+    _repository.setToken(rawToken);
 
-    setState(() {
-      _isCallingShareInfo = true;
-      _currentTransitionCode = null;
-      _currentResultCode = null;
-      _currentStatus = null;
-      _screenMessage = 'Đang kiểm tra và gửi thông tin chia sẻ với OneVNU...';
-    });
+    _logToken(
+      action: action,
+      token: rawToken,
+    );
+  }
+
+  void _initializeRepositoryToken() {
+    final token = Globals().token.trim();
+
+    if (token.isEmpty) {
+      _logBlock(
+        title: 'VNEID INITIALIZATION',
+        isError: true,
+        values: {
+          'message': 'Token rỗng, người dùng chưa đăng nhập',
+          'tokenLength': token.length,
+        },
+      );
+      return;
+    }
+
+    _applyBearerToken(
+      token,
+      action: 'INIT STATE - GÁN BEARER TOKEN CHO API REPOSITORY',
+    );
+  }
+
+  Future<void> _startVneidSync() async {
+    if (_isBusy) {
+      logWarning('VNEID SYNC | Bỏ qua vì màn hình đang xử lý request khác');
+      return;
+    }
+
+    final token = Globals().token.trim();
+
+    _logToken(
+      action: 'START SYNC - TOKEN LẤY TỪ GLOBALS',
+      token: token,
+    );
+
+    if (token.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _screenMessage = 'Chưa có token xác thực – vui lòng đăng nhập.';
+        });
+      }
+
+      snackBarError(
+        'Bạn chưa đăng nhập. Vui lòng đăng nhập trước khi đồng bộ.',
+      );
+      return;
+    }
+
+    _applyBearerToken(
+      token,
+      action: 'START SYNC - GÁN BEARER TOKEN TRƯỚC SHARE-INFO',
+    );
+
+    if (mounted) {
+      setState(() {
+        _isCallingShareInfo = true;
+        _currentTransitionCode = null;
+        _currentResultCode = null;
+        _currentStatus = null;
+        _screenMessage =
+        'Đang kiểm tra và gửi thông tin chia sẻ với OneVNU...';
+      });
+    }
+
+    final configName = _configNameController.text.trim();
+    final stopwatch = Stopwatch()..start();
+
+    _logBlock(
+      title: 'VNEID SHARE-INFO REQUEST',
+      values: {
+        'apiName': 'shareVneidInfo',
+        'expectedMethod': 'POST',
+        'expectedEndpoint': '/share-info',
+        'configName': configName.isEmpty ? '<empty>' : configName,
+        'tokenIsEmpty': token.isEmpty,
+        'tokenLength': token.length,
+        'authorization': 'Bearer ${_maskToken(_normalizeRawToken(token))}',
+        'requestArguments': {
+          'configName': configName,
+        },
+        'note':
+        'Đây là toàn bộ tham số màn hình truyền vào ApiRepository. '
+            'Body/headers cuối cùng do ApiRepository tạo cần Dio interceptor '
+            'để quan sát chính xác.',
+      },
+    );
 
     try {
-      // Bước 1: gọi share-info trước.
-      // API này có nhiệm vụ validate dữ liệu và gắn cờ để VNeID mở popup consent.
-      // await ApiRepository().shareVneidInfo();
-      //test
-      var ressponseShareVneid = await ApiRepository().shareVneidInfo(
-        configName: _configNameController.text.trim(),
+      final responseShareVneid = await _repository.shareVneidInfo(
+        configName: configName,
+      );
+
+      stopwatch.stop();
+
+      _logBlock(
+        title: 'VNEID SHARE-INFO RESPONSE',
+        values: {
+          'apiName': 'shareVneidInfo',
+          'elapsedMilliseconds': stopwatch.elapsedMilliseconds,
+          'responseType': responseShareVneid.runtimeType,
+          'responseData': _sanitizeForLog(responseShareVneid),
+        },
       );
 
       if (!mounted) return;
@@ -140,13 +245,28 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
         _isCallingShareInfo = false;
         _isOpeningVneid = true;
         _screenMessage =
-            'Đã gửi thông tin. Đang mở VNeID để xác nhận chia sẻ...';
+        'Đã gửi thông tin. Đang mở VNeID để xác nhận chia sẻ...';
       });
 
-      // Bước 2: share-info OK thì mới mở VNeID.
+      _logBlock(
+        title: 'VNEID OPEN EXTERNAL APP REQUEST',
+        values: {
+          'uri': _vneidShareUri,
+          'launchMode': LaunchMode.externalApplication,
+        },
+      );
+
       final isOpened = await launchUrl(
         _vneidShareUri,
         mode: LaunchMode.externalApplication,
+      );
+
+      _logBlock(
+        title: 'VNEID OPEN EXTERNAL APP RESULT',
+        values: {
+          'uri': _vneidShareUri,
+          'isOpened': isOpened,
+        },
       );
 
       if (!isOpened) {
@@ -164,14 +284,27 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
 
       setState(() {
         _screenMessage =
-            'Vui lòng hoàn tất xác nhận chia sẻ trên ứng dụng VNeID.';
+        'Vui lòng hoàn tất xác nhận chia sẻ trên ứng dụng VNeID.';
       });
-    } catch (e) {
-      logError('VNeID share-info error: $e');
+    } catch (error, stackTrace) {
+      if (stopwatch.isRunning) {
+        stopwatch.stop();
+      }
+
+      _logApiError(
+        apiName: 'shareVneidInfo',
+        error: error,
+        stackTrace: stackTrace,
+        token: token,
+        additionalData: {
+          'configName': configName,
+          'elapsedMilliseconds': stopwatch.elapsedMilliseconds,
+        },
+      );
 
       if (!mounted) return;
 
-      final message = _errorMessage(e);
+      final message = _errorMessage(error);
 
       setState(() {
         _screenMessage = message;
@@ -189,16 +322,31 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
   }
 
   Future<void> _handleVneidCallback(VneidDeepLinkEvent event) async {
-    logInfo('==== VNeID CALLBACK HANDLER START ====');
-    logInfo('Callback event URI: ${event.uri}');
-    logInfo('Callback event data: ${event.data}');
+    final data = event.data;
+
+    _logBlock(
+      title: 'VNEID CALLBACK RECEIVED',
+      values: {
+        'uri': event.uri,
+        'rawEventType': event.runtimeType,
+        'rawEvent': _sanitizeForLog(event),
+        'dataType': data?.runtimeType,
+        'data': _sanitizeForLog(data),
+      },
+    );
 
     if (!mounted) return;
 
-    final data = event.data;
-
     if (data == null) {
-      logWarning('VNeID callback data is null');
+      _logBlock(
+        title: 'VNEID CALLBACK INVALID',
+        isError: true,
+        values: {
+          'reason': 'Callback data is null',
+          'uri': event.uri,
+        },
+      );
+
       setState(() {
         _screenMessage = 'Không nhận được kết quả hợp lệ từ VNeID.';
       });
@@ -209,12 +357,31 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
 
     final transitionCode = data.transactionCode.trim();
     final resultCode = data.result?.trim() ?? '';
-    logInfo('Parsed transitionCode: $transitionCode');
-    logInfo('Parsed resultCode: $resultCode');
-    if (transitionCode.isEmpty || !const ['1', '2', '3'].contains(resultCode)) {
-      logWarning(
-        'Invalid VNeID callback: transitionCode=$transitionCode, resultCode=$resultCode',
+    final isValidResultCode = const ['1', '2', '3'].contains(resultCode);
+
+    _logBlock(
+      title: 'VNEID CALLBACK PARSED',
+      values: {
+        'callbackUri': event.uri,
+        'transitionCode': transitionCode,
+        'transitionCodeIsEmpty': transitionCode.isEmpty,
+        'resultCode': resultCode,
+        'resultLabel': _resultLabel(resultCode),
+        'isValidResultCode': isValidResultCode,
+      },
+    );
+
+    if (transitionCode.isEmpty || !isValidResultCode) {
+      _logBlock(
+        title: 'VNEID CALLBACK VALIDATION FAILED',
+        isError: true,
+        values: {
+          'transitionCode': transitionCode,
+          'resultCode': resultCode,
+          'acceptedResultCodes': const ['1', '2', '3'],
+        },
       );
+
       setState(() {
         _screenMessage = 'Không nhận được kết quả hợp lệ từ VNeID.';
       });
@@ -223,28 +390,37 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
       return;
     }
 
-    logInfo(
-      'VNeID callback validation passed, proceeding with resultCode=$resultCode',
-    );
-
     setState(() {
       _currentTransitionCode = transitionCode;
       _currentResultCode = resultCode;
       _currentStatus = null;
     });
 
-    await ApiRepository().upsertVneidSyncTicket(
-      VneidSyncTicket(
-        transactionCode: transitionCode,
-        createdAt: DateTime.now(),
-        status: null,
-        message: _resultLabel(resultCode),
-      ),
+    final ticket = VneidSyncTicket(
+      transactionCode: transitionCode,
+      createdAt: DateTime.now(),
+      status: null,
+      message: _resultLabel(resultCode),
     );
-    logInfo('VNeID sync ticket upserted for transactionCode: $transitionCode');
+
+    _logBlock(
+      title: 'VNEID CACHE TICKET UPSERT REQUEST',
+      values: {
+        'ticket': _sanitizeForLog(ticket),
+      },
+    );
+
+    await _repository.upsertVneidSyncTicket(ticket);
+
+    _logBlock(
+      title: 'VNEID CACHE TICKET UPSERT SUCCESS',
+      values: {
+        'transitionCode': transitionCode,
+        'resultCode': resultCode,
+      },
+    );
 
     if (resultCode == '2') {
-      logInfo('VNeID resultCode=2 (user declined), showing message');
       setState(() {
         _screenMessage = 'Bạn chưa đồng ý chia sẻ thông tin từ VNeID.';
       });
@@ -254,58 +430,129 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
     }
 
     if (resultCode == '3') {
-      logInfo('VNeID resultCode=3 (expired), showing message');
       setState(() {
         _screenMessage =
-            'Phiên chia sẻ thông tin đã hết hạn. Vui lòng thử lại.';
+        'Phiên chia sẻ thông tin đã hết hạn. Vui lòng thử lại.';
       });
 
       snackBarWarning('Phiên chia sẻ thông tin đã hết hạn.');
       return;
     }
 
-    // resultCode = 1
-    logInfo('VNeID resultCode=1 (success), calling _checkVneidStatus');
     await _checkVneidStatus(transitionCode);
   }
 
   Future<void> _checkVneidStatus(String transitionCode) async {
-    logInfo('==== VNeID CHECK STATUS START ====');
-    logInfo('Checking status for transactionCode: $transitionCode');
+    if (_isCheckingStatus) {
+      logWarning(
+        'VNEID STATUS | Bỏ qua vì request kiểm tra trạng thái đang chạy',
+      );
+      return;
+    }
 
-    if (_isCheckingStatus) return;
+    final normalizedTransitionCode = transitionCode.trim();
+    final token = Globals().token.trim();
 
-    setState(() {
-      _isCheckingStatus = true;
-      _screenMessage = 'Đã xác nhận chia sẻ. Đang kiểm tra trạng thái phiếu...';
-    });
+    if (normalizedTransitionCode.isEmpty) {
+      logWarning('VNEID STATUS | transitionCode rỗng');
+      snackBarError('Mã giao dịch không hợp lệ.');
+      return;
+    }
+
+    if (token.isEmpty) {
+      logWarning('VNEID STATUS | Token rỗng');
+      snackBarError('Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.');
+      return;
+    }
+
+    _applyBearerToken(
+      token,
+      action: 'CHECK STATUS - GÁN BEARER TOKEN TRƯỚC STATUS API',
+    );
+
+    if (mounted) {
+      setState(() {
+        _isCheckingStatus = true;
+        _screenMessage =
+        'Đã xác nhận chia sẻ. Đang kiểm tra trạng thái phiếu...';
+      });
+    }
+
+    final stopwatch = Stopwatch()..start();
+
+    _logBlock(
+      title: 'VNEID STATUS REQUEST',
+      values: {
+        'apiName': 'getVneidShareInfoStatus',
+        'expectedMethod': 'GET',
+        'expectedEndpoint':
+        '/share-info/status/$normalizedTransitionCode',
+        'transitionCode': normalizedTransitionCode,
+        'tokenIsEmpty': token.isEmpty,
+        'tokenLength': token.length,
+        'authorization': 'Bearer ${_maskToken(_normalizeRawToken(token))}',
+        'requestArguments': {
+          'transitionCode': normalizedTransitionCode,
+        },
+      },
+    );
 
     try {
-      logInfo('Calling ApiRepository.getVneidShareInfoStatus...');
-      final response = await ApiRepository().getVneidShareInfoStatus(
-        transitionCode,
+      final response = await _repository.getVneidShareInfoStatus(
+        normalizedTransitionCode,
       );
 
-      logInfo(
-        'VNeID status API response: status=${response.status}, studentCode=${response.studentCode}, fullName=${response.fullName}, message=${response.message}',
+      stopwatch.stop();
+
+      _logBlock(
+        title: 'VNEID STATUS RESPONSE',
+        values: {
+          'apiName': 'getVneidShareInfoStatus',
+          'elapsedMilliseconds': stopwatch.elapsedMilliseconds,
+          'responseType': response.runtimeType,
+          'responseData': {
+            'txnId': response.txnId,
+            'status': response.status,
+            'studentCode': response.studentCode,
+            'fullName': response.fullName,
+            'identityNo': _maskNullableIdentityNo(response.identityNo),
+            'message': response.message,
+          },
+          'serializedResponse': _sanitizeForLog(response),
+        },
       );
 
       if (!mounted) return;
 
-      final status = response.status?.toUpperCase();
-      await ApiRepository().upsertVneidSyncTicket(
-        VneidSyncTicket(
-          transactionCode: transitionCode,
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-          status: response.status,
-          studentCode: response.studentCode,
-          fullName: response.fullName,
-          identityNo: response.identityNo,
-          message: response.message,
-        ),
+      final status = response.status?.trim().toUpperCase();
+      final ticket = VneidSyncTicket(
+        transactionCode: normalizedTransitionCode,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+        status: response.status,
+        studentCode: response.studentCode,
+        fullName: response.fullName,
+        identityNo: response.identityNo,
+        message: response.message,
       );
-      logInfo('VNeID sync ticket updated with status: ${response.status}');
+
+      _logBlock(
+        title: 'VNEID CACHE STATUS UPSERT REQUEST',
+        values: {
+          'ticket': _sanitizeForLog(ticket),
+        },
+      );
+
+      await _repository.upsertVneidSyncTicket(ticket);
+
+      _logBlock(
+        title: 'VNEID CACHE STATUS UPSERT SUCCESS',
+        values: {
+          'transitionCode': normalizedTransitionCode,
+          'status': response.status,
+        },
+      );
+
       setState(() {
         _currentStatus = response;
         _screenMessage = response.message?.trim().isNotEmpty == true
@@ -314,21 +561,31 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
       });
 
       if (status == 'SUCCESS') {
-        logInfo('VNeID status=SUCCESS, showing success message');
         snackBarSuccess('Đồng bộ thông tin thành công.');
       } else if (status == 'PENDING') {
-        logInfo('VNeID status=PENDING, showing warning');
         snackBarWarning('Phiếu đồng bộ đang được xử lý.');
       } else {
-        logWarning('VNeID status=$status (FAILED/OTHER), showing error');
         snackBarError(response.message ?? 'Đồng bộ thông tin thất bại.');
       }
-    } catch (e) {
-      logError('VNeID status error: $e');
+    } catch (error, stackTrace) {
+      if (stopwatch.isRunning) {
+        stopwatch.stop();
+      }
+
+      _logApiError(
+        apiName: 'getVneidShareInfoStatus',
+        error: error,
+        stackTrace: stackTrace,
+        token: token,
+        additionalData: {
+          'transitionCode': normalizedTransitionCode,
+          'elapsedMilliseconds': stopwatch.elapsedMilliseconds,
+        },
+      );
 
       if (!mounted) return;
 
-      final message = _errorMessage(e);
+      final message = _errorMessage(error);
 
       setState(() {
         _screenMessage = message;
@@ -341,8 +598,207 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
           _isCheckingStatus = false;
         });
       }
-      logInfo('==== VNeID CHECK STATUS END ====');
+
+      _logBlock(
+        title: 'VNEID STATUS FINISHED',
+        values: {
+          'transitionCode': normalizedTransitionCode,
+          'elapsedMilliseconds': stopwatch.elapsedMilliseconds,
+        },
+      );
     }
+  }
+
+  void _logToken({required String action, required String token}) {
+    _logBlock(
+      title: 'VNEID TOKEN',
+      values: {
+        'action': action,
+        'tokenIsEmpty': token.isEmpty,
+        'tokenLength': token.length,
+        'tokenMasked': _maskToken(token),
+        'authorizationHeaderMasked': 'Bearer ${_maskToken(_normalizeRawToken(token))}',
+      },
+    );
+  }
+
+  void _logApiError({
+    required String apiName,
+    required Object error,
+    required StackTrace stackTrace,
+    required String token,
+    Map<String, dynamic>? additionalData,
+  }) {
+    final values = <String, dynamic>{
+      'apiName': apiName,
+      'tokenIsEmpty': token.isEmpty,
+      'tokenLength': token.length,
+      'tokenMasked': _maskToken(token),
+      'errorType': error.runtimeType,
+      'error': error,
+      if (additionalData != null) ...additionalData,
+    };
+
+    if (error is DioException) {
+      values.addAll({
+        'dioErrorType': error.type,
+        'dioMessage': error.message,
+        'requestMethod': error.requestOptions.method,
+        'requestUri': error.requestOptions.uri,
+        'requestPath': error.requestOptions.path,
+        'requestBaseUrl': error.requestOptions.baseUrl,
+        'requestHeaders': _sanitizeForLog(error.requestOptions.headers),
+        'requestQueryParameters':
+        _sanitizeForLog(error.requestOptions.queryParameters),
+        'requestBody': _sanitizeForLog(error.requestOptions.data),
+        'requestContentType': error.requestOptions.contentType,
+        'requestResponseType': error.requestOptions.responseType,
+        'requestConnectTimeout': error.requestOptions.connectTimeout,
+        'requestSendTimeout': error.requestOptions.sendTimeout,
+        'requestReceiveTimeout': error.requestOptions.receiveTimeout,
+        'responseStatusCode': error.response?.statusCode,
+        'responseStatusMessage': error.response?.statusMessage,
+        'responseHeaders': _sanitizeForLog(error.response?.headers.map),
+        'responseData': _sanitizeForLog(error.response?.data),
+        'responseRealUri': error.response?.realUri,
+      });
+    }
+
+    values['stackTrace'] = stackTrace;
+
+    _logBlock(
+      title: 'VNEID API ERROR',
+      values: values,
+      isError: true,
+    );
+  }
+
+  void _logBlock({
+    required String title,
+    required Map<String, dynamic> values,
+    bool isError = false,
+  }) {
+    final logger = isError ? logError : logInfo;
+    final separator = '=' * 18;
+
+    logger('$separator $title $separator');
+
+    for (final entry in values.entries) {
+      logger('${entry.key}: ${_sanitizeForLog(entry.value)}');
+    }
+
+    logger('=' * (title.length + 38));
+  }
+
+  dynamic _sanitizeForLog(dynamic value, {String? keyName}) {
+    if (value == null) return null;
+
+    final normalizedKey = keyName?.trim().toLowerCase();
+
+    if (_isTokenKey(normalizedKey)) {
+      return _maskToken(value.toString());
+    }
+
+    if (_isIdentityKey(normalizedKey)) {
+      return _maskIdentityNo(value.toString());
+    }
+
+    if (value is Map) {
+      return value.map(
+            (key, item) => MapEntry(
+          key.toString(),
+          _sanitizeForLog(item, keyName: key.toString()),
+        ),
+      );
+    }
+
+    if (value is Iterable) {
+      return value.map((item) => _sanitizeForLog(item)).toList();
+    }
+
+    if (value is FormData) {
+      return {
+        'fields': value.fields
+            .map(
+              (entry) => {
+            'name': entry.key,
+            'value': _sanitizeForLog(
+              entry.value,
+              keyName: entry.key,
+            ),
+          },
+        )
+            .toList(),
+        'files': value.files
+            .map(
+              (entry) => {
+            'fieldName': entry.key,
+            'fileName': entry.value.filename,
+            'length': entry.value.length,
+            'contentType': entry.value.contentType?.toString(),
+          },
+        )
+            .toList(),
+      };
+    }
+
+    if (value is String || value is num || value is bool || value is Uri) {
+      return value;
+    }
+
+    try {
+      final dynamic dynamicValue = value;
+      final dynamic jsonValue = dynamicValue.toJson();
+      return _sanitizeForLog(jsonValue, keyName: keyName);
+    } catch (_) {
+      return value.toString();
+    }
+  }
+
+  bool _isTokenKey(String? key) {
+    if (key == null || key.isEmpty) return false;
+
+    return key == 'authorization' ||
+        key == 'token' ||
+        key == 'jwt' ||
+        key == 'access_token' ||
+        key == 'accesstoken' ||
+        key == 'refresh_token' ||
+        key == 'refreshtoken';
+  }
+
+  bool _isIdentityKey(String? key) {
+    if (key == null || key.isEmpty) return false;
+
+    return key == 'cccd' ||
+        key == 'identityno' ||
+        key == 'identity_no' ||
+        key == 'citizenid' ||
+        key == 'citizen_id';
+  }
+
+  String _maskToken(String token) {
+    final normalized = token.trim();
+
+    if (normalized.isEmpty) return '<empty>';
+
+    final lower = normalized.toLowerCase();
+    final hasBearerPrefix = lower.startsWith('bearer ');
+    final rawToken = hasBearerPrefix ? normalized.substring(7).trim() : normalized;
+    final prefix = hasBearerPrefix ? 'Bearer ' : '';
+
+    if (rawToken.length <= 14) {
+      return '${prefix}***';
+    }
+
+    final firstPart = rawToken.substring(0, 8);
+    final lastPart = rawToken.substring(rawToken.length - 6);
+    return '$prefix$firstPart...$lastPart';
+  }
+
+  String? _maskNullableIdentityNo(String? value) {
+    if (value == null) return null;
+    return _maskIdentityNo(value);
   }
 
   String _errorMessage(Object error) {
@@ -453,18 +909,6 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  // children: [
-                  //   _buildIntroCard(),
-                  //   if (_currentTransitionCode != null) ...[
-                  //     const SizedBox(height: 16),
-                  //     _buildCallbackCard(),
-                  //   ],
-                  //   if (_currentStatus != null) ...[
-                  //     const SizedBox(height: 16),
-                  //     _buildStatusCard(_currentStatus!),
-                  //   ],
-                  // ],
-                  //test
                   children: [
                     _buildIntroCard(),
                     const SizedBox(height: 16),
@@ -488,7 +932,6 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
     );
   }
 
-  //test
   Widget _buildConfigCard() {
     return Container(
       width: double.infinity,
@@ -628,33 +1071,52 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
   }
 
   Future<void> _restoreLatestCachedTicket() async {
-    final tickets = await ApiRepository().getCachedVneidSyncTickets();
+    try {
+      final tickets = await _repository.getCachedVneidSyncTickets();
 
-    if (!mounted || tickets.isEmpty) return;
+      _logBlock(
+        title: 'VNEID CACHE RESTORE',
+        values: {
+          'ticketCount': tickets.length,
+          'tickets': _sanitizeForLog(tickets),
+        },
+      );
 
-    final latest = tickets.first;
+      if (!mounted || tickets.isEmpty) return;
 
-    setState(() {
-      _currentTransitionCode = latest.transactionCode;
-      _currentResultCode = null;
+      final latest = tickets.first;
 
-      _screenMessage = latest.message?.trim().isNotEmpty == true
-          ? latest.message
-          : 'Đã khôi phục mã giao dịch gần nhất.';
+      setState(() {
+        _currentTransitionCode = latest.transactionCode;
+        _currentResultCode = null;
+        _screenMessage = latest.message?.trim().isNotEmpty == true
+            ? latest.message
+            : 'Đã khôi phục mã giao dịch gần nhất.';
 
-      if (latest.status?.trim().isNotEmpty == true) {
-        _currentStatus = VneidShareInfoStatusModel(
-          txnId: latest.transactionCode,
-          status: latest.status,
-          studentCode: latest.studentCode,
-          fullName: latest.fullName,
-          identityNo: latest.identityNo,
-          message: latest.message,
-        );
-      } else {
-        _currentStatus = null;
-      }
-    });
+        if (latest.status?.trim().isNotEmpty == true) {
+          _currentStatus = VneidShareInfoStatusModel(
+            txnId: latest.transactionCode,
+            status: latest.status,
+            studentCode: latest.studentCode,
+            fullName: latest.fullName,
+            identityNo: latest.identityNo,
+            message: latest.message,
+          );
+        } else {
+          _currentStatus = null;
+        }
+      });
+    } catch (error, stackTrace) {
+      _logBlock(
+        title: 'VNEID CACHE RESTORE ERROR',
+        isError: true,
+        values: {
+          'errorType': error.runtimeType,
+          'error': error,
+          'stackTrace': stackTrace,
+        },
+      );
+    }
   }
 
   Widget _buildCallbackCard() {

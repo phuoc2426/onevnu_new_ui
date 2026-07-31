@@ -877,13 +877,21 @@ class ApiRepository {
         rethrow;
       }
     }
+    final token = Globals().token;
+    final headers = <String, dynamic>{
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    };
+    if (token.isNotEmpty) {
+      headers['Authorization'] = 'Bearer ${token.trim()}';
+    }
+
+    logInfo('shareVneidInfo request headers: $headers');
+
     final response = await Dio().post<Map<String, dynamic>>(
       'https://residence.sohatech.vn/residence/api/vneid/share-info',
       data: body,
-      options: Options(
-        contentType: Headers.jsonContentType,
-        headers: {'Content-Type': 'application/json'},
-      ),
+      options: Options(contentType: Headers.jsonContentType, headers: headers),
     );
 
     return VneidShareInfoResponseModel.fromJson(
@@ -896,9 +904,15 @@ class ApiRepository {
   ) async {
     final encodedTransactionCode = Uri.encodeComponent(transactionCode);
 
+    final token = Globals().token;
+    final headers = <String, dynamic>{'Accept': 'application/json'};
+    if (token.isNotEmpty) {
+      headers['Authorization'] = 'Bearer ${token.trim()}';
+    }
+
     final response = await Dio().get<Map<String, dynamic>>(
       'https://residence.sohatech.vn/residence/api/vneid/share-info/status/$encodedTransactionCode',
-      options: Options(headers: {'Accept': 'application/json'}),
+      options: Options(headers: headers),
     );
 
     final data = response.data ?? <String, dynamic>{};
@@ -1238,7 +1252,9 @@ class ApiRepository {
         },
       ),
     );
-    return ApplicantSigninResponse.fromJson(response.data ?? <String, dynamic>{});
+    return ApplicantSigninResponse.fromJson(
+      response.data ?? <String, dynamic>{},
+    );
   }
 
   Future<ApplicantSigninResponse> applicantRefreshToken(
@@ -1254,7 +1270,9 @@ class ApiRepository {
         },
       ),
     );
-    return ApplicantSigninResponse.fromJson(response.data ?? <String, dynamic>{});
+    return ApplicantSigninResponse.fromJson(
+      response.data ?? <String, dynamic>{},
+    );
   }
 
   Future<void> applicantSignout() async {

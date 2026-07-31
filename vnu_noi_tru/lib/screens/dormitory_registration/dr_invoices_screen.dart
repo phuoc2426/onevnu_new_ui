@@ -19,11 +19,18 @@ class DRInvoicesScreen extends StatefulWidget {
   final int dormitoryId;
   final String dormitoryName;
 
+  /// Khoảng thời gian lưu trú đang hiển thị tại card lịch sử bên ngoài.
+  /// Dùng lại chính dữ liệu này để ngày trong card hóa đơn luôn đồng nhất.
+  final DateTime? accommodationStartDate;
+  final DateTime? accommodationEndDate;
+
   const DRInvoicesScreen({
     super.key,
     required this.identityNo,
     required this.dormitoryId,
     required this.dormitoryName,
+    this.accommodationStartDate,
+    this.accommodationEndDate,
   });
 
   @override
@@ -125,38 +132,6 @@ class _DRInvoicesScreenState extends State<DRInvoicesScreen> {
           const SizedBox(height: 30),
         ],
       ),
-    );
-  }
-
-  // =========================================================
-  // Header
-  // =========================================================
-
-  Widget _buildHeaderRow({required String label, required String value}) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        SizedBox(
-          width: 90,
-          child: Text(
-            '$label:',
-            style: const TextStyle(
-              fontSize: AppFontSizes.font11,
-              color: Color(0xFF607266),
-            ),
-          ),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: const TextStyle(
-              fontSize: AppFontSizes.font11,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF1B2E21),
-            ),
-          ),
-        ),
-      ],
     );
   }
 
@@ -267,6 +242,7 @@ class _DRInvoicesScreenState extends State<DRInvoicesScreen> {
     final DormitoryPaymentMethodModel? paymentMethod = _resolvePaymentMethod();
 
     final double remainingAmount = _calculateRemainingAmount(invoice);
+    final String? periodRange = _invoicePeriodRange(invoice);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -311,6 +287,32 @@ class _DRInvoicesScreenState extends State<DRInvoicesScreen> {
                           color: Color(0xFF111318),
                         ),
                       ),
+                      if (periodRange != null) ...<Widget>[
+                        const SizedBox(height: 4),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: <Widget>[
+                            const Icon(
+                              Icons.date_range_outlined,
+                              size: 14,
+                              color: Color(0xFF078B3E),
+                            ),
+                            const SizedBox(width: 5),
+                            Expanded(
+                              child: Text(
+                                '${periodRange.replaceFirst(' - ', ' - ')}',
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: AppFontSizes.font11,
+                                  color: Color(0xFF4F5660),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                       if (invoice.code != null &&
                           invoice.code!.trim().isNotEmpty) ...[
                         const SizedBox(height: 4),
@@ -397,6 +399,35 @@ class _DRInvoicesScreenState extends State<DRInvoicesScreen> {
         ),
       ),
     );
+  }
+
+  String? _invoicePeriodRange(DormitoryInvoiceModel invoice) {
+    // Ưu tiên đúng ngày start_date/end_date của hồ sơ nội trú,
+    // giống phần "Thời gian ở từ/đến" tại card lịch sử bên ngoài.
+    // Chỉ dùng ngày riêng của biên lai làm dự phòng khi màn hình được mở
+    // từ nơi khác và không truyền dữ liệu hồ sơ nội trú.
+    final DateTime? start = widget.accommodationStartDate ??
+        invoice.resolvedPeriodStartDate;
+    final DateTime? end = widget.accommodationEndDate ??
+        invoice.resolvedPeriodEndDate;
+
+    if (start != null && end != null) {
+      return '${_formatShortDate(start)} - ${_formatShortDate(end)}';
+    }
+
+    if (start != null) {
+      return _formatShortDate(start);
+    }
+
+    if (end != null) {
+      return _formatShortDate(end);
+    }
+
+    return null;
+  }
+
+  String _formatShortDate(DateTime value) {
+    return DateFormat('dd/MM/yy').format(value.toLocal());
   }
 
   Widget _buildAmountRow({
@@ -1146,54 +1177,24 @@ class _DRInvoicesScreenState extends State<DRInvoicesScreen> {
   // Minh chứng đã gửi
   // =========================================================
 
-  DormitoryPaymentModel _getLatestPayment(
-      DormitoryInvoiceModel invoice,
-      ) {
-    final List<DormitoryPaymentModel> payments =
-    List<DormitoryPaymentModel>.from(invoice.payments);
-
-    payments.sort(
-          (
-          DormitoryPaymentModel first,
-          DormitoryPaymentModel second,
-          ) {
-        final DateTime firstDate =
-            first.createdAt ??
-                DateTime.fromMillisecondsSinceEpoch(0);
-
-        final DateTime secondDate =
-            second.createdAt ??
-                DateTime.fromMillisecondsSinceEpoch(0);
-
-        return secondDate.compareTo(firstDate);
-      },
-    );
-
-    return payments.first;
-  }
-
   Widget _buildLatestPaymentBox(DormitoryInvoiceModel invoice) {
-    final DormitoryPaymentModel payment = _getLatestPayment(invoice);
+    final DormitoryPaymentModel payment = invoice.latestPayment!;
+
+    final String status = payment.status?.toLowerCase().trim() ?? '';
 
     Color color;
     IconData icon;
     String title;
 
-    // Trạng thái hóa đơn là nguồn kết luận cuối cùng.
-    // Hóa đơn đã thanh toán thì minh chứng cũng được coi là đã xác nhận.
+    // Trạng thái Receipt là nguồn chính xác cuối cùng.
+    // Khi biên lai đã được xác nhận thanh toán, minh chứng cũng phải
+    // hiển thị là đã xác nhận, kể cả Payment mới nhất còn trả về pending.
     if (invoice.isPaid) {
       color = AppTheme.colorSuccess;
       icon = Icons.check_circle_rounded;
       title = 'Minh chứng đã được xác nhận';
-    } else if (invoice.hasPendingPayment) {
-      color = Colors.orange;
-      icon = Icons.hourglass_top_rounded;
-      title = 'Minh chứng đang chờ xác nhận';
     } else {
-      final String paymentStatus =
-          payment.status?.toLowerCase().trim() ?? '';
-
-      switch (paymentStatus) {
+      switch (status) {
         case 'approved':
         case 'confirmed':
         case 'paid':
@@ -1205,9 +1206,6 @@ class _DRInvoicesScreenState extends State<DRInvoicesScreen> {
           break;
 
         case 'rejected':
-        case 'failed':
-        case 'cancelled':
-        case 'canceled':
           color = AppTheme.colorError;
           icon = Icons.cancel_rounded;
           title = 'Minh chứng bị từ chối';
@@ -1227,20 +1225,14 @@ class _DRInvoicesScreenState extends State<DRInvoicesScreen> {
       decoration: BoxDecoration(
         color: color.withOpacity(0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: color.withOpacity(0.25),
-        ),
+        border: Border.all(color: color.withOpacity(0.25)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Row(
             children: <Widget>[
-              Icon(
-                icon,
-                size: 19,
-                color: color,
-              ),
+              Icon(icon, size: 19, color: color),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -1259,7 +1251,7 @@ class _DRInvoicesScreenState extends State<DRInvoicesScreen> {
             const SizedBox(height: 8),
             Text(
               'Ngày gửi: '
-                  '${DateFormat('dd/MM/yyyy HH:mm').format(payment.createdAt!)}',
+              '${DateFormat('dd/MM/yyyy HH:mm').format(payment.createdAt!)}',
               style: const TextStyle(
                 fontSize: AppFontSizes.font11,
                 color: Color(0xFF666B75),
@@ -1278,13 +1270,11 @@ class _DRInvoicesScreenState extends State<DRInvoicesScreen> {
             ),
           ],
 
-          // Khi hóa đơn đã thanh toán thì không hiển thị lại
-          // lý do từ chối của một minh chứng cũ.
-          if (!invoice.isPaid &&
-              _hasText(payment.rejectionReason)) ...[
+          if (_hasText(payment.rejectionReason)) ...[
             const SizedBox(height: 6),
             Text(
-              'Lý do từ chối: ${payment.rejectionReason}',
+              'Lý do từ chối: '
+              '${payment.rejectionReason}',
               style: const TextStyle(
                 fontSize: AppFontSizes.font11,
                 color: Colors.red,
@@ -1348,7 +1338,7 @@ class _DRInvoicesScreenState extends State<DRInvoicesScreen> {
 
   Future<void> _pickPaymentProof(DormitoryInvoiceModel invoice) async {
     if (invoice.id == null) {
-      _showError('Không tìm thấy mã hóa đơn');
+      _showError('Không tìm thấy mã biên lai');
       return;
     }
 
@@ -1389,7 +1379,7 @@ class _DRInvoicesScreenState extends State<DRInvoicesScreen> {
 
       await _cubit.uploadProof(
         identityNo: widget.identityNo,
-        invoiceId: invoice.id!,
+        receiptId: invoice.id!,
         proofImage: proofFile,
         note: confirmResult.note,
         dormitoryId: widget.dormitoryId,

@@ -14,6 +14,8 @@ class DormitoryPaymentCubit extends Cubit<DormitoryPaymentState> {
   final DormitoryPaymentRepository _repository =
       DormitoryPaymentRepository();
 
+  /// Tên biến giữ nguyên để không phải đổi toàn bộ giao diện cũ.
+  /// Dữ liệu thực tế hiện được lấy từ API receipts.
   List<DormitoryInvoiceModel> invoices = <DormitoryInvoiceModel>[];
 
   List<DormitoryPaymentMethodModel> paymentMethods =
@@ -32,7 +34,7 @@ class DormitoryPaymentCubit extends Cubit<DormitoryPaymentState> {
     try {
       try {
         final DormitoryInvoiceResponse response =
-            await _repository.getInvoices(
+            await _repository.getReceipts(
           identityNo: identityNo,
         );
 
@@ -57,8 +59,7 @@ class DormitoryPaymentCubit extends Cubit<DormitoryPaymentState> {
             )
             .toList();
       } catch (_) {
-        // API phương thức thanh toán chưa có hoặc đang lỗi thì vẫn
-        // hiển thị danh sách hóa đơn.
+        // API phương thức thanh toán lỗi thì vẫn hiển thị biên lai.
         paymentMethods = <DormitoryPaymentMethodModel>[];
       }
 
@@ -77,17 +78,13 @@ class DormitoryPaymentCubit extends Cubit<DormitoryPaymentState> {
         return;
       }
 
-      emit(
-        DormitoryPaymentError(
-          _cleanError(error),
-        ),
-      );
+      emit(DormitoryPaymentError(_cleanError(error)));
     }
   }
 
   Future<bool> uploadProof({
     required String identityNo,
-    required Object invoiceId,
+    required Object receiptId,
     required File proofImage,
     required int dormitoryId,
     String? note,
@@ -99,9 +96,10 @@ class DormitoryPaymentCubit extends Cubit<DormitoryPaymentState> {
     try {
       emit(const DormitoryPaymentUploading(0));
 
-      await _repository.uploadPaymentProof(
+      final Map<String, dynamic> response =
+          await _repository.uploadPaymentProof(
         identityNo: identityNo,
-        invoiceId: invoiceId,
+        receiptId: receiptId,
         proofImage: proofImage,
         note: note,
         onSendProgress: (int sent, int total) {
@@ -109,11 +107,7 @@ class DormitoryPaymentCubit extends Cubit<DormitoryPaymentState> {
             return;
           }
 
-          emit(
-            DormitoryPaymentUploading(
-              sent / total,
-            ),
-          );
+          emit(DormitoryPaymentUploading(sent / total));
         },
       );
 
@@ -121,11 +115,10 @@ class DormitoryPaymentCubit extends Cubit<DormitoryPaymentState> {
         return false;
       }
 
-      emit(
-        const DormitoryPaymentUploadSuccess(
-          'Gửi minh chứng thanh toán thành công',
-        ),
-      );
+      final String message = _responseMessage(response) ??
+          'Đã gửi minh chứng chuyển khoản, chờ kế toán xác nhận.';
+
+      emit(DormitoryPaymentUploadSuccess(message));
 
       await loadData(
         identityNo: identityNo,
@@ -135,15 +128,16 @@ class DormitoryPaymentCubit extends Cubit<DormitoryPaymentState> {
       return true;
     } catch (error) {
       if (!isClosed) {
-        emit(
-          DormitoryPaymentError(
-            _cleanError(error),
-          ),
-        );
+        emit(DormitoryPaymentError(_cleanError(error)));
       }
 
       return false;
     }
+  }
+
+  String? _responseMessage(Map<String, dynamic> response) {
+    final String value = response['message']?.toString().trim() ?? '';
+    return value.isEmpty ? null : value;
   }
 
   bool _isApiNotAvailable(Object error) {
@@ -163,9 +157,27 @@ class DormitoryPaymentCubit extends Cubit<DormitoryPaymentState> {
       if (responseData is Map) {
         final dynamic message = responseData['message'];
 
-        if (message != null &&
-            message.toString().trim().isNotEmpty) {
+        if (message != null && message.toString().trim().isNotEmpty) {
           return message.toString();
+        }
+
+        final dynamic errors = responseData['errors'];
+        if (errors is Map && errors.isNotEmpty) {
+          final List<String> messages = <String>[];
+
+          for (final dynamic value in errors.values) {
+            if (value is Iterable) {
+              messages.addAll(
+                value.map((dynamic item) => item.toString()),
+              );
+            } else if (value != null) {
+              messages.add(value.toString());
+            }
+          }
+
+          if (messages.isNotEmpty) {
+            return messages.join('\n');
+          }
         }
       }
 
