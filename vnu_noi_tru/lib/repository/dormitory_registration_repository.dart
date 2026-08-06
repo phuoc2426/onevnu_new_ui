@@ -4,20 +4,16 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as path;
 import 'package:vnu_core/common/log.dart';
-import 'package:vnu_core/constants/config.dart';
 import 'package:vnu_core/globals.dart';
 import 'package:vnu_core/repository/app_repository.dart';
 import 'package:vnu_core/repository/data_repository.dart';
+import 'package:vnu_core/services/app_config_service.dart';
 import 'package:vnu_core/services/dio_options.dart';
+import 'package:vnu_core/services/services_url.dart';
 import 'package:vnu_noi_tru/models/model.dart';
 
 class DormitoryRegistrationRepository {
-  DormitoryRegistrationRepository._internal() {
-    _dio = DioOptions().createDio(kBaseUrlNewDormitory);
-    _studentDio = DioOptions().createDio(_studentApiBaseUrl);
-  }
-
-  static const String _studentApiBaseUrl = 'https://ktx.sohatech.vn/api/';
+  DormitoryRegistrationRepository._internal();
 
   static final DormitoryRegistrationRepository _singleton =
       DormitoryRegistrationRepository._internal();
@@ -26,14 +22,33 @@ class DormitoryRegistrationRepository {
     return _singleton;
   }
 
-  late Dio _dio;
-  late Dio _studentDio;
+  Dio? _dio;
+  Dio? _studentDio;
+  String _dormitoryBaseUrl = '';
+  String _studentBaseUrl = '';
+
+
+  Dio get _dormitoryClient {
+    final Dio? client = _dio;
+    if (client == null) {
+      throw StateError('Dormitory API client has not been initialized');
+    }
+    return client;
+  }
+
+  Dio get _studentClient {
+    final Dio? client = _studentDio;
+    if (client == null) {
+      throw StateError('KTX student API client has not been initialized');
+    }
+    return client;
+  }
 
   Future<RegistrationPeriodResponse> getRegistrationPeriods({
     required int dormitoryId,
   }) async {
     await _loadTokenIfNeeded();
-    final response = await _dio.get<Map<String, dynamic>>(
+    final response = await _dormitoryClient.get<Map<String, dynamic>>(
       '$dormitoryId/registration-periods',
       options: _jsonOptions(),
     );
@@ -42,7 +57,7 @@ class DormitoryRegistrationRepository {
 
   Future<DormitoryListResponse> getDormitories() async {
     await _loadTokenIfNeeded();
-    final response = await _dio.get<Map<String, dynamic>>(
+    final response = await _dormitoryClient.get<Map<String, dynamic>>(
       'list',
       options: _jsonOptions(),
     );
@@ -51,7 +66,7 @@ class DormitoryRegistrationRepository {
 
   Future<RoomTypeListResponse> getRoomTypes() async {
     await _loadTokenIfNeeded();
-    final response = await _dio.get<Map<String, dynamic>>(
+    final response = await _dormitoryClient.get<Map<String, dynamic>>(
       'room-types',
       options: _jsonOptions(),
     );
@@ -60,7 +75,7 @@ class DormitoryRegistrationRepository {
 
   Future<PriorityObjectListResponse> getPriorityObjects() async {
     await _loadTokenIfNeeded();
-    final response = await _dio.get<Map<String, dynamic>>(
+    final response = await _dormitoryClient.get<Map<String, dynamic>>(
       'priority-objects',
       options: _jsonOptions(),
     );
@@ -86,13 +101,14 @@ class DormitoryRegistrationRepository {
 
     if (normalizedStudentCode.isNotEmpty) {
       try {
-        final String encodedStudentCode =
-            Uri.encodeComponent(normalizedStudentCode);
-        final Response<Map<String, dynamic>> response =
-            await _studentDio.get<Map<String, dynamic>>(
-          'students/$encodedStudentCode',
-          options: _jsonOptions(),
+        final String encodedStudentCode = Uri.encodeComponent(
+          normalizedStudentCode,
         );
+        final Response<Map<String, dynamic>> response = await _studentClient
+            .get<Map<String, dynamic>>(
+              'students/$encodedStudentCode',
+              options: _jsonOptions(),
+            );
 
         return MyRegistrationResponse.fromJson(response.data ?? {});
       } on DioException catch (error) {
@@ -111,19 +127,19 @@ class DormitoryRegistrationRepository {
       queryParams['identity_no'] = normalizedIdentityNo;
     }
 
-    final Response<Map<String, dynamic>> response =
-        await _studentDio.get<Map<String, dynamic>>(
-      'dormitory/me',
-      queryParameters: queryParams.isNotEmpty ? queryParams : null,
-      options: _jsonOptions(),
-    );
+    final Response<Map<String, dynamic>> response = await _studentClient
+        .get<Map<String, dynamic>>(
+          'dormitory/me',
+          queryParameters: queryParams.isNotEmpty ? queryParams : null,
+          options: _jsonOptions(),
+        );
 
     return MyRegistrationResponse.fromJson(response.data ?? {});
   }
 
   Future<SingleRegistrationResponse> getRegistrationDetail(Object id) async {
     await _loadTokenIfNeeded();
-    final response = await _dio.get<Map<String, dynamic>>(
+    final response = await _dormitoryClient.get<Map<String, dynamic>>(
       'registrations/$id',
       options: _jsonOptions(),
     );
@@ -152,12 +168,11 @@ class DormitoryRegistrationRepository {
     final List<File> uniqueFiles = _deduplicateFiles(files);
     final FormData formData = FormData();
     final String normalizedType = type.trim();
-    final String effectiveType =
-        normalizedType.isEmpty ? 'student_registration' : normalizedType;
+    final String effectiveType = normalizedType.isEmpty
+        ? 'student_registration'
+        : normalizedType;
 
-    formData.fields.add(
-      MapEntry<String, String>('type', effectiveType),
-    );
+    formData.fields.add(MapEntry<String, String>('type', effectiveType));
 
     final Map<String, dynamic> studentJson = student.toJson();
     final dynamic familyMembers = studentJson.remove('family_members');
@@ -201,8 +216,9 @@ class DormitoryRegistrationRepository {
     }
 
     final List<String> studentFieldNames = formData.fields
-        .where((MapEntry<String, String> entry) =>
-            entry.key.startsWith('student['))
+        .where(
+          (MapEntry<String, String> entry) => entry.key.startsWith('student['),
+        )
         .map((MapEntry<String, String> entry) => entry.key)
         .toList();
 
@@ -215,7 +231,7 @@ class DormitoryRegistrationRepository {
 
     await _loadTokenIfNeeded();
 
-    final response = await _dio.post<Map<String, dynamic>>(
+    final response = await _dormitoryClient.post<Map<String, dynamic>>(
       'attachments/upload',
       data: formData,
       options: _multipartOptions(),
@@ -321,7 +337,7 @@ class DormitoryRegistrationRepository {
       }
     }
 
-    final response = await _dio.post<Map<String, dynamic>>(
+    final response = await _dormitoryClient.post<Map<String, dynamic>>(
       'registrations',
       data: formData,
       options: _multipartOptions(),
@@ -344,7 +360,7 @@ class DormitoryRegistrationRepository {
 
     final String encodedIdentityNo = Uri.encodeComponent(normalizedIdentityNo);
 
-    final response = await _studentDio.patch<Map<String, dynamic>>(
+    final response = await _studentClient.patch<Map<String, dynamic>>(
       'students/$encodedIdentityNo',
       data: data,
       options: _jsonOptions(),
@@ -353,43 +369,35 @@ class DormitoryRegistrationRepository {
     return response.data ?? <String, dynamic>{};
   }
 
-
   /// Lấy danh sách phòng để sinh viên có thể chọn phòng mong muốn khi gửi
   /// yêu cầu chuyển phòng.
   ///
   /// API dùng base /api/dormitory/: GET /rooms.
   /// Response được đọc linh hoạt vì backend có thể trả data.items, data.rooms
   /// hoặc trực tiếp một danh sách trong data.
-  Future<List<Map<String, dynamic>>> getRooms({
-    int? dormitoryId,
-  }) async {
+  Future<List<Map<String, dynamic>>> getRooms({int? dormitoryId}) async {
     await _loadTokenIfNeeded();
 
     final Map<String, dynamic> queryParameters = <String, dynamic>{
       'size': 1000,
-      if (dormitoryId != null && dormitoryId > 0)
-        'dormitory_id': dormitoryId,
+      if (dormitoryId != null && dormitoryId > 0) 'dormitory_id': dormitoryId,
     };
 
-    final Response<Map<String, dynamic>> response =
-        await _dio.get<Map<String, dynamic>>(
-      'rooms',
-      queryParameters: queryParameters,
-      options: _jsonOptions(),
-    );
+    final Response<Map<String, dynamic>> response = await _dormitoryClient
+        .get<Map<String, dynamic>>(
+          'rooms',
+          queryParameters: queryParameters,
+          options: _jsonOptions(),
+        );
 
     final dynamic rawResponse = response.data;
-    final dynamic rawData = rawResponse is Map
-        ? rawResponse['data']
-        : null;
+    final dynamic rawData = rawResponse is Map ? rawResponse['data'] : null;
 
     dynamic rawItems;
     if (rawData is List) {
       rawItems = rawData;
     } else if (rawData is Map) {
-      rawItems = rawData['items'] ??
-          rawData['rooms'] ??
-          rawData['data'];
+      rawItems = rawData['items'] ?? rawData['rooms'] ?? rawData['data'];
     }
 
     if (rawItems is! List) {
@@ -398,8 +406,7 @@ class DormitoryRegistrationRepository {
 
     final List<Map<String, dynamic>> rooms = rawItems
         .whereType<Map>()
-        .map((Map<dynamic, dynamic> item) =>
-            Map<String, dynamic>.from(item))
+        .map((Map<dynamic, dynamic> item) => Map<String, dynamic>.from(item))
         .toList();
 
     if (dormitoryId == null || dormitoryId <= 0) {
@@ -428,7 +435,7 @@ class DormitoryRegistrationRepository {
 
   Future<dynamic> submitDraft(Object id) async {
     await _loadTokenIfNeeded();
-    final response = await _dio.post<Map<String, dynamic>>(
+    final response = await _dormitoryClient.post<Map<String, dynamic>>(
       'registrations/$id/submit',
       data: <String, dynamic>{},
       options: _jsonOptions(),
@@ -440,7 +447,7 @@ class DormitoryRegistrationRepository {
     Object id,
   ) async {
     await _loadTokenIfNeeded();
-    final response = await _dio.get<Map<String, dynamic>>(
+    final response = await _dormitoryClient.get<Map<String, dynamic>>(
       'registrations/$id/histories',
       options: _jsonOptions(),
     );
@@ -472,9 +479,7 @@ class DormitoryRegistrationRepository {
 
     await _loadTokenIfNeeded();
 
-    final Map<String, dynamic> body = <String, dynamic>{
-      'type': type,
-    };
+    final Map<String, dynamic> body = <String, dynamic>{'type': type};
 
     if (type == 'change_room' && desiredRoomId != null) {
       body['desired_room_id'] = desiredRoomId;
@@ -491,7 +496,7 @@ class DormitoryRegistrationRepository {
       'hasNote=${body.containsKey('note')}',
     );
 
-    final response = await _studentDio.post<Map<String, dynamic>>(
+    final response = await _studentClient.post<Map<String, dynamic>>(
       'dormitory/registrations/${Uri.encodeComponent(registrationId.toString())}/request-status',
       data: body,
       options: _jsonOptions(),
@@ -500,17 +505,11 @@ class DormitoryRegistrationRepository {
     return response.data ?? <String, dynamic>{};
   }
 
-  void _addFormField(
-    FormData formData,
-    String key,
-    dynamic value,
-  ) {
+  void _addFormField(FormData formData, String key, dynamic value) {
     if (value == null) return;
     if (value is String && value.trim().isEmpty) return;
 
-    formData.fields.add(
-      MapEntry<String, String>(key, value.toString()),
-    );
+    formData.fields.add(MapEntry<String, String>(key, value.toString()));
   }
 
   Options _multipartOptions() {
@@ -545,7 +544,38 @@ class DormitoryRegistrationRepository {
     return Options(headers: headers);
   }
 
+  Future<void> _ensureApiClients() async {
+    await AppConfigService().ensureLoaded();
+
+    final String studentBaseUrl = ServicesUrl().effectiveKtxApiUrl;
+    final String dormitoryBaseUrl =
+        ServicesUrl().effectiveKtxDormitoryApiUrl;
+
+    if (studentBaseUrl.isEmpty || dormitoryBaseUrl.isEmpty) {
+      throw StateError(
+        'KTX API URL is unavailable. Check /api/config on '
+        '${ServicesUrl.defaultBaseUrl}.',
+      );
+    }
+
+    if (_studentDio == null || _studentBaseUrl != studentBaseUrl) {
+      _studentDio?.close(force: true);
+      _studentDio = DioOptions().createDio(studentBaseUrl);
+      _studentBaseUrl = studentBaseUrl;
+      logInfo('Dormitory student API from config: $studentBaseUrl');
+    }
+
+    if (_dio == null || _dormitoryBaseUrl != dormitoryBaseUrl) {
+      _dio?.close(force: true);
+      _dio = DioOptions().createDio(dormitoryBaseUrl);
+      _dormitoryBaseUrl = dormitoryBaseUrl;
+      logInfo('Dormitory API from config: $dormitoryBaseUrl');
+    }
+  }
+
   Future<void> _loadTokenIfNeeded() async {
+    await _ensureApiClients();
+
     if (Globals().token.isEmpty) {
       final stored = await DataRepository().getSecureSaveKey(kLoginToken);
       if (stored != null && stored.isNotEmpty) {

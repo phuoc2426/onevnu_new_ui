@@ -1,15 +1,15 @@
 import 'package:dio/dio.dart';
 import 'package:vnu_core/common/log.dart';
-import 'package:vnu_core/constants/config.dart';
 import 'package:vnu_core/globals.dart';
 import 'package:vnu_core/repository/app_repository.dart';
 import 'package:vnu_core/repository/data_repository.dart';
 import 'package:vnu_core/services/dio_options.dart';
+import 'package:vnu_core/services/services_url.dart';
 import 'package:vnu_noi_tru/models/dormitory_registration/registration_history_model.dart';
 
 class DormitoryHistoryLookupRepository {
   DormitoryHistoryLookupRepository._internal() {
-    _dio = DioOptions().createDio(kBaseUrlNewDormitory);
+    _dio = DioOptions().createDio(ServicesUrl().effectiveKtxDormitoryApiUrl);
   }
 
   static final DormitoryHistoryLookupRepository _instance =
@@ -32,28 +32,30 @@ class DormitoryHistoryLookupRepository {
         RegistrationHistoryResponse.fromJson(historyJson);
 
     final List<Map<String, dynamic>> baseResponses =
-        await Future.wait<Map<String, dynamic>>(
-      <Future<Map<String, dynamic>>>[
-        _safeGetJson('registrations/$registrationId'),
-        _safeGetJson('list'),
-        _safeGetJson('room-types'),
-        _safeGetJson('priority-objects'),
-        _safeGetJson(
-          'rooms',
-          queryParameters: <String, dynamic>{'size': 1000},
-        ),
-      ],
+        await Future.wait<Map<String, dynamic>>(<Future<Map<String, dynamic>>>[
+          _safeGetJson('registrations/$registrationId'),
+          _safeGetJson('list'),
+          _safeGetJson('room-types'),
+          _safeGetJson('priority-objects'),
+          _safeGetJson(
+            'rooms',
+            queryParameters: <String, dynamic>{'size': 1000},
+          ),
+        ]);
+
+    final Map<String, dynamic> registrationDetail = _extractObject(
+      baseResponses[0]['data'],
     );
 
-    final Map<String, dynamic> registrationDetail =
-        _extractObject(baseResponses[0]['data']);
-
-    final List<Map<String, dynamic>> dormitories =
-        _extractItems(baseResponses[1]);
-    final List<Map<String, dynamic>> roomTypes =
-        _extractItems(baseResponses[2]);
-    final List<Map<String, dynamic>> priorityObjects =
-        _extractItems(baseResponses[3]);
+    final List<Map<String, dynamic>> dormitories = _extractItems(
+      baseResponses[1],
+    );
+    final List<Map<String, dynamic>> roomTypes = _extractItems(
+      baseResponses[2],
+    );
+    final List<Map<String, dynamic>> priorityObjects = _extractItems(
+      baseResponses[3],
+    );
     final List<Map<String, dynamic>> rooms = _extractItems(baseResponses[4]);
 
     final Set<int> dormitoryIds = <int>{};
@@ -108,12 +110,12 @@ class DormitoryHistoryLookupRepository {
     String path, {
     Map<String, dynamic>? queryParameters,
   }) async {
-    final Response<Map<String, dynamic>> response =
-        await _dio.get<Map<String, dynamic>>(
-      path,
-      queryParameters: queryParameters,
-      options: _jsonOptions(),
-    );
+    final Response<Map<String, dynamic>> response = await _dio
+        .get<Map<String, dynamic>>(
+          path,
+          queryParameters: queryParameters,
+          options: _jsonOptions(),
+        );
 
     return response.data ?? <String, dynamic>{};
   }
@@ -123,10 +125,7 @@ class DormitoryHistoryLookupRepository {
     Map<String, dynamic>? queryParameters,
   }) async {
     try {
-      return await _getJson(
-        path,
-        queryParameters: queryParameters,
-      );
+      return await _getJson(path, queryParameters: queryParameters);
     } catch (error) {
       logWarning('History lookup failed for $path: $error');
       return <String, dynamic>{};
@@ -170,11 +169,8 @@ class DormitoryHistoryLookupRepository {
     return <String, dynamic>{};
   }
 
-  Map<int, Map<String, dynamic>> _indexById(
-    List<Map<String, dynamic>> items,
-  ) {
-    final Map<int, Map<String, dynamic>> result =
-        <int, Map<String, dynamic>>{};
+  Map<int, Map<String, dynamic>> _indexById(List<Map<String, dynamic>> items) {
+    final Map<int, Map<String, dynamic>> result = <int, Map<String, dynamic>>{};
 
     for (final Map<String, dynamic> item in items) {
       final int? id = _toInt(item['id']);
@@ -218,8 +214,7 @@ class DormitoryHistoryLookupRepository {
   Future<void> _loadTokenIfNeeded() async {
     if (Globals().token.isNotEmpty) return;
 
-    final String? stored =
-        await DataRepository().getSecureSaveKey(kLoginToken);
+    final String? stored = await DataRepository().getSecureSaveKey(kLoginToken);
 
     if (stored != null && stored.isNotEmpty) {
       Globals().token = stored;
@@ -271,8 +266,7 @@ class DormitoryHistoryResolvedData {
   String periodNameFor(int? id) {
     if (id == null) return '';
 
-    final String catalogName =
-        _nameFromMap(periodsById[id], <String>['name']);
+    final String catalogName = _nameFromMap(periodsById[id], <String>['name']);
     if (catalogName.isNotEmpty) return catalogName;
 
     final int? detailId = _toInt(
@@ -306,10 +300,11 @@ class DormitoryHistoryResolvedData {
     if (id == null) return '';
 
     final Map<String, dynamic>? room = roomsById[id];
-    final String catalogNumber = _nameFromMap(
-      room,
-      <String>['roomNumber', 'room_number', 'name'],
-    );
+    final String catalogNumber = _nameFromMap(room, <String>[
+      'roomNumber',
+      'room_number',
+      'name',
+    ]);
     if (catalogNumber.isNotEmpty) return catalogNumber;
 
     final int? detailRoomId = _toInt(
@@ -440,10 +435,7 @@ class DormitoryHistoryResolvedData {
     return 'API chưa trả thông tin người thực hiện';
   }
 
-  String approvedByNameFor(
-    RegistrationHistoryModel history,
-    int? approvedBy,
-  ) {
+  String approvedByNameFor(RegistrationHistoryModel history, int? approvedBy) {
     if (approvedBy == null) return '';
 
     if (history.performedBy == approvedBy && history.performer != null) {
@@ -453,10 +445,7 @@ class DormitoryHistoryResolvedData {
     return 'API chưa trả thông tin người duyệt';
   }
 
-  static String _nameFromMap(
-    Map<String, dynamic>? source,
-    List<String> keys,
-  ) {
+  static String _nameFromMap(Map<String, dynamic>? source, List<String> keys) {
     if (source == null) return '';
     return _firstText(keys.map((String key) => source[key]).toList());
   }

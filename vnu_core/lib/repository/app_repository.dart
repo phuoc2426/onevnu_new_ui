@@ -7,6 +7,7 @@ import 'package:vnu_core/constants/enum.dart';
 import 'package:vnu_core/data_request/phan_anh_hien_truong_request.dart';
 import 'package:vnu_core/data_request/tao_hoi_dap_request.dart';
 import 'package:vnu_core/models/box_service_model.dart';
+import 'package:vnu_core/services/app_config_service.dart';
 import 'package:vnu_core/services/services_url.dart';
 
 import '../data/api_response.dart';
@@ -46,9 +47,20 @@ class ApiRepository {
     }
   }
 
-  void setDomain(String baseUrl) {
-    _dio = DioOptions().createDio(baseUrl);
+  /// Kept for compatibility with the old domain dialog. The core API is fixed
+  /// and the supplied value is intentionally ignored.
+  void setDomain(String _) {
+    final String token = Globals().token;
+
+    _dio.close(force: true);
+    _dio = DioOptions().createDio(ServicesUrl().baseUrl);
     _apiClient = AppApiProvider(_dio);
+
+    if (token.isNotEmpty) {
+      setToken(token);
+    }
+
+    logInfo('Core API reset to fixed URL: ${ServicesUrl().baseUrl}');
   }
 
   // --  New API
@@ -854,8 +866,11 @@ class ApiRepository {
 
     if (normalizedConfigName != null && normalizedConfigName.isNotEmpty) {
       try {
+        final String cccdConfigBaseUrl =
+            await _getRequiredCccdConfigBaseUrl();
         final configResponse = await Dio().get<Map<String, dynamic>>(
-          'http://112.137.132.211/cccd-config/configs/$normalizedConfigName',
+          '${cccdConfigBaseUrl}configs/'
+          '${Uri.encodeComponent(normalizedConfigName)}',
           options: Options(headers: {'Accept': 'application/json'}),
         );
 
@@ -877,6 +892,8 @@ class ApiRepository {
         rethrow;
       }
     }
+    final String vneidBaseUrl = await _getRequiredVneidBaseUrl();
+
     final token = Globals().token;
     final headers = <String, dynamic>{
       'Content-Type': 'application/json',
@@ -889,7 +906,7 @@ class ApiRepository {
     logInfo('shareVneidInfo request headers: $headers');
 
     final response = await Dio().post<Map<String, dynamic>>(
-      'https://residence.sohatech.vn/residence/api/vneid/share-info',
+      '${vneidBaseUrl}api/vneid/share-info',
       data: body,
       options: Options(contentType: Headers.jsonContentType, headers: headers),
     );
@@ -903,6 +920,7 @@ class ApiRepository {
     String transactionCode,
   ) async {
     final encodedTransactionCode = Uri.encodeComponent(transactionCode);
+    final String vneidBaseUrl = await _getRequiredVneidBaseUrl();
 
     final token = Globals().token;
     final headers = <String, dynamic>{'Accept': 'application/json'};
@@ -911,7 +929,7 @@ class ApiRepository {
     }
 
     final response = await Dio().get<Map<String, dynamic>>(
-      'https://residence.sohatech.vn/residence/api/vneid/share-info/status/$encodedTransactionCode',
+      '${vneidBaseUrl}api/vneid/share-info/status/$encodedTransactionCode',
       options: Options(headers: headers),
     );
 
@@ -920,6 +938,36 @@ class ApiRepository {
     logInfo('VNeID share-info/status response: $data');
 
     return VneidShareInfoStatusModel.fromJson(data);
+  }
+
+  Future<String> _getRequiredCccdConfigBaseUrl() async {
+    await AppConfigService().ensureLoaded();
+
+    final String baseUrl = ServicesUrl().effectiveCccdConfigApiUrl;
+    if (baseUrl.isEmpty) {
+      throw StateError(
+        'CCCD config API URL is unavailable. Add cccdConfigApiUrl to '
+        '/api/config on ${ServicesUrl.defaultBaseUrl}.',
+      );
+    }
+
+    logInfo('Using CCCD config API from config: $baseUrl');
+    return baseUrl;
+  }
+
+  Future<String> _getRequiredVneidBaseUrl() async {
+    await AppConfigService().ensureLoaded();
+
+    final String baseUrl = ServicesUrl().effectiveVneidApiUrl;
+    if (baseUrl.isEmpty) {
+      throw StateError(
+        'VNeID API URL is unavailable. Check /api/config on '
+        '${ServicesUrl.defaultBaseUrl}.',
+      );
+    }
+
+    logInfo('Using VNeID API from config: $baseUrl');
+    return baseUrl;
   }
 
   Future<T?> _firstOrNull<T>(Future<List<T>> future) async {
@@ -1145,14 +1193,45 @@ class ApiRepository {
     return _apiClient.getChiTietThongBao(idThongBao);
   }
 
-  Future<String?> getConfig() async {
-    final String response = await _apiClient.getConfig();
-    final Map<String, dynamic> rMap = jsonDecode(response);
-    if (rMap.containsKey("domainDownload")) {
-      return rMap["domainDownload"];
+  Future<Map<String, dynamic>> getConfig() async {
+    // Always request config through the fixed ONEVNU mobile API and bypass any
+    // intermediary HTTP cache that could return obsolete endpoint values.
+    final Response<dynamic> response = await _dio.get<dynamic>(
+      '/api/config',
+      queryParameters: <String, dynamic>{
+        '_ts': DateTime.now().millisecondsSinceEpoch,
+      },
+      options: Options(
+        headers: const <String, dynamic>{
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+        },
+      ),
+    );
+
+    final dynamic raw = response.data;
+    final Map<String, dynamic> rMap;
+
+    if (raw is Map) {
+      rMap = Map<String, dynamic>.from(raw);
+    } else if (raw is String && raw.trim().isNotEmpty) {
+      final dynamic decoded = jsonDecode(raw);
+      if (decoded is! Map) {
+        throw const FormatException('/api/config must return a JSON object');
+      }
+      rMap = Map<String, dynamic>.from(decoded);
+    } else {
+      throw const FormatException('/api/config returned an empty response');
     }
 
-    return null;
+    return <String, dynamic>{
+      'domainDownload': rMap['domainDownload'],
+      'ktxApiUrl': rMap['ktxApiUrl'],
+      'vneidApiUrl': rMap['vneidApiUrl'],
+      'cccdConfigApiUrl': rMap['cccdConfigApiUrl'],
+      'zaloGroupUrl': rMap['zaloGroupUrl'],
+    };
   }
 
   Future<int> getNotificationCount({bool isRead = false}) async {

@@ -4,16 +4,15 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http_parser/http_parser.dart';
 import 'package:path/path.dart' as path;
+import 'package:vnu_core/common/log.dart';
+import 'package:vnu_core/services/app_config_service.dart';
 import 'package:vnu_core/services/dio_options.dart';
+import 'package:vnu_core/services/services_url.dart';
 import 'package:vnu_noi_tru/models/dormitory_payment/dormitory_invoice_model.dart';
 import 'package:vnu_noi_tru/models/dormitory_payment/dormitory_payment_method_model.dart';
 
 class DormitoryPaymentRepository {
-  DormitoryPaymentRepository._internal() {
-    _dio = DioOptions().createDio(_baseUrl);
-  }
-
-  static const String _baseUrl = 'https://ktx.sohatech.vn/api/';
+  DormitoryPaymentRepository._internal();
 
   static final DormitoryPaymentRepository _instance =
       DormitoryPaymentRepository._internal();
@@ -22,7 +21,29 @@ class DormitoryPaymentRepository {
     return _instance;
   }
 
-  late final Dio _dio;
+  Dio? _dio;
+  String _dioBaseUrl = '';
+
+  Future<Dio> _getDio() async {
+    await AppConfigService().ensureLoaded();
+
+    final String baseUrl = ServicesUrl().effectiveKtxApiUrl;
+    if (baseUrl.isEmpty) {
+      throw StateError(
+        'KTX API URL is unavailable. Check /api/config on '
+        '${ServicesUrl.defaultBaseUrl}.',
+      );
+    }
+
+    if (_dio == null || _dioBaseUrl != baseUrl) {
+      _dio?.close(force: true);
+      _dio = DioOptions().createDio(baseUrl);
+      _dioBaseUrl = baseUrl;
+      logInfo('DormitoryPaymentRepository API from config: $baseUrl');
+    }
+
+    return _dio!;
+  }
 
   /// Lấy toàn bộ biên lai của sinh viên.
   ///
@@ -37,18 +58,16 @@ class DormitoryPaymentRepository {
       throw ArgumentError('CCCD không được để trống');
     }
 
-    final String encodedIdentityNo =
-        Uri.encodeComponent(normalizedIdentityNo);
+    final Dio dio = await _getDio();
+    final String encodedIdentityNo = Uri.encodeComponent(normalizedIdentityNo);
 
-    final Response<Map<String, dynamic>> response =
-        await _dio.get<Map<String, dynamic>>(
-      'students/$encodedIdentityNo/receipts',
-      options: Options(
-        headers: <String, dynamic>{
-          'Accept': 'application/json',
-        },
-      ),
-    );
+    final Response<Map<String, dynamic>> response = await dio
+        .get<Map<String, dynamic>>(
+          'students/$encodedIdentityNo/receipts',
+          options: Options(
+            headers: <String, dynamic>{'Accept': 'application/json'},
+          ),
+        );
 
     return DormitoryInvoiceResponse.fromJson(
       response.data ?? const <String, dynamic>{},
@@ -56,24 +75,22 @@ class DormitoryPaymentRepository {
   }
 
   /// Giữ lại tên hàm cũ để các nơi chưa cập nhật vẫn biên dịch được.
-  Future<DormitoryInvoiceResponse> getInvoices({
-    required String identityNo,
-  }) {
+  Future<DormitoryInvoiceResponse> getInvoices({required String identityNo}) {
     return getReceipts(identityNo: identityNo);
   }
 
   Future<DormitoryPaymentMethodResponse> getPaymentMethods({
     required int dormitoryId,
   }) async {
-    final Response<Map<String, dynamic>> response =
-        await _dio.get<Map<String, dynamic>>(
-      'dormitory/$dormitoryId/payment-methods',
-      options: Options(
-        headers: <String, dynamic>{
-          'Accept': 'application/json',
-        },
-      ),
-    );
+    final Dio dio = await _getDio();
+
+    final Response<Map<String, dynamic>> response = await dio
+        .get<Map<String, dynamic>>(
+          'dormitory/$dormitoryId/payment-methods',
+          options: Options(
+            headers: <String, dynamic>{'Accept': 'application/json'},
+          ),
+        );
 
     return DormitoryPaymentMethodResponse.fromJson(
       response.data ?? const <String, dynamic>{},
@@ -108,10 +125,8 @@ class DormitoryPaymentRepository {
       throw ArgumentError('Mã biên lai không hợp lệ');
     }
 
-    final String encodedIdentityNo =
-        Uri.encodeComponent(normalizedIdentityNo);
-    final String encodedReceiptId =
-        Uri.encodeComponent(normalizedReceiptId);
+    final String encodedIdentityNo = Uri.encodeComponent(normalizedIdentityNo);
+    final String encodedReceiptId = Uri.encodeComponent(normalizedReceiptId);
 
     final String? normalizedNote = note?.trim();
 
@@ -132,33 +147,31 @@ class DormitoryPaymentRepository {
       'receipt=$normalizedReceiptId',
     );
 
-    final FormData formData = FormData.fromMap(
-      <String, dynamic>{
-        'proof_image': await MultipartFile.fromFile(
-          proofImage.path,
-          filename: uploadFileName,
-          contentType: MediaType('image', 'jpeg'),
-        ),
-        if (normalizedNote != null && normalizedNote.isNotEmpty)
-          'note': normalizedNote,
-      },
-    );
+    final FormData formData = FormData.fromMap(<String, dynamic>{
+      'proof_image': await MultipartFile.fromFile(
+        proofImage.path,
+        filename: uploadFileName,
+        contentType: MediaType('image', 'jpeg'),
+      ),
+      if (normalizedNote != null && normalizedNote.isNotEmpty)
+        'note': normalizedNote,
+    });
+
+    final Dio dio = await _getDio();
 
     try {
-      final Response<Map<String, dynamic>> response =
-          await _dio.post<Map<String, dynamic>>(
-        'students/$encodedIdentityNo'
-        '/receipts/$encodedReceiptId'
-        '/payment-proof',
-        data: formData,
-        onSendProgress: onSendProgress,
-        options: Options(
-          headers: <String, dynamic>{
-            'Accept': 'application/json',
-          },
-          contentType: Headers.multipartFormDataContentType,
-        ),
-      );
+      final Response<Map<String, dynamic>> response = await dio
+          .post<Map<String, dynamic>>(
+            'students/$encodedIdentityNo'
+            '/receipts/$encodedReceiptId'
+            '/payment-proof',
+            data: formData,
+            onSendProgress: onSendProgress,
+            options: Options(
+              headers: <String, dynamic>{'Accept': 'application/json'},
+              contentType: Headers.multipartFormDataContentType,
+            ),
+          );
 
       debugPrint(
         '[PAYMENT-PROOF-UPLOAD-SUCCESS] '

@@ -11,10 +11,11 @@ import 'package:vnu_core/common/guide/configs/profile_guide_config.dart';
 import 'package:vnu_core/common/log.dart';
 import 'package:vnu_core/globals.dart';
 import 'package:vnu_core/repository/app_repository.dart';
+import 'package:vnu_core/services/app_config_service.dart';
 import 'package:vnu_core/services/services_url.dart';
 import 'package:vnu_core/vnu_core.dart';
 
-import '../../home/vcore_home_view_v3.dart';
+import '../../home/home_with_zalo_bubble.dart';
 import '../../news/views/vcore_news_view_v3.dart';
 import '../../profile/views/vcore_profile_view.dart';
 import '../../system_news/views/vcore_system_news_view.dart';
@@ -36,11 +37,11 @@ class _VcoreTabbarViewState extends State<VcoreTabbarView> {
 
   final GlobalKey<ScaffoldState> _key = GlobalKey();
 
-  static List<Widget> get _widgetOptions => const <Widget>[
-    VcoreHomeViewV3(),
-    VcoreNewsViewV3(),
-    VcoreSystemNewsView(),
-    VcoreProfileView(),
+  List<Widget> get _widgetOptions => <Widget>[
+    HomeWithZaloBubble(isActive: _selectedIndex == _homeTabIndex),
+    const VcoreNewsViewV3(),
+    const VcoreSystemNewsView(),
+    const VcoreProfileView(),
   ];
 
   void _onItemTapped(int index) {
@@ -83,10 +84,11 @@ class _VcoreTabbarViewState extends State<VcoreTabbarView> {
     super.initState();
 
     _registerGuideActions();
+    AppConfigService().ensureLoaded();
 
     try {
       FirebaseMessaging.instance.getToken().then(
-            (firebaseToken) => VnuCore().addFirebaseToken(firebaseToken),
+        (firebaseToken) => VnuCore().addFirebaseToken(firebaseToken),
       );
     } catch (e) {
       logError(e.toString());
@@ -113,14 +115,6 @@ class _VcoreTabbarViewState extends State<VcoreTabbarView> {
   }
 
   Future<void> _loadAndRefreshStartInfo() async {
-    try {
-      ApiRepository().getConfig().then(
-            (domain) => ServicesUrl().baseUrlFileDownload = domain,
-      );
-    } catch (e) {
-      logError(e.toString());
-    }
-
     try {
       ApiRepository().getCurrentUser().then((user) {
         Globals().currentUserModel.value = user;
@@ -200,10 +194,7 @@ class _VcoreTabbarViewState extends State<VcoreTabbarView> {
       key: _key,
       extendBody: true,
       backgroundColor: Colors.white,
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: _widgetOptions,
-      ),
+      body: IndexedStack(index: _selectedIndex, children: _widgetOptions),
       bottomNavigationBar: _buildSalomonBottomNavBar(),
     );
   }
@@ -226,10 +217,7 @@ class _VcoreTabbarViewState extends State<VcoreTabbarView> {
         ),
         child: SalomonBottomBar(
           currentIndex: _selectedIndex,
-          itemPadding: const EdgeInsets.symmetric(
-            vertical: 8,
-            horizontal: 10,
-          ),
+          itemPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
           onTap: _onItemTapped,
           selectedItemColor: const Color(0xFF16A34A),
           unselectedItemColor: Colors.grey.shade400,

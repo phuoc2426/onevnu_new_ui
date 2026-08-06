@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:showcaseview/showcaseview.dart';
 
+import '../core/app_showcase_scope.dart';
 import '../models/app_guide_item.dart';
 import '../registry/app_guide_registry.dart';
 import 'app_guide_pending_service.dart';
@@ -58,8 +59,14 @@ class AppGuideNavigationService {
     if (anchor == null || anchorContext == null) return false;
     if (!anchorContext.mounted) return false;
 
-    ShowCaseWidget.of(anchorContext).startShowCase([anchor.key]);
-    return true;
+    AppGuideOverlayVisibility.show();
+    try {
+      ShowCaseWidget.of(anchorContext).startShowCase([anchor.key]);
+      return true;
+    } catch (_) {
+      AppGuideOverlayVisibility.hide();
+      rethrow;
+    }
   }
 
   Future<bool> openGroup({
@@ -132,8 +139,14 @@ class AppGuideNavigationService {
       '[GUIDE_GROUP_START] group=$groupId keys=${keys.length} ids=${ids.join(', ')}',
     );
 
-    ShowCaseWidget.of(firstContext).startShowCase(keys);
-    return true;
+    AppGuideOverlayVisibility.show();
+    try {
+      ShowCaseWidget.of(firstContext).startShowCase(keys);
+      return true;
+    } catch (_) {
+      AppGuideOverlayVisibility.hide();
+      rethrow;
+    }
   }
 
   Future<_ResolvedGuideItem> _resolveRenderableItem({

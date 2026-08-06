@@ -22,12 +22,17 @@ class VcoreBrowserView extends StatefulWidget {
   /// Ẩn top navbar và sử dụng nút back dạng bong bóng kéo thả.
   final bool useFloatingBackButton;
 
+  /// Khi true, đây là WebView dùng cho chức năng "Nhà trọ" (motel).
+  /// WebView sẽ nằm dưới một header trắng, bao gồm cả vùng SafeArea.
+  final bool isMotel;
+
   const VcoreBrowserView({
     super.key,
     required this.title,
     this.url,
     this.html,
     this.useFloatingBackButton = false,
+    this.isMotel = false,
   }) : assert(
          url != null || html != null,
          'Phải truyền url hoặc html cho VcoreBrowserView.',
@@ -78,6 +83,14 @@ class _VcoreBrowserViewState extends State<VcoreBrowserView> {
   /// Khoảng cách với mép màn hình.
   static const double _floatingButtonMargin = 10;
 
+  /// Phần header trắng dành riêng cho WebView phòng trọ.
+  ///
+  /// Chiều cao này không bao gồm phần status bar/SafeArea.
+  static const double _motelHeaderExtent = 15;
+
+  /// Khoảng trắng bao quanh WebView phòng trọ.
+  static const double _motelWebViewMargin = 8;
+
   /// Lưu thông tin màn hình gần nhất để Timer sử dụng.
   double _lastScreenWidth = 0;
   double _lastScreenHeight = 0;
@@ -125,7 +138,24 @@ class _VcoreBrowserViewState extends State<VcoreBrowserView> {
       showBackButton: true,
       body: Column(
         children: [
-          Expanded(child: WebViewWidget(controller: controller.webController)),
+          if (widget.isMotel)
+            const SizedBox(
+              height: _motelHeaderExtent,
+              child: ColoredBox(color: Colors.white),
+            ),
+          Expanded(
+            child: ColoredBox(
+              color: Colors.white,
+              child: Padding(
+                padding: EdgeInsets.all(
+                  widget.isMotel ? _motelWebViewMargin : 0,
+                ),
+                child: WebViewWidget(
+                  controller: controller.webController,
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -141,10 +171,12 @@ class _VcoreBrowserViewState extends State<VcoreBrowserView> {
         return false;
       },
       child: Scaffold(
-        backgroundColor: AppColor.bgColor,
+        backgroundColor: widget.isMotel ? Colors.white : AppColor.bgColor,
         body: LayoutBuilder(
           builder: (BuildContext context, BoxConstraints constraints) {
             final EdgeInsets safePadding = MediaQuery.paddingOf(context);
+            final double motelWebViewTop =
+                safePadding.top + _motelHeaderExtent;
 
             /// Lưu lại thông tin màn hình để Timer sử dụng.
             _lastScreenWidth = constraints.maxWidth;
@@ -186,9 +218,37 @@ class _VcoreBrowserViewState extends State<VcoreBrowserView> {
               clipBehavior: Clip.none,
               children: [
                 /// WebView chiếm toàn bộ màn hình.
-                Positioned.fill(
-                  child: WebViewWidget(controller: controller.webController),
-                ),
+                if (widget.isMotel) ...[
+                  /// Nền trắng phủ cả status bar và vùng header.
+                  const Positioned.fill(
+                    child: ColoredBox(color: Colors.white),
+                  ),
+
+                  /// Đường phân cách nhẹ giúp nhận biết phần header trắng.
+                  Positioned(
+                    top: motelWebViewTop - 1,
+                    left: 0,
+                    right: 0,
+                    height: 1,
+                    child: const ColoredBox(color: Color(0xFFE5E7EB)),
+                  ),
+
+                  /// WebView bắt đầu phía dưới header và có viền trắng xung quanh.
+                  Positioned(
+                    top: motelWebViewTop,
+                    left: _motelWebViewMargin,
+                    right: _motelWebViewMargin,
+                    bottom: _motelWebViewMargin,
+                    child: WebViewWidget(
+                      controller: controller.webController,
+                    ),
+                  ),
+                ] else
+                  Positioned.fill(
+                    child: WebViewWidget(
+                      controller: controller.webController,
+                    ),
+                  ),
 
                 /// Bong bóng back.
                 AnimatedPositioned(

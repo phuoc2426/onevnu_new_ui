@@ -61,8 +61,10 @@ class _ApplicantLoginScreenState extends State<ApplicantLoginScreen> {
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        Colors.white.withOpacity(0.05), // Giảm từ 0.2 xuống 0.05
-                        Colors.white.withOpacity(0.0),  // Giảm từ 0.05 xuống 0.0
+                        Colors.white.withOpacity(
+                          0.05,
+                        ), // Giảm từ 0.2 xuống 0.05
+                        Colors.white.withOpacity(0.0), // Giảm từ 0.05 xuống 0.0
                         Colors.white.withOpacity(0.05),
                       ],
                       begin: Alignment.topCenter,
@@ -141,7 +143,6 @@ class _ApplicantLoginScreenState extends State<ApplicantLoginScreen> {
             color: Colors.white.withOpacity(0.1),
             borderRadius: BorderRadius.circular(24),
             border: Border.all(color: Colors.black12, width: 1),
-
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -183,11 +184,7 @@ class _ApplicantLoginScreenState extends State<ApplicantLoginScreen> {
                   filled: true,
                   fillColor: Colors.white.withOpacity(0.9),
                 ),
-                keyboardType: TextInputType.number,
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                  LengthLimitingTextInputFormatter(12),
-                ],
+                keyboardType: TextInputType.text,
                 textInputAction: TextInputAction.next,
                 cursorColor: Colors.green,
               ),
@@ -219,8 +216,7 @@ class _ApplicantLoginScreenState extends State<ApplicantLoginScreen> {
                   filled: true,
                   fillColor: Colors.white.withOpacity(0.9),
                 ),
-                keyboardType: TextInputType.phone,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                keyboardType: TextInputType.text,
                 textInputAction: TextInputAction.done,
                 onSubmitted: (_) => controller.login(),
                 cursorColor: Colors.green,

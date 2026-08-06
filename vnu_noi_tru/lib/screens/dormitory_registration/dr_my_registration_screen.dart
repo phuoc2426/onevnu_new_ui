@@ -11,6 +11,7 @@ import 'package:vnu_core/widgets/vcore_module_scaffold.dart';
 import 'package:vnu_noi_tru/cubit/dormitory_registration_cubit.dart';
 import 'package:vnu_noi_tru/models/dormitory_payment/dormitory_invoice_model.dart';
 import 'package:vnu_noi_tru/repository/dormitory_payment_repository.dart';
+import 'package:vnu_core/services/services_url.dart';
 import 'package:vnu_noi_tru/repository/dormitory_registration_repository.dart';
 
 import 'dr_history_bottom_sheet.dart';
@@ -18,24 +19,22 @@ import 'dr_wizard_flow.dart';
 import 'dr_invoices_screen.dart';
 import 'dr_student_update_sheet.dart';
 import 'dr_student_history_sheet.dart';
+
 class DRMyRegistrationScreen extends StatefulWidget {
   const DRMyRegistrationScreen({super.key});
 
   @override
-  State<DRMyRegistrationScreen> createState() =>
-      _DRMyRegistrationScreenState();
+  State<DRMyRegistrationScreen> createState() => _DRMyRegistrationScreenState();
 }
 
-class _DRMyRegistrationScreenState
-    extends State<DRMyRegistrationScreen> {
-  final DormitoryRegistrationCubit _cubit =
-  DormitoryRegistrationCubit();
+class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
+  final DormitoryRegistrationCubit _cubit = DormitoryRegistrationCubit();
 
   final DormitoryRegistrationRepository _repository =
-  DormitoryRegistrationRepository();
+      DormitoryRegistrationRepository();
 
   final DormitoryPaymentRepository _paymentRepository =
-  DormitoryPaymentRepository();
+      DormitoryPaymentRepository();
 
   List<dynamic> _roomTypes = <dynamic>[];
   DormitoryInvoiceModel? _latestReceipt;
@@ -76,8 +75,7 @@ class _DRMyRegistrationScreenState
     await _loadRoomTypesForDisplay();
     await _cubit.getPriorityObjects();
 
-    final bool hasOpenPeriod =
-    await _cubit.checkAnyOpenRegistrationPeriod();
+    final bool hasOpenPeriod = await _cubit.checkAnyOpenRegistrationPeriod();
 
     if (mounted) {
       setState(() {
@@ -101,8 +99,7 @@ class _DRMyRegistrationScreenState
 
     await _loadRoomTypesForDisplay();
 
-    final bool hasOpenPeriod =
-    await _cubit.checkAnyOpenRegistrationPeriod();
+    final bool hasOpenPeriod = await _cubit.checkAnyOpenRegistrationPeriod();
 
     if (mounted) {
       setState(() {
@@ -125,10 +122,10 @@ class _DRMyRegistrationScreenState
     accommodations.sort((dynamic first, dynamic second) {
       final DateTime firstTime =
           _accommodationCreatedAt(first) ??
-              DateTime.fromMillisecondsSinceEpoch(0);
+          DateTime.fromMillisecondsSinceEpoch(0);
       final DateTime secondTime =
           _accommodationCreatedAt(second) ??
-              DateTime.fromMillisecondsSinceEpoch(0);
+          DateTime.fromMillisecondsSinceEpoch(0);
 
       final int timeCompare = secondTime.compareTo(firstTime);
       if (timeCompare != 0) return timeCompare;
@@ -147,10 +144,12 @@ class _DRMyRegistrationScreenState
     }
 
     final dynamic latestAccommodation = accommodations.first;
-    final int? registrationPeriodId =
-        _registrationPeriodId(latestAccommodation);
-    final int? dormitoryId =
-        _resolveDormitoryIdForAccommodation(latestAccommodation);
+    final int? registrationPeriodId = _registrationPeriodId(
+      latestAccommodation,
+    );
+    final int? dormitoryId = _resolveDormitoryIdForAccommodation(
+      latestAccommodation,
+    );
 
     if (registrationPeriodId == null || dormitoryId == null) {
       _setLatestPendingMaxApprovalDays(null, requestSerial);
@@ -161,8 +160,9 @@ class _DRMyRegistrationScreenState
       final dynamic response = await _repository.getRegistrationPeriods(
         dormitoryId: dormitoryId,
       );
-      final List<dynamic> periods =
-          List<dynamic>.from(response.data?.items ?? const <dynamic>[]);
+      final List<dynamic> periods = List<dynamic>.from(
+        response.data?.items ?? const <dynamic>[],
+      );
 
       dynamic matchedPeriod;
       for (final dynamic period in periods) {
@@ -189,9 +189,7 @@ class _DRMyRegistrationScreenState
             );
 
       _setLatestPendingMaxApprovalDays(
-        maxApprovalDays != null && maxApprovalDays > 0
-            ? maxApprovalDays
-            : null,
+        maxApprovalDays != null && maxApprovalDays > 0 ? maxApprovalDays : null,
         requestSerial,
       );
     } catch (_) {
@@ -201,10 +199,7 @@ class _DRMyRegistrationScreenState
     }
   }
 
-  void _setLatestPendingMaxApprovalDays(
-    int? value,
-    int requestSerial,
-  ) {
+  void _setLatestPendingMaxApprovalDays(int? value, int requestSerial) {
     if (requestSerial != _pendingApprovalLookupSerial) return;
 
     if (!mounted) {
@@ -227,9 +222,8 @@ class _DRMyRegistrationScreenState
 
     if (identityNo.isEmpty) {
       final SharedPreferences preferences =
-      await SharedPreferences.getInstance();
-      identityNo =
-          preferences.getString('applicant_cccd')?.trim() ?? '';
+          await SharedPreferences.getInstance();
+      identityNo = preferences.getString('applicant_cccd')?.trim() ?? '';
     }
 
     if (identityNo.isEmpty) {
@@ -244,16 +238,17 @@ class _DRMyRegistrationScreenState
     }
 
     try {
-      final DormitoryInvoiceResponse response =
-      await _paymentRepository.getReceipts(identityNo: identityNo);
+      final DormitoryInvoiceResponse response = await _paymentRepository
+          .getReceipts(identityNo: identityNo);
 
       final List<DormitoryInvoiceModel> receipts =
-      List<DormitoryInvoiceModel>.from(response.invoices);
+          List<DormitoryInvoiceModel>.from(response.invoices);
 
       receipts.sort(_compareReceiptNewestFirst);
 
-      final DormitoryInvoiceModel? latest =
-      receipts.isEmpty ? null : receipts.first;
+      final DormitoryInvoiceModel? latest = receipts.isEmpty
+          ? null
+          : receipts.first;
 
       if (!mounted) {
         _latestReceipt = latest;
@@ -278,9 +273,9 @@ class _DRMyRegistrationScreenState
   }
 
   int _compareReceiptNewestFirst(
-      DormitoryInvoiceModel first,
-      DormitoryInvoiceModel second,
-      ) {
+    DormitoryInvoiceModel first,
+    DormitoryInvoiceModel second,
+  ) {
     final DateTime firstDate =
         first.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
     final DateTime secondDate =
@@ -393,42 +388,29 @@ class _DRMyRegistrationScreenState
       },
     );
   }
-  String _studentIdentityNo(
-      dynamic student,
-      ) {
+
+  String _studentIdentityNo(dynamic student) {
     final String value = _readString(
       student,
       'identity_no',
-          (dynamic object) =>
-      object.cccd,
-      aliases: const <String>[
-        'identityNo',
-        'identity_number',
-        'cccd',
-      ],
+      (dynamic object) => object.cccd,
+      aliases: const <String>['identityNo', 'identity_number', 'cccd'],
     );
 
     if (value.trim().isNotEmpty) {
       return value.trim();
     }
 
-    return Globals()
-        .thongTinSinhVienModel
-        .value
-        ?.soCmtCccd
-        ?.trim() ??
-        '';
+    return Globals().thongTinSinhVienModel.value?.soCmtCccd?.trim() ?? '';
   }
 
   int? _dormitoryId(dynamic item) {
-    final dynamic dormitory =
-    _dormitory(item);
+    final dynamic dormitory = _dormitory(item);
 
     final int? nestedId = _readInt(
       dormitory,
       'id',
-          (dynamic object) =>
-      object.id,
+      (dynamic object) => object.id,
     );
 
     if (nestedId != null) {
@@ -438,21 +420,14 @@ class _DRMyRegistrationScreenState
     return _readInt(
       item,
       'dormitory_id',
-          (dynamic object) =>
-      object.dormitoryId,
-      aliases: const <String>[
-        'dormitoryId',
-      ],
+      (dynamic object) => object.dormitoryId,
+      aliases: const <String>['dormitoryId'],
     );
   }
 
   int? _registrationPeriodId(dynamic item) {
     final dynamic period = _registrationPeriod(item);
-    final int? nestedId = _readInt(
-      period,
-      'id',
-      (dynamic object) => object.id,
-    );
+    final int? nestedId = _readInt(period, 'id', (dynamic object) => object.id);
 
     if (nestedId != null) return nestedId;
 
@@ -468,25 +443,18 @@ class _DRMyRegistrationScreenState
     final int? directId = _dormitoryId(item);
     if (directId != null) return directId;
 
-    final String targetName =
-        _normalizeDormitoryNameForMatch(_dormitoryName(item));
+    final String targetName = _normalizeDormitoryNameForMatch(
+      _dormitoryName(item),
+    );
     if (targetName.isEmpty) return null;
 
     for (final dynamic dormitory in _cubit.dormitories) {
       final String candidateName = _normalizeDormitoryNameForMatch(
-        _readString(
-          dormitory,
-          'name',
-          (dynamic object) => object.name,
-        ),
+        _readString(dormitory, 'name', (dynamic object) => object.name),
       );
 
       if (candidateName == targetName) {
-        return _readInt(
-          dormitory,
-          'id',
-          (dynamic object) => object.id,
-        );
+        return _readInt(dormitory, 'id', (dynamic object) => object.id);
       }
     }
 
@@ -496,21 +464,13 @@ class _DRMyRegistrationScreenState
     if (targetName.length >= 4) {
       for (final dynamic dormitory in _cubit.dormitories) {
         final String candidateName = _normalizeDormitoryNameForMatch(
-          _readString(
-            dormitory,
-            'name',
-            (dynamic object) => object.name,
-          ),
+          _readString(dormitory, 'name', (dynamic object) => object.name),
         );
 
         if (candidateName.length >= 4 &&
             (candidateName.contains(targetName) ||
                 targetName.contains(candidateName))) {
-          return _readInt(
-            dormitory,
-            'id',
-            (dynamic object) => object.id,
-          );
+          return _readInt(dormitory, 'id', (dynamic object) => object.id);
         }
       }
     }
@@ -521,12 +481,10 @@ class _DRMyRegistrationScreenState
   String _normalizeDormitoryNameForMatch(String value) {
     String normalized = value.trim().toLowerCase();
     normalized = normalized.replaceAll(RegExp(r'[\s_-]+'), ' ');
-    normalized = normalized.replaceFirst(
-      RegExp(r'^(ký túc xá|ktx)\s*'),
-      '',
-    );
+    normalized = normalized.replaceFirst(RegExp(r'^(ký túc xá|ktx)\s*'), '');
     return normalized.trim();
   }
+
   List<dynamic> _readAccommodations(dynamic data) {
     if (data == null) return <dynamic>[];
 
@@ -597,8 +555,7 @@ class _DRMyRegistrationScreenState
       }
 
       if (summary is Map && detail is Map) {
-        final Map<String, dynamic> merged =
-        Map<String, dynamic>.from(detail);
+        final Map<String, dynamic> merged = Map<String, dynamic>.from(detail);
 
         // Ưu tiên giá trị tóm tắt khi khác null vì status ở đây
         // đã được backend chuẩn hóa thành PENDING/APPROVED/ASSIGNED...
@@ -644,11 +601,11 @@ class _DRMyRegistrationScreenState
   }
 
   String _readString(
-      dynamic obj,
-      String mapKey,
-      String Function(dynamic object) getter, {
-        List<String> aliases = const <String>[],
-      }) {
+    dynamic obj,
+    String mapKey,
+    String Function(dynamic object) getter, {
+    List<String> aliases = const <String>[],
+  }) {
     if (obj == null) return '';
 
     if (obj is Map) {
@@ -670,11 +627,11 @@ class _DRMyRegistrationScreenState
   }
 
   int? _readInt(
-      dynamic obj,
-      String mapKey,
-      int? Function(dynamic object) getter, {
-        List<String> aliases = const <String>[],
-      }) {
+    dynamic obj,
+    String mapKey,
+    int? Function(dynamic object) getter, {
+    List<String> aliases = const <String>[],
+  }) {
     if (obj == null) return null;
 
     if (obj is Map) {
@@ -709,11 +666,11 @@ class _DRMyRegistrationScreenState
   }
 
   DateTime? _readDate(
-      dynamic obj,
-      String mapKey,
-      dynamic Function(dynamic object) getter, {
-        List<String> aliases = const <String>[],
-      }) {
+    dynamic obj,
+    String mapKey,
+    dynamic Function(dynamic object) getter, {
+    List<String> aliases = const <String>[],
+  }) {
     if (obj == null) return null;
 
     if (obj is Map) {
@@ -734,11 +691,11 @@ class _DRMyRegistrationScreenState
   }
 
   dynamic _readNested(
-      dynamic obj,
-      String mapKey,
-      dynamic Function(dynamic object) getter, {
-        List<String> aliases = const <String>[],
-      }) {
+    dynamic obj,
+    String mapKey,
+    dynamic Function(dynamic object) getter, {
+    List<String> aliases = const <String>[],
+  }) {
     if (obj == null) return null;
 
     if (obj is Map) {
@@ -766,7 +723,7 @@ class _DRMyRegistrationScreenState
     final String fromApi = _readString(
       student,
       'full_name',
-          (dynamic object) => object.fullName,
+      (dynamic object) => object.fullName,
       aliases: const <String>['fullName'],
     );
 
@@ -781,7 +738,7 @@ class _DRMyRegistrationScreenState
     final String fromApi = _readString(
       student,
       'student_code',
-          (dynamic object) => object.studentCode,
+      (dynamic object) => object.studentCode,
       aliases: const <String>['studentCode'],
     );
 
@@ -796,44 +753,33 @@ class _DRMyRegistrationScreenState
     return _readString(
       student,
       'class',
-          (dynamic object) => object.className,
+      (dynamic object) => object.className,
       aliases: const <String>['className'],
     );
   }
 
   String _studentMajor(dynamic student) {
-    return _readString(
-      student,
-      'major',
-          (dynamic object) => object.major,
-    );
+    return _readString(student, 'major', (dynamic object) => object.major);
   }
 
   String _studentPhone(dynamic student) {
     return _readString(
       student,
       'phone_number',
-          (dynamic object) => object.phone,
-      aliases: const <String>[
-        'phoneNumber',
-        'phone',
-      ],
+      (dynamic object) => object.phone,
+      aliases: const <String>['phoneNumber', 'phone'],
     );
   }
 
   String _studentEmail(dynamic student) {
-    return _readString(
-      student,
-      'email',
-          (dynamic object) => object.email,
-    );
+    return _readString(student, 'email', (dynamic object) => object.email);
   }
 
   String _studentUniversity(dynamic student) {
     return _readString(
       student,
       'university_name',
-          (dynamic object) => object.universityName,
+      (dynamic object) => object.universityName,
       aliases: const <String>['university'],
     );
   }
@@ -842,7 +788,7 @@ class _DRMyRegistrationScreenState
     return _readString(
       student,
       'identity_type',
-          (dynamic object) => object.identityType,
+      (dynamic object) => object.identityType,
       aliases: const <String>['identityType'],
     );
   }
@@ -851,7 +797,7 @@ class _DRMyRegistrationScreenState
     return _readDate(
       student,
       'dob',
-          (dynamic object) => object.dob,
+      (dynamic object) => object.dob,
       aliases: const <String>['dateOfBirth'],
     );
   }
@@ -860,7 +806,7 @@ class _DRMyRegistrationScreenState
     final String value = _readString(
       student,
       'gender',
-          (dynamic object) => object.gender,
+      (dynamic object) => object.gender,
     ).trim().toLowerCase();
 
     if (value == 'male' || value == 'nam') return 'Nam';
@@ -872,24 +818,20 @@ class _DRMyRegistrationScreenState
     return _readString(
       student,
       'academic_year',
-          (dynamic object) => object.academicYear,
+      (dynamic object) => object.academicYear,
       aliases: const <String>['academicYear'],
     );
   }
 
   String _studentLevel(dynamic student) {
-    return _readString(
-      student,
-      'level',
-          (dynamic object) => object.level,
-    );
+    return _readString(student, 'level', (dynamic object) => object.level);
   }
 
   String _studentPermanentAddress(dynamic student) {
     return _readString(
       student,
       'permanent_address',
-          (dynamic object) => object.permanentAddress,
+      (dynamic object) => object.permanentAddress,
       aliases: const <String>[
         'permanentAddress',
         'vneid_permanent_address',
@@ -902,7 +844,7 @@ class _DRMyRegistrationScreenState
     return _readString(
       student,
       'temporary_address',
-          (dynamic object) => object.temporaryAddress,
+      (dynamic object) => object.temporaryAddress,
       aliases: const <String>[
         'temporaryAddress',
         'vneid_temporary_address',
@@ -915,7 +857,7 @@ class _DRMyRegistrationScreenState
     final dynamic rawObjects = _readNested(
       student,
       'priority_objects',
-          (dynamic object) => object.priorityObjects,
+      (dynamic object) => object.priorityObjects,
       aliases: const <String>['priorityObjects'],
     );
 
@@ -936,7 +878,7 @@ class _DRMyRegistrationScreenState
     return _readString(
       student,
       'priority_object_name',
-          (dynamic object) => object.priorityObjectName,
+      (dynamic object) => object.priorityObjectName,
       aliases: const <String>['priorityObjectName'],
     );
   }
@@ -955,10 +897,10 @@ class _DRMyRegistrationScreenState
     if (normalized.isEmpty) return normalized;
     final Uri? uri = Uri.tryParse(normalized);
     if (uri != null && uri.hasScheme) return normalized;
-    if (normalized.startsWith('/')) {
-      return 'https://ktx.sohatech.vn$normalized';
-    }
-    return 'https://ktx.sohatech.vn/$normalized';
+    final String host = ServicesUrl().effectiveKtxHostUrl;
+    return normalized.startsWith('/')
+        ? '$host${normalized.substring(1)}'
+        : '$host$normalized';
   }
 
   List<dynamic> _studentFamilyMembers(dynamic student) {
@@ -1038,8 +980,9 @@ class _DRMyRegistrationScreenState
   }
 
   bool _isStudentInformationLocked(dynamic latestAccommodation) {
-    final String status =
-        _accommodationStatus(latestAccommodation).trim().toLowerCase();
+    final String status = _accommodationStatus(
+      latestAccommodation,
+    ).trim().toLowerCase();
     return status == 'approved' || status == 'assigned' || status == 'active';
   }
 
@@ -1055,8 +998,7 @@ class _DRMyRegistrationScreenState
     }
 
     String identityNo = _studentIdentityNo(student).trim();
-    final SharedPreferences preferences =
-        await SharedPreferences.getInstance();
+    final SharedPreferences preferences = await SharedPreferences.getInstance();
     identityNo = identityNo.isNotEmpty
         ? identityNo
         : preferences.getString('applicant_cccd')?.trim() ?? '';
@@ -1070,33 +1012,29 @@ class _DRMyRegistrationScreenState
 
     final DRStudentUpdateResult? result =
         await showModalBottomSheet<DRStudentUpdateResult>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (BuildContext context) {
-        return DRStudentUpdateSheet(
-          student: student,
-          accommodation: latestAccommodation,
-          identityNo: identityNo,
-          // Nút cập nhật hiện đang tạm ẩn. Không truyền tham số
-          // initialPriorityObjectName vì constructor DRStudentUpdateSheet
-          // trong source hiện tại chưa khai báo tham số này.
+          context: context,
+          isScrollControlled: true,
+          useSafeArea: true,
+          backgroundColor: Colors.transparent,
+          builder: (BuildContext context) {
+            return DRStudentUpdateSheet(
+              student: student,
+              accommodation: latestAccommodation,
+              identityNo: identityNo,
+              // Nút cập nhật hiện đang tạm ẩn. Không truyền tham số
+              // initialPriorityObjectName vì constructor DRStudentUpdateSheet
+              // trong source hiện tại chưa khai báo tham số này.
+            );
+          },
         );
-      },
-    );
 
     if (result == null || !mounted) return;
 
-    final String? applicantIdentityNo =
-        preferences.getString('applicant_cccd');
+    final String? applicantIdentityNo = preferences.getString('applicant_cccd');
     if (applicantIdentityNo != null &&
         applicantIdentityNo.trim().isNotEmpty &&
         applicantIdentityNo.trim() != result.identityNo.trim()) {
-      await preferences.setString(
-        'applicant_cccd',
-        result.identityNo.trim(),
-      );
+      await preferences.setString('applicant_cccd', result.identityNo.trim());
     }
 
     if (!mounted) return;
@@ -1116,8 +1054,7 @@ class _DRMyRegistrationScreenState
 
       if (value == null) return null;
 
-      return int.tryParse(value.toString()) ??
-          value.toString();
+      return int.tryParse(value.toString()) ?? value.toString();
     }
 
     try {
@@ -1131,7 +1068,7 @@ class _DRMyRegistrationScreenState
     final String raw = _readString(
       item,
       'status',
-          (dynamic object) => object.status,
+      (dynamic object) => object.status,
     ).trim().toLowerCase();
 
     if (raw.isNotEmpty && int.tryParse(raw) == null) {
@@ -1163,18 +1100,14 @@ class _DRMyRegistrationScreenState
   }
 
   String _accommodationNote(dynamic item) {
-    return _readString(
-      item,
-      'note',
-          (dynamic object) => object.note,
-    );
+    return _readString(item, 'note', (dynamic object) => object.note);
   }
 
   DateTime? _accommodationCreatedAt(dynamic item) {
     return _readDate(
       item,
       'created_at',
-          (dynamic object) => object.createdAt,
+      (dynamic object) => object.createdAt,
       aliases: const <String>['createdAt'],
     );
   }
@@ -1183,7 +1116,7 @@ class _DRMyRegistrationScreenState
     return _readDate(
       item,
       'approved_at',
-          (dynamic object) => object.approvedAt,
+      (dynamic object) => object.approvedAt,
       aliases: const <String>['approvedAt'],
     );
   }
@@ -1192,7 +1125,7 @@ class _DRMyRegistrationScreenState
     return _readDate(
       item,
       'assigned_at',
-          (dynamic object) => object.assignedAt,
+      (dynamic object) => object.assignedAt,
       aliases: const <String>['assignedAt'],
     );
   }
@@ -1201,7 +1134,7 @@ class _DRMyRegistrationScreenState
     return _readDate(
       item,
       'start_date',
-          (dynamic object) => object.startDate,
+      (dynamic object) => object.startDate,
       aliases: const <String>['startDate'],
     );
   }
@@ -1210,7 +1143,7 @@ class _DRMyRegistrationScreenState
     return _readDate(
       item,
       'end_date',
-          (dynamic object) => object.endDate,
+      (dynamic object) => object.endDate,
       aliases: const <String>['endDate'],
     );
   }
@@ -1219,7 +1152,7 @@ class _DRMyRegistrationScreenState
     return _readDate(
       item,
       'updated_at',
-          (dynamic object) => object.updatedAt,
+      (dynamic object) => object.updatedAt,
       aliases: const <String>['updatedAt'],
     );
   }
@@ -1228,7 +1161,7 @@ class _DRMyRegistrationScreenState
     return _readDate(
       item,
       'checkin_at',
-          (dynamic object) => object.checkinAt,
+      (dynamic object) => object.checkinAt,
       aliases: const <String>['checkinAt'],
     );
   }
@@ -1237,7 +1170,7 @@ class _DRMyRegistrationScreenState
     return _readDate(
       item,
       'checkout_at',
-          (dynamic object) => object.checkoutAt,
+      (dynamic object) => object.checkoutAt,
       aliases: const <String>['checkoutAt'],
     );
   }
@@ -1246,7 +1179,7 @@ class _DRMyRegistrationScreenState
     return _readString(
       item,
       'reason_stay',
-          (dynamic object) => object.reasonStay,
+      (dynamic object) => object.reasonStay,
       aliases: const <String>['reasonStay', 'reason'],
     );
   }
@@ -1255,7 +1188,7 @@ class _DRMyRegistrationScreenState
     final dynamic value = _readNested(
       item,
       'is_room_leader',
-          (dynamic object) => object.isRoomLeader,
+      (dynamic object) => object.isRoomLeader,
       aliases: const <String>['isRoomLeader'],
     );
 
@@ -1272,7 +1205,7 @@ class _DRMyRegistrationScreenState
     final String value = _readString(
       item,
       'request_status',
-          (dynamic object) => object.requestStatus,
+      (dynamic object) => object.requestStatus,
       aliases: const <String>['requestStatus'],
     ).trim().toLowerCase();
 
@@ -1326,11 +1259,7 @@ class _DRMyRegistrationScreenState
 
   int? _currentRoomId(dynamic item) {
     final dynamic room = _room(item);
-    final int? nestedId = _readInt(
-      room,
-      'id',
-          (dynamic object) => object.id,
-    );
+    final int? nestedId = _readInt(room, 'id', (dynamic object) => object.id);
     if (nestedId != null) {
       return nestedId;
     }
@@ -1338,7 +1267,7 @@ class _DRMyRegistrationScreenState
     return _readInt(
       item,
       'room_id',
-          (dynamic object) => object.roomId,
+      (dynamic object) => object.roomId,
       aliases: const <String>['roomId'],
     );
   }
@@ -1376,11 +1305,7 @@ class _DRMyRegistrationScreenState
   }
 
   int? _roomOptionCapacity(Map<String, dynamic> room) {
-    return _readInt(
-      room,
-      'capacity',
-      (dynamic object) => object.capacity,
-    );
+    return _readInt(room, 'capacity', (dynamic object) => object.capacity);
   }
 
   int _roomOptionCurrentOccupancy(Map<String, dynamic> room) {
@@ -1413,13 +1338,14 @@ class _DRMyRegistrationScreenState
         aliases: const <String>['floor_name', 'floorName', 'number'],
       ).trim();
     } else {
-      value = (rawFloor ??
-              room['floor_name'] ??
-              room['floorName'] ??
-              room['floor_number'] ??
-              room['floorNumber'])
-          ?.toString()
-          .trim() ??
+      value =
+          (rawFloor ??
+                  room['floor_name'] ??
+                  room['floorName'] ??
+                  room['floor_number'] ??
+                  room['floorNumber'])
+              ?.toString()
+              .trim() ??
           '';
     }
 
@@ -1452,17 +1378,13 @@ class _DRMyRegistrationScreenState
     return _readNested(
       item,
       'registration_period',
-          (dynamic object) => object.registrationPeriod,
+      (dynamic object) => object.registrationPeriod,
       aliases: const <String>['registrationPeriod'],
     );
   }
 
   dynamic _dormitory(dynamic item) {
-    return _readNested(
-      item,
-      'dormitory',
-          (dynamic object) => object.dormitory,
-    );
+    return _readNested(item, 'dormitory', (dynamic object) => object.dormitory);
   }
 
   /// Loại phòng chỉ dùng để hiển thị sau khi cán bộ KTX đã xếp.
@@ -1471,17 +1393,13 @@ class _DRMyRegistrationScreenState
     return _readNested(
       item,
       'room_type',
-          (dynamic object) => object.roomType,
+      (dynamic object) => object.roomType,
       aliases: const <String>['roomType'],
     );
   }
 
   dynamic _room(dynamic item) {
-    return _readNested(
-      item,
-      'room',
-          (dynamic object) => object.room,
-    );
+    return _readNested(item, 'room', (dynamic object) => object.room);
   }
 
   DateTime? _periodStartTime(dynamic item) {
@@ -1489,7 +1407,7 @@ class _DRMyRegistrationScreenState
     return _readDate(
       period,
       'start_time',
-          (dynamic object) => object.startTime,
+      (dynamic object) => object.startTime,
       aliases: const <String>['startTime'],
     );
   }
@@ -1499,7 +1417,7 @@ class _DRMyRegistrationScreenState
     return _readDate(
       period,
       'end_time',
-          (dynamic object) => object.endTime,
+      (dynamic object) => object.endTime,
       aliases: const <String>['endTime'],
     );
   }
@@ -1509,7 +1427,7 @@ class _DRMyRegistrationScreenState
     return _readString(
       period,
       'description',
-          (dynamic object) => object.description,
+      (dynamic object) => object.description,
     );
   }
 
@@ -1519,7 +1437,7 @@ class _DRMyRegistrationScreenState
     final dynamic pluralObjects = _readNested(
       item,
       'priority_objects',
-          (dynamic object) => object.priorityObjects,
+      (dynamic object) => object.priorityObjects,
       aliases: const <String>['priorityObjects'],
     );
 
@@ -1535,7 +1453,7 @@ class _DRMyRegistrationScreenState
     final dynamic rawIds = _readNested(
       item,
       'priority_object_ids',
-          (dynamic object) => object.priorityObjectIds,
+      (dynamic object) => object.priorityObjectIds,
       aliases: const <String>['priorityObjectIds'],
     );
 
@@ -1548,9 +1466,11 @@ class _DRMyRegistrationScreenState
       for (final dynamic priority in _cubit.priorityObjects) {
         final int? id = _readInt(priority, 'id', (dynamic object) => object.id);
         if (id == priorityId) {
-          final String name =
-          _readString(priority, 'name', (dynamic object) => object.name)
-              .trim();
+          final String name = _readString(
+            priority,
+            'name',
+            (dynamic object) => object.name,
+          ).trim();
           if (name.isNotEmpty && !names.contains(name)) {
             names.add(name);
           }
@@ -1562,7 +1482,7 @@ class _DRMyRegistrationScreenState
     final dynamic nested = _readNested(
       item,
       'priority_object',
-          (dynamic object) => object.priorityObject,
+      (dynamic object) => object.priorityObject,
       aliases: const <String>['priorityObject'],
     );
 
@@ -1590,7 +1510,7 @@ class _DRMyRegistrationScreenState
     final int? singularId = _readInt(
       item,
       'priority_object_id',
-          (dynamic object) => object.priorityObjectId,
+      (dynamic object) => object.priorityObjectId,
       aliases: const <String>['priorityObjectId'],
     );
 
@@ -1598,9 +1518,11 @@ class _DRMyRegistrationScreenState
       for (final dynamic priority in _cubit.priorityObjects) {
         final int? id = _readInt(priority, 'id', (dynamic object) => object.id);
         if (id == singularId) {
-          final String name =
-          _readString(priority, 'name', (dynamic object) => object.name)
-              .trim();
+          final String name = _readString(
+            priority,
+            'name',
+            (dynamic object) => object.name,
+          ).trim();
           if (name.isNotEmpty && !names.contains(name)) {
             names.add(name);
           }
@@ -1628,7 +1550,7 @@ class _DRMyRegistrationScreenState
     final String name = _readString(
       period,
       'name',
-          (dynamic object) => object.name,
+      (dynamic object) => object.name,
     );
 
     if (name.isNotEmpty) {
@@ -1638,11 +1560,8 @@ class _DRMyRegistrationScreenState
     final String directName = _readString(
       item,
       'registrationPeriodName',
-          (dynamic object) =>
-      object.registrationPeriodName ?? '',
-      aliases: const <String>[
-        'registration_period_name',
-      ],
+      (dynamic object) => object.registrationPeriodName ?? '',
+      aliases: const <String>['registration_period_name'],
     );
 
     if (directName.isNotEmpty) {
@@ -1652,11 +1571,8 @@ class _DRMyRegistrationScreenState
     final int? periodId = _readInt(
       item,
       'registration_period_id',
-          (dynamic object) =>
-      object.registrationPeriodId,
-      aliases: const <String>[
-        'registrationPeriodId',
-      ],
+      (dynamic object) => object.registrationPeriodId,
+      aliases: const <String>['registrationPeriodId'],
     );
 
     if (periodId != null) {
@@ -1676,7 +1592,7 @@ class _DRMyRegistrationScreenState
     final String nestedName = _readString(
       dormitory,
       'name',
-          (dynamic object) => object.name,
+      (dynamic object) => object.name,
     );
     if (nestedName.isNotEmpty) return nestedName;
 
@@ -1685,8 +1601,11 @@ class _DRMyRegistrationScreenState
       for (final dynamic value in _cubit.dormitories) {
         final int? id = _readInt(value, 'id', (dynamic object) => object.id);
         if (id == dormitoryId) {
-          final String name =
-          _readString(value, 'name', (dynamic object) => object.name);
+          final String name = _readString(
+            value,
+            'name',
+            (dynamic object) => object.name,
+          );
           if (name.isNotEmpty) return name;
         }
       }
@@ -1700,7 +1619,7 @@ class _DRMyRegistrationScreenState
     final String nestedAddress = _readString(
       dormitory,
       'address',
-          (dynamic object) => object.address,
+      (dynamic object) => object.address,
     );
     if (nestedAddress.isNotEmpty) return nestedAddress;
 
@@ -1712,7 +1631,7 @@ class _DRMyRegistrationScreenState
           return _readString(
             value,
             'address',
-                (dynamic object) => object.address,
+            (dynamic object) => object.address,
           );
         }
       }
@@ -1731,14 +1650,14 @@ class _DRMyRegistrationScreenState
     final String nestedName = _readString(
       roomType,
       'name',
-          (dynamic object) => object.name,
+      (dynamic object) => object.name,
     );
     if (nestedName.isNotEmpty) return nestedName;
 
     final int? roomTypeId = _readInt(
       item,
       'room_type_id',
-          (dynamic object) => object.roomTypeId,
+      (dynamic object) => object.roomTypeId,
       aliases: const <String>['roomTypeId'],
     );
 
@@ -1761,8 +1680,7 @@ class _DRMyRegistrationScreenState
       return '';
     }
 
-    final String amount =
-        '${_formatPrice(receipt.totalAmount.toString())} đ';
+    final String amount = '${_formatPrice(receipt.totalAmount.toString())} đ';
 
     final DateTime? start =
         receipt.resolvedPeriodStartDate ?? _accommodationStartDate(item);
@@ -1794,7 +1712,7 @@ class _DRMyRegistrationScreenState
     final String roomNumber = _readString(
       room,
       'room_number',
-          (dynamic object) => object.roomNumber,
+      (dynamic object) => object.roomNumber,
       aliases: const <String>['roomNumber'],
     );
 
@@ -1805,8 +1723,7 @@ class _DRMyRegistrationScreenState
     return _readString(
       item,
       'assignedRoom',
-          (dynamic object) =>
-      object.assignedRoom ?? '',
+      (dynamic object) => object.assignedRoom ?? '',
       aliases: const <String>['assigned_room'],
     );
   }
@@ -1817,7 +1734,7 @@ class _DRMyRegistrationScreenState
     final int? capacity = _readInt(
       room,
       'capacity',
-          (dynamic object) => object.capacity,
+      (dynamic object) => object.capacity,
     );
 
     return capacity?.toString() ?? '';
@@ -1829,8 +1746,7 @@ class _DRMyRegistrationScreenState
     final int? currentOccupancy = _readInt(
       room,
       'current_occupancy',
-          (dynamic object) =>
-      object.currentOccupancy,
+      (dynamic object) => object.currentOccupancy,
     );
 
     return currentOccupancy?.toString() ?? '';
@@ -1840,9 +1756,7 @@ class _DRMyRegistrationScreenState
   // Trạng thái hồ sơ
   // =========================================================
 
-  bool _hasBlockingRegistration(
-      List<dynamic> accommodations,
-      ) {
+  bool _hasBlockingRegistration(List<dynamic> accommodations) {
     if (accommodations.isEmpty) {
       return false;
     }
@@ -1851,10 +1765,10 @@ class _DRMyRegistrationScreenState
     sorted.sort((dynamic first, dynamic second) {
       final DateTime firstTime =
           _accommodationCreatedAt(first) ??
-              DateTime.fromMillisecondsSinceEpoch(0);
+          DateTime.fromMillisecondsSinceEpoch(0);
       final DateTime secondTime =
           _accommodationCreatedAt(second) ??
-              DateTime.fromMillisecondsSinceEpoch(0);
+          DateTime.fromMillisecondsSinceEpoch(0);
 
       final int timeCompare = secondTime.compareTo(firstTime);
       if (timeCompare != 0) {
@@ -1868,8 +1782,9 @@ class _DRMyRegistrationScreenState
       return secondId.compareTo(firstId);
     });
 
-    final String latestStatus =
-    _accommodationStatus(sorted.first).trim().toLowerCase();
+    final String latestStatus = _accommodationStatus(
+      sorted.first,
+    ).trim().toLowerCase();
 
     // Chỉ ba trạng thái này mới ẩn nút đăng ký mới.
     return latestStatus == 'approved' ||
@@ -1974,260 +1889,231 @@ class _DRMyRegistrationScreenState
   Widget build(BuildContext context) {
     return VcoreModuleScaffold(
       title: 'Ký túc xá của tôi',
-      floatingActionButton: BlocBuilder<
-          DormitoryRegistrationCubit,
-          DormitoryRegistrationState>(
-        bloc: _cubit,
-        builder: (
-            BuildContext context,
-            DormitoryRegistrationState state,
-            ) {
-          final dynamic data = _readDataFromState(state);
+      floatingActionButton:
+          BlocBuilder<DormitoryRegistrationCubit, DormitoryRegistrationState>(
+            bloc: _cubit,
+            builder: (BuildContext context, DormitoryRegistrationState state) {
+              final dynamic data = _readDataFromState(state);
 
-          // Chưa tải xong dữ liệu hồ sơ thì chưa kết luận việc hiển thị nút.
-          if (data == null) {
-            return const SizedBox.shrink();
-          }
+              // Chưa tải xong dữ liệu hồ sơ thì chưa kết luận việc hiển thị nút.
+              if (data == null) {
+                return const SizedBox.shrink();
+              }
 
-          final List<dynamic> accommodations = _readAccommodations(data);
+              final List<dynamic> accommodations = _readAccommodations(data);
 
-          // Chỉ ẩn khi hồ sơ mới nhất là APPROVED, ASSIGNED hoặc ACTIVE.
-          if (_hasBlockingRegistration(accommodations)) {
-            return const SizedBox.shrink();
-          }
+              // Chỉ ẩn khi hồ sơ mới nhất là APPROVED, ASSIGNED hoặc ACTIVE.
+              if (_hasBlockingRegistration(accommodations)) {
+                return const SizedBox.shrink();
+              }
 
-          final bool canRegister =
-              _hasOpenRegistrationPeriod &&
+              final bool canRegister =
+                  _hasOpenRegistrationPeriod &&
                   !_isCheckingOpenRegistrationPeriod;
 
-          return FloatingActionButton.extended(
-            onPressed: canRegister ? _goToRegisterFlow : null,
-            backgroundColor: canRegister
-                ? const Color(0xFF078B3E)
-                : const Color(0xFFBDBDBD),
-            foregroundColor: Colors.white,
-            elevation: canRegister ? 4 : 0,
-            icon: _isCheckingOpenRegistrationPeriod
-                ? const SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: Colors.white,
-              ),
-            )
-                : const Icon(
-              Icons.app_registration,
-              size: 18,
-              color: Colors.white,
-            ),
-            label: Text(
-              _isCheckingOpenRegistrationPeriod
-                  ? 'Đang kiểm tra'
-                  : 'Đăng ký mới',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: AppFontSizes.mediumSmall,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          );
-        },
-      ),
-      body: ProgressHubWidget(
-        contextComplete: (BuildContext context) {
-          _hubContext = context;
-        },
-        child: BlocListener<
-            DormitoryRegistrationCubit,
-            DormitoryRegistrationState>(
-          bloc: _cubit,
-          listener: (
-              BuildContext context,
-              DormitoryRegistrationState state,
-              ) {
-            if (state
-            is DormitoryRegistrationShowHub) {
-              Utils.showProgress(_hubContext);
-            }
-
-            if (state
-            is DormitoryRegistrationDismissHub) {
-              Utils.dismissProgress(_hubContext);
-            }
-
-            if (state
-            is DormitoryRegistrationSavedSuccess) {
-              snackBarSuccess(state.message);
-              _refreshData();
-            }
-
-            if (state
-            is DormitoryRegistrationError) {
-              snackBarError(state.message);
-            }
-          },
-          child: BlocBuilder<
-              DormitoryRegistrationCubit,
-              DormitoryRegistrationState>(
-            bloc: _cubit,
-            builder: (
-                BuildContext context,
-                DormitoryRegistrationState state,
-                ) {
-              if (state
-              is DormitoryRegistrationLoading) {
-                return const Center(
-                  child: CircularProgressIndicator(
-                    color: AppTheme.colorMain,
-                  ),
-                );
-              }
-
-              final dynamic data =
-              _readDataFromState(state);
-
-              if (data == null) {
-                return const Center(
-                  child: CircularProgressIndicator(
-                    color: AppTheme.colorMain,
-                  ),
-                );
-              }
-
-              final dynamic student =
-              _readStudent(data);
-
-              final List<dynamic> accommodations =
-              _readAccommodations(data);
-
-              accommodations.sort((
-                  dynamic first,
-                  dynamic second,
-                  ) {
-                final DateTime firstTime =
-                    _accommodationCreatedAt(first) ??
-                        DateTime.fromMillisecondsSinceEpoch(0);
-
-                final DateTime secondTime =
-                    _accommodationCreatedAt(second) ??
-                        DateTime.fromMillisecondsSinceEpoch(0);
-
-                final int timeCompare =
-                secondTime.compareTo(firstTime);
-
-                if (timeCompare != 0) {
-                  return timeCompare;
-                }
-
-                final Object? firstId =
-                _accommodationId(first);
-
-                final Object? secondId =
-                _accommodationId(second);
-
-                final int firstInt = firstId is int
-                    ? firstId
-                    : int.tryParse(
-                  firstId?.toString() ?? '',
-                ) ??
-                    0;
-
-                final int secondInt = secondId is int
-                    ? secondId
-                    : int.tryParse(
-                  secondId?.toString() ?? '',
-                ) ??
-                    0;
-
-                return secondInt.compareTo(firstInt);
-              });
-
-              if (accommodations.isEmpty) {
-                return RefreshIndicator(
-                  onRefresh: _refreshData,
-                  child: ListView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.all(16),
-                    children: <Widget>[
-                      if (student != null) ...<Widget>[
-                        _buildStudentCard(student, null),
-                        const SizedBox(height: 16),
-                      ],
-                      _buildStudentHistoryOverviewCard(data),
-                      const SizedBox(height: 16),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(18),
-                        decoration: BoxDecoration(
+              return FloatingActionButton.extended(
+                onPressed: canRegister ? _goToRegisterFlow : null,
+                backgroundColor: canRegister
+                    ? const Color(0xFF078B3E)
+                    : const Color(0xFFBDBDBD),
+                foregroundColor: Colors.white,
+                elevation: canRegister ? 4 : 0,
+                icon: _isCheckingOpenRegistrationPeriod
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(15),
-                          border: Border.all(
-                            color: const Color(0xFFE3E7E4),
-                          ),
                         ),
-                        child: const Column(
-                          children: <Widget>[
-                            Icon(
-                              Icons.apartment_outlined,
-                              size: 42,
-                              color: Color(0xFF9AA19C),
-                            ),
-                            SizedBox(height: 10),
-                            Text(
-                              'Chưa có thông tin đăng ký ký túc xá',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: Color(0xFF666D68),
-                                fontSize: AppFontSizes.mediumSmall,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
+                      )
+                    : const Icon(
+                        Icons.app_registration,
+                        size: 18,
+                        color: Colors.white,
                       ),
-                    ],
+                label: Text(
+                  _isCheckingOpenRegistrationPeriod
+                      ? 'Đang kiểm tra'
+                      : 'Đăng ký mới',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: AppFontSizes.mediumSmall,
+                    fontWeight: FontWeight.bold,
                   ),
-                );
-              }
-
-              return RefreshIndicator(
-                onRefresh: _refreshData,
-                child: ListView(
-                  physics:
-                  const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.all(16),
-                  children: <Widget>[
-                    if (_accommodationStatus(accommodations.first) ==
-                        'pending') ...<Widget>[
-                      _buildPendingApprovalBanner(),
-                      const SizedBox(height: 16),
-                    ],
-                    // Trạng thái mới nhất được hiển thị ở đầu màn hình.
-                    // Danh sách accommodations đã được ghép giữa bản tóm tắt
-                    // và bản chi tiết nên vẫn có đủ KTX, đợt và trạng thái.
-                    _buildCurrentRegistrationStatusCard(
-                      accommodations.first,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildStudentCard(student, accommodations.first),
-                    const SizedBox(height: 16),
-                    _buildStudentHistoryOverviewCard(data),
-                    const SizedBox(height: 16),
-                    // Giữ nguyên toàn bộ card hồ sơ chi tiết phía dưới.
-                    ...accommodations.asMap().entries.map(
-                          (MapEntry<int, dynamic> entry) =>
-                          _buildAccommodationCard(
-                            entry.value,
-                            student,
-                            isLatest: entry.key == 0,
-                          ),
-                    ),
-                  ],
                 ),
               );
             },
           ),
+      body: ProgressHubWidget(
+        contextComplete: (BuildContext context) {
+          _hubContext = context;
+        },
+        child: BlocListener<DormitoryRegistrationCubit, DormitoryRegistrationState>(
+          bloc: _cubit,
+          listener: (BuildContext context, DormitoryRegistrationState state) {
+            if (state is DormitoryRegistrationShowHub) {
+              Utils.showProgress(_hubContext);
+            }
+
+            if (state is DormitoryRegistrationDismissHub) {
+              Utils.dismissProgress(_hubContext);
+            }
+
+            if (state is DormitoryRegistrationSavedSuccess) {
+              snackBarSuccess(state.message);
+              _refreshData();
+            }
+
+            if (state is DormitoryRegistrationError) {
+              snackBarError(state.message);
+            }
+          },
+          child:
+              BlocBuilder<
+                DormitoryRegistrationCubit,
+                DormitoryRegistrationState
+              >(
+                bloc: _cubit,
+                builder: (BuildContext context, DormitoryRegistrationState state) {
+                  if (state is DormitoryRegistrationLoading) {
+                    return const Center(
+                      child: CircularProgressIndicator(
+                        color: AppTheme.colorMain,
+                      ),
+                    );
+                  }
+
+                  final dynamic data = _readDataFromState(state);
+
+                  if (data == null) {
+                    return const Center(
+                      child: CircularProgressIndicator(
+                        color: AppTheme.colorMain,
+                      ),
+                    );
+                  }
+
+                  final dynamic student = _readStudent(data);
+
+                  final List<dynamic> accommodations = _readAccommodations(
+                    data,
+                  );
+
+                  accommodations.sort((dynamic first, dynamic second) {
+                    final DateTime firstTime =
+                        _accommodationCreatedAt(first) ??
+                        DateTime.fromMillisecondsSinceEpoch(0);
+
+                    final DateTime secondTime =
+                        _accommodationCreatedAt(second) ??
+                        DateTime.fromMillisecondsSinceEpoch(0);
+
+                    final int timeCompare = secondTime.compareTo(firstTime);
+
+                    if (timeCompare != 0) {
+                      return timeCompare;
+                    }
+
+                    final Object? firstId = _accommodationId(first);
+
+                    final Object? secondId = _accommodationId(second);
+
+                    final int firstInt = firstId is int
+                        ? firstId
+                        : int.tryParse(firstId?.toString() ?? '') ?? 0;
+
+                    final int secondInt = secondId is int
+                        ? secondId
+                        : int.tryParse(secondId?.toString() ?? '') ?? 0;
+
+                    return secondInt.compareTo(firstInt);
+                  });
+
+                  if (accommodations.isEmpty) {
+                    return RefreshIndicator(
+                      onRefresh: _refreshData,
+                      child: ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.all(16),
+                        children: <Widget>[
+                          if (student != null) ...<Widget>[
+                            _buildStudentCard(student, null),
+                            const SizedBox(height: 16),
+                          ],
+                          _buildStudentHistoryOverviewCard(data),
+                          const SizedBox(height: 16),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(18),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(15),
+                              border: Border.all(
+                                color: const Color(0xFFE3E7E4),
+                              ),
+                            ),
+                            child: const Column(
+                              children: <Widget>[
+                                Icon(
+                                  Icons.apartment_outlined,
+                                  size: 42,
+                                  color: Color(0xFF9AA19C),
+                                ),
+                                SizedBox(height: 10),
+                                Text(
+                                  'Chưa có thông tin đăng ký ký túc xá',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: Color(0xFF666D68),
+                                    fontSize: AppFontSizes.mediumSmall,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  return RefreshIndicator(
+                    onRefresh: _refreshData,
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.all(16),
+                      children: <Widget>[
+                        if (_accommodationStatus(accommodations.first) ==
+                            'pending') ...<Widget>[
+                          _buildPendingApprovalBanner(),
+                          const SizedBox(height: 16),
+                        ],
+                        // Trạng thái mới nhất được hiển thị ở đầu màn hình.
+                        // Danh sách accommodations đã được ghép giữa bản tóm tắt
+                        // và bản chi tiết nên vẫn có đủ KTX, đợt và trạng thái.
+                        _buildCurrentRegistrationStatusCard(
+                          accommodations.first,
+                        ),
+                        const SizedBox(height: 16),
+                        _buildStudentCard(student, accommodations.first),
+                        const SizedBox(height: 16),
+                        _buildStudentHistoryOverviewCard(data),
+                        const SizedBox(height: 16),
+                        // Giữ nguyên toàn bộ card hồ sơ chi tiết phía dưới.
+                        ...accommodations.asMap().entries.map(
+                          (MapEntry<int, dynamic> entry) =>
+                              _buildAccommodationCard(
+                                entry.value,
+                                student,
+                                isLatest: entry.key == 0,
+                              ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
         ),
       ),
     );
@@ -2245,9 +2131,7 @@ class _DRMyRegistrationScreenState
       decoration: BoxDecoration(
         color: const Color(0xFFFFF8E7),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: const Color(0xFFF1D48A),
-        ),
+        border: Border.all(color: const Color(0xFFF1D48A)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2284,7 +2168,8 @@ class _DRMyRegistrationScreenState
                     ),
                   ),
                   TextSpan(
-                    text: 'Đơn của bạn đang chờ Ban quản lý duyệt, '
+                    text:
+                        'Đơn của bạn đang chờ Ban quản lý duyệt, '
                         '$expectedResultText'
                         'Bạn có thể theo dõi trạng thái đơn trong mục '
                         '\'Đơn đăng ký\'.',
@@ -2311,9 +2196,7 @@ class _DRMyRegistrationScreenState
       color: statusColor.withOpacity(0.08),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(15),
-        side: BorderSide(
-          color: statusColor.withOpacity(0.28),
-        ),
+        side: BorderSide(color: statusColor.withOpacity(0.28)),
       ),
       child: InkWell(
         onTap: () => _showHistory(_accommodationId(item)),
@@ -2375,7 +2258,7 @@ class _DRMyRegistrationScreenState
                       const SizedBox(height: 4),
                       Text(
                         'Ngày đăng ký: '
-                            '${DateFormat('dd/MM/yyyy HH:mm').format(createdAt.toLocal())}',
+                        '${DateFormat('dd/MM/yyyy HH:mm').format(createdAt.toLocal())}',
                         style: const TextStyle(
                           fontSize: AppFontSizes.font11,
                           color: Color(0xFF737982),
@@ -2386,11 +2269,7 @@ class _DRMyRegistrationScreenState
                 ),
               ),
               const SizedBox(width: 8),
-              Icon(
-                Icons.chevron_right_rounded,
-                color: statusColor,
-                size: 22,
-              ),
+              Icon(Icons.chevron_right_rounded, color: statusColor, size: 22),
             ],
           ),
         ),
@@ -2398,10 +2277,7 @@ class _DRMyRegistrationScreenState
     );
   }
 
-  Widget _buildStudentCard(
-    dynamic student,
-    dynamic latestAccommodation,
-  ) {
+  Widget _buildStudentCard(dynamic student, dynamic latestAccommodation) {
     final DateTime? dob = _studentDateOfBirth(student);
     final String identityNo = _studentIdentityNo(student);
     final String identityType = _studentIdentityType(student);
@@ -2412,8 +2288,10 @@ class _DRMyRegistrationScreenState
     final String temporaryAddress = _studentTemporaryAddress(student);
     // student.show đặt lựa chọn ưu tiên trong accommodation.priorityObject,
     // không nằm trong object student. Vẫn fallback về dữ liệu student cũ.
-    final String priorityObject =
-        _priorityObjectName(latestAccommodation, student);
+    final String priorityObject = _priorityObjectName(
+      latestAccommodation,
+      student,
+    );
     final String avatarUrl = _studentAvatarUrl(student);
     final List<dynamic> familyMembers = _studentFamilyMembers(student);
     // Tạm ẩn trạng thái khóa trên giao diện.
@@ -2427,9 +2305,7 @@ class _DRMyRegistrationScreenState
       elevation: 4,
       shadowColor: Colors.black.withOpacity(0.05),
       color: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(15),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -2649,8 +2525,10 @@ class _DRMyRegistrationScreenState
   }
 
   Widget _buildStudentHistoryOverviewCard(dynamic data) {
-    final int accommodationCount =
-        _readTopLevelList(data, 'accommodations').length;
+    final int accommodationCount = _readTopLevelList(
+      data,
+      'accommodations',
+    ).length;
     final int roommateCount = _readTopLevelList(data, 'roommates').length;
     final int receiptCount = _readTopLevelList(data, 'receipts').length;
     final int issueCount = _readTopLevelList(data, 'issues').length;
@@ -2721,10 +2599,7 @@ class _DRMyRegistrationScreenState
                 ),
               ),
               const SizedBox(width: 8),
-              const Icon(
-                Icons.chevron_right_rounded,
-                color: Color(0xFF078B3E),
-              ),
+              const Icon(Icons.chevron_right_rounded, color: Color(0xFF078B3E)),
             ],
           ),
         ),
@@ -2733,10 +2608,10 @@ class _DRMyRegistrationScreenState
   }
 
   Widget _buildAccommodationCard(
-      dynamic item,
-      dynamic student, {
-        required bool isLatest,
-      }) {
+    dynamic item,
+    dynamic student, {
+    required bool isLatest,
+  }) {
     final String status = _accommodationStatus(item);
     final String periodName = _periodName(item);
     final String periodDescription = _periodDescription(item);
@@ -2748,8 +2623,9 @@ class _DRMyRegistrationScreenState
     final String priorityObjectName = _priorityObjectName(item, student);
 
     final String roomTypeName = _roomTypeName(item);
-    final String latestReceiptPrice =
-    isLatest ? _latestReceiptPriceText(item) : '';
+    final String latestReceiptPrice = isLatest
+        ? _latestReceiptPriceText(item)
+        : '';
     final String roomNumber = _roomNumber(item);
     final String roomCapacity = _roomCapacity(item);
     final String roomCurrentOccupancy = _roomCurrentOccupancy(item);
@@ -2773,9 +2649,7 @@ class _DRMyRegistrationScreenState
       elevation: 4,
       shadowColor: Colors.black.withOpacity(0.05),
       color: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(15),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
       child: InkWell(
         onTap: () => _showHistory(_accommodationId(item)),
         borderRadius: BorderRadius.circular(15),
@@ -2846,10 +2720,7 @@ class _DRMyRegistrationScreenState
                   requestStatus.isNotEmpty)
                 _buildInfoRow('Trạng thái yêu cầu:', requestStatus),
               if (isRoomLeader != null)
-                _buildInfoRow(
-                  'Trưởng phòng:',
-                  isRoomLeader ? 'Có' : 'Không',
-                ),
+                _buildInfoRow('Trưởng phòng:', isRoomLeader ? 'Có' : 'Không'),
               if (startDate != null)
                 _buildInfoRow(
                   'Thời gian ở từ:',
@@ -2884,10 +2755,7 @@ class _DRMyRegistrationScreenState
                 if (roomTypeName.isNotEmpty)
                   _buildInfoRow('Loại phòng:', roomTypeName),
                 if (latestReceiptPrice.isNotEmpty)
-                  _buildInfoRow(
-                    'Giá phòng:',
-                    latestReceiptPrice,
-                  ),
+                  _buildInfoRow('Giá phòng:', latestReceiptPrice),
                 if (roomNumber.isNotEmpty) _buildInfoRow('Phòng:', roomNumber),
                 if (roomCapacity.isNotEmpty)
                   _buildInfoRow(
@@ -2958,10 +2826,7 @@ class _DRMyRegistrationScreenState
     );
   }
 
-  Widget _buildSectionTitle({
-    required IconData icon,
-    required String title,
-  }) {
+  Widget _buildSectionTitle({required IconData icon, required String title}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Row(
@@ -2981,19 +2846,15 @@ class _DRMyRegistrationScreenState
     );
   }
 
-  Widget _buildActionArea(
-      dynamic item,
-      dynamic student,
-      ) {
-    final String status =
-    _accommodationStatus(item);
+  Widget _buildActionArea(dynamic item, dynamic student) {
+    final String status = _accommodationStatus(item);
 
     if (status == 'draft') {
       return _buildNoticeBox(
         icon: Icons.info_outline_rounded,
         color: Colors.orange,
         text:
-        'Bản nháp cũ không còn được hỗ trợ. '
+            'Bản nháp cũ không còn được hỗ trợ. '
             'Vui lòng tạo đăng ký mới.',
       );
     }
@@ -3003,13 +2864,12 @@ class _DRMyRegistrationScreenState
         width: double.infinity,
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: AppTheme.colorError
-              .withOpacity(0.08),
+          color: AppTheme.colorError.withOpacity(0.08),
           borderRadius: BorderRadius.circular(10),
         ),
         child: const Text(
           'Hồ sơ đã bị từ chối. Bạn có thể đăng ký '
-              'lại nếu đợt đăng ký còn mở.',
+          'lại nếu đợt đăng ký còn mở.',
           style: TextStyle(
             fontSize: AppFontSizes.font11,
             color: Colors.red,
@@ -3019,9 +2879,7 @@ class _DRMyRegistrationScreenState
       );
     }
 
-    if (status == 'approved' ||
-        status == 'assigned' ||
-        status == 'active') {
+    if (status == 'approved' || status == 'assigned' || status == 'active') {
       final bool hasRoomType = _roomTypeName(item).isNotEmpty;
       final bool hasRoom = _roomNumber(item).isNotEmpty;
 
@@ -3030,19 +2888,23 @@ class _DRMyRegistrationScreenState
 
       if (status == 'active') {
         noticeIcon = Icons.home_rounded;
-        notice = 'Bạn đang lưu trú tại ký túc xá. '
+        notice =
+            'Bạn đang lưu trú tại ký túc xá. '
             'Vui lòng theo dõi hóa đơn và trạng thái thanh toán.';
       } else if (status == 'assigned' || hasRoom) {
         noticeIcon = Icons.meeting_room_rounded;
-        notice = 'Hồ sơ đã được duyệt và bạn đã được xếp phòng. '
+        notice =
+            'Hồ sơ đã được duyệt và bạn đã được xếp phòng. '
             'Vui lòng kiểm tra thông tin phòng và hóa đơn.';
       } else if (hasRoomType) {
         noticeIcon = Icons.bed_rounded;
-        notice = 'Hồ sơ đã được duyệt và đã có loại phòng. '
+        notice =
+            'Hồ sơ đã được duyệt và đã có loại phòng. '
             'Vui lòng kiểm tra hóa đơn và chờ xếp phòng cụ thể.';
       } else {
         noticeIcon = Icons.verified_rounded;
-        notice = 'Hồ sơ đã được duyệt. Ban quản lý chưa trả '
+        notice =
+            'Hồ sơ đã được duyệt. Ban quản lý chưa trả '
             'thông tin loại phòng hoặc phòng cụ thể.';
       }
 
@@ -3069,7 +2931,7 @@ class _DRMyRegistrationScreenState
         icon: Icons.hourglass_top_rounded,
         color: AppTheme.colorWarning,
         text:
-        'Hồ sơ đang chờ ban quản lý '
+            'Hồ sơ đang chờ ban quản lý '
             'xét duyệt.',
       );
     }
@@ -3091,7 +2953,7 @@ class _DRMyRegistrationScreenState
                 : Icons.swap_horiz_rounded,
             color: Colors.orange,
             text:
-            '${_requestTypeText(requestType)} đang chờ ban quản lý xử lý.',
+                '${_requestTypeText(requestType)} đang chờ ban quản lý xử lý.',
           ),
           const SizedBox(height: 10),
           SizedBox(
@@ -3187,8 +3049,9 @@ class _DRMyRegistrationScreenState
     required int dormitoryId,
     int? currentRoomId,
   }) async {
-    final List<Map<String, dynamic>> rooms =
-        await _repository.getRooms(dormitoryId: dormitoryId);
+    final List<Map<String, dynamic>> rooms = await _repository.getRooms(
+      dormitoryId: dormitoryId,
+    );
 
     final Map<int, _AccommodationRoomChoice> unique =
         <int, _AccommodationRoomChoice>{};
@@ -3210,23 +3073,22 @@ class _DRMyRegistrationScreenState
     }
 
     final List<_AccommodationRoomChoice> result = unique.values.toList()
-      ..sort(
-        (_AccommodationRoomChoice first, _AccommodationRoomChoice second) {
-          final int buildingCompare =
-              first.buildingId.compareTo(second.buildingId);
-          if (buildingCompare != 0) return buildingCompare;
+      ..sort((_AccommodationRoomChoice first, _AccommodationRoomChoice second) {
+        final int buildingCompare = first.buildingId.compareTo(
+          second.buildingId,
+        );
+        if (buildingCompare != 0) return buildingCompare;
 
-          return first.displayName
-              .toLowerCase()
-              .compareTo(second.displayName.toLowerCase());
-        },
-      );
+        return first.displayName.toLowerCase().compareTo(
+          second.displayName.toLowerCase(),
+        );
+      });
 
     return result;
   }
 
   Future<_AccommodationRequestFormResult?>
-      _showAccommodationRequestBottomSheet({
+  _showAccommodationRequestBottomSheet({
     required String type,
     required String title,
     required IconData icon,
@@ -3277,20 +3139,20 @@ class _DRMyRegistrationScreenState
 
     final _AccommodationRequestFormResult? result =
         await _showAccommodationRequestBottomSheet(
-      type: 'change_room',
-      title: 'Yêu cầu chuyển phòng',
-      icon: Icons.swap_horiz_rounded,
-      color: const Color(0xFF078B3E),
-      currentRoom: roomNumber.isEmpty ? null : roomNumber,
-      // Không tải và không hiển thị danh sách phòng. Sinh viên chỉ gửi
-      // lý do; Ban quản lý sẽ xem xét và bố trí phòng phù hợp.
-      description:
-          'Yêu cầu sẽ được gửi đến Ban quản lý ký túc xá để xem xét. '
-          'Ban quản lý sẽ chủ động bố trí phòng phù hợp theo tình trạng '
-          'phòng thực tế.',
-      noteLabel: 'Lý do chuyển phòng',
-      noteHint: 'Nhập lý do hoặc nhu cầu cần hỗ trợ',
-    );
+          type: 'change_room',
+          title: 'Yêu cầu chuyển phòng',
+          icon: Icons.swap_horiz_rounded,
+          color: const Color(0xFF078B3E),
+          currentRoom: roomNumber.isEmpty ? null : roomNumber,
+          // Không tải và không hiển thị danh sách phòng. Sinh viên chỉ gửi
+          // lý do; Ban quản lý sẽ xem xét và bố trí phòng phù hợp.
+          description:
+              'Yêu cầu sẽ được gửi đến Ban quản lý ký túc xá để xem xét. '
+              'Ban quản lý sẽ chủ động bố trí phòng phù hợp theo tình trạng '
+              'phòng thực tế.',
+          noteLabel: 'Lý do chuyển phòng',
+          noteHint: 'Nhập lý do hoặc nhu cầu cần hỗ trợ',
+        );
 
     if (result == null) return;
 
@@ -3313,18 +3175,18 @@ class _DRMyRegistrationScreenState
     final String roomNumber = _roomNumber(item);
     final _AccommodationRequestFormResult? result =
         await _showAccommodationRequestBottomSheet(
-      type: 'checkout',
-      title: 'Yêu cầu trả phòng',
-      icon: Icons.logout_rounded,
-      color: Colors.orange.shade700,
-      currentRoom: roomNumber.isEmpty ? null : roomNumber,
-      description:
-          'Yêu cầu trả phòng sẽ được gửi đến Ban quản lý ký túc xá. '
-          'Hệ thống chỉ ghi nhận yêu cầu, chưa tự động kết thúc lưu trú '
-          'hoặc bàn giao phòng.',
-      noteLabel: 'Lý do trả phòng',
-      noteHint: 'Nhập lý do và thời gian dự kiến rời ký túc xá',
-    );
+          type: 'checkout',
+          title: 'Yêu cầu trả phòng',
+          icon: Icons.logout_rounded,
+          color: Colors.orange.shade700,
+          currentRoom: roomNumber.isEmpty ? null : roomNumber,
+          description:
+              'Yêu cầu trả phòng sẽ được gửi đến Ban quản lý ký túc xá. '
+              'Hệ thống chỉ ghi nhận yêu cầu, chưa tự động kết thúc lưu trú '
+              'hoặc bàn giao phòng.',
+          noteLabel: 'Lý do trả phòng',
+          noteHint: 'Nhập lý do và thời gian dự kiến rời ký túc xá',
+        );
 
     if (result == null) return;
 
@@ -3436,9 +3298,7 @@ class _DRMyRegistrationScreenState
       await _refreshData();
     } catch (error) {
       if (mounted) {
-        snackBarError(
-          error.toString().replaceFirst('Exception: ', ''),
-        );
+        snackBarError(error.toString().replaceFirst('Exception: ', ''));
       }
     } finally {
       if (mounted) {
@@ -3449,28 +3309,23 @@ class _DRMyRegistrationScreenState
     }
   }
 
-  Widget _buildInvoiceButton(
-      dynamic item,
-      dynamic student,
-      ) {
+  Widget _buildInvoiceButton(dynamic item, dynamic student) {
     return SizedBox(
       width: double.infinity,
       child: FilledButton.icon(
         onPressed: () {
-          final String identityNo =
-          _studentIdentityNo(student);
+          final String identityNo = _studentIdentityNo(student);
 
           // student.show thường chỉ trả tên KTX trong accommodations[].dormitory,
           // không trả dormitoryId. Ưu tiên ID trực tiếp, sau đó đối chiếu tên
           // với danh mục KTX đã tải. Không chặn mở hóa đơn nếu vẫn chưa có ID,
           // vì API receipts chỉ cần CCCD/mã định danh sinh viên.
-          final int? dormitoryId =
-          _resolveDormitoryIdForAccommodation(item);
+          final int? dormitoryId = _resolveDormitoryIdForAccommodation(item);
 
           if (identityNo.isEmpty) {
             snackBarError(
               'Không tìm thấy số CCCD '
-                  'của sinh viên',
+              'của sinh viên',
             );
             return;
           }
@@ -3485,40 +3340,28 @@ class _DRMyRegistrationScreenState
           Navigator.push<void>(
             context,
             MaterialPageRoute<void>(
-              builder: (
-                  BuildContext context,
-                  ) {
+              builder: (BuildContext context) {
                 return DRInvoicesScreen(
                   identityNo: identityNo,
                   dormitoryId: dormitoryId,
                   dormitoryName: _dormitoryName(item),
-                  accommodationStartDate:
-                  _accommodationStartDate(item),
-                  accommodationEndDate:
-                  _accommodationEndDate(item),
+                  accommodationStartDate: _accommodationStartDate(item),
+                  accommodationEndDate: _accommodationEndDate(item),
                 );
               },
             ),
           );
         },
         style: FilledButton.styleFrom(
-          backgroundColor:
-          const Color(0xFF078B3E),
+          backgroundColor: const Color(0xFF078B3E),
           foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(
-            vertical: 13,
-          ),
+          padding: const EdgeInsets.symmetric(vertical: 13),
           shape: RoundedRectangleBorder(
-            borderRadius:
-            BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(12),
           ),
         ),
-        icon: const Icon(
-          Icons.receipt_long_rounded,
-        ),
-        label: const Text(
-          'Hóa đơn & thanh toán',
-        ),
+        icon: const Icon(Icons.receipt_long_rounded),
+        label: const Text('Hóa đơn & thanh toán'),
       ),
     );
   }
@@ -3537,11 +3380,7 @@ class _DRMyRegistrationScreenState
       ),
       child: Row(
         children: <Widget>[
-          Icon(
-            icon,
-            size: 16,
-            color: color,
-          ),
+          Icon(icon, size: 16, color: color),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -3559,14 +3398,10 @@ class _DRMyRegistrationScreenState
   }
 
   Widget _buildStatusBadge(String? status) {
-    final Color color =
-    _getStatusColor(status);
+    final Color color = _getStatusColor(status);
 
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 10,
-        vertical: 4,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: color.withOpacity(0.1),
         borderRadius: BorderRadius.circular(20),
@@ -3582,28 +3417,22 @@ class _DRMyRegistrationScreenState
     );
   }
 
-  Widget _buildInfoRow(
-      String label,
-      String value,
-      ) {
+  Widget _buildInfoRow(String label, String value) {
     if (value.trim().isEmpty) {
       return const SizedBox.shrink();
     }
 
     return Padding(
-      padding:
-      const EdgeInsets.symmetric(vertical: 3),
+      padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
-        crossAxisAlignment:
-        CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           SizedBox(
             width: 105,
             child: Text(
               label,
               style: const TextStyle(
-                fontSize:
-                AppFontSizes.font11,
+                fontSize: AppFontSizes.font11,
                 color: Color(0xFF666B75),
               ),
             ),
@@ -3612,8 +3441,7 @@ class _DRMyRegistrationScreenState
             child: Text(
               value,
               style: const TextStyle(
-                fontSize:
-                AppFontSizes.font11,
+                fontSize: AppFontSizes.font11,
                 color: Color(0xFF111318),
                 fontWeight: FontWeight.w500,
               ),
@@ -3625,25 +3453,18 @@ class _DRMyRegistrationScreenState
   }
 
   String _formatPrice(String value) {
-    final String raw =
-    value.replaceAll(',', '');
+    final String raw = value.replaceAll(',', '');
 
-    final double? number =
-    double.tryParse(raw);
+    final double? number = double.tryParse(raw);
 
     if (number == null) {
       return value;
     }
 
-    return NumberFormat(
-      '#,###',
-      'vi_VN',
-    ).format(number);
+    return NumberFormat('#,###', 'vi_VN').format(number);
   }
 
-  void _showHistory(
-      Object? accommodationId,
-      ) {
+  void _showHistory(Object? accommodationId) {
     if (accommodationId == null) {
       return;
     }
@@ -3653,9 +3474,7 @@ class _DRMyRegistrationScreenState
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (BuildContext context) {
-        return DRHistoryBottomSheet(
-          registrationId: accommodationId,
-        );
+        return DRHistoryBottomSheet(registrationId: accommodationId);
       },
     );
   }
@@ -3677,12 +3496,10 @@ class _DRMyRegistrationScreenState
       return;
     }
 
-    final dynamic result =
-    await Navigator.push<dynamic>(
+    final dynamic result = await Navigator.push<dynamic>(
       context,
       MaterialPageRoute<dynamic>(
-        builder: (BuildContext context) =>
-        const DRWizardFlow(),
+        builder: (BuildContext context) => const DRWizardFlow(),
       ),
     );
 
@@ -3690,8 +3507,7 @@ class _DRMyRegistrationScreenState
       return;
     }
 
-    if (result is String &&
-        result.isNotEmpty) {
+    if (result is String && result.isNotEmpty) {
       await _refreshData();
 
       if (!mounted) {
@@ -3701,22 +3517,15 @@ class _DRMyRegistrationScreenState
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           behavior: SnackBarBehavior.floating,
-          backgroundColor:
-          const Color(0xFF078B3E),
+          backgroundColor: const Color(0xFF078B3E),
           shape: RoundedRectangleBorder(
-            borderRadius:
-            BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(14),
           ),
           content: Row(
             children: <Widget>[
-              const Icon(
-                Icons.check_circle_rounded,
-                color: Colors.white,
-              ),
+              const Icon(Icons.check_circle_rounded, color: Colors.white),
               const SizedBox(width: 10),
-              Expanded(
-                child: Text(result),
-              ),
+              Expanded(child: Text(result)),
             ],
           ),
         ),
@@ -3735,10 +3544,7 @@ class _AccommodationRequestFormResult {
   final String? note;
   final int? desiredRoomId;
 
-  const _AccommodationRequestFormResult({
-    this.note,
-    this.desiredRoomId,
-  });
+  const _AccommodationRequestFormResult({this.note, this.desiredRoomId});
 }
 
 class _AccommodationRoomChoice {
@@ -3875,8 +3681,7 @@ class _AccommodationRequestFormSheetState
   final TextEditingController _noteController = TextEditingController();
   final FocusNode _noteFocusNode = FocusNode();
 
-  List<_AccommodationRoomChoice> _roomChoices =
-      <_AccommodationRoomChoice>[];
+  List<_AccommodationRoomChoice> _roomChoices = <_AccommodationRoomChoice>[];
   final Set<int> _expandedBuildingIds = <int>{};
   int _selectedRoomValue = -1;
   bool _loadingRooms = false;
@@ -3914,8 +3719,8 @@ class _AccommodationRequestFormSheetState
     });
 
     try {
-      final List<_AccommodationRoomChoice> rooms =
-          await widget.roomLoader!.call();
+      final List<_AccommodationRoomChoice> rooms = await widget.roomLoader!
+          .call();
       if (!mounted) return;
 
       setState(() {
@@ -3927,7 +3732,7 @@ class _AccommodationRequestFormSheetState
           );
         _roomLoadMessage = rooms.isEmpty
             ? 'Hiện chưa có phòng khác để lựa chọn. '
-                'Ban quản lý sẽ xem xét và sắp xếp phòng phù hợp.'
+                  'Ban quản lý sẽ xem xét và sắp xếp phòng phù hợp.'
             : null;
       });
     } catch (_) {
@@ -4036,9 +3841,7 @@ class _AccommodationRequestFormSheetState
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
                 decoration: const BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.vertical(
-                    top: Radius.circular(22),
-                  ),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
                 ),
                 child: SingleChildScrollView(
                   keyboardDismissBehavior:
@@ -4128,15 +3931,15 @@ class _AccommodationRequestFormSheetState
                         children: <Widget>[
                           Expanded(
                             child: OutlinedButton(
-                              onPressed:
-                                  _closing ? null : () => _close(null),
+                              onPressed: _closing ? null : () => _close(null),
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: const Color(0xFF475467),
                                 side: const BorderSide(
                                   color: Color(0xFFD0D5DD),
                                 ),
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 13),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 13,
+                                ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
@@ -4151,10 +3954,11 @@ class _AccommodationRequestFormSheetState
                               style: FilledButton.styleFrom(
                                 backgroundColor: widget.color,
                                 foregroundColor: Colors.white,
-                                disabledBackgroundColor:
-                                    widget.color.withOpacity(0.55),
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 13),
+                                disabledBackgroundColor: widget.color
+                                    .withOpacity(0.55),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 13,
+                                ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
@@ -4168,10 +3972,7 @@ class _AccommodationRequestFormSheetState
                                         color: Colors.white,
                                       ),
                                     )
-                                  : const Icon(
-                                      Icons.send_rounded,
-                                      size: 18,
-                                    ),
+                                  : const Icon(Icons.send_rounded, size: 18),
                               label: const Text('Gửi yêu cầu'),
                             ),
                           ),
@@ -4224,14 +4025,16 @@ class _AccommodationRequestFormSheetState
     final String value = roomNumber.trim().toUpperCase();
     if (value.isEmpty) return '';
 
-    final RegExpMatch? towerMatch =
-        RegExp(r'^(CT\d+)[\-_\s]').firstMatch(value);
+    final RegExpMatch? towerMatch = RegExp(
+      r'^(CT\d+)[\-_\s]',
+    ).firstMatch(value);
     if (towerMatch != null) {
       return towerMatch.group(1) ?? '';
     }
 
-    final RegExpMatch? letterMatch =
-        RegExp(r'^([A-Z]{1,5})(?=\d{2,})').firstMatch(value);
+    final RegExpMatch? letterMatch = RegExp(
+      r'^([A-Z]{1,5})(?=\d{2,})',
+    ).firstMatch(value);
     return letterMatch?.group(1) ?? '';
   }
 
@@ -4241,8 +4044,10 @@ class _AccommodationRequestFormSheetState
     required int totalBuildings,
   }) {
     final Set<String> hints = rooms
-        .map((_AccommodationRoomChoice room) =>
-            _buildingHintFromRoomNumber(room.roomName))
+        .map(
+          (_AccommodationRoomChoice room) =>
+              _buildingHintFromRoomNumber(room.roomName),
+        )
         .where((String value) => value.isNotEmpty)
         .toSet();
 
@@ -4301,8 +4106,9 @@ class _AccommodationRequestFormSheetState
     }
 
     final List<int> buildingIds = groupedRooms.keys.toList()..sort();
-    final int selectableRoomCount =
-        _roomChoices.where((_AccommodationRoomChoice room) => room.isSelectable).length;
+    final int selectableRoomCount = _roomChoices
+        .where((_AccommodationRoomChoice room) => room.isSelectable)
+        .length;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -4327,10 +4133,7 @@ class _AccommodationRequestFormSheetState
             ),
             if (_roomChoices.isNotEmpty)
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 4,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: const Color(0xFFEAF8EF),
                   borderRadius: BorderRadius.circular(999),
@@ -4361,16 +4164,22 @@ class _AccommodationRequestFormSheetState
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
-                for (int index = 0; index < buildingIds.length; index++) ...<Widget>[
+                for (
+                  int index = 0;
+                  index < buildingIds.length;
+                  index++
+                ) ...<Widget>[
                   _buildBuildingFolder(
                     buildingId: buildingIds[index],
                     buildingName: _buildingDisplayName(
-                      rooms: groupedRooms[buildingIds[index]] ??
+                      rooms:
+                          groupedRooms[buildingIds[index]] ??
                           const <_AccommodationRoomChoice>[],
                       index: index,
                       totalBuildings: buildingIds.length,
                     ),
-                    rooms: groupedRooms[buildingIds[index]] ??
+                    rooms:
+                        groupedRooms[buildingIds[index]] ??
                         const <_AccommodationRoomChoice>[],
                   ),
                   if (index < buildingIds.length - 1)
@@ -4417,9 +4226,7 @@ class _AccommodationRequestFormSheetState
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
           decoration: BoxDecoration(
-            color: selected
-                ? const Color(0xFFEAF8EF)
-                : const Color(0xFFF8FAFC),
+            color: selected ? const Color(0xFFEAF8EF) : const Color(0xFFF8FAFC),
             borderRadius: BorderRadius.circular(13),
             border: Border.all(
               color: selected
@@ -4613,13 +4420,11 @@ class _AccommodationRequestFormSheetState
             color: selected
                 ? const Color(0xFFEAF8EF)
                 : enabled
-                    ? Colors.transparent
-                    : const Color(0xFFF8FAFC),
+                ? Colors.transparent
+                : const Color(0xFFF8FAFC),
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: selected
-                  ? const Color(0xFF8FD2A9)
-                  : Colors.transparent,
+              color: selected ? const Color(0xFF8FD2A9) : Colors.transparent,
             ),
           ),
           child: Row(
@@ -4649,8 +4454,8 @@ class _AccommodationRequestFormSheetState
                   color: selected
                       ? const Color(0xFF078B3E)
                       : enabled
-                          ? const Color(0xFF475467)
-                          : const Color(0xFF98A2B3),
+                      ? const Color(0xFF475467)
+                      : const Color(0xFF98A2B3),
                 ),
               ),
               const SizedBox(width: 9),
@@ -4667,8 +4472,8 @@ class _AccommodationRequestFormSheetState
                         color: selected
                             ? const Color(0xFF056B31)
                             : enabled
-                                ? const Color(0xFF344054)
-                                : const Color(0xFF98A2B3),
+                            ? const Color(0xFF344054)
+                            : const Color(0xFF98A2B3),
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -4713,19 +4518,13 @@ class _AccommodationRequestFormSheetState
         shape: BoxShape.circle,
         color: selected ? const Color(0xFF078B3E) : Colors.white,
         border: Border.all(
-          color: selected
-              ? const Color(0xFF078B3E)
-              : const Color(0xFF98A2B3),
+          color: selected ? const Color(0xFF078B3E) : const Color(0xFF98A2B3),
           width: 1.5,
         ),
       ),
       alignment: Alignment.center,
       child: selected
-          ? const Icon(
-              Icons.check_rounded,
-              size: 14,
-              color: Colors.white,
-            )
+          ? const Icon(Icons.check_rounded, size: 14, color: Colors.white)
           : null,
     );
   }

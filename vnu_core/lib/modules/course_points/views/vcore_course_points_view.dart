@@ -113,9 +113,9 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
   }
 
   void _showFilterBottomSheet(
-    BuildContext context,
-    VcoreCoursePointsController controller,
-  ) {
+      BuildContext context,
+      VcoreCoursePointsController controller,
+      ) {
     Get.bottomSheet(
       Container(
         constraints: BoxConstraints(
@@ -239,9 +239,9 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
                       return _buildSemesterChoiceCard(
                         hocKy: hk,
                         isSelected: isSelected,
-                        onTap: () {
-                          controller.changeHocKy(hk.disPlayName());
+                        onTap: () async {
                           Get.back();
+                          await controller.changeHocKy(hk.disPlayName());
                         },
                       );
                     }),
@@ -561,16 +561,16 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
           ),
         ),
         ...analysis.dimensions.map(
-          (dim) => _CapabilityDimensionCard(dimension: dim),
+              (dim) => _CapabilityDimensionCard(dimension: dim),
         ),
       ],
     );
   }
 
   Widget _buildTopControlSection(
-    BuildContext context,
-    VcoreCoursePointsController controller,
-  ) {
+      BuildContext context,
+      VcoreCoursePointsController controller,
+      ) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
       child: Row(
@@ -731,9 +731,9 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
   }
 
   Widget _buildAiAnalysisView(
-    BuildContext context,
-    VcoreCoursePointsController controller,
-  ) {
+      BuildContext context,
+      VcoreCoursePointsController controller,
+      ) {
     final courses = controller.diemThiHocKy.toList();
     final gpa = controller.diemTrungBinhHocKy.value;
     final analysis = controller.aiRadarAnalysis.value;
@@ -747,18 +747,20 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: analysis == null
               ? _AiRadarPromotionalCard(
-                  onStart: () => controller.runAiAnalysis(),
-                )
+            onStart: () => controller.runAiAnalysis(),
+          )
               : _AnimatedCourseRadarCard(
-                  analysis: analysis,
-                  courseCount: courses.length,
-                ),
+            analysis: analysis,
+            courseCount: courses.length,
+          ),
         ),
-        const SizedBox(height: 14),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: _GpaSummaryCard(gpa: gpa),
-        ),
+        if (gpa != null) ...[
+          const SizedBox(height: 14),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: _GpaSummaryCard(gpa: gpa),
+          ),
+        ],
         if (analysis != null) ...[
           const SizedBox(height: 14),
           Padding(
@@ -771,9 +773,9 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
   }
 
   Widget _buildGradeListView(
-    BuildContext context,
-    VcoreCoursePointsController controller,
-  ) {
+      BuildContext context,
+      VcoreCoursePointsController controller,
+      ) {
     return Obx(() {
       final currentHk = controller.hocKy.value;
 
@@ -807,13 +809,15 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
 
       final hkId = currentHk.id ?? '';
       final courses = controller.diemThiTheoHocKy[hkId] ?? [];
+      final officialGpa = controller.diemTrungBinhHocKy.value;
 
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.only(bottom: 40),
         children: [
           _buildTopControlSection(context, controller),
-          if (courses.isNotEmpty) _buildSemesterSummaryCard(courses),
+          if (courses.isNotEmpty && officialGpa != null)
+            _buildSemesterSummaryCard(officialGpa),
           _buildCertificateOverviewCard(controller),
           if (courses.isEmpty)
             Padding(
@@ -847,7 +851,7 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
             )
           else
             ...courses.map(
-              (course) => _buildCourseGradeCard(context, course, controller),
+                  (course) => _buildCourseGradeCard(context, course, controller),
             ),
         ],
       );
@@ -908,9 +912,9 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
   }
 
   void _showSemesterSelectorBottomSheet(
-    BuildContext context,
-    VcoreCoursePointsController controller,
-  ) {
+      BuildContext context,
+      VcoreCoursePointsController controller,
+      ) {
     Get.bottomSheet(
       Container(
         decoration: const BoxDecoration(
@@ -968,13 +972,13 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
                     ),
                     trailing: isSelected
                         ? const Icon(
-                            Icons.check_circle,
-                            color: Color(0xFF18A957),
-                          )
+                      Icons.check_circle,
+                      color: Color(0xFF18A957),
+                    )
                         : null,
-                    onTap: () {
-                      controller.hocKy.value = hk;
+                    onTap: () async {
                       Get.back();
+                      await controller.changeHocKy(hk.disPlayName());
                     },
                   );
                 },
@@ -1066,7 +1070,7 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
               const SizedBox(height: 12),
               _buildNoticeBox(
                 text:
-                    'Chưa có dữ liệu chứng chỉ hoặc đơn vị đào tạo không cấu hình chứng chỉ.',
+                'Chưa có dữ liệu chứng chỉ hoặc đơn vị đào tạo không cấu hình chứng chỉ.',
                 icon: Icons.verified_outlined,
                 color: const Color(0xFF667085),
                 background: const Color(0xFFF3F6FA),
@@ -1126,7 +1130,7 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
                               const SizedBox(height: 6),
                               Text(
                                 'Số QĐ: ${item.soQuyetDinh}'
-                                '${item.ngayQuyetDinh.isNotEmpty ? ' • Ngày: ${item.ngayQuyetDinh}' : ''}',
+                                    '${item.ngayQuyetDinh.isNotEmpty ? ' • Ngày: ${item.ngayQuyetDinh}' : ''}',
                                 style: TextStyles.semiBold.copyWith(
                                   fontSize: AppFontSizes.extraSmall,
                                   color: const Color(0xFF18864B),
@@ -1201,10 +1205,10 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
   }
 
   Widget _buildCourseGradeCard(
-    BuildContext context,
-    DiemThiHocKyModel course,
-    VcoreCoursePointsController controller,
-  ) {
+      BuildContext context,
+      DiemThiHocKyModel course,
+      VcoreCoursePointsController controller,
+      ) {
     final hasGrade = course.diemHe10 != null && course.diemHe10!.isNotEmpty;
     final credits = course.soTinChi ?? '0';
     final score10 = hasGrade
@@ -1430,10 +1434,10 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
   }
 
   void _showCoursePointDetailBottomSheet(
-    BuildContext context,
-    DiemThiHocKyModel course,
-    VcoreCoursePointsController controller,
-  ) {
+      BuildContext context,
+      DiemThiHocKyModel course,
+      VcoreCoursePointsController controller,
+      ) {
     Get.bottomSheet(
       Container(
         constraints: BoxConstraints(
@@ -1531,36 +1535,20 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
     );
   }
 
-  Widget _buildSemesterSummaryCard(List<DiemThiHocKyModel> semesterGrades) {
-    double totalGpaCredits = 0;
-    double weighted10 = 0;
-    double weighted4 = 0;
-    int noScoreCredits = 0;
-
-    for (var course in semesterGrades) {
-      final credits = double.tryParse(
-        course.soTinChi?.replaceAll(',', '.') ?? '',
-      );
-      final score10 = course.diemHe10 != null && course.diemHe10!.isNotEmpty
-          ? double.tryParse(course.diemHe10!.replaceAll(',', '.'))
-          : null;
-
-      if (credits == null) continue;
-      if (score10 == null) {
-        noScoreCredits += credits.round();
-        continue;
-      }
-
-      totalGpaCredits += credits;
-      weighted10 += score10 * credits;
-      weighted4 += GradeScaleHelper.getScore4(score10) * credits;
-    }
-
-    double gpa10 = totalGpaCredits > 0 ? (weighted10 / totalGpaCredits) : 0.0;
-    double gpa4 = totalGpaCredits > 0 ? (weighted4 / totalGpaCredits) : 0.0;
-    final gpaLetter = totalGpaCredits > 0
-        ? GradeScaleHelper.getLetterGrade(gpa10)
-        : '--';
+  Widget _buildSemesterSummaryCard(DiemTrungBinhModel gpa) {
+    final gpa4HocKy = _displayText(gpa.diemTrungBinhHe4HocKy);
+    final gpa10HocKy = _displayText(gpa.diemTrungBinhHe10HocKy);
+    final tinChiHocKy = _displayText(gpa.tongSoTinChiTichLuyHocKy);
+    final tinChiTruotHocKy = _displayText(gpa.tongSoTinChiTruotHocKy);
+    final gpa4TichLuy = _displayText(
+      gpa.diemTrungBinhHe4TichLuyDenHocKyHienTai,
+    );
+    final gpa10TichLuy = _displayText(
+      gpa.diemTrungBinhHe10TichLuyDenHocKyHienTai,
+    );
+    final tinChiTichLuy = _displayText(
+      gpa.tongSoTinChiTichLuyTichLuyDenHocKyHienTai,
+    );
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -1589,21 +1577,31 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
             ),
           ),
           const SizedBox(height: 12),
+          _buildSummaryRow('Số tín chỉ học kỳ', tinChiHocKy),
+          const SizedBox(height: 8),
+          _buildSummaryRow('GPA học kỳ hệ 10', gpa10HocKy),
+          const SizedBox(height: 8),
           _buildSummaryRow(
-            'Số tín chỉ tính GPA',
-            totalGpaCredits.round().toString(),
+            'GPA học kỳ hệ 4',
+            gpa4HocKy,
+            isGpa4: true,
           ),
           const SizedBox(height: 8),
-          _buildSummaryRow('GPA hệ 10', gpa10.toStringAsFixed(2)),
-          const SizedBox(height: 8),
-          _buildSummaryRow('Điểm chữ', gpaLetter),
-          const SizedBox(height: 8),
-          _buildSummaryRow('GPA hệ 4', gpa4.toStringAsFixed(2), isGpa4: true),
+          _buildSummaryRow('GPA tích lũy hệ 10', gpa10TichLuy),
           const SizedBox(height: 8),
           _buildSummaryRow(
-            'Số tín chỉ chưa có điểm',
-            noScoreCredits.toString(),
-            isHighlight: noScoreCredits > 0,
+            'GPA tích lũy hệ 4',
+            gpa4TichLuy,
+            isGpa4: true,
+          ),
+          const SizedBox(height: 8),
+          _buildSummaryRow('Tổng tín chỉ tích lũy', tinChiTichLuy),
+          const SizedBox(height: 8),
+          _buildSummaryRow(
+            'Số tín chỉ trượt học kỳ',
+            tinChiTruotHocKy,
+            isHighlight:
+            tinChiTruotHocKy != '0' && tinChiTruotHocKy != '--',
           ),
         ],
       ),
@@ -1611,11 +1609,11 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
   }
 
   Widget _buildSummaryRow(
-    String label,
-    String value, {
-    bool isGpa4 = false,
-    bool isHighlight = false,
-  }) {
+      String label,
+      String value, {
+        bool isGpa4 = false,
+        bool isHighlight = false,
+      }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -1631,8 +1629,8 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
             color: isGpa4
                 ? const Color(0xFF18A957)
                 : (isHighlight
-                      ? const Color(0xFFE8590C)
-                      : const Color(0xFF212529)),
+                ? const Color(0xFFE8590C)
+                : const Color(0xFF212529)),
           ),
         ),
       ],
@@ -1792,8 +1790,8 @@ class _AnimatedCourseRadarCardState extends State<_AnimatedCourseRadarCard>
   void didUpdateWidget(covariant _AnimatedCourseRadarCard oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.analysis.dimensions
-            .map((e) => '${e.code}:${e.score}')
-            .join('|') !=
+        .map((e) => '${e.code}:${e.score}')
+        .join('|') !=
         widget.analysis.dimensions
             .map((e) => '${e.code}:${e.score}')
             .join('|')) {
@@ -1919,13 +1917,13 @@ class _CourseRadarPainter extends CustomPainter {
   }
 
   void _paintText(
-    Canvas canvas, {
-    required String text,
-    required Offset center,
-    required Color color,
-    required double fontSize,
-    required FontWeight fontWeight,
-  }) {
+      Canvas canvas, {
+        required String text,
+        required Offset center,
+        required Color color,
+        required double fontSize,
+        required FontWeight fontWeight,
+      }) {
     final painter = TextPainter(
       text: TextSpan(
         text: text,
@@ -2155,7 +2153,7 @@ class _CapabilityDimensionCardState extends State<_CapabilityDimensionCard> {
                     )
                   else
                     ...widget.dimension.evidenceCourses.map(
-                      (ev) => _EvidenceCourseRow(evidence: ev),
+                          (ev) => _EvidenceCourseRow(evidence: ev),
                     ),
                 ],
               ),
@@ -2266,6 +2264,10 @@ class _GpaSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (gpa == null) {
+      return const SizedBox.shrink();
+    }
+
     final gpa4Total = _text(gpa?.diemTrungBinhHe4TichLuyDenHocKyHienTai);
     final gpa10Total = _text(gpa?.diemTrungBinhHe10TichLuyDenHocKyHienTai);
     final tcTotal = _text(gpa?.tongSoTinChiTichLuyTichLuyDenHocKyHienTai);

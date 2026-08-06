@@ -26,48 +26,33 @@ import 'package:vnu_core/vnu_core.dart';
 import 'package:vnu_core/widgets/buttons_widget.dart';
 import 'package:vnu_core/widgets/progress_hub_widget.dart';
 
-enum _LoginMode {
-  student,
-  applicant,
-}
+enum _LoginMode { student, applicant }
 
 class VCoreLoginScreenV3 extends StatefulWidget {
   static const int serialTaps = 10;
   static const int tapDurationInMs = 7000;
 
-  static int get timeNow =>
-      DateTime.now().millisecondsSinceEpoch;
+  static int get timeNow => DateTime.now().millisecondsSinceEpoch;
 
-  const VCoreLoginScreenV3({
-    super.key,
-    this.initialApplicantTab = false,
-  });
+  const VCoreLoginScreenV3({super.key, this.initialApplicantTab = false});
 
   final bool initialApplicantTab;
 
   @override
-  State<VCoreLoginScreenV3> createState() =>
-      _VCoreLoginScreenV3State();
+  State<VCoreLoginScreenV3> createState() => _VCoreLoginScreenV3State();
 }
 
-class _VCoreLoginScreenV3State
-    extends State<VCoreLoginScreenV3> {
+class _VCoreLoginScreenV3State extends State<VCoreLoginScreenV3> {
   final AuthCubit _authCubit = AuthCubit();
 
-  final ApplicantAuthController
-  _applicantAuthController =
-  ApplicantAuthController();
+  final ApplicantAuthController _applicantAuthController =
+      ApplicantAuthController();
 
-  final TextEditingController
-  _studentCodeController =
-  TextEditingController();
+  final TextEditingController _studentCodeController = TextEditingController();
 
-  final TextEditingController
-  _passwordController =
-  TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
 
-  final LocalAuthentication auth =
-  LocalAuthentication();
+  final LocalAuthentication auth = LocalAuthentication();
 
   late BuildContext hubContext;
 
@@ -84,26 +69,19 @@ class _VCoreLoginScreenV3State
   String userNameLocal = '';
   String passwordLocal = '';
 
-  static const Color green =
-  Color(0xFF07964B);
+  static const Color green = Color(0xFF07964B);
 
-  static const Color greenLight =
-  Color(0xFF18C96A);
+  static const Color greenLight = Color(0xFF18C96A);
 
-  static const Color greenDark =
-  Color(0xFF008A43);
+  static const Color greenDark = Color(0xFF008A43);
 
-  static const Color textDark =
-  Color(0xFF101936);
+  static const Color textDark = Color(0xFF101936);
 
-  static const Color textMuted =
-  Color(0xFF7B849A);
+  static const Color textMuted = Color(0xFF7B849A);
 
-  static const Color hint =
-  Color(0xFF9AA2B7);
+  static const Color hint = Color(0xFF9AA2B7);
 
-  static const Color border =
-  Color(0xFFE3E7EE);
+  static const Color border = Color(0xFFE3E7EE);
 
   @override
   void initState() {
@@ -114,17 +92,12 @@ class _VCoreLoginScreenV3State
         : _LoginMode.student;
 
     if (kDebugMode) {
-      if (ServicesUrl()
-          .baseUrl
-          .contains('rteam.vn')) {
-        _studentCodeController.text =
-        '20032496';
+      if (ServicesUrl().baseUrl.contains('rteam.vn')) {
+        _studentCodeController.text = '20032496';
         _passwordController.text = '1';
       } else {
-        _studentCodeController.text =
-        '21010442';
-        _passwordController.text =
-        'VnuDuac@#2024';
+        _studentCodeController.text = '21010442';
+        _passwordController.text = 'VnuDuac@#2024';
       }
     }
 
@@ -146,30 +119,18 @@ class _VCoreLoginScreenV3State
   Future<void> _checkBio() async {
     try {
       final String savedUsername =
-          await DataRepository()
-              .getSecureSaveKey(
-            kLoginUserName,
-          ) ??
-              '';
+          await DataRepository().getSecureSaveKey(kLoginUserName) ?? '';
 
       if (savedUsername.isNotEmpty) {
-        _studentCodeController.text =
-            savedUsername;
+        _studentCodeController.text = savedUsername;
       }
 
       final String enabledBio =
-          await DataRepository()
-              .getSecureSaveKey(
-            kLoginEnableBio,
-          ) ??
-              '';
+          await DataRepository().getSecureSaveKey(kLoginEnableBio) ?? '';
 
-      isEnableLoginBio =
-          enabledBio.isNotEmpty;
+      isEnableLoginBio = enabledBio.isNotEmpty;
 
-      final List<BiometricType>
-      availableBiometrics =
-      await auth
+      final List<BiometricType> availableBiometrics = await auth
           .getAvailableBiometrics();
 
       if (availableBiometrics.isEmpty) {
@@ -183,12 +144,8 @@ class _VCoreLoginScreenV3State
       }
 
       final bool hasBio =
-          availableBiometrics.contains(
-            BiometricType.face,
-          ) ||
-              availableBiometrics.contains(
-                BiometricType.fingerprint,
-              );
+          availableBiometrics.contains(BiometricType.face) ||
+          availableBiometrics.contains(BiometricType.fingerprint);
 
       if (!hasBio) {
         if (!mounted) return;
@@ -201,46 +158,30 @@ class _VCoreLoginScreenV3State
       }
 
       userNameLocal =
-          await DataRepository()
-              .getSecureSaveKey(
-            kLoginUserName,
-          ) ??
-              '';
+          await DataRepository().getSecureSaveKey(kLoginUserName) ?? '';
 
       passwordLocal =
-          await DataRepository()
-              .getSecureSaveKey(
-            kLoginPassword,
-          ) ??
-              '';
+          await DataRepository().getSecureSaveKey(kLoginPassword) ?? '';
 
       if (!mounted) return;
 
       setState(() {
         isDeviceSupportBio = true;
 
-        isBioByFaceId =
-            availableBiometrics.contains(
-              BiometricType.face,
-            );
+        isBioByFaceId = availableBiometrics.contains(BiometricType.face);
       });
     } catch (error, stackTrace) {
       logError(
         'Kiểm tra sinh trắc học lỗi: '
-            '$error\n$stackTrace',
+        '$error\n$stackTrace',
       );
     }
   }
 
-  void _selectLoginMode(
-      _LoginMode mode,
-      ) {
+  void _selectLoginMode(_LoginMode mode) {
     if (_loginMode == mode) return;
 
-    FocusManager
-        .instance
-        .primaryFocus
-        ?.unfocus();
+    FocusManager.instance.primaryFocus?.unfocus();
 
     setState(() {
       _loginMode = mode;
@@ -248,10 +189,7 @@ class _VCoreLoginScreenV3State
   }
 
   void _loginStudent() {
-    FocusManager
-        .instance
-        .primaryFocus
-        ?.unfocus();
+    FocusManager.instance.primaryFocus?.unfocus();
 
     _authCubit.loginMobile(
       _studentCodeController.text.trim(),
@@ -262,16 +200,12 @@ class _VCoreLoginScreenV3State
   }
 
   Future<void> _loginWithBio() async {
-    FocusManager
-        .instance
-        .primaryFocus
-        ?.unfocus();
+    FocusManager.instance.primaryFocus?.unfocus();
 
-    if (userNameLocal.isEmpty ||
-        passwordLocal.isEmpty) {
+    if (userNameLocal.isEmpty || passwordLocal.isEmpty) {
       snackBarWarning(
         'Bạn cần đăng nhập trước khi '
-            'sử dụng tính năng này.',
+        'sử dụng tính năng này.',
       );
       return;
     }
@@ -279,20 +213,18 @@ class _VCoreLoginScreenV3State
     if (!isEnableLoginBio) {
       snackBarWarning(
         'Bạn cần đăng nhập và bật '
-            'tính năng sinh trắc học '
-            'trong mục Cá nhân.',
+        'tính năng sinh trắc học '
+        'trong mục Cá nhân.',
       );
       return;
     }
 
     try {
-      final bool authenticated =
-      await auth.authenticate(
+      final bool authenticated = await auth.authenticate(
         localizedReason: isBioByFaceId
             ? 'Quét khuôn mặt để đăng nhập'
             : 'Quét vân tay để đăng nhập',
-        options:
-        const AuthenticationOptions(
+        options: const AuthenticationOptions(
           biometricOnly: true,
           stickyAuth: true,
         ),
@@ -300,28 +232,20 @@ class _VCoreLoginScreenV3State
 
       if (!authenticated) return;
 
-      _authCubit.loginMobile(
-        userNameLocal,
-        passwordLocal,
-        '',
-        '',
-      );
+      _authCubit.loginMobile(userNameLocal, passwordLocal, '', '');
     } catch (error, stackTrace) {
       logError(
         'Đăng nhập sinh trắc học lỗi: '
-            '$error\n$stackTrace',
+        '$error\n$stackTrace',
       );
     }
   }
 
   void _handleSecretTap() {
-    final int now =
-        VCoreLoginScreenV3.timeNow;
+    final int now = VCoreLoginScreenV3.timeNow;
 
     final bool exceededDuration =
-        now - startTap >
-            VCoreLoginScreenV3
-                .tapDurationInMs;
+        now - startTap > VCoreLoginScreenV3.tapDurationInMs;
 
     if (exceededDuration) {
       consecutiveTaps = 0;
@@ -330,8 +254,7 @@ class _VCoreLoginScreenV3State
 
     consecutiveTaps++;
 
-    if (consecutiveTaps !=
-        VCoreLoginScreenV3.serialTaps) {
+    if (consecutiveTaps != VCoreLoginScreenV3.serialTaps) {
       return;
     }
 
@@ -341,23 +264,18 @@ class _VCoreLoginScreenV3State
     showDialog<void>(
       barrierDismissible: false,
       context: context,
-      builder: (
-          BuildContext dialogContext,
-          ) {
-        return VcoreProfileDomainDialog(
-          openTalker: _openTalker,
-        );
+      builder: (BuildContext dialogContext) {
+        return VcoreProfileDomainDialog(openTalker: _openTalker);
       },
     ).then((_) async {
       try {
-        await VnuCore()
-            .addFirebaseTokenSwitchDomain(
+        await VnuCore().addFirebaseTokenSwitchDomain(
           ServicesUrl().firebaseToken,
         );
       } catch (error, stackTrace) {
         logError(
           'Đồng bộ FCM khi đổi domain lỗi: '
-              '$error\n$stackTrace',
+          '$error\n$stackTrace',
         );
       }
     });
@@ -366,76 +284,56 @@ class _VCoreLoginScreenV3State
   void _openTalker() {
     String password = '';
 
-    final double buttonWidth =
-        MediaQuery.of(context).size.width /
-            4;
+    final double buttonWidth = MediaQuery.of(context).size.width / 4;
 
     showDialog<void>(
       barrierDismissible: false,
       context: context,
-      builder: (
-          BuildContext dialogContext,
-          ) {
+      builder: (BuildContext dialogContext) {
         return Dialog(
           shape: RoundedRectangleBorder(
-            borderRadius:
-            BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(16),
           ),
-          backgroundColor:
-          Colors.transparent,
+          backgroundColor: Colors.transparent,
           child: Container(
-            padding:
-            const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius:
-              BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(16),
             ),
             child: Column(
-              mainAxisSize:
-              MainAxisSize.min,
+              mainAxisSize: MainAxisSize.min,
               children: <Widget>[
                 VcoreProfileTextFieldWidget(
                   title: 'Mật khẩu',
-                  hintText:
-                  'Nhập mật khẩu',
+                  hintText: 'Nhập mật khẩu',
                   value: password,
                   autoFocus: true,
-                  onChange: (
-                      String text,
-                      ) {
+                  onChange: (String text) {
                     password = text;
                   },
-                  onSubmitted: (
-                      String text,
-                      ) {
+                  onSubmitted: (String text) {
                     password = text;
                   },
                 ),
                 const SizedBox(height: 24),
                 Row(
-                  mainAxisAlignment:
-                  MainAxisAlignment.center,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: <Widget>[
                     WhiteButton(
                       width: buttonWidth,
                       title: 'Hủy',
                       action: () {
-                        Navigator.pop(
-                          dialogContext,
-                        );
+                        Navigator.pop(dialogContext);
                       },
                     ),
                     const SizedBox(width: 12),
                     BlueButton(
                       width: buttonWidth,
                       title: 'Xác nhận',
-                      bgColor:
-                      AppColors.greenAccent,
+                      bgColor: AppColors.greenAccent,
                       action: () {
-                        Navigator.pop(
-                          dialogContext,
-                        );
+                        Navigator.pop(dialogContext);
                       },
                     ),
                   ],
@@ -449,15 +347,9 @@ class _VCoreLoginScreenV3State
       if (password.isEmpty) return;
 
       if (password == kLogPass) {
-        Get.to(
-              () => TalkerScreen(
-            talker: Globals().talker,
-          ),
-        );
+        Get.to(() => TalkerScreen(talker: Globals().talker));
       } else {
-        snackBarError(
-          'Mật khẩu không đúng.',
-        );
+        snackBarError('Mật khẩu không đúng.');
       }
     });
   }
@@ -467,139 +359,92 @@ class _VCoreLoginScreenV3State
     return Scaffold(
       backgroundColor: Colors.white,
       body: ProgressHubWidget(
-        contextComplete: (
-            BuildContext progressContext,
-            ) {
+        contextComplete: (BuildContext progressContext) {
           hubContext = progressContext;
 
-          _applicantAuthController.context =
-              progressContext;
+          _applicantAuthController.context = progressContext;
         },
-        child:
-        BlocListener<AuthCubit, AuthState>(
+        child: BlocListener<AuthCubit, AuthState>(
           bloc: _authCubit,
-          listener: (
-              BuildContext context,
-              AuthState state,
-              ) {
+          listener: (BuildContext context, AuthState state) {
             if (state is AuthError) {
-              snackBarError(
-                state.message,
-              );
+              snackBarError(state.message);
             }
 
             if (state is AuthShowHub) {
-              Utils.showProgress(
-                hubContext,
-              );
+              Utils.showProgress(hubContext);
             }
 
             if (state is AuthDismissHub) {
-              Utils.dismissProgress(
-                hubContext,
-              );
+              Utils.dismissProgress(hubContext);
             }
           },
-          child:
-          BlocBuilder<AuthCubit, AuthState>(
+          child: BlocBuilder<AuthCubit, AuthState>(
             bloc: _authCubit,
-            builder: (
-                BuildContext context,
-                AuthState state,
-                ) {
+            builder: (BuildContext context, AuthState state) {
               return Stack(
                 children: <Widget>[
                   GestureDetector(
-                    behavior:
-                    HitTestBehavior
-                        .translucent,
-                    onTap:
-                    _handleSecretTap,
-                    child:
-                    const _LoginBackground(),
+                    behavior: HitTestBehavior.translucent,
+                    onTap: _handleSecretTap,
+                    child: const _LoginBackground(),
                   ),
                   SafeArea(
                     child: LayoutBuilder(
-                      builder: (
-                          BuildContext context,
-                          BoxConstraints
-                          constraints,
-                          ) {
-                        final double screenWidth =
-                            constraints
-                                .maxWidth;
+                      builder:
+                          (BuildContext context, BoxConstraints constraints) {
+                            final double screenWidth = constraints.maxWidth;
 
-                        final double screenHeight =
-                            constraints
-                                .maxHeight;
+                            final double screenHeight = constraints.maxHeight;
 
-                        final double
-                        horizontalPadding =
-                        screenWidth < 390
-                            ? 22
-                            : 28;
+                            final double horizontalPadding = screenWidth < 390
+                                ? 22
+                                : 28;
 
-                        final double cardTop =
-                        screenHeight < 720
-                            ? 145
-                            : screenHeight <
-                            800
-                            ? 168
-                            : 192;
+                            final double cardTop = screenHeight < 720
+                                ? 145
+                                : screenHeight < 800
+                                ? 168
+                                : 192;
 
-                        return SingleChildScrollView(
-                          physics:
-                          const BouncingScrollPhysics(),
-                          padding:
-                          EdgeInsets.fromLTRB(
-                            horizontalPadding,
-                            cardTop,
-                            horizontalPadding,
-                            24,
-                          ),
-                          child: Center(
-                            child:
-                            ConstrainedBox(
-                              constraints:
-                              const BoxConstraints(
-                                maxWidth: 430,
+                            return SingleChildScrollView(
+                              physics: const BouncingScrollPhysics(),
+                              padding: EdgeInsets.fromLTRB(
+                                horizontalPadding,
+                                cardTop,
+                                horizontalPadding,
+                                24,
                               ),
-                              child: _LoginCard(
-                                loginMode:
-                                _loginMode,
-                                onLoginModeChanged:
-                                _selectLoginMode,
-                                studentCodeController:
-                                _studentCodeController,
-                                passwordController:
-                                _passwordController,
-                                applicantController:
-                                _applicantAuthController,
-                                obscurePassword:
-                                _obscurePassword,
-                                isDeviceSupportBio:
-                                isDeviceSupportBio,
-                                isBioByFaceId:
-                                isBioByFaceId,
-                                onStudentLogin:
-                                _loginStudent,
-                                onApplicantLogin:
-                                _applicantAuthController
-                                    .login,
-                                onBioLogin:
-                                _loginWithBio,
-                                onTogglePassword:
-                                    () {
-                                  setState(() {
-                                    _obscurePassword =
-                                    !_obscurePassword;
-                                  });
-                                },
+                              child: Center(
+                                child: ConstrainedBox(
+                                  constraints: const BoxConstraints(
+                                    maxWidth: 430,
+                                  ),
+                                  child: _LoginCard(
+                                    loginMode: _loginMode,
+                                    onLoginModeChanged: _selectLoginMode,
+                                    studentCodeController:
+                                        _studentCodeController,
+                                    passwordController: _passwordController,
+                                    applicantController:
+                                        _applicantAuthController,
+                                    obscurePassword: _obscurePassword,
+                                    isDeviceSupportBio: isDeviceSupportBio,
+                                    isBioByFaceId: isBioByFaceId,
+                                    onStudentLogin: _loginStudent,
+                                    onApplicantLogin:
+                                        _applicantAuthController.login,
+                                    onBioLogin: _loginWithBio,
+                                    onTogglePassword: () {
+                                      setState(() {
+                                        _obscurePassword = !_obscurePassword;
+                                      });
+                                    },
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
-                        );
-                      },
+                            );
+                          },
                     ),
                   ),
                 ],
@@ -612,8 +457,7 @@ class _VCoreLoginScreenV3State
   }
 }
 
-class _LoginBackground
-    extends StatelessWidget {
+class _LoginBackground extends StatelessWidget {
   const _LoginBackground();
 
   @override
@@ -621,18 +465,10 @@ class _LoginBackground
     return Stack(
       children: <Widget>[
         Positioned.fill(
-          child: Image.asset(
-            'assets/images/bg-login1.png',
-            fit: BoxFit.cover,
-          ),
+          child: Image.asset('assets/images/bg-login1.png', fit: BoxFit.cover),
         ),
         Positioned.fill(
-          child: Container(
-            color:
-            Colors.white.withOpacity(
-              0.08,
-            ),
-          ),
+          child: Container(color: Colors.white.withOpacity(0.08)),
         ),
       ],
     );
@@ -657,17 +493,13 @@ class _LoginCard extends StatelessWidget {
 
   final _LoginMode loginMode;
 
-  final ValueChanged<_LoginMode>
-  onLoginModeChanged;
+  final ValueChanged<_LoginMode> onLoginModeChanged;
 
-  final TextEditingController
-  studentCodeController;
+  final TextEditingController studentCodeController;
 
-  final TextEditingController
-  passwordController;
+  final TextEditingController passwordController;
 
-  final ApplicantAuthController
-  applicantController;
+  final ApplicantAuthController applicantController;
 
   final bool obscurePassword;
   final bool isDeviceSupportBio;
@@ -678,38 +510,20 @@ class _LoginCard extends StatelessWidget {
   final VoidCallback onBioLogin;
   final VoidCallback onTogglePassword;
 
-  bool get _isStudent =>
-      loginMode == _LoginMode.student;
+  bool get _isStudent => loginMode == _LoginMode.student;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding:
-      const EdgeInsets.fromLTRB(
-        20,
-        20,
-        20,
-        22,
-      ),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 22),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(
-          0.88,
-        ),
-        borderRadius:
-        BorderRadius.circular(28),
-        border: Border.all(
-          color: Colors.white.withOpacity(
-            0.75,
-          ),
-          width: 1,
-        ),
+        color: Colors.white.withOpacity(0.88),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: Colors.white.withOpacity(0.75), width: 1),
         boxShadow: <BoxShadow>[
           BoxShadow(
-            color:
-            Colors.black.withOpacity(
-              0.08,
-            ),
+            color: Colors.black.withOpacity(0.08),
             blurRadius: 28,
             offset: const Offset(0, 14),
           ),
@@ -720,23 +534,14 @@ class _LoginCard extends StatelessWidget {
         children: <Widget>[
           _LoginModeTabs(
             selectedMode: loginMode,
-            onChanged:
-            onLoginModeChanged,
+            onChanged: onLoginModeChanged,
           ),
           const SizedBox(height: 20),
           AnimatedSwitcher(
-            duration:
-            const Duration(
-              milliseconds: 220,
-            ),
-            switchInCurve:
-            Curves.easeOut,
-            switchOutCurve:
-            Curves.easeIn,
-            transitionBuilder: (
-                Widget child,
-                Animation<double> animation,
-                ) {
+            duration: const Duration(milliseconds: 220),
+            switchInCurve: Curves.easeOut,
+            switchOutCurve: Curves.easeIn,
+            transitionBuilder: (Widget child, Animation<double> animation) {
               return FadeTransition(
                 opacity: animation,
                 child: SizeTransition(
@@ -746,9 +551,7 @@ class _LoginCard extends StatelessWidget {
                 ),
               );
             },
-            child: _isStudent
-                ? _buildStudentForm()
-                : _buildApplicantForm(),
+            child: _isStudent ? _buildStudentForm() : _buildApplicantForm(),
           ),
           const SizedBox(height: 24),
           const _DividerText(),
@@ -761,40 +564,27 @@ class _LoginCard extends StatelessWidget {
 
   Widget _buildStudentForm() {
     return Column(
-      key: const ValueKey<String>(
-        'student-login-form',
-      ),
+      key: const ValueKey<String>('student-login-form'),
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
         _InputField(
-          controller:
-          studentCodeController,
-          icon:
-          Icons.person_outline_rounded,
+          controller: studentCodeController,
+          icon: Icons.person_outline_rounded,
           hintText: 'Mã sinh viên',
-          textInputAction:
-          TextInputAction.next,
+          textInputAction: TextInputAction.next,
         ),
         const SizedBox(height: 12),
         _InputField(
-          controller:
-          passwordController,
-          icon:
-          Icons.lock_outline_rounded,
+          controller: passwordController,
+          icon: Icons.lock_outline_rounded,
           hintText: 'Mật khẩu',
           obscureText: obscurePassword,
           suffixIcon: obscurePassword
-              ? Icons
-              .visibility_off_outlined
-              : Icons
-              .visibility_outlined,
-          onSuffixTap:
-          onTogglePassword,
-          textInputAction:
-          TextInputAction.done,
-          onSubmitted: (
-              String value,
-              ) {
+              ? Icons.visibility_off_outlined
+              : Icons.visibility_outlined,
+          onSuffixTap: onTogglePassword,
+          textInputAction: TextInputAction.done,
+          onSubmitted: (String value) {
             onStudentLogin();
           },
         ),
@@ -811,11 +601,7 @@ class _LoginCard extends StatelessWidget {
             ),
             if (isDeviceSupportBio) ...[
               const SizedBox(width: 12),
-              _BioLoginButton(
-                isBioByFaceId:
-                isBioByFaceId,
-                onTap: onBioLogin,
-              ),
+              _BioLoginButton(isBioByFaceId: isBioByFaceId, onTap: onBioLogin),
             ],
           ],
         ),
@@ -825,53 +611,24 @@ class _LoginCard extends StatelessWidget {
 
   Widget _buildApplicantForm() {
     return Column(
-      key: const ValueKey<String>(
-        'applicant-login-form',
-      ),
+      key: const ValueKey<String>('applicant-login-form'),
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
         _InputField(
-          controller:
-          applicantController
-              .cccdController,
+          controller: applicantController.cccdController,
           icon: Icons.badge_outlined,
           hintText: 'Số CCCD',
-          keyboardType:
-          TextInputType.number,
-          inputFormatters:
-          <TextInputFormatter>[
-            FilteringTextInputFormatter
-                .digitsOnly,
-            LengthLimitingTextInputFormatter(
-              12,
-            ),
-          ],
-          textInputAction:
-          TextInputAction.next,
+          keyboardType: TextInputType.text,
+          textInputAction: TextInputAction.next,
         ),
         const SizedBox(height: 12),
         _InputField(
-          controller:
-          applicantController
-              .phoneNumberController,
+          controller: applicantController.phoneNumberController,
           icon: Icons.phone_outlined,
-          hintText:
-          'Số điện thoại đã đăng ký',
-          keyboardType:
-          TextInputType.phone,
-          inputFormatters:
-          <TextInputFormatter>[
-            FilteringTextInputFormatter
-                .digitsOnly,
-            LengthLimitingTextInputFormatter(
-              12,
-            ),
-          ],
-          textInputAction:
-          TextInputAction.done,
-          onSubmitted: (
-              String value,
-              ) {
+          hintText: 'Số điện thoại đã đăng ký',
+          keyboardType: TextInputType.text,
+          textInputAction: TextInputAction.done,
+          onSubmitted: (String value) {
             onApplicantLogin();
           },
         ),
@@ -879,17 +636,10 @@ class _LoginCard extends StatelessWidget {
         const _ApplicantLoginNotice(),
         const SizedBox(height: 18),
         Obx(
-              () => _MainLoginButton(
-            title:
-            'Đăng nhập tân sinh viên',
-            isLoading:
-            applicantController
-                .isLoading
-                .value,
-            onTap:
-            applicantController
-                .isLoading
-                .value
+          () => _MainLoginButton(
+            title: 'Đăng nhập tân sinh viên',
+            isLoading: applicantController.isLoading.value,
+            onTap: applicantController.isLoading.value
                 ? null
                 : onApplicantLogin,
           ),
@@ -899,12 +649,8 @@ class _LoginCard extends StatelessWidget {
   }
 }
 
-class _LoginModeTabs
-    extends StatelessWidget {
-  const _LoginModeTabs({
-    required this.selectedMode,
-    required this.onChanged,
-  });
+class _LoginModeTabs extends StatelessWidget {
+  const _LoginModeTabs({required this.selectedMode, required this.onChanged});
 
   final _LoginMode selectedMode;
   final ValueChanged<_LoginMode> onChanged;
@@ -917,13 +663,9 @@ class _LoginModeTabs
           child: _LoginModeTab(
             title: 'Sinh viên',
             icon: Icons.school_outlined,
-            selected:
-            selectedMode ==
-                _LoginMode.student,
+            selected: selectedMode == _LoginMode.student,
             onTap: () {
-              onChanged(
-                _LoginMode.student,
-              );
+              onChanged(_LoginMode.student);
             },
           ),
         ),
@@ -931,15 +673,10 @@ class _LoginModeTabs
         Expanded(
           child: _LoginModeTab(
             title: 'Tân sinh viên',
-            icon:
-            Icons.how_to_reg_outlined,
-            selected:
-            selectedMode ==
-                _LoginMode.applicant,
+            icon: Icons.how_to_reg_outlined,
+            selected: selectedMode == _LoginMode.applicant,
             onTap: () {
-              onChanged(
-                _LoginMode.applicant,
-              );
+              onChanged(_LoginMode.applicant);
             },
             fontSize: 10,
           ),
@@ -949,8 +686,7 @@ class _LoginModeTabs
   }
 }
 
-class _LoginModeTab
-    extends StatelessWidget {
+class _LoginModeTab extends StatelessWidget {
   const _LoginModeTab({
     required this.title,
     required this.icon,
@@ -968,111 +704,69 @@ class _LoginModeTab
   Widget build(BuildContext context) {
     return Material(
       color: Colors.transparent,
-      borderRadius:
-      BorderRadius.circular(15),
+      borderRadius: BorderRadius.circular(15),
       child: InkWell(
         onTap: onTap,
-        borderRadius:
-        BorderRadius.circular(15),
+        borderRadius: BorderRadius.circular(15),
         child: AnimatedContainer(
-          duration:
-          const Duration(
-            milliseconds: 220,
-          ),
+          duration: const Duration(milliseconds: 220),
           curve: Curves.easeOutCubic,
           height: 50,
-          padding:
-          const EdgeInsets.symmetric(
-            horizontal: 8,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 8),
           decoration: BoxDecoration(
             gradient: selected
                 ? const LinearGradient(
-              begin:
-              Alignment.centerLeft,
-              end:
-              Alignment.centerRight,
-              colors: <Color>[
-                _VCoreLoginScreenV3State
-                    .greenLight,
-                _VCoreLoginScreenV3State
-                    .greenDark,
-              ],
-            )
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    colors: <Color>[
+                      _VCoreLoginScreenV3State.greenLight,
+                      _VCoreLoginScreenV3State.greenDark,
+                    ],
+                  )
                 : null,
-            color: selected
-                ? null
-                : Colors.white
-                .withOpacity(0.72),
-            borderRadius:
-            BorderRadius.circular(15),
+            color: selected ? null : Colors.white.withOpacity(0.72),
+            borderRadius: BorderRadius.circular(15),
             border: Border.all(
-              color: selected
-                  ? Colors.transparent
-                  : const Color(
-                0xFFE1E8E4,
-              ),
+              color: selected ? Colors.transparent : const Color(0xFFE1E8E4),
             ),
             boxShadow: selected
                 ? <BoxShadow>[
-              BoxShadow(
-                color:
-                _VCoreLoginScreenV3State
-                    .green
-                    .withOpacity(
-                  0.25,
-                ),
-                blurRadius: 14,
-                offset:
-                const Offset(
-                  0,
-                  6,
-                ),
-              ),
-            ]
+                    BoxShadow(
+                      color: _VCoreLoginScreenV3State.green.withOpacity(0.25),
+                      blurRadius: 14,
+                      offset: const Offset(0, 6),
+                    ),
+                  ]
                 : <BoxShadow>[
-              BoxShadow(
-                color: Colors.black
-                    .withOpacity(
-                  0.035,
-                ),
-                blurRadius: 8,
-                offset:
-                const Offset(
-                  0,
-                  3,
-                ),
-              ),
-            ],
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.035),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
           ),
           child: Row(
-            mainAxisAlignment:
-            MainAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: <Widget>[
               Icon(
                 icon,
                 size: 21,
                 color: selected
                     ? Colors.white
-                    : _VCoreLoginScreenV3State
-                    .textMuted,
+                    : _VCoreLoginScreenV3State.textMuted,
               ),
               const SizedBox(width: 7),
               Flexible(
                 child: Text(
                   title,
                   maxLines: 1,
-                  overflow:
-                  TextOverflow.ellipsis,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: selected
                         ? Colors.white
-                        : _VCoreLoginScreenV3State
-                        .textMuted,
+                        : _VCoreLoginScreenV3State.textMuted,
                     fontSize: fontSize ?? AppFontSizes.mediumSmall,
-                    fontWeight: selected
-                        ? FontWeight.w800
-                        : FontWeight.w700,
+                    fontWeight: selected ? FontWeight.w800 : FontWeight.w700,
                   ),
                 ),
               ),
@@ -1084,61 +778,42 @@ class _LoginModeTab
   }
 }
 
-class _ApplicantLoginNotice
-    extends StatelessWidget {
+class _ApplicantLoginNotice extends StatelessWidget {
   const _ApplicantLoginNotice();
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding:
-      const EdgeInsets.symmetric(
-        horizontal: 12,
-        vertical: 10,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color:
-        _VCoreLoginScreenV3State
-            .green
-            .withOpacity(0.07),
-        borderRadius:
-        BorderRadius.circular(14),
+        color: _VCoreLoginScreenV3State.green.withOpacity(0.07),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color:
-          _VCoreLoginScreenV3State
-              .green
-              .withOpacity(0.14),
+          color: _VCoreLoginScreenV3State.green.withOpacity(0.14),
         ),
       ),
       child: const Row(
-        crossAxisAlignment:
-        CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Icon(
             Icons.info_outline_rounded,
-            color:
-            _VCoreLoginScreenV3State
-                .green,
+            color: _VCoreLoginScreenV3State.green,
             size: 19,
           ),
           SizedBox(width: 8),
           Expanded(
             child: Text(
               'Dành cho tân sinh viên '
-                  'có tên trong danh sách '
-                  'trúng tuyển. Sử dụng CCCD '
-                  'và số điện thoại đã đăng ký '
-                  'với nhà trường.',
+              'có tên trong danh sách '
+              'trúng tuyển. Sử dụng CCCD '
+              'và số điện thoại đã đăng ký '
+              'với nhà trường.',
               style: TextStyle(
-                color:
-                _VCoreLoginScreenV3State
-                    .textMuted,
-                fontSize:
-                AppFontSizes.small,
+                color: _VCoreLoginScreenV3State.textMuted,
+                fontSize: AppFontSizes.small,
                 height: 1.4,
-                fontWeight:
-                FontWeight.w500,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ),
@@ -1169,8 +844,7 @@ class _InputField extends StatelessWidget {
   final VoidCallback? onSuffixTap;
   final bool obscureText;
   final TextInputType? keyboardType;
-  final List<TextInputFormatter>?
-  inputFormatters;
+  final List<TextInputFormatter>? inputFormatters;
   final TextInputAction? textInputAction;
   final ValueChanged<String>? onSubmitted;
 
@@ -1182,74 +856,48 @@ class _InputField extends StatelessWidget {
         controller: controller,
         obscureText: obscureText,
         keyboardType: keyboardType,
-        inputFormatters:
-        inputFormatters,
-        textInputAction:
-        textInputAction,
+        inputFormatters: inputFormatters,
+        textInputAction: textInputAction,
         onSubmitted: onSubmitted,
         autocorrect: false,
-        enableSuggestions:
-        !obscureText,
+        enableSuggestions: !obscureText,
         style: const TextStyle(
-          color:
-          _VCoreLoginScreenV3State
-              .textDark,
-          fontSize:
-          AppFontSizes.mediumLarge,
+          color: _VCoreLoginScreenV3State.textDark,
+          fontSize: AppFontSizes.mediumLarge,
           fontWeight: FontWeight.w500,
         ),
         decoration: InputDecoration(
           border: InputBorder.none,
           hintText: hintText,
-          hintStyle:
-          const TextStyle(
-            color:
-            _VCoreLoginScreenV3State
-                .hint,
-            fontSize:
-            AppFontSizes
-                .mediumLarge,
-            fontWeight:
-            FontWeight.w500,
+          hintStyle: const TextStyle(
+            color: _VCoreLoginScreenV3State.hint,
+            fontSize: AppFontSizes.mediumLarge,
+            fontWeight: FontWeight.w500,
           ),
           prefixIcon: Icon(
             icon,
-            color:
-            _VCoreLoginScreenV3State
-                .green,
+            color: _VCoreLoginScreenV3State.green,
             size: 24,
           ),
-          suffixIcon:
-          suffixIcon == null
+          suffixIcon: suffixIcon == null
               ? null
               : InkWell(
-            onTap:
-            onSuffixTap,
-            borderRadius:
-            BorderRadius
-                .circular(
-              24,
-            ),
-            child: Icon(
-              suffixIcon,
-              color:
-              _VCoreLoginScreenV3State
-                  .textMuted,
-              size: 22,
-            ),
-          ),
-          contentPadding:
-          const EdgeInsets.symmetric(
-            vertical: 17,
-          ),
+                  onTap: onSuffixTap,
+                  borderRadius: BorderRadius.circular(24),
+                  child: Icon(
+                    suffixIcon,
+                    color: _VCoreLoginScreenV3State.textMuted,
+                    size: 22,
+                  ),
+                ),
+          contentPadding: const EdgeInsets.symmetric(vertical: 17),
         ),
       ),
     );
   }
 }
 
-class _GlassLikeBox
-    extends StatelessWidget {
+class _GlassLikeBox extends StatelessWidget {
   const _GlassLikeBox({
     required this.child,
     required this.height,
@@ -1265,25 +913,12 @@ class _GlassLikeBox
     return Container(
       height: height,
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(
-          0.62,
-        ),
-        borderRadius:
-        BorderRadius.circular(
-          borderRadius,
-        ),
-        border: Border.all(
-          color: Colors.white.withOpacity(
-            0.9,
-          ),
-          width: 1,
-        ),
+        color: Colors.white.withOpacity(0.62),
+        borderRadius: BorderRadius.circular(borderRadius),
+        border: Border.all(color: Colors.white.withOpacity(0.9), width: 1),
         boxShadow: <BoxShadow>[
           BoxShadow(
-            color:
-            Colors.black.withOpacity(
-              0.035,
-            ),
+            color: Colors.black.withOpacity(0.035),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),
@@ -1294,8 +929,7 @@ class _GlassLikeBox
   }
 }
 
-class _LoginOptionsRow
-    extends StatelessWidget {
+class _LoginOptionsRow extends StatelessWidget {
   const _LoginOptionsRow();
 
   @override
@@ -1304,9 +938,7 @@ class _LoginOptionsRow
       children: <Widget>[
         const Icon(
           Icons.check_circle,
-          color:
-          _VCoreLoginScreenV3State
-              .green,
+          color: _VCoreLoginScreenV3State.green,
           size: 22,
         ),
         const SizedBox(width: 5),
@@ -1314,44 +946,27 @@ class _LoginOptionsRow
           child: Text(
             'Ghi nhớ đăng nhập',
             style: TextStyle(
-              color:
-              _VCoreLoginScreenV3State
-                  .textMuted,
-              fontSize:
-              AppFontSizes.small,
+              color: _VCoreLoginScreenV3State.textMuted,
+              fontSize: AppFontSizes.small,
               height: 1.3,
-              fontWeight:
-              FontWeight.w500,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ),
         const SizedBox(width: 8),
         InkWell(
-          borderRadius:
-          BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(8),
           onTap: () {
-            Get.to(
-                  () => const VcoreProfileForgotPassViewV2
-                  .loginSupport(),
-            );
+            Get.to(() => const VcoreProfileForgotPassViewV2.loginSupport());
           },
           child: const Padding(
-            padding:
-            EdgeInsets.symmetric(
-              horizontal: 4,
-              vertical: 6,
-            ),
+            padding: EdgeInsets.symmetric(horizontal: 4, vertical: 6),
             child: Text(
               'Quên mật khẩu?',
               style: TextStyle(
-                color:
-                _VCoreLoginScreenV3State
-                    .green,
-                fontSize:
-                AppFontSizes
-                    .mediumSmall,
-                fontWeight:
-                FontWeight.w700,
+                color: _VCoreLoginScreenV3State.green,
+                fontSize: AppFontSizes.mediumSmall,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ),
@@ -1361,8 +976,7 @@ class _LoginOptionsRow
   }
 }
 
-class _MainLoginButton
-    extends StatelessWidget {
+class _MainLoginButton extends StatelessWidget {
   const _MainLoginButton({
     required this.title,
     required this.onTap,
@@ -1377,86 +991,53 @@ class _MainLoginButton
   Widget build(BuildContext context) {
     return Material(
       color: Colors.transparent,
-      borderRadius:
-      BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(18),
       child: InkWell(
-        onTap:
-        isLoading ? null : onTap,
-        borderRadius:
-        BorderRadius.circular(18),
+        onTap: isLoading ? null : onTap,
+        borderRadius: BorderRadius.circular(18),
         child: Ink(
           height: 56,
           decoration: BoxDecoration(
-            borderRadius:
-            BorderRadius.circular(
-              18,
-            ),
+            borderRadius: BorderRadius.circular(18),
             gradient: LinearGradient(
-              begin:
-              Alignment.centerLeft,
-              end:
-              Alignment.centerRight,
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
               colors: onTap == null
                   ? <Color>[
-                _VCoreLoginScreenV3State
-                    .greenLight
-                    .withOpacity(
-                  0.55,
-                ),
-                _VCoreLoginScreenV3State
-                    .greenDark
-                    .withOpacity(
-                  0.55,
-                ),
-              ]
+                      _VCoreLoginScreenV3State.greenLight.withOpacity(0.55),
+                      _VCoreLoginScreenV3State.greenDark.withOpacity(0.55),
+                    ]
                   : const <Color>[
-                _VCoreLoginScreenV3State
-                    .greenLight,
-                _VCoreLoginScreenV3State
-                    .greenDark,
-              ],
+                      _VCoreLoginScreenV3State.greenLight,
+                      _VCoreLoginScreenV3State.greenDark,
+                    ],
             ),
             boxShadow: <BoxShadow>[
               BoxShadow(
-                color:
-                _VCoreLoginScreenV3State
-                    .green
-                    .withOpacity(
-                  0.24,
-                ),
+                color: _VCoreLoginScreenV3State.green.withOpacity(0.24),
                 blurRadius: 18,
-                offset:
-                const Offset(0, 8),
+                offset: const Offset(0, 8),
               ),
             ],
           ),
           child: Center(
             child: isLoading
                 ? const SizedBox(
-              width: 23,
-              height: 23,
-              child:
-              CircularProgressIndicator(
-                strokeWidth: 2.4,
-                valueColor:
-                AlwaysStoppedAnimation<
-                    Color>(
-                  Colors.white,
-                ),
-              ),
-            )
+                    width: 23,
+                    height: 23,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.4,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
                 : Text(
-              title,
-              style:
-              const TextStyle(
-                color: Colors.white,
-                fontSize:
-                AppFontSizes
-                    .large,
-                fontWeight:
-                FontWeight.w800,
-              ),
-            ),
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: AppFontSizes.large,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
           ),
         ),
       ),
@@ -1464,12 +1045,8 @@ class _MainLoginButton
   }
 }
 
-class _BioLoginButton
-    extends StatelessWidget {
-  const _BioLoginButton({
-    required this.isBioByFaceId,
-    required this.onTap,
-  });
+class _BioLoginButton extends StatelessWidget {
+  const _BioLoginButton({required this.isBioByFaceId, required this.onTap});
 
   final bool isBioByFaceId;
   final VoidCallback onTap;
@@ -1478,34 +1055,21 @@ class _BioLoginButton
   Widget build(BuildContext context) {
     return Material(
       color: Colors.transparent,
-      borderRadius:
-      BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(18),
       child: InkWell(
         onTap: onTap,
-        borderRadius:
-        BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(18),
         child: Ink(
           height: 56,
           width: 56,
           decoration: BoxDecoration(
-            borderRadius:
-            BorderRadius.circular(
-              18,
-            ),
-            color:
-            _VCoreLoginScreenV3State
-                .greenDark,
+            borderRadius: BorderRadius.circular(18),
+            color: _VCoreLoginScreenV3State.greenDark,
             boxShadow: <BoxShadow>[
               BoxShadow(
-                color:
-                _VCoreLoginScreenV3State
-                    .green
-                    .withOpacity(
-                  0.22,
-                ),
+                color: _VCoreLoginScreenV3State.green.withOpacity(0.22),
                 blurRadius: 16,
-                offset:
-                const Offset(0, 8),
+                offset: const Offset(0, 8),
               ),
             ],
           ),
@@ -1526,8 +1090,7 @@ class _BioLoginButton
   }
 }
 
-class _DividerText
-    extends StatelessWidget {
+class _DividerText extends StatelessWidget {
   const _DividerText();
 
   @override
@@ -1535,47 +1098,28 @@ class _DividerText
     return const Row(
       children: <Widget>[
         Expanded(
-          child: Divider(
-            color:
-            _VCoreLoginScreenV3State
-                .border,
-            thickness: 1,
-          ),
+          child: Divider(color: _VCoreLoginScreenV3State.border, thickness: 1),
         ),
         Padding(
-          padding:
-          EdgeInsets.symmetric(
-            horizontal: 14,
-          ),
+          padding: EdgeInsets.symmetric(horizontal: 14),
           child: Text(
             'Các tiện ích khác',
             style: TextStyle(
-              color:
-              _VCoreLoginScreenV3State
-                  .textMuted,
-              fontSize:
-              AppFontSizes
-                  .mediumSmall,
-              fontWeight:
-              FontWeight.w600,
+              color: _VCoreLoginScreenV3State.textMuted,
+              fontSize: AppFontSizes.mediumSmall,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ),
         Expanded(
-          child: Divider(
-            color:
-            _VCoreLoginScreenV3State
-                .border,
-            thickness: 1,
-          ),
+          child: Divider(color: _VCoreLoginScreenV3State.border, thickness: 1),
         ),
       ],
     );
   }
 }
 
-class _UtilityButtons
-    extends StatelessWidget {
+class _UtilityButtons extends StatelessWidget {
   const _UtilityButtons();
 
   @override
@@ -1584,8 +1128,7 @@ class _UtilityButtons
       children: <Widget>[
         Expanded(
           child: _UtilityButton(
-            icon:
-            Icons.home_work_outlined,
+            icon: Icons.home_work_outlined,
             title: 'Phòng trọ',
             onTap: openMotelWebView,
           ),
@@ -1596,23 +1139,19 @@ class _UtilityButtons
             icon: Icons.map_outlined,
             title: 'Bản đồ',
             onTap: () {
-              Get.to(
-                    () =>
-                const VcoreImmapView(),
-              );
+              Get.to(() => const VcoreImmapView());
             },
           ),
         ),
         const SizedBox(width: 10),
         Expanded(
           child: _UtilityButton(
-            icon:
-            Icons.support_agent_outlined,
+            icon: Icons.support_agent_outlined,
             title: 'Hỗ trợ',
             onTap: () {
               Utils.openUrl(
                 'https://www.facebook.com/'
-                    'supportdangkyhocvnu',
+                'supportdangkyhocvnu',
               );
             },
           ),
@@ -1622,8 +1161,7 @@ class _UtilityButtons
   }
 }
 
-class _UtilityButton
-    extends StatelessWidget {
+class _UtilityButton extends StatelessWidget {
   const _UtilityButton({
     required this.icon,
     required this.title,
@@ -1638,41 +1176,26 @@ class _UtilityButton
   Widget build(BuildContext context) {
     return Material(
       color: Colors.transparent,
-      borderRadius:
-      BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(16),
       child: InkWell(
         onTap: onTap,
-        borderRadius:
-        BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(16),
         child: _GlassLikeBox(
           height: 62,
           borderRadius: 16,
           child: Column(
-            mainAxisAlignment:
-            MainAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: <Widget>[
-              Icon(
-                icon,
-                color:
-                _VCoreLoginScreenV3State
-                    .green,
-                size: 22,
-              ),
+              Icon(icon, color: _VCoreLoginScreenV3State.green, size: 22),
               const SizedBox(height: 6),
               Text(
                 title,
                 maxLines: 1,
-                overflow:
-                TextOverflow.ellipsis,
-                style:
-                const TextStyle(
-                  color:
-                  _VCoreLoginScreenV3State
-                      .textDark,
-                  fontSize:
-                  AppFontSizes.small,
-                  fontWeight:
-                  FontWeight.w700,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: _VCoreLoginScreenV3State.textDark,
+                  fontSize: AppFontSizes.small,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ],

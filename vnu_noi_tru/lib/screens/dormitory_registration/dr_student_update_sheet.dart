@@ -9,6 +9,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:vnu_core/common/app_text_styles.dart';
 import 'package:vnu_core/themes/app_theme.dart';
+import 'package:vnu_core/services/services_url.dart';
 import 'package:vnu_noi_tru/models/model.dart';
 import 'package:vnu_noi_tru/repository/dormitory_registration_repository.dart';
 
@@ -35,8 +36,7 @@ class DRStudentUpdateSheet extends StatefulWidget {
   });
 
   @override
-  State<DRStudentUpdateSheet> createState() =>
-      _DRStudentUpdateSheetState();
+  State<DRStudentUpdateSheet> createState() => _DRStudentUpdateSheetState();
 }
 
 class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
@@ -112,285 +112,233 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
   void initState() {
     super.initState();
 
-    _existingPriorityDocuments =
-        _readExistingPriorityDocuments(widget.accommodation);
+    _existingPriorityDocuments = _readExistingPriorityDocuments(
+      widget.accommodation,
+    );
     _initialPriorityObjectIds = _readExistingPriorityObjectIds();
     _initialPriorityObjectNames = _readExistingPriorityObjectNames();
 
     _existingAvatarUrl = _resolveAvatarUrl(
-      _readText(
-        widget.student,
-        const <String>['avatar', 'avatar_url', 'avatarUrl'],
-        (dynamic object) => object.avatar,
-      ),
+      _readText(widget.student, const <String>[
+        'avatar',
+        'avatar_url',
+        'avatarUrl',
+      ], (dynamic object) => object.avatar),
     );
 
     _studentCodeController = TextEditingController(
-      text: _readText(
-        widget.student,
-        const <String>['student_code', 'studentCode'],
-        (dynamic object) => object.studentCode,
-      ),
+      text: _readText(widget.student, const <String>[
+        'student_code',
+        'studentCode',
+      ], (dynamic object) => object.studentCode),
     );
 
     _fullNameController = TextEditingController(
-      text: _readText(
-        widget.student,
-        const <String>['full_name', 'fullName'],
-        (dynamic object) => object.fullName,
-      ),
+      text: _readText(widget.student, const <String>[
+        'full_name',
+        'fullName',
+      ], (dynamic object) => object.fullName),
     );
 
     _dobController = TextEditingController(
       text: _readDateText(
-        _readValue(
-          widget.student,
-          const <String>['dob', 'date_of_birth', 'dateOfBirth'],
-          (dynamic object) => object.dob,
-        ),
+        _readValue(widget.student, const <String>[
+          'dob',
+          'date_of_birth',
+          'dateOfBirth',
+        ], (dynamic object) => object.dob),
       ),
     );
 
-    final String rawGender = _readText(
-      widget.student,
-      const <String>['gender'],
-      (dynamic object) => object.gender,
-    ).toLowerCase();
+    final String rawGender = _readText(widget.student, const <String>[
+      'gender',
+    ], (dynamic object) => object.gender).toLowerCase();
     _gender = rawGender == 'female' || rawGender == 'nữ' ? 'female' : 'male';
 
     _phoneController = TextEditingController(
-      text: _readText(
-        widget.student,
-        const <String>['phone_number', 'phoneNumber', 'phone'],
-        (dynamic object) => object.phone,
-      ),
+      text: _readText(widget.student, const <String>[
+        'phone_number',
+        'phoneNumber',
+        'phone',
+      ], (dynamic object) => object.phone),
     );
 
     _emailController = TextEditingController(
-      text: _readText(
-        widget.student,
-        const <String>['email'],
-        (dynamic object) => object.email,
-      ),
+      text: _readText(widget.student, const <String>[
+        'email',
+      ], (dynamic object) => object.email),
     );
 
-    final String rawIdentityType = _readText(
-      widget.student,
-      const <String>['identity_type', 'identityType'],
-      (dynamic object) => object.identityType,
-    ).toUpperCase();
-    if (const <String>{'CCCD', 'CMND', 'HC', 'GTK'}
-        .contains(rawIdentityType)) {
+    final String rawIdentityType = _readText(widget.student, const <String>[
+      'identity_type',
+      'identityType',
+    ], (dynamic object) => object.identityType).toUpperCase();
+    if (const <String>{'CCCD', 'CMND', 'HC', 'GTK'}.contains(rawIdentityType)) {
       _identityType = rawIdentityType;
     }
 
     _identityNameController = TextEditingController(
-      text: _readText(
-        widget.student,
-        const <String>['identity_name', 'identityName'],
-        (dynamic object) => object.identityName,
-      ),
+      text: _readText(widget.student, const <String>[
+        'identity_name',
+        'identityName',
+      ], (dynamic object) => object.identityName),
     );
 
     _identityNoController = TextEditingController(
-      text: _readText(
-        widget.student,
-        const <String>['identity_no', 'identityNo', 'cccd'],
-        (dynamic object) => object.cccd,
-      ).isNotEmpty
-          ? _readText(
-              widget.student,
-              const <String>['identity_no', 'identityNo', 'cccd'],
-              (dynamic object) => object.cccd,
-            )
+      text:
+          _readText(widget.student, const <String>[
+            'identity_no',
+            'identityNo',
+            'cccd',
+          ], (dynamic object) => object.cccd).isNotEmpty
+          ? _readText(widget.student, const <String>[
+              'identity_no',
+              'identityNo',
+              'cccd',
+            ], (dynamic object) => object.cccd)
           : widget.identityNo,
     );
 
     _identityIssueDateController = TextEditingController(
       text: _readDateText(
-        _readValue(
-          widget.student,
-          const <String>[
-            'identity_issue_date',
-            'identityIssueDate',
-            'cccd_issue_date',
-          ],
-          (dynamic object) => object.cccdIssueDate,
-        ),
+        _readValue(widget.student, const <String>[
+          'identity_issue_date',
+          'identityIssueDate',
+          'cccd_issue_date',
+        ], (dynamic object) => object.cccdIssueDate),
       ),
     );
 
     _identityIssuePlaceController = TextEditingController(
-      text: _readText(
-        widget.student,
-        const <String>[
-          'identity_issue_place',
-          'identityIssuePlace',
-        ],
-        (dynamic object) => object.identityIssuePlace,
-      ),
+      text: _readText(widget.student, const <String>[
+        'identity_issue_place',
+        'identityIssuePlace',
+      ], (dynamic object) => object.identityIssuePlace),
     );
 
     _classNameController = TextEditingController(
-      text: _readText(
-        widget.student,
-        const <String>['class', 'class_name', 'className'],
-        (dynamic object) => object.className,
-      ),
+      text: _readText(widget.student, const <String>[
+        'class',
+        'class_name',
+        'className',
+      ], (dynamic object) => object.className),
     );
     _facultyController = TextEditingController(
-      text: _readText(
-        widget.student,
-        const <String>['faculty'],
-        (dynamic object) => object.faculty,
-      ),
+      text: _readText(widget.student, const <String>[
+        'faculty',
+      ], (dynamic object) => object.faculty),
     );
     _majorController = TextEditingController(
-      text: _readText(
-        widget.student,
-        const <String>['major'],
-        (dynamic object) => object.major,
-      ),
+      text: _readText(widget.student, const <String>[
+        'major',
+      ], (dynamic object) => object.major),
     );
     _academicYearController = TextEditingController(
-      text: _readText(
-        widget.student,
-        const <String>['academic_year', 'academicYear'],
-        (dynamic object) => object.academicYear,
-      ),
+      text: _readText(widget.student, const <String>[
+        'academic_year',
+        'academicYear',
+      ], (dynamic object) => object.academicYear),
     );
     _systemController = TextEditingController(
-      text: _readText(
-        widget.student,
-        const <String>['system'],
-        (dynamic object) => object.system,
-      ),
+      text: _readText(widget.student, const <String>[
+        'system',
+      ], (dynamic object) => object.system),
     );
     _levelController = TextEditingController(
-      text: _readText(
-        widget.student,
-        const <String>['level'],
-        (dynamic object) => object.level,
-      ),
+      text: _readText(widget.student, const <String>[
+        'level',
+      ], (dynamic object) => object.level),
     );
     _universityController = TextEditingController(
-      text: _readText(
-        widget.student,
-        const <String>[
-          'university',
-          'university_name',
-          'universityName',
-        ],
-        (dynamic object) => object.university,
-      ),
+      text: _readText(widget.student, const <String>[
+        'university',
+        'university_name',
+        'universityName',
+      ], (dynamic object) => object.university),
     );
 
     _countryController = TextEditingController(
-      text: _readText(
-        widget.student,
-        const <String>['country'],
-        (dynamic object) => object.country,
-      ),
+      text: _readText(widget.student, const <String>[
+        'country',
+      ], (dynamic object) => object.country),
     );
 
     _nationalController = TextEditingController(
-      text: _readText(
-        widget.student,
-        const <String>['national', 'nationality'],
-        (dynamic object) => object.national,
-      ),
+      text: _readText(widget.student, const <String>[
+        'national',
+        'nationality',
+      ], (dynamic object) => object.national),
     );
 
     _permanentAddressController = TextEditingController(
-      text: _readText(
-        widget.student,
-        const <String>['permanent_address', 'permanentAddress', 'hometown'],
-        (dynamic object) => object.hometown,
-      ),
+      text: _readText(widget.student, const <String>[
+        'permanent_address',
+        'permanentAddress',
+        'hometown',
+      ], (dynamic object) => object.hometown),
     );
 
     _contactAddressController = TextEditingController(
-      text: _readText(
-        widget.student,
-        const <String>['contact_address', 'contactAddress'],
-        (dynamic object) => object.contactAddress,
-      ),
+      text: _readText(widget.student, const <String>[
+        'contact_address',
+        'contactAddress',
+      ], (dynamic object) => object.contactAddress),
     );
 
     _vneidPermanentAddressController = TextEditingController(
-      text: _readText(
-        widget.student,
-        const <String>[
-          'vneid_permanent_address',
-          'vneidPermanentAddress',
-        ],
-        (dynamic object) => object.vneidPermanentAddress,
-      ),
+      text: _readText(widget.student, const <String>[
+        'vneid_permanent_address',
+        'vneidPermanentAddress',
+      ], (dynamic object) => object.vneidPermanentAddress),
     );
 
     _permanentProvinceCodeController = TextEditingController(
-      text: _readText(
-        widget.student,
-        const <String>[
-          'permanent_province_code',
-          'permanentProvinceCode',
-        ],
-        (dynamic object) => object.permanentProvinceCode,
-      ),
+      text: _readText(widget.student, const <String>[
+        'permanent_province_code',
+        'permanentProvinceCode',
+      ], (dynamic object) => object.permanentProvinceCode),
     );
 
     _permanentWardCodeController = TextEditingController(
-      text: _readText(
-        widget.student,
-        const <String>['permanent_ward_code', 'permanentWardCode'],
-        (dynamic object) => object.permanentWardCode,
-      ),
+      text: _readText(widget.student, const <String>[
+        'permanent_ward_code',
+        'permanentWardCode',
+      ], (dynamic object) => object.permanentWardCode),
     );
 
     _temporaryAddressController = TextEditingController(
-      text: _readText(
-        widget.student,
-        const <String>['temporary_address', 'temporaryAddress'],
-        (dynamic object) => object.temporaryAddress,
-      ),
+      text: _readText(widget.student, const <String>[
+        'temporary_address',
+        'temporaryAddress',
+      ], (dynamic object) => object.temporaryAddress),
     );
 
     _vneidTemporaryAddressController = TextEditingController(
-      text: _readText(
-        widget.student,
-        const <String>[
-          'vneid_temporary_address',
-          'vneidTemporaryAddress',
-        ],
-        (dynamic object) => object.vneidTemporaryAddress,
-      ),
+      text: _readText(widget.student, const <String>[
+        'vneid_temporary_address',
+        'vneidTemporaryAddress',
+      ], (dynamic object) => object.vneidTemporaryAddress),
     );
 
     _temporaryProvinceCodeController = TextEditingController(
-      text: _readText(
-        widget.student,
-        const <String>[
-          'temporary_province_code',
-          'temporaryProvinceCode',
-        ],
-        (dynamic object) => object.temporaryProvinceCode,
-      ),
+      text: _readText(widget.student, const <String>[
+        'temporary_province_code',
+        'temporaryProvinceCode',
+      ], (dynamic object) => object.temporaryProvinceCode),
     );
 
     _temporaryWardCodeController = TextEditingController(
-      text: _readText(
-        widget.student,
-        const <String>['temporary_ward_code', 'temporaryWardCode'],
-        (dynamic object) => object.temporaryWardCode,
-      ),
+      text: _readText(widget.student, const <String>[
+        'temporary_ward_code',
+        'temporaryWardCode',
+      ], (dynamic object) => object.temporaryWardCode),
     );
 
     _reasonStayController = TextEditingController(
-      text: _readText(
-        widget.student,
-        const <String>['reason_stay', 'reasonStay'],
-        (dynamic object) => object.reasonStay,
-      ),
+      text: _readText(widget.student, const <String>[
+        'reason_stay',
+        'reasonStay',
+      ], (dynamic object) => object.reasonStay),
     );
 
     _familyForms.addAll(_readFamilyMembers(widget.student));
@@ -557,10 +505,7 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
 
     Widget avatarWidget;
     if (hasLocalAvatar) {
-      avatarWidget = Image.file(
-        _avatarFile!,
-        fit: BoxFit.cover,
-      );
+      avatarWidget = Image.file(_avatarFile!, fit: BoxFit.cover);
     } else if (hasRemoteAvatar) {
       avatarWidget = Image.network(
         _existingAvatarUrl,
@@ -584,11 +529,7 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
                   : null,
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(14),
-                child: SizedBox(
-                  width: 86,
-                  height: 108,
-                  child: avatarWidget,
-                ),
+                child: SizedBox(width: 86, height: 108, child: avatarWidget),
               ),
             ),
             const SizedBox(width: 14),
@@ -649,7 +590,11 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
       child: const Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: <Widget>[
-          Icon(Icons.person_outline_rounded, size: 36, color: Color(0xFF078B3E)),
+          Icon(
+            Icons.person_outline_rounded,
+            size: 36,
+            color: Color(0xFF078B3E),
+          ),
           SizedBox(height: 5),
           Text(
             'Ảnh 3x4',
@@ -735,7 +680,9 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
       );
 
       if (output == null) {
-        throw Exception('Không thể xử lý ảnh thẻ. Vui lòng chọn ảnh JPG hoặc PNG khác.');
+        throw Exception(
+          'Không thể xử lý ảnh thẻ. Vui lòng chọn ảnh JPG hoặc PNG khác.',
+        );
       }
 
       lastOutput = File(output.path);
@@ -785,9 +732,10 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
     if (normalized.isEmpty) return '';
     final Uri? uri = Uri.tryParse(normalized);
     if (uri != null && uri.hasScheme) return normalized;
+    final String host = ServicesUrl().effectiveKtxHostUrl;
     return normalized.startsWith('/')
-        ? 'https://ktx.sohatech.vn$normalized'
-        : 'https://ktx.sohatech.vn/$normalized';
+        ? '$host${normalized.substring(1)}'
+        : '$host$normalized';
   }
 
   Widget _buildPersonalCard() {
@@ -1234,10 +1182,7 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
                           onDeleted: _submitting
                               ? null
                               : () => _togglePriorityObject(item),
-                          deleteIcon: const Icon(
-                            Icons.close_rounded,
-                            size: 17,
-                          ),
+                          deleteIcon: const Icon(Icons.close_rounded, size: 17),
                           backgroundColor: Colors.white,
                           side: const BorderSide(color: Color(0xFFB9DDC5)),
                           labelStyle: const TextStyle(
@@ -1256,8 +1201,8 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
         ],
         ..._priorityObjects.map((PriorityObjectModel item) {
           final bool selected = _isPriorityObjectSelected(item);
-          final String itemKey =
-              (item.id ?? item.name ?? item.hashCode).toString();
+          final String itemKey = (item.id ?? item.name ?? item.hashCode)
+              .toString();
 
           return AnimatedSize(
             duration: const Duration(milliseconds: 260),
@@ -1268,10 +1213,7 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
               reverseDuration: const Duration(milliseconds: 220),
               switchInCurve: Curves.easeOutCubic,
               switchOutCurve: Curves.easeInCubic,
-              transitionBuilder: (
-                Widget child,
-                Animation<double> animation,
-              ) {
+              transitionBuilder: (Widget child, Animation<double> animation) {
                 final Animation<Offset> slideAnimation = Tween<Offset>(
                   begin: const Offset(-0.14, 0),
                   end: Offset.zero,
@@ -1286,9 +1228,7 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
                 );
               },
               child: selected
-                  ? SizedBox.shrink(
-                      key: ValueKey<String>('selected-$itemKey'),
-                    )
+                  ? SizedBox.shrink(key: ValueKey<String>('selected-$itemKey'))
                   : Padding(
                       key: ValueKey<String>('available-$itemKey'),
                       padding: const EdgeInsets.only(bottom: 8),
@@ -1303,9 +1243,7 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: const Color(0xFFE3E6EB),
-                            ),
+                            border: Border.all(color: const Color(0xFFE3E6EB)),
                           ),
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1446,9 +1384,9 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
           ),
           const SizedBox(height: 8),
           ..._priorityDocumentFiles.asMap().entries.map(
-                (MapEntry<int, File> entry) =>
-                    _buildSelectedPriorityDocument(entry.key, entry.value),
-              ),
+            (MapEntry<int, File> entry) =>
+                _buildSelectedPriorityDocument(entry.key, entry.value),
+          ),
         ],
         const SizedBox(height: 16),
         const Text(
@@ -1673,9 +1611,7 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
                     loadingBuilder: (_, Widget child, ImageChunkEvent? event) {
                       if (event == null) return child;
                       return const Center(
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                        ),
+                        child: CircularProgressIndicator(color: Colors.white),
                       );
                     },
                     errorBuilder: (_, __, ___) => const Center(
@@ -1823,17 +1759,14 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
           ),
         ] else
           ..._familyForms.asMap().entries.map(
-                (MapEntry<int, _StudentFamilyMemberForm> entry) =>
-                    _buildFamilyEditor(entry.key, entry.value),
-              ),
+            (MapEntry<int, _StudentFamilyMemberForm> entry) =>
+                _buildFamilyEditor(entry.key, entry.value),
+          ),
       ],
     );
   }
 
-  Widget _buildFamilyEditor(
-    int index,
-    _StudentFamilyMemberForm form,
-  ) {
+  Widget _buildFamilyEditor(int index, _StudentFamilyMemberForm form) {
     return Container(
       margin: const EdgeInsets.only(top: 12),
       padding: const EdgeInsets.all(12),
@@ -1882,7 +1815,9 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
               ),
               IconButton(
                 tooltip: 'Xóa người thân',
-                onPressed: _submitting ? null : () => _removeFamilyMember(index),
+                onPressed: _submitting
+                    ? null
+                    : () => _removeFamilyMember(index),
                 icon: const Icon(
                   Icons.delete_outline_rounded,
                   color: Colors.red,
@@ -2194,32 +2129,36 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
         'identity_type': _identityType,
         'identity_name': _textOrNull(_identityNameController),
         'identity_no': updatedIdentityNo.isEmpty ? null : updatedIdentityNo,
-        'identity_issue_date':
-            _dateToApiOrNull(_identityIssueDateController.text),
+        'identity_issue_date': _dateToApiOrNull(
+          _identityIssueDateController.text,
+        ),
         'identity_issue_place': _textOrNull(_identityIssuePlaceController),
         'country': _textOrNull(_countryController),
         'national': _textOrNull(_nationalController),
         'permanent_address': _textOrNull(_permanentAddressController),
         'contact_address': _textOrNull(_contactAddressController),
-        'vneid_permanent_address':
-            _textOrNull(_vneidPermanentAddressController),
-        'permanent_province_code':
-            _textOrNull(_permanentProvinceCodeController),
-        'permanent_ward_code':
-            _textOrNull(_permanentWardCodeController),
+        'vneid_permanent_address': _textOrNull(
+          _vneidPermanentAddressController,
+        ),
+        'permanent_province_code': _textOrNull(
+          _permanentProvinceCodeController,
+        ),
+        'permanent_ward_code': _textOrNull(_permanentWardCodeController),
         'temporary_address': _textOrNull(_temporaryAddressController),
-        'vneid_temporary_address':
-            _textOrNull(_vneidTemporaryAddressController),
-        'temporary_province_code':
-            _textOrNull(_temporaryProvinceCodeController),
-        'temporary_ward_code':
-            _textOrNull(_temporaryWardCodeController),
+        'vneid_temporary_address': _textOrNull(
+          _vneidTemporaryAddressController,
+        ),
+        'temporary_province_code': _textOrNull(
+          _temporaryProvinceCodeController,
+        ),
+        'temporary_ward_code': _textOrNull(_temporaryWardCodeController),
         'reason_stay': _textOrNull(_reasonStayController),
         // Gửi kèm để backend mới có thể đồng bộ lựa chọn ưu tiên.
         // Với backend cũ chưa khai báo hai field này, Laravel sẽ bỏ qua.
         'priority_object_ids': selectedPriorityIds,
-        'priority_object_name':
-            selectedPriorityNames.isEmpty ? null : selectedPriorityNames,
+        'priority_object_name': selectedPriorityNames.isEmpty
+            ? null
+            : selectedPriorityNames,
         // API quy định: gửi key này sẽ thay toàn bộ danh sách hiện tại.
         'family_members': _familyForms
             .map((_StudentFamilyMemberForm item) => item.toPayload().toJson())
@@ -2237,11 +2176,8 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
           : null;
 
       if (_avatarFile != null && uploadStudent != null) {
-        final UploadedAttachmentListResponse avatarResponse =
-            await _repository.uploadAvatar(
-          student: uploadStudent,
-          file: _avatarFile!,
-        );
+        final UploadedAttachmentListResponse avatarResponse = await _repository
+            .uploadAvatar(student: uploadStudent, file: _avatarFile!);
         if (avatarResponse.success != true &&
             (avatarResponse.data == null || avatarResponse.data!.isEmpty)) {
           throw Exception('Không tải được ảnh thẻ sinh viên');
@@ -2251,14 +2187,15 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
       final List<Object> uploadedPriorityAttachmentIds = <Object>[];
 
       if (_priorityDocumentFiles.isNotEmpty && uploadStudent != null) {
-        final List<File> filesToUpload =
-            List<File>.from(_priorityDocumentFiles);
+        final List<File> filesToUpload = List<File>.from(
+          _priorityDocumentFiles,
+        );
         for (int index = 0; index < filesToUpload.length; index++) {
-          final UploadedAttachmentListResponse proofResponse =
-              await _repository.uploadPriorityDocuments(
-            student: uploadStudent,
-            files: <File>[filesToUpload[index]],
-          );
+          final UploadedAttachmentListResponse proofResponse = await _repository
+              .uploadPriorityDocuments(
+                student: uploadStudent,
+                files: <File>[filesToUpload[index]],
+              );
 
           if (proofResponse.success != true &&
               (proofResponse.data == null || proofResponse.data!.isEmpty)) {
@@ -2289,8 +2226,8 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
 
       final String baseMessage =
           response['message']?.toString().trim().isNotEmpty == true
-              ? response['message'].toString()
-              : 'Cập nhật thông tin sinh viên thành công.';
+          ? response['message'].toString()
+          : 'Cập nhật thông tin sinh viên thành công.';
       final String uploadMessage = _priorityDocumentFiles.isEmpty
           ? ''
           : ' Đã tải lên ${_priorityDocumentFiles.length} giấy tờ ưu tiên.';
@@ -2319,26 +2256,22 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
     required String identityNo,
   }) {
     return RegistrationStudentPayload(
-      studentCode: _readText(
-        widget.student,
-        const <String>['student_code', 'studentCode'],
-        (dynamic object) => object.studentCode,
-      ),
+      studentCode: _readText(widget.student, const <String>[
+        'student_code',
+        'studentCode',
+      ], (dynamic object) => object.studentCode),
       fullName: _fullNameController.text.trim(),
       dob: _dateToApiOrNull(_dobController.text) ?? '',
       cccd: identityNo.trim(),
-      cccdIssueDate:
-          _dateToApiOrNull(_identityIssueDateController.text) ?? '',
+      cccdIssueDate: _dateToApiOrNull(_identityIssueDateController.text) ?? '',
       identityIssuePlace: _textOrNull(_identityIssuePlaceController),
       identityType: _identityType,
       identityName: _textOrNull(_identityNameController),
       country: _textOrNull(_countryController),
       national: _textOrNull(_nationalController),
       hometown: _permanentAddressController.text.trim(),
-      vneidPermanentAddress:
-          _textOrNull(_vneidPermanentAddressController),
-      permanentProvinceCode:
-          _textOrNull(_permanentProvinceCodeController),
+      vneidPermanentAddress: _textOrNull(_vneidPermanentAddressController),
+      permanentProvinceCode: _textOrNull(_permanentProvinceCodeController),
       permanentWardCode: _textOrNull(_permanentWardCodeController),
       contactAddress: _textOrNull(_contactAddressController),
       className: _classNameController.text.trim(),
@@ -2352,10 +2285,8 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
           ? null
           : _selectedPriorityObjectNames,
       temporaryAddress: _temporaryAddressController.text.trim(),
-      vneidTemporaryAddress:
-          _textOrNull(_vneidTemporaryAddressController),
-      temporaryProvinceCode:
-          _textOrNull(_temporaryProvinceCodeController),
+      vneidTemporaryAddress: _textOrNull(_vneidTemporaryAddressController),
+      temporaryProvinceCode: _textOrNull(_temporaryProvinceCodeController),
       temporaryWardCode: _textOrNull(_temporaryWardCodeController),
       reasonStay: _textOrNull(_reasonStayController),
       gender: _gender,
@@ -2380,8 +2311,9 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
       final List<PriorityObjectModel> items =
           response.data?.items ?? <PriorityObjectModel>[];
 
-      final List<PriorityObjectModel> initiallySelected =
-          items.where((PriorityObjectModel item) {
+      final List<PriorityObjectModel> initiallySelected = items.where((
+        PriorityObjectModel item,
+      ) {
         final int? id = item.id;
         final String normalizedName = _normalizePriorityName(item.name);
         return (id != null && _initialPriorityObjectIds.contains(id)) ||
@@ -2403,8 +2335,7 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
       if (!mounted) return;
       setState(() {
         _loadingPriorityObjects = false;
-        _priorityObjectsError =
-            'Không tải được danh sách đối tượng ưu tiên.';
+        _priorityObjectsError = 'Không tải được danh sách đối tượng ưu tiên.';
       });
       debugPrint('[DORMITORY-PRIORITY-LOAD-ERROR] $error');
     }
@@ -2421,15 +2352,15 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
   }
 
   void _togglePriorityObject(PriorityObjectModel item) {
-    final int index = _selectedPriorityObjects.indexWhere(
-      (PriorityObjectModel selected) {
-        if (item.id != null && selected.id != null) {
-          return item.id == selected.id;
-        }
-        return _normalizePriorityName(item.name) ==
-            _normalizePriorityName(selected.name);
-      },
-    );
+    final int index = _selectedPriorityObjects.indexWhere((
+      PriorityObjectModel selected,
+    ) {
+      if (item.id != null && selected.id != null) {
+        return item.id == selected.id;
+      }
+      return _normalizePriorityName(item.name) ==
+          _normalizePriorityName(selected.name);
+    });
 
     setState(() {
       if (index >= 0) {
@@ -2450,9 +2381,7 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
   }
 
   String? _requiredValidator(String? value) {
-    return value == null || value.trim().isEmpty
-        ? 'Không được để trống'
-        : null;
+    return value == null || value.trim().isEmpty ? 'Không được để trống' : null;
   }
 
   String? _emailValidator(String? value) {
@@ -2535,7 +2464,10 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
 
   Set<int> _readExistingPriorityObjectIds() {
     final Set<int> result = <int>{};
-    for (final dynamic source in <dynamic>[widget.student, widget.accommodation]) {
+    for (final dynamic source in <dynamic>[
+      widget.student,
+      widget.accommodation,
+    ]) {
       _collectPriorityValues(source, result, null);
     }
     return result;
@@ -2543,7 +2475,10 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
 
   Set<String> _readExistingPriorityObjectNames() {
     final Set<String> result = <String>{};
-    for (final dynamic source in <dynamic>[widget.student, widget.accommodation]) {
+    for (final dynamic source in <dynamic>[
+      widget.student,
+      widget.accommodation,
+    ]) {
       _collectPriorityValues(source, null, result);
     }
     return result;
@@ -2557,30 +2492,23 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
     if (source == null) return;
 
     final List<dynamic> rawValues = <dynamic>[
-      _readValue(
-        source,
-        const <String>['priority_object_ids', 'priorityObjectIds'],
-        (dynamic object) => object.priorityObjectIds,
-      ),
-      _readValue(
-        source,
-        const <String>['priority_objects', 'priorityObjects'],
-        (dynamic object) => object.priorityObjects,
-      ),
-      _readValue(
-        source,
-        const <String>[
-          'priority_object_name',
-          'priorityObjectName',
-          'priorityObject',
-        ],
-        (dynamic object) => object.priorityObjectName,
-      ),
-      _readValue(
-        source,
-        const <String>['registration', 'registration_detail'],
-        (dynamic object) => object.registration,
-      ),
+      _readValue(source, const <String>[
+        'priority_object_ids',
+        'priorityObjectIds',
+      ], (dynamic object) => object.priorityObjectIds),
+      _readValue(source, const <String>[
+        'priority_objects',
+        'priorityObjects',
+      ], (dynamic object) => object.priorityObjects),
+      _readValue(source, const <String>[
+        'priority_object_name',
+        'priorityObjectName',
+        'priorityObject',
+      ], (dynamic object) => object.priorityObjectName),
+      _readValue(source, const <String>[
+        'registration',
+        'registration_detail',
+      ], (dynamic object) => object.registration),
     ];
 
     for (final dynamic raw in rawValues) {
@@ -2609,15 +2537,18 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
           : int.tryParse(idValue?.toString() ?? '');
       if (id != null) ids?.add(id);
 
-      final String name = (raw['name'] ??
-              raw['priority_object_name'] ??
-              raw['priorityObjectName'])
-          ?.toString()
-          .trim() ?? '';
+      final String name =
+          (raw['name'] ??
+                  raw['priority_object_name'] ??
+                  raw['priorityObjectName'])
+              ?.toString()
+              .trim() ??
+          '';
       final String normalizedName = _normalizePriorityName(name);
       if (normalizedName.isNotEmpty) names?.add(normalizedName);
 
-      final dynamic nested = raw['priority_objects'] ??
+      final dynamic nested =
+          raw['priority_objects'] ??
           raw['priorityObjects'] ??
           raw['priority_object_ids'] ??
           raw['priorityObjectIds'];
@@ -2653,21 +2584,16 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
     if (accommodation == null) return <_ExistingPriorityDocument>[];
 
     final List<dynamic> sources = <dynamic>[
-      _readValue(
-        accommodation,
-        const <String>[
-          'documents',
-          'attachments',
-          'attachment_files',
-          'attachmentFiles',
-        ],
-        (dynamic object) => object.documents,
-      ),
-      _readValue(
-        accommodation,
-        const <String>['registration', 'registration_detail'],
-        (dynamic object) => object.registration,
-      ),
+      _readValue(accommodation, const <String>[
+        'documents',
+        'attachments',
+        'attachment_files',
+        'attachmentFiles',
+      ], (dynamic object) => object.documents),
+      _readValue(accommodation, const <String>[
+        'registration',
+        'registration_detail',
+      ], (dynamic object) => object.registration),
     ];
 
     final List<dynamic> rawDocuments = <dynamic>[];
@@ -2675,7 +2601,8 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
       if (source is Iterable) {
         rawDocuments.addAll(source);
       } else if (source is Map) {
-        final dynamic nested = source['documents'] ??
+        final dynamic nested =
+            source['documents'] ??
             source['attachments'] ??
             source['attachment_files'] ??
             source['attachmentFiles'];
@@ -2695,46 +2622,36 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
     final Set<String> seen = <String>{};
 
     for (final dynamic item in rawDocuments) {
-      final String name = _readText(
-        item,
-        const <String>[
-          'name',
-          'file_name',
-          'fileName',
-          'original_name',
-          'originalName',
-        ],
-        (dynamic object) => object.name,
-      );
-      final String url = _readText(
-        item,
-        const <String>[
-          'url',
-          'file_url',
-          'fileUrl',
-          'path',
-          'download_url',
-          'downloadUrl',
-        ],
-        (dynamic object) => object.url,
-      );
-      final String type = _readText(
-        item,
-        const <String>[
-          'type',
-          'file_type',
-          'fileType',
-          'document_type',
-          'documentType',
-        ],
-        (dynamic object) => object.type,
-      );
+      final String name = _readText(item, const <String>[
+        'name',
+        'file_name',
+        'fileName',
+        'original_name',
+        'originalName',
+      ], (dynamic object) => object.name);
+      final String url = _readText(item, const <String>[
+        'url',
+        'file_url',
+        'fileUrl',
+        'path',
+        'download_url',
+        'downloadUrl',
+      ], (dynamic object) => object.url);
+      final String type = _readText(item, const <String>[
+        'type',
+        'file_type',
+        'fileType',
+        'document_type',
+        'documentType',
+      ], (dynamic object) => object.type);
 
       final String searchable = '$name $type'.toLowerCase();
-      final bool isAvatar = searchable.contains('avatar') ||
+      final bool isAvatar =
+          searchable.contains('avatar') ||
           searchable.contains('ảnh thẻ') ||
           searchable.contains('anh the');
-      final bool isIdentity = searchable.contains('cccd') ||
+      final bool isIdentity =
+          searchable.contains('cccd') ||
           searchable.contains('cmnd') ||
           searchable.contains('identity') ||
           searchable.contains('mặt trước') ||
@@ -2760,16 +2677,14 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
   }
 
   List<_StudentFamilyMemberForm> _readFamilyMembers(dynamic student) {
-    final dynamic raw = _readValue(
-      student,
-      const <String>['family_members', 'familyMembers'],
-      (dynamic object) => object.familyMembers,
-    );
+    final dynamic raw = _readValue(student, const <String>[
+      'family_members',
+      'familyMembers',
+    ], (dynamic object) => object.familyMembers);
 
     if (raw is! Iterable) return <_StudentFamilyMemberForm>[];
 
-    final List<_StudentFamilyMemberForm> result =
-        <_StudentFamilyMemberForm>[];
+    final List<_StudentFamilyMemberForm> result = <_StudentFamilyMemberForm>[];
 
     for (final dynamic item in raw) {
       if (item is FamilyMemberPayload) {
@@ -2786,31 +2701,24 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
         continue;
       }
 
-      final String relationship = _readText(
-        item,
-        const <String>['relationship'],
-        (dynamic object) => object.relationship,
-      );
-      final String fullName = _readText(
-        item,
-        const <String>['full_name', 'fullName'],
-        (dynamic object) => object.fullName,
-      );
-      final String birthYearText = _readText(
-        item,
-        const <String>['birth_year', 'birthYear'],
-        (dynamic object) => object.birthYear,
-      );
-      final String occupation = _readText(
-        item,
-        const <String>['occupation'],
-        (dynamic object) => object.occupation,
-      );
-      final String phone = _readText(
-        item,
-        const <String>['phone_number', 'phoneNumber'],
-        (dynamic object) => object.phoneNumber,
-      );
+      final String relationship = _readText(item, const <String>[
+        'relationship',
+      ], (dynamic object) => object.relationship);
+      final String fullName = _readText(item, const <String>[
+        'full_name',
+        'fullName',
+      ], (dynamic object) => object.fullName);
+      final String birthYearText = _readText(item, const <String>[
+        'birth_year',
+        'birthYear',
+      ], (dynamic object) => object.birthYear);
+      final String occupation = _readText(item, const <String>[
+        'occupation',
+      ], (dynamic object) => object.occupation);
+      final String phone = _readText(item, const <String>[
+        'phone_number',
+        'phoneNumber',
+      ], (dynamic object) => object.phoneNumber);
 
       if (fullName.isNotEmpty) {
         result.add(
@@ -2835,10 +2743,7 @@ class _ExistingPriorityDocument {
   final String name;
   final String url;
 
-  const _ExistingPriorityDocument({
-    required this.name,
-    required this.url,
-  });
+  const _ExistingPriorityDocument({required this.name, required this.url});
 }
 
 class _StudentFamilyMemberForm {
@@ -2876,9 +2781,7 @@ class _StudentFamilyMemberForm {
       occupationController: TextEditingController(
         text: payload.occupation ?? '',
       ),
-      phoneController: TextEditingController(
-        text: payload.phoneNumber ?? '',
-      ),
+      phoneController: TextEditingController(text: payload.phoneNumber ?? ''),
     );
   }
 

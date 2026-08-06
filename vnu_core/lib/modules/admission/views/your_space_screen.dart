@@ -8,6 +8,7 @@ import 'package:vnu_core/modules/notify/views/vcore_notify_view_v3.dart';
 import 'package:vnu_core/repository/app_repository.dart';
 import 'package:vnu_core/repository/applicant_session_repository.dart';
 import 'package:vnu_core/screens/vcore_admission_view.dart';
+import 'package:vnu_core/widgets/zalo_chat_bubble.dart';
 import 'package:vnu_noi_tru/screens/dormitory_registration/dr_my_registration_screen.dart';
 
 class YourSpaceScreen extends StatefulWidget {
@@ -598,6 +599,8 @@ class _YourSpaceScreenState extends State<YourSpaceScreen>
         backgroundColor: AppColors.homeBg,
         body: SizedBox.expand(
           child: Stack(
+            fit: StackFit.expand,
+            clipBehavior: Clip.none,
             children: [
               Positioned.fill(
                 child: Image.asset(
@@ -648,6 +651,9 @@ class _YourSpaceScreenState extends State<YourSpaceScreen>
                     ),
                   ),
                 ),
+              ),
+              const ZaloChatBubble(
+                edgeInsets: EdgeInsets.fromLTRB(12, 12, 16, 24),
               ),
             ],
           ),

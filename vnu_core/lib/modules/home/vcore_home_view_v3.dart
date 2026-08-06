@@ -32,12 +32,14 @@ import 'package:vnu_core/modules/notify/views/vcore_notify_view_v3.dart';
 import 'package:vnu_core/modules/one_door/views/vcore_one_door_view.dart';
 // import 'package:vnu_core/modules/paht/views/vcore_paht_view.dart';
 import 'package:vnu_core/modules/paht_v2/views/vcore_paht_view_v2.dart';
+import 'package:vnu_core/modules/profile/views/vcore_profile_person_info_view.dart';
 import 'package:vnu_core/modules/sync/views/vcore_sync_view.dart';
 import 'package:vnu_core/services/services_url.dart';
 import 'package:vnu_core/widgets/progress_hub_widget.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:vnu_core/common/app_text_styles.dart';
+import 'package:vnu_core/widgets/zalo_chat_bubble.dart';
 import 'package:vnu_core/modules/question/views/vcore_question_view.dart';
 
 import 'package:vnu_core/common/guide/guide.dart';
@@ -47,7 +49,7 @@ import 'package:vnu_core/common/guide/guide.dart';
 
 class _LocalNotificationService {
   static final FlutterLocalNotificationsPlugin _plugin =
-  FlutterLocalNotificationsPlugin();
+      FlutterLocalNotificationsPlugin();
 
   static bool _initialized = false;
 
@@ -85,8 +87,8 @@ class _LocalNotificationService {
 
     await _plugin
         .resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin
-    >()
+          AndroidFlutterLocalNotificationsPlugin
+        >()
         ?.requestNotificationsPermission();
 
     _initialized = true;
@@ -189,12 +191,17 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
 
   bool get isSchoolNewsTab => newsTabIndex == 0;
 
+  static const String _temporaryAddressFunctionLabel = 'Cập nhật tạm trú';
+  static const String _temporaryAddressPinnedMigrationKey =
+      'kPinnedFunctions_v3_temp_address_v1';
+
   List<String> _pinnedFunctionLabels = [
     'Lịch học & thi',
     'Điểm',
     'Học bổng',
     'Việc làm',
     'Đồng bộ',
+    _temporaryAddressFunctionLabel,
   ];
 
   static final List<_FunctionItem> _allAvailableFunctions = [
@@ -212,6 +219,10 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
     _FunctionItem('Học bổng', Color.fromRGBO(255, 55, 95, 1)), // Rose
     _FunctionItem('Phản ánh', Color.fromRGBO(255, 204, 0, 1)), // Vàng
     _FunctionItem('Nội trú', Color.fromRGBO(191, 90, 242, 1)), // Lavender
+    _FunctionItem(
+      _temporaryAddressFunctionLabel,
+      Color.fromRGBO(0, 122, 255, 1),
+    ),
     _FunctionItem('Phòng trọ', Color.fromRGBO(0, 199, 190, 1)), // Turquoise
     _FunctionItem('Thủ tục', Color.fromRGBO(118, 214, 78, 1)), // Lime
     _FunctionItem('Thư viện', Color.fromRGBO(255, 159, 10, 1)), // Gold
@@ -224,37 +235,38 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
     'Học tập': _allAvailableFunctions
         .where(
           (e) => [
-        'Lịch học & thi',
-        'Điểm',
-        'Đăng ký môn',
-        'Điểm danh',
-      ].contains(e.label),
-    )
+            'Lịch học & thi',
+            'Điểm',
+            'Đăng ký môn',
+            'Điểm danh',
+          ].contains(e.label),
+        )
         .toList(),
     'Dịch vụ': _allAvailableFunctions
         .where(
           (e) => [
-        'Học phí',
-        'Học bổng',
-        'Thủ tục',
-        'Nội trú',
-        'Phản ánh',
-        'Đồng bộ',
-        'Hỏi đáp',
-      ].contains(e.label),
-    )
+            'Học phí',
+            'Học bổng',
+            'Thủ tục',
+            'Nội trú',
+            _temporaryAddressFunctionLabel,
+            'Phản ánh',
+            'Đồng bộ',
+            'Hỏi đáp',
+          ].contains(e.label),
+        )
         .toList(),
     'Tiện ích': _allAvailableFunctions
         .where(
           (e) => [
-        'Tài liệu',
-        'Thư viện',
-        'Bản đồ',
-        'Việc làm',
-        'Phòng trọ',
-        'Cẩm nang',
-      ].contains(e.label),
-    )
+            'Tài liệu',
+            'Thư viện',
+            'Bản đồ',
+            'Việc làm',
+            'Phòng trọ',
+            'Cẩm nang',
+          ].contains(e.label),
+        )
         .toList(),
   };
 
@@ -396,6 +408,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
       await cache.markGroupSeen('home.intro');
     }
   }
+
   Future<void> _previewHomeGuide() async {
     if (!mounted) return;
 
@@ -419,12 +432,11 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
     final cache = const AppGuideCacheService();
     final hasSeen = await cache.hasSeenGroup('home.intro');
 
-    snackBarWarning(
-      'Guide cache:\nhome.intro hasSeen = $hasSeen',
-    );
+    snackBarWarning('Guide cache:\nhome.intro hasSeen = $hasSeen');
 
     debugPrint('[GUIDE_CACHE] home.intro hasSeen = $hasSeen');
   }
+
   Future<void> _previewHomeIntroGroup() async {
     if (!mounted) return;
 
@@ -470,11 +482,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
           color: AppColors.brandGreen.withOpacity(0.10),
           borderRadius: BorderRadius.circular(14),
         ),
-        child: Icon(
-          icon,
-          color: AppColors.brandGreen,
-          size: 21,
-        ),
+        child: Icon(icon, color: AppColors.brandGreen, size: 21),
       ),
       title: Text(
         title,
@@ -498,6 +506,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
       onTap: onTap,
     );
   }
+
   @override
   void dispose() {
     _guideRegistryForActions?.unregisterAction('home.show_study_tab');
@@ -587,6 +596,8 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
         return 'home.function.paht';
       case 'Nội trú':
         return 'home.function.boarding';
+      case _temporaryAddressFunctionLabel:
+        return 'home.function.profile_temp_address';
       case 'Phòng trọ':
         return 'home.function.motel';
       case 'Thủ tục':
@@ -626,14 +637,41 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final saved = prefs.getStringList('kPinnedFunctions_v3');
+      final bool migrationApplied =
+          prefs.getBool(_temporaryAddressPinnedMigrationKey) ?? false;
 
-      if (saved != null && saved.isNotEmpty) {
-        setState(() {
-          _pinnedFunctionLabels = saved;
-        });
+      final List<String> loaded = saved != null && saved.isNotEmpty
+          ? List<String>.from(saved)
+          : List<String>.from(_pinnedFunctionLabels);
+
+      final List<String> normalized = <String>[];
+      for (final String label in loaded) {
+        final bool exists = _allAvailableFunctions.any(
+          (_FunctionItem item) => item.label == label,
+        );
+        if (exists && !normalized.contains(label)) {
+          normalized.add(label);
+        }
       }
+
+      // Add the new temporary-address shortcut once for existing users. After
+      // this migration, users can still unpin it normally from the pin dialog.
+      if (!migrationApplied &&
+          !normalized.contains(_temporaryAddressFunctionLabel)) {
+        normalized.add(_temporaryAddressFunctionLabel);
+      }
+
+      await prefs.setStringList('kPinnedFunctions_v3', normalized);
+      if (!migrationApplied) {
+        await prefs.setBool(_temporaryAddressPinnedMigrationKey, true);
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _pinnedFunctionLabels = normalized;
+      });
     } catch (e) {
-      // ignore
+      // Keep the built-in defaults when local preferences cannot be read.
     }
   }
 
@@ -642,6 +680,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setStringList('kPinnedFunctions_v3', labels);
 
+      if (!mounted) return;
       setState(() {
         _pinnedFunctionLabels = labels;
       });
@@ -680,8 +719,15 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
         Get.to(() => const VcorePahtViewV2());
         break;
       case 'Nội trú':
-      // snackBarWarning('Chức năng đang hoàn thiện');
+        // snackBarWarning('Chức năng đang hoàn thiện');
         Get.to(() => const DRMyRegistrationScreen());
+        break;
+      case _temporaryAddressFunctionLabel:
+        Get.to(
+          () => const VcoreProfilePersonInfoView(
+            scrollToTemporaryAddress: true,
+          ),
+        );
         break;
       case 'Phòng trọ':
         openMotelWebView();
@@ -702,7 +748,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
         Get.to(() => const VcoreJobsViewV2());
         break;
       case 'Đồng bộ':
-      // snackBarWarning('Chức năng đang hoàn thiện');
+        // snackBarWarning('Chức năng đang hoàn thiện');
         Get.to(() => VcoreSyncView());
         break;
       case 'Hỏi đáp':
@@ -738,6 +784,8 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
         return Icons.rate_review_rounded;
       case 'Nội trú':
         return Icons.home_work_rounded;
+      case _temporaryAddressFunctionLabel:
+        return Icons.location_on_rounded;
       case 'Phòng trọ':
         return Icons.home_outlined;
       case 'Thủ tục':
@@ -1187,10 +1235,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                     child: Obx(() => _buildHeader()),
                   ),
                   const SizedBox(height: 22),
-                  AppGuideAnchor(
-                    id: 'home.overview',
-                    child: _buildOverview(),
-                  ),
+                  AppGuideAnchor(id: 'home.overview', child: _buildOverview()),
                   const SizedBox(height: 14),
                   AppGuideAnchor(
                     id: 'home.schedule',
@@ -1207,10 +1252,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                     child: _buildImportantNotice(),
                   ),
                   const SizedBox(height: 14),
-                  AppGuideAnchor(
-                    id: 'home.news',
-                    child: _buildNewsBlock(),
-                  ),
+                  AppGuideAnchor(id: 'home.news', child: _buildNewsBlock()),
                 ],
               ),
             ),
@@ -1312,12 +1354,12 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
             child: _headerButton(
               Icons.notifications_none_rounded,
               badge:
-              (widget.controller.unreadSystemCount.value +
-                  widget.controller.unreadTrainingCount.value) >
-                  0
+                  (widget.controller.unreadSystemCount.value +
+                          widget.controller.unreadTrainingCount.value) >
+                      0
                   ? (widget.controller.unreadSystemCount.value +
-                  widget.controller.unreadTrainingCount.value)
-                  .toString()
+                            widget.controller.unreadTrainingCount.value)
+                        .toString()
                   : null,
             ),
           ),
@@ -1332,6 +1374,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
       ],
     );
   }
+
   void _debugGuideState() {
     try {
       final registry = AppGuideRegistryScope.of(context);
@@ -1430,9 +1473,9 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
       final todayCount = widget.controller.getTodayTotalSubjects().toString();
       final examCount = widget.controller.getUpcomingExamCount().toString();
       final notifyCount =
-      (widget.controller.unreadSystemCount.value +
-          widget.controller.unreadTrainingCount.value)
-          .toString();
+          (widget.controller.unreadSystemCount.value +
+                  widget.controller.unreadTrainingCount.value)
+              .toString();
 
       String getVietnameseWeekday() {
         final weekday = DateTime.now().weekday;
@@ -1487,21 +1530,22 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                     border: index == items.length - 1
                         ? null
                         : Border(
-                      right: BorderSide(
-                        color: Colors.grey.withOpacity(0.18),
-                      ),
-                    ),
+                            right: BorderSide(
+                              color: Colors.grey.withOpacity(0.18),
+                            ),
+                          ),
                   ),
                   child: GestureDetector(
                     onTap: () {
                       if (index == 0) {
                         Get.to(
-                              () => VcoreExamScheduleView(
+                          () => VcoreExamScheduleView(
                             initialDate: DateTime.now(),
                           ),
                         );
                       } else if (index == 1) {
-                        final upcomingExams = widget.controller.getUpcomingExams();
+                        final upcomingExams = widget.controller
+                            .getUpcomingExams();
                         DateTime? targetDate;
                         if (upcomingExams.isNotEmpty) {
                           final ngayThi = upcomingExams.first.ngayThi;
@@ -1519,7 +1563,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                           }
                         }
                         Get.to(
-                              () => VcoreExamScheduleView(
+                          () => VcoreExamScheduleView(
                             initialDate: targetDate ?? DateTime.now(),
                           ),
                         );
@@ -1599,10 +1643,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          AppGuideAnchor(
-            id: 'home.schedule.tabs',
-            child: _buildScheduleTabs(),
-          ),
+          AppGuideAnchor(id: 'home.schedule.tabs', child: _buildScheduleTabs()),
           const SizedBox(height: 10),
           AppGuideAnchor(
             id: 'home.schedule.cards',
@@ -1617,25 +1658,25 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                       padding: const EdgeInsets.only(right: 10),
                       child: isStudyTab
                           ? AppGuideAnchor(
-                        id: 'home.schedule.next_study',
-                        child: _buildNextStudyCard(),
-                      )
+                              id: 'home.schedule.next_study',
+                              child: _buildNextStudyCard(),
+                            )
                           : AppGuideAnchor(
-                        id: 'home.schedule.next_exam',
-                        child: _buildNextExamCard(),
-                      ),
+                              id: 'home.schedule.next_exam',
+                              child: _buildNextExamCard(),
+                            ),
                     ),
                     Padding(
                       padding: const EdgeInsets.only(right: 10),
                       child: isStudyTab
                           ? AppGuideAnchor(
-                        id: 'home.schedule.study_timeline',
-                        child: _buildTodayStudyTimeline(),
-                      )
+                              id: 'home.schedule.study_timeline',
+                              child: _buildTodayStudyTimeline(),
+                            )
                           : AppGuideAnchor(
-                        id: 'home.schedule.exam_timeline',
-                        child: _buildTodayExamTimeline(),
-                      ),
+                              id: 'home.schedule.exam_timeline',
+                              child: _buildTodayExamTimeline(),
+                            ),
                     ),
                   ],
                 );
@@ -1787,36 +1828,36 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
           Expanded(
             child: upcomingSchedule.isEmpty
                 ? const Center(
-              child: Text(
-                'Không có lịch học sắp tới',
-                style: TextStyle(
-                  color: Colors.grey,
-                  fontSize: AppFontSizes.small,
-                ),
-              ),
-            )
+                    child: Text(
+                      'Không có lịch học sắp tới',
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontSize: AppFontSizes.small,
+                      ),
+                    ),
+                  )
                 : ListView.builder(
-              itemCount: min(upcomingSchedule.length, 3),
-              padding: EdgeInsets.zero,
-              physics: const NeverScrollableScrollPhysics(),
-              itemBuilder: (context, index) {
-                final item = upcomingSchedule[index];
-                final data = item.data;
+                    itemCount: min(upcomingSchedule.length, 3),
+                    padding: EdgeInsets.zero,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemBuilder: (context, index) {
+                      final item = upcomingSchedule[index];
+                      final data = item.data;
 
-                return _timelineItem(
-                  time:
-                  '${item.ngayHocShortText} • Tiết ${data.tietBatDau ?? '--'}',
-                  title: data.tenHocPhan ?? '',
-                  room: data.tenPhong ?? '--',
-                  color: index == 0
-                      ? const Color(0xFF059669)
-                      : index == 1
-                      ? const Color(0xFF3B82F6)
-                      : const Color(0xFFF59E0B),
-                  isLast: index == min(upcomingSchedule.length, 3) - 1,
-                );
-              },
-            ),
+                      return _timelineItem(
+                        time:
+                            '${item.ngayHocShortText} • Tiết ${data.tietBatDau ?? '--'}',
+                        title: data.tenHocPhan ?? '',
+                        room: data.tenPhong ?? '--',
+                        color: index == 0
+                            ? const Color(0xFF059669)
+                            : index == 1
+                            ? const Color(0xFF3B82F6)
+                            : const Color(0xFFF59E0B),
+                        isLast: index == min(upcomingSchedule.length, 3) - 1,
+                      );
+                    },
+                  ),
           ),
         ],
       ),
@@ -1835,35 +1876,35 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
           Expanded(
             child: upcomingExams.isEmpty
                 ? const Center(
-              child: Text(
-                'Không có lịch thi sắp tới',
-                style: TextStyle(
-                  color: Colors.grey,
-                  fontSize: AppFontSizes.small,
-                ),
-              ),
-            )
+                    child: Text(
+                      'Không có lịch thi sắp tới',
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontSize: AppFontSizes.small,
+                      ),
+                    ),
+                  )
                 : ListView.builder(
-              itemCount: min(upcomingExams.length, 3),
-              padding: EdgeInsets.zero,
-              physics: const NeverScrollableScrollPhysics(),
-              itemBuilder: (context, index) {
-                final item = upcomingExams[index];
+                    itemCount: min(upcomingExams.length, 3),
+                    padding: EdgeInsets.zero,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemBuilder: (context, index) {
+                      final item = upcomingExams[index];
 
-                return _timelineItem(
-                  time:
-                  '${_formatShortDate(item.ngayThi)} • ${item.gioBatDauThi ?? '--:--'}',
-                  title: item.tenHocPhan ?? '',
-                  room: item.phongThi ?? '--',
-                  color: index == 0
-                      ? const Color(0xFF2563EB)
-                      : index == 1
-                      ? const Color(0xFF7C3AED)
-                      : const Color(0xFFF97316),
-                  isLast: index == min(upcomingExams.length, 3) - 1,
-                );
-              },
-            ),
+                      return _timelineItem(
+                        time:
+                            '${_formatShortDate(item.ngayThi)} • ${item.gioBatDauThi ?? '--:--'}',
+                        title: item.tenHocPhan ?? '',
+                        room: item.phongThi ?? '--',
+                        color: index == 0
+                            ? const Color(0xFF2563EB)
+                            : index == 1
+                            ? const Color(0xFF7C3AED)
+                            : const Color(0xFFF97316),
+                        isLast: index == min(upcomingExams.length, 3) - 1,
+                      );
+                    },
+                  ),
           ),
         ],
       ),
@@ -1893,37 +1934,45 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
         children: [
           AppGuideAnchor(
             id: 'home.quick_access.pin',
-            child: _sectionHeader('Truy cập nhanh', 'Ghim', onTap: _showPinDialog),
+            child: _sectionHeader(
+              'Truy cập nhanh',
+              'Ghim',
+              onTap: _showPinDialog,
+            ),
           ),
           const SizedBox(height: 14),
           AppGuideAnchor(
             id: 'home.quick_access.list',
             child: orderedPinned.isEmpty
                 ? const Center(
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 20),
-                child: Text(
-                  'Chưa có chức năng nào được ghim.\nNhấn "Ghim" để thêm.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.grey,
-                    fontSize: AppFontSizes.mediumSmall,
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(vertical: 20),
+                      child: Text(
+                        'Chưa có chức năng nào được ghim.\nNhấn "Ghim" để thêm.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.grey,
+                          fontSize: AppFontSizes.mediumSmall,
+                        ),
+                      ),
+                    ),
+                  )
+                : GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: EdgeInsets.zero,
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 4,
+                      crossAxisSpacing: 8,
+                      mainAxisSpacing: 14,
+                      mainAxisExtent: 108,
+                    ),
+                    itemCount: orderedPinned.length,
+                    itemBuilder: (BuildContext context, int index) {
+                      return _functionItem(orderedPinned[index]);
+                    },
                   ),
-                ),
-              ),
-            )
-                : SizedBox(
-              height: 98,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: orderedPinned.length,
-                padding: EdgeInsets.zero,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
-                itemBuilder: (context, index) {
-                  return _functionItem(orderedPinned[index]);
-                },
-              ),
-            ),
           ),
         ],
       ),
@@ -1983,7 +2032,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                     color: Colors.red,
                     onTap: () {
                       Get.to(
-                            () => VcoreNotifyDetailViewV3(
+                        () => VcoreNotifyDetailViewV3(
                           title: item.tieuDe ?? 'Thông báo đào tạo',
                           htmlContent: item.noiDung ?? '',
                           sender: 'Phòng Đào tạo',
@@ -2093,7 +2142,8 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
 
                     if (isSchoolNewsTab) {
                       final tinTuc = schoolItems[realIndex];
-                      final guid = tinTuc.guidFileAnhDaiDiens?.isNotEmpty == true
+                      final guid =
+                          tinTuc.guidFileAnhDaiDiens?.isNotEmpty == true
                           ? tinTuc.guidFileAnhDaiDiens!.first
                           : '';
 
@@ -2101,7 +2151,8 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                           ? '${ServicesUrl().baseUrlFileDownload}$guid'
                           : '';
 
-                      final cacheKey = 'school_${tinTuc.guid ?? realIndex}_$guid';
+                      final cacheKey =
+                          'school_${tinTuc.guid ?? realIndex}_$guid';
 
                       return Padding(
                         padding: const EdgeInsets.only(right: 12),
@@ -2112,7 +2163,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                           accentColor: const Color(0xFF059669),
                           onTap: () {
                             Get.to(
-                                  () => VcoreNewsDetailView(tinTucModel: tinTuc),
+                              () => VcoreNewsDetailView(tinTucModel: tinTuc),
                             );
                           },
                         ),
@@ -2160,12 +2211,12 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
           borderRadius: BorderRadius.circular(99),
           boxShadow: active
               ? [
-            BoxShadow(
-              color: AppColors.brandGreen.withOpacity(0.12),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ]
+                  BoxShadow(
+                    color: AppColors.brandGreen.withOpacity(0.12),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
               : [],
         ),
         child: Text(
@@ -2417,7 +2468,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
     return AppGuideAnchor(
       id: _homeFunctionGuideId(item.label),
       child: SizedBox(
-        width: 82,
+        width: double.infinity,
         child: GestureDetector(
           onTap: () => _handleFunctionTap(item.label),
           behavior: HitTestBehavior.opaque,
@@ -2577,27 +2628,27 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                 ),
                 child: imageUrl.isNotEmpty
                     ? CachedNetworkImage(
-                  imageUrl: imageUrl,
-                  cacheKey: cacheKey,
-                  fit: BoxFit.cover,
-                  httpHeaders: Globals().headerToken(),
-                  placeholder: (_, __) =>
-                      Container(color: Colors.grey.shade200),
-                  errorWidget: (_, __, ___) => Container(
-                    color: const Color(0xFFD9E5E2),
-                    child: const Icon(
-                      Icons.article_outlined,
-                      color: Colors.grey,
-                    ),
-                  ),
-                )
+                        imageUrl: imageUrl,
+                        cacheKey: cacheKey,
+                        fit: BoxFit.cover,
+                        httpHeaders: Globals().headerToken(),
+                        placeholder: (_, __) =>
+                            Container(color: Colors.grey.shade200),
+                        errorWidget: (_, __, ___) => Container(
+                          color: const Color(0xFFD9E5E2),
+                          child: const Icon(
+                            Icons.article_outlined,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      )
                     : Container(
-                  color: const Color(0xFFD9E5E2),
-                  child: const Icon(
-                    Icons.article_outlined,
-                    color: Colors.grey,
-                  ),
-                ),
+                        color: const Color(0xFFD9E5E2),
+                        child: const Icon(
+                          Icons.article_outlined,
+                          color: Colors.grey,
+                        ),
+                      ),
               ),
             ),
             Padding(
@@ -3025,7 +3076,7 @@ class _RadialPinOverlayState extends State<_RadialPinOverlay>
                             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                             children: List.generate(
                               widget.groupedFunctions.length,
-                                  (idx) {
+                              (idx) {
                                 final catName = widget.groupedFunctions.keys
                                     .elementAt(idx);
                                 final isActive = activeCategoryIndex == idx;
@@ -3127,7 +3178,7 @@ class _RadialPinOverlayState extends State<_RadialPinOverlay>
                                       height: 90,
                                       child: Column(
                                         mainAxisAlignment:
-                                        MainAxisAlignment.center,
+                                            MainAxisAlignment.center,
                                         children: [
                                           Stack(
                                             clipBehavior: Clip.none,
@@ -3142,30 +3193,30 @@ class _RadialPinOverlayState extends State<_RadialPinOverlay>
                                                   shape: BoxShape.circle,
                                                   color: isPinned
                                                       ? item.color.withOpacity(
-                                                    0.2,
-                                                  )
+                                                          0.2,
+                                                        )
                                                       : Colors.white
-                                                      .withOpacity(0.12),
+                                                            .withOpacity(0.12),
                                                   border: Border.all(
                                                     color: isPinned
                                                         ? item.color
                                                         : Colors.white
-                                                        .withOpacity(
-                                                      0.25,
-                                                    ),
+                                                              .withOpacity(
+                                                                0.25,
+                                                              ),
                                                     width: isPinned ? 2.5 : 1.5,
                                                   ),
                                                   boxShadow: isPinned
                                                       ? [
-                                                    BoxShadow(
-                                                      color: item.color
-                                                          .withOpacity(
-                                                        0.4,
-                                                      ),
-                                                      blurRadius: 12,
-                                                      spreadRadius: 1,
-                                                    ),
-                                                  ]
+                                                          BoxShadow(
+                                                            color: item.color
+                                                                .withOpacity(
+                                                                  0.4,
+                                                                ),
+                                                            blurRadius: 12,
+                                                            spreadRadius: 1,
+                                                          ),
+                                                        ]
                                                       : [],
                                                 ),
                                                 child: Center(
@@ -3176,7 +3227,7 @@ class _RadialPinOverlayState extends State<_RadialPinOverlay>
                                                     color: isPinned
                                                         ? item.color
                                                         : Colors.white
-                                                        .withOpacity(0.9),
+                                                              .withOpacity(0.9),
                                                     size: 24,
                                                   ),
                                                 ),
@@ -3189,13 +3240,13 @@ class _RadialPinOverlayState extends State<_RadialPinOverlay>
                                                     width: 18,
                                                     height: 18,
                                                     decoration:
-                                                    const BoxDecoration(
-                                                      color: Color(
-                                                        0xFF07964B,
-                                                      ),
-                                                      shape:
-                                                      BoxShape.circle,
-                                                    ),
+                                                        const BoxDecoration(
+                                                          color: Color(
+                                                            0xFF07964B,
+                                                          ),
+                                                          shape:
+                                                              BoxShape.circle,
+                                                        ),
                                                     child: const Icon(
                                                       Icons.check,
                                                       color: Colors.white,
@@ -3215,8 +3266,8 @@ class _RadialPinOverlayState extends State<_RadialPinOverlay>
                                               color: isPinned
                                                   ? Colors.white
                                                   : Colors.white.withOpacity(
-                                                0.85,
-                                              ),
+                                                      0.85,
+                                                    ),
                                               fontSize: AppFontSizes.font11,
                                               fontWeight: isPinned
                                                   ? FontWeight.bold

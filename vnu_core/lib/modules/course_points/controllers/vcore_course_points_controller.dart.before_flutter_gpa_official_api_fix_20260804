@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vnu_core/common/gpa_cache_manager.dart';
 import 'package:vnu_core/common/utils.dart';
 import 'package:vnu_core/repository/app_repository.dart';
 
@@ -14,6 +15,7 @@ import '../../../ai_radar/models/academic_course.dart';
 import '../../../ai_radar/models/ai_radar_analysis.dart';
 import '../../../globals.dart';
 import '../../../models/model.dart';
+import 'package:vnu_core/extensions/extension_string.dart';
 import 'package:vnu_core/extensions/extension_string.dart';
 
 class VcoreCoursePointsController extends GetxController {
@@ -31,8 +33,6 @@ class VcoreCoursePointsController extends GetxController {
   RxList<BrcChungChiModel> chungChis = RxList([]);
   RxString chungChiError = ''.obs;
   RxBool isCheckingDiemSources = false.obs;
-
-  static const int _gpaCacheSchemaVersion = 2;
 
   final Map<String, Map<String, dynamic>> _mobileFullCache = {};
 
@@ -79,7 +79,7 @@ class VcoreCoursePointsController extends GetxController {
 
   Future<void> changeKieuTruong(String? displayName) async {
     final selected = danhSachKieuTruong.firstWhereOrNull(
-          (e) => e.toDisplayName() == displayName,
+      (e) => e.toDisplayName() == displayName,
     );
 
     if (selected == null) return;
@@ -155,11 +155,7 @@ class VcoreCoursePointsController extends GetxController {
       danhSachKieuTruong.value = available;
 
       if (available.isEmpty) {
-        // Không có dữ liệu thì để giao diện hiển thị trạng thái rỗng.
-        // Không hiện snackbar, đặc biệt khi người dùng bật xem môn ngoài CTĐT.
-        kieuTruong.value = null;
-        hocKy.value = null;
-        diemTrungBinhHocKy.value = null;
+        snackBarError('Không tìm thấy dữ liệu điểm ở BRC1, BRC2 hoặc BRC3.');
         return;
       }
 
@@ -172,11 +168,7 @@ class VcoreCoursePointsController extends GetxController {
     } catch (e) {
       Utils.dismissProgress(context);
       isCheckingDiemSources.value = false;
-
-      // Ở chế độ xem môn ngoài CTĐT, không có dữ liệu là trạng thái hợp lệ.
-      if (isTheoChuongTrinhDaoTao.value) {
-        snackBarError(e.toString());
-      }
+      snackBarError(e.toString());
     }
   }
 
@@ -197,27 +189,14 @@ class VcoreCoursePointsController extends GetxController {
     await _loadData();
   }
 
-  Future<void> changeHocKy(String? displayName) async {
-    final selectedSemester = danhSachHocKy.firstWhereOrNull(
-          (element) => element.disPlayName() == (displayName ?? '_///_'),
+  void changeHocKy(String? displayName) {
+    final obj = danhSachHocKy.firstWhereOrNull(
+      (element) => element.disPlayName() == (displayName ?? '_///_'),
     );
 
-    if (selectedSemester == null) {
-      return;
+    if (obj != null) {
+      hocKy.value = obj;
     }
-
-    hocKy.value = selectedSemester;
-
-    // Xóa GPA kỳ cũ ngay để giao diện không hiển thị nhầm trong lúc tải.
-    diemTrungBinhHocKy.value = null;
-
-    await _loadOfficialSemesterGpa(selectedSemester.id);
-
-    final coursesForAi = _deduplicateCourses(
-      diemThiTheoHocKy.values.toList(),
-    );
-
-    await _saveOfficialDataToCache(coursesForAi);
   }
 
   void refreshData() {
@@ -275,7 +254,7 @@ class VcoreCoursePointsController extends GetxController {
         );
 
         final nganh = listNganh.firstWhereOrNull(
-              (e) => e.id == student.idNganhDaoTao,
+          (e) => e.id == student.idNganhDaoTao,
         );
 
         majorName.value = nganh?.ten ?? 'Ngành đào tạo chưa xác định';
@@ -303,18 +282,12 @@ class VcoreCoursePointsController extends GetxController {
       Utils.dismissProgress(context);
       refreshController.refreshCompleted();
       refreshController.loadComplete();
-
-      if (isTheoChuongTrinhDaoTao.value) {
-        snackBarError(e.toString());
-      }
+      snackBarError(e.toString());
     }
   }
 
   Future<bool> _loadFromCache(Map<String, dynamic> cachedData) async {
     try {
-      if (cachedData['schemaVersion'] != _gpaCacheSchemaVersion) {
-        return false;
-      }
       if (cachedData['danhSachHocKy'] is List) {
         final List<dynamic> listHk = cachedData['danhSachHocKy'];
 
@@ -326,7 +299,7 @@ class VcoreCoursePointsController extends GetxController {
           final currentHocKyId = hocKy.value?.id;
           final stillAvailable =
               currentHocKyId != null &&
-                  danhSachHocKy.any((e) => e.id == currentHocKyId);
+              danhSachHocKy.any((e) => e.id == currentHocKyId);
 
           if (!stillAvailable) {
             hocKy.value = danhSachHocKy.first;
@@ -362,38 +335,19 @@ class VcoreCoursePointsController extends GetxController {
         diemThiTheoHocKy.value = grouped;
       }
 
-      final gpa4HocKy =
-          cachedData['gpaHe4HocKy']?.toString() ?? '0.00';
-      final gpa4TichLuy =
-          cachedData['gpaHe4TichLuy']?.toString() ??
-              cachedData['gpaHe4']?.toString() ??
-              '0.00';
-      final gpa10HocKy =
-          cachedData['gpaHe10HocKy']?.toString() ?? '0.00';
-      final gpa10TichLuy =
-          cachedData['gpaHe10TichLuy']?.toString() ??
-              cachedData['gpaHe10']?.toString() ??
-              '0.00';
-      final tinChiHocKy =
-          cachedData['tongTinChiHocKy']?.toString() ?? '0';
-      final tinChiTichLuy =
-          cachedData['tongTinChiTichLuy']?.toString() ??
-              cachedData['tongTinChi']?.toString() ??
-              '0';
-      final tinChiTruotHocKy =
-          cachedData['tongTinChiTruotHocKy']?.toString() ?? '0';
-      final tinChiTruotTichLuy =
-          cachedData['tongTinChiTruotTichLuy']?.toString() ?? '0';
+      final gpa4 = cachedData['gpaHe4']?.toString() ?? '0.00';
+      final gpa10 = cachedData['gpaHe10']?.toString() ?? '0.00';
+      final tcTichLuy = cachedData['tongTinChi']?.toString() ?? '0';
 
       diemTrungBinhHocKy.value = DiemTrungBinhModel(
-        diemTrungBinhHe4HocKy: gpa4HocKy,
-        diemTrungBinhHe4TichLuyDenHocKyHienTai: gpa4TichLuy,
-        diemTrungBinhHe10HocKy: gpa10HocKy,
-        diemTrungBinhHe10TichLuyDenHocKyHienTai: gpa10TichLuy,
-        tongSoTinChiTichLuyHocKy: tinChiHocKy,
-        tongSoTinChiTichLuyTichLuyDenHocKyHienTai: tinChiTichLuy,
-        tongSoTinChiTruotHocKy: tinChiTruotHocKy,
-        tongSoTinChiTruotTichLuyDenHocKyHienTai: tinChiTruotTichLuy,
+        diemTrungBinhHe4HocKy: gpa4,
+        diemTrungBinhHe4TichLuyDenHocKyHienTai: gpa4,
+        diemTrungBinhHe10HocKy: gpa10,
+        diemTrungBinhHe10TichLuyDenHocKyHienTai: gpa10,
+        tongSoTinChiTichLuyHocKy: tcTichLuy,
+        tongSoTinChiTichLuyTichLuyDenHocKyHienTai: tcTichLuy,
+        tongSoTinChiTruotHocKy: '0',
+        tongSoTinChiTruotTichLuyDenHocKyHienTai: '0',
       );
 
       await _resolveStudentInfo();
@@ -416,9 +370,9 @@ class VcoreCoursePointsController extends GetxController {
     final full = cached != null && _hasHocKyData(cached)
         ? cached
         : await ApiRepository().getDiemSinhVienMobileFull(
-      currentSource,
-      !isTheoChuongTrinhDaoTao.value,
-    );
+            currentSource,
+            !isTheoChuongTrinhDaoTao.value,
+          );
 
     _mobileFullCache[currentSource] = full;
     _applyMobileFullResponse(full);
@@ -426,12 +380,6 @@ class VcoreCoursePointsController extends GetxController {
     Utils.dismissProgress(context);
 
     if (danhSachHocKy.isEmpty) {
-      diemTrungBinhHocKy.value = null;
-
-      if (!isTheoChuongTrinhDaoTao.value) {
-        return;
-      }
-
       throw Exception(
         'Không tìm thấy danh sách học kỳ cho nguồn điểm đang chọn.',
       );
@@ -445,56 +393,13 @@ class VcoreCoursePointsController extends GetxController {
       diemThiTheoHocKy.values.toList(),
     );
 
-    // Giữ danh sách loại trùng cho giao diện và AI Radar.
-    // Không dùng danh sách này để tự tính GPA chính thức.
     diemThiHocKy.value = deduplicatedList;
 
-    await _loadOfficialSemesterGpa(hocKy.value?.id);
-    await _saveOfficialDataToCache(deduplicatedList);
+    _calculateGpaStatistics(deduplicatedList);
+
+    await _saveCalculatedDataToCache(deduplicatedList);
+
     await _loadAiAnalysisFromCacheOnly(deduplicatedList);
-  }
-
-  Future<void> _loadOfficialSemesterGpa(String? semesterId) async {
-    final normalizedSemesterId = semesterId?.trim() ?? '';
-
-    // Luôn xóa giá trị kỳ trước trước khi gọi API.
-    diemTrungBinhHocKy.value = null;
-
-    if (normalizedSemesterId.isEmpty) {
-      return;
-    }
-
-    final source = kieuTruong.value ?? 'TruongChinh';
-
-    try {
-      final result = await ApiRepository().getDiemTrungBinhHocKy(
-        normalizedSemesterId,
-        source,
-        isTheoChuongTrinhDaoTao.value,
-      );
-
-      if (result.isEmpty) {
-        // Không có GPA thì view tự ẩn card tổng kết.
-        return;
-      }
-
-      // Nguồn GPA chính thức. Không quy đổi lại từ điểm chữ/điểm hệ 10.
-      diemTrungBinhHocKy.value = result.first;
-
-      debugPrint(
-        '[GPA_OFFICIAL] term=$normalizedSemesterId '
-            'gpa4HocKy=${result.first.diemTrungBinhHe4HocKy} '
-            'gpa4TichLuy='
-            '${result.first.diemTrungBinhHe4TichLuyDenHocKyHienTai}',
-      );
-    } catch (e) {
-      // Khi xem môn ngoài CTĐT, API GPA có thể không có dữ liệu.
-      // Đây không phải lỗi giao diện: chỉ ẩn card GPA.
-      diemTrungBinhHocKy.value = null;
-      debugPrint(
-        '[GPA_OFFICIAL_EMPTY] term=$normalizedSemesterId error=$e',
-      );
-    }
   }
 
   bool _hasHocKyData(Map<String, dynamic> full) {
@@ -504,11 +409,7 @@ class VcoreCoursePointsController extends GetxController {
 
   Future<void> toggleXemCaMonNgoaiCtdt() async {
     isTheoChuongTrinhDaoTao.toggle();
-
-    // Không giữ GPA của chế độ trước trong lúc tải lại dữ liệu.
-    diemTrungBinhHocKy.value = null;
     _mobileFullCache.clear();
-
     await getDanhSachKieuTruong();
   }
 
@@ -551,8 +452,8 @@ class VcoreCoursePointsController extends GetxController {
           .whereType<Map>()
           .map(
             (course) =>
-            _parseMobileCourse(Map<String, dynamic>.from(course), idHocKy),
-      )
+                _parseMobileCourse(Map<String, dynamic>.from(course), idHocKy),
+          )
           .toList();
     }
 
@@ -562,7 +463,7 @@ class VcoreCoursePointsController extends GetxController {
       final currentHocKyId = hocKy.value?.id;
       final stillAvailable =
           currentHocKyId != null &&
-              danhSachHocKy.any((e) => e.id == currentHocKyId);
+          danhSachHocKy.any((e) => e.id == currentHocKyId);
 
       hocKy.value = stillAvailable
           ? danhSachHocKy.firstWhere((e) => e.id == currentHocKyId)
@@ -584,9 +485,9 @@ class VcoreCoursePointsController extends GetxController {
   }
 
   DiemThiHocKyModel _parseMobileCourse(
-      Map<String, dynamic> raw,
-      String idHocKy,
-      ) {
+    Map<String, dynamic> raw,
+    String idHocKy,
+  ) {
     return DiemThiHocKyModel.fromJson({
       ...raw,
       'idHocKy': idHocKy,
@@ -655,8 +556,8 @@ class VcoreCoursePointsController extends GetxController {
   }
 
   List<DiemThiHocKyModel> _deduplicateCourses(
-      List<List<DiemThiHocKyModel>> results,
-      ) {
+    List<List<DiemThiHocKyModel>> results,
+  ) {
     final uniqueCourses = <String, DiemThiHocKyModel>{};
 
     for (final list in results) {
@@ -687,49 +588,68 @@ class VcoreCoursePointsController extends GetxController {
     return uniqueCourses.values.toList();
   }
 
-  Future<void> _saveOfficialDataToCache(
-      List<DiemThiHocKyModel> deduplicatedList,
-      ) async {
+  void _calculateGpaStatistics(List<DiemThiHocKyModel> deduplicatedList) {
+    double totalCredits = 0;
+    double weightedGrade10 = 0;
+    double weightedGrade4 = 0;
+    int tcTichLuy = 0;
+    int tcTruot = 0;
+
+    for (final course in deduplicatedList) {
+      final grade10 = double.tryParse(
+        course.diemHe10?.replaceAll(',', '.') ?? '',
+      );
+
+      final grade4 = double.tryParse(
+        course.diemHe4?.replaceAll(',', '.') ?? '',
+      );
+
+      final credits = double.tryParse(
+        course.soTinChi?.replaceAll(',', '.') ?? '',
+      );
+
+      if (grade10 == null || credits == null) continue;
+
+      weightedGrade10 += grade10 * credits;
+
+      if (grade4 != null) {
+        weightedGrade4 += grade4 * credits;
+      }
+
+      totalCredits += credits;
+
+      if (grade10 >= 4.0) {
+        tcTichLuy += credits.round();
+      } else {
+        tcTruot += credits.round();
+      }
+    }
+
+    final gpa10 = totalCredits > 0 ? (weightedGrade10 / totalCredits) : 0.0;
+    final gpa4 = totalCredits > 0 ? (weightedGrade4 / totalCredits) : 0.0;
+
+    diemTrungBinhHocKy.value = DiemTrungBinhModel(
+      diemTrungBinhHe4HocKy: gpa4.toStringAsFixed(2),
+      diemTrungBinhHe4TichLuyDenHocKyHienTai: gpa4.toStringAsFixed(2),
+      diemTrungBinhHe10HocKy: gpa10.toStringAsFixed(2),
+      diemTrungBinhHe10TichLuyDenHocKyHienTai: gpa10.toStringAsFixed(2),
+      tongSoTinChiTichLuyHocKy: tcTichLuy.toString(),
+      tongSoTinChiTichLuyTichLuyDenHocKyHienTai: tcTichLuy.toString(),
+      tongSoTinChiTruotHocKy: tcTruot.toString(),
+      tongSoTinChiTruotTichLuyDenHocKyHienTai: tcTruot.toString(),
+    );
+  }
+
+  Future<void> _saveCalculatedDataToCache(
+    List<DiemThiHocKyModel> deduplicatedList,
+  ) async {
     try {
       final gpa = diemTrungBinhHocKy.value;
 
-      // Không có GPA chính thức thì không ghi số 0 đè lên cache hợp lệ.
-      if (gpa == null) {
-        return;
-      }
-
       final data = {
-        'schemaVersion': _gpaCacheSchemaVersion,
-        'selectedHocKyId': hocKy.value?.id ?? '',
-
-        // Các key cũ được giữ để không phá dashboard/consumer hiện hữu.
-        // Chúng luôn mang giá trị tích lũy chính thức từ API.
-        'gpaHe4': double.tryParse(
-          gpa?.diemTrungBinhHe4TichLuyDenHocKyHienTai ?? '0',
-        ) ??
-            0.0,
-        'gpaHe10': double.tryParse(
-          gpa?.diemTrungBinhHe10TichLuyDenHocKyHienTai ?? '0',
-        ) ??
-            0.0,
-        'tongTinChi': int.tryParse(
-          gpa?.tongSoTinChiTichLuyTichLuyDenHocKyHienTai ?? '0',
-        ) ??
-            0,
-
-        'gpaHe4HocKy': gpa?.diemTrungBinhHe4HocKy ?? '0.00',
-        'gpaHe4TichLuy':
-        gpa?.diemTrungBinhHe4TichLuyDenHocKyHienTai ?? '0.00',
-        'gpaHe10HocKy': gpa?.diemTrungBinhHe10HocKy ?? '0.00',
-        'gpaHe10TichLuy':
-        gpa?.diemTrungBinhHe10TichLuyDenHocKyHienTai ?? '0.00',
-        'tongTinChiHocKy': gpa?.tongSoTinChiTichLuyHocKy ?? '0',
-        'tongTinChiTichLuy':
-        gpa?.tongSoTinChiTichLuyTichLuyDenHocKyHienTai ?? '0',
-        'tongTinChiTruotHocKy': gpa?.tongSoTinChiTruotHocKy ?? '0',
-        'tongTinChiTruotTichLuy':
-        gpa?.tongSoTinChiTruotTichLuyDenHocKyHienTai ?? '0',
-
+        'gpaHe4': double.tryParse(gpa?.diemTrungBinhHe4HocKy ?? '0') ?? 0.0,
+        'gpaHe10': double.tryParse(gpa?.diemTrungBinhHe10HocKy ?? '0') ?? 0.0,
+        'tongTinChi': int.tryParse(gpa?.tongSoTinChiTichLuyHocKy ?? '0') ?? 0,
         'soKyDaHoc': danhSachHocKy.length,
         'deduplicatedList': deduplicatedList.map((e) => e.toJson()).toList(),
         'danhSachHocKy': danhSachHocKy.map((e) => e.toJson()).toList(),
@@ -742,8 +662,8 @@ class VcoreCoursePointsController extends GetxController {
   }
 
   Future<void> _loadAiAnalysisFromCacheOnly(
-      List<DiemThiHocKyModel> courses,
-      ) async {
+    List<DiemThiHocKyModel> courses,
+  ) async {
     if (courses.isEmpty) {
       aiRadarAnalysis.value = null;
       hasRequestedAiAnalysis.value = false;
@@ -798,7 +718,7 @@ class VcoreCoursePointsController extends GetxController {
       await Future.delayed(const Duration(milliseconds: 500));
 
       loadingStateText.value =
-      'AI đang chấm điểm học phần lên từng mũi nhọn...';
+          'AI đang chấm điểm học phần lên từng mũi nhọn...';
       await Future.delayed(const Duration(milliseconds: 500));
 
       loadingStateText.value = 'AI đang vẽ radar...';
@@ -870,9 +790,9 @@ class BrcChungChiModel {
     );
     final hasPassed =
         trangThai.toLowerCase().contains('đạt') ||
-            trangThai.toLowerCase().contains('dat') ||
-            soQuyetDinh.isNotEmpty ||
-            _string(json['stdId'] ?? json['Std_id'] ?? json['STD_ID']).isNotEmpty;
+        trangThai.toLowerCase().contains('dat') ||
+        soQuyetDinh.isNotEmpty ||
+        _string(json['stdId'] ?? json['Std_id'] ?? json['STD_ID']).isNotEmpty;
 
     return BrcChungChiModel(
       trangThai: trangThai.isNotEmpty

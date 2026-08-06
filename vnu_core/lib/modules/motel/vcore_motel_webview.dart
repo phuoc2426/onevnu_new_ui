@@ -10,6 +10,7 @@ void openMotelWebView() {
       title: kMotelWebTitle,
       url: kMotelWebUrl,
       useFloatingBackButton: true,
+      isMotel: true,
     ),
   );
 }

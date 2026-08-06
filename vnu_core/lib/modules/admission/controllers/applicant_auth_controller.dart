@@ -15,11 +15,9 @@ import 'package:vnu_core/services/services_url.dart';
 class ApplicantAuthController extends GetxController {
   BuildContext? context;
 
-  final TextEditingController cccdController =
-  TextEditingController();
+  final TextEditingController cccdController = TextEditingController();
 
-  final TextEditingController phoneNumberController =
-  TextEditingController();
+  final TextEditingController phoneNumberController = TextEditingController();
 
   final RxBool isLoading = false.obs;
 
@@ -28,28 +26,16 @@ class ApplicantAuthController extends GetxController {
 
     FocusManager.instance.primaryFocus?.unfocus();
 
-    final String cccd =
-    cccdController.text.replaceAll(
-      RegExp(r'\D'),
-      '',
-    );
+    final String cccd = cccdController.text.trim();
+    final String phoneNumber = phoneNumberController.text.trim();
 
-    final String phoneNumber =
-    _normalizePhoneNumber(
-      phoneNumberController.text,
-    );
-
-    if (cccd.length != 12) {
-      snackBarError(
-        'CCCD phải gồm đúng 12 chữ số',
-      );
+    if (cccd.isEmpty) {
+      snackBarError('Vui lòng nhập số CCCD');
       return;
     }
 
-    if (phoneNumber.length != 10) {
-      snackBarError(
-        'Số điện thoại phải gồm đúng 10 chữ số',
-      );
+    if (phoneNumber.isEmpty) {
+      snackBarError('Vui lòng nhập số điện thoại');
       return;
     }
 
@@ -57,23 +43,24 @@ class ApplicantAuthController extends GetxController {
     _showProgress();
 
     try {
+      final String maskedCccd = cccd.length > 8
+          ? '********${cccd.substring(cccd.length - 4)}'
+          : '********';
       logInfo(
         '[NEW_STUDENT_LOGIN] '
-            'Bắt đầu đăng nhập, '
-            'CCCD=********${cccd.substring(8)}',
+        'Bắt đầu đăng nhập, '
+        'CCCD=$maskedCccd',
       );
 
-      final String fcmToken =
-      await _getFcmToken();
+      final String fcmToken = await _getFcmToken();
 
       logInfo(
         '[NEW_STUDENT_LOGIN] '
-            'FCM token tồn tại: '
-            '${fcmToken.isNotEmpty}',
+        'FCM token tồn tại: '
+        '${fcmToken.isNotEmpty}',
       );
 
-      final response =
-      await ApiRepository().applicantLogin(
+      final response = await ApiRepository().applicantLogin(
         cccd: cccd,
         phoneNumber: phoneNumber,
         deviceToken: fcmToken,
@@ -82,120 +69,86 @@ class ApplicantAuthController extends GetxController {
 
       logInfo(
         '[NEW_STUDENT_LOGIN] '
-            'API đăng nhập thành công, '
-            'principalType=${response.principalType}, '
-            'applicantId=${response.applicant.id}',
+        'API đăng nhập thành công, '
+        'principalType=${response.principalType}, '
+        'applicantId=${response.applicant.id}',
       );
 
       if (response.accessToken.trim().isEmpty) {
-        throw const FormatException(
-          'Máy chủ không trả về access token',
-        );
+        throw const FormatException('Máy chủ không trả về access token');
       }
 
       if (response.refreshToken.trim().isEmpty) {
-        throw const FormatException(
-          'Máy chủ không trả về refresh token',
-        );
+        throw const FormatException('Máy chủ không trả về refresh token');
       }
 
-      final String fullName =
-      response.applicant.fullName.trim();
+      final String fullName = response.applicant.fullName.trim();
 
       if (fullName.isEmpty) {
-        throw const FormatException(
-          'Máy chủ không trả về tên tân sinh viên',
-        );
+        throw const FormatException('Máy chủ không trả về tên tân sinh viên');
       }
 
-      await ApplicantSessionRepository().save(
-        response,
-      );
+      await ApplicantSessionRepository().save(response);
 
-      logInfo(
-        '[NEW_STUDENT_LOGIN] Đã lưu session',
-      );
+      logInfo('[NEW_STUDENT_LOGIN] Đã lưu session');
 
-      Globals().token =
-          response.accessToken.trim();
+      Globals().token = response.accessToken.trim();
 
-      Globals().refreshToken =
-          response.refreshToken.trim();
+      Globals().refreshToken = response.refreshToken.trim();
 
-      ApiRepository().setToken(
-        Globals().token,
-      );
+      ApiRepository().setToken(Globals().token);
 
       logInfo(
         '[NEW_STUDENT_LOGIN] '
-            'Đã gắn Authorization header',
+        'Đã gắn Authorization header',
       );
 
       _dismissProgress();
 
       logInfo(
         '[NEW_STUDENT_LOGIN] '
-            'Chuyển tới ApplicantHomeScreen',
+        'Chuyển tới ApplicantHomeScreen',
       );
 
-      Get.offAll(
-            () => ApplicantHomeScreen(
-          fullName: fullName,
-        ),
+      Get.offAll(() => ApplicantHomeScreen(fullName: fullName));
+    } on FormatException catch (error, stackTrace) {
+      _dismissProgress();
+
+      logError(
+        '[NEW_STUDENT_LOGIN] '
+        'Lỗi định dạng response: '
+        '$error\n$stackTrace',
       );
-    } on FormatException catch (
-    error,
-    stackTrace,
-    ) {
-    _dismissProgress();
 
-    logError(
-    '[NEW_STUDENT_LOGIN] '
-    'Lỗi định dạng response: '
-    '$error\n$stackTrace',
-    );
+      snackBarError(
+        'Dữ liệu đăng nhập từ máy chủ '
+        'không đúng định dạng: '
+        '${error.message}',
+      );
+    } on DioException catch (error, stackTrace) {
+      _dismissProgress();
 
-    snackBarError(
-    'Dữ liệu đăng nhập từ máy chủ '
-    'không đúng định dạng: '
-    '${error.message}',
-    );
-    } on DioException catch (
-    error,
-    stackTrace,
-    ) {
-    _dismissProgress();
+      logError(
+        '[NEW_STUDENT_LOGIN] '
+        'HTTP error: '
+        'status=${error.response?.statusCode}, '
+        'data=${error.response?.data}\n'
+        '$stackTrace',
+      );
 
-    logError(
-    '[NEW_STUDENT_LOGIN] '
-    'HTTP error: '
-    'status=${error.response?.statusCode}, '
-    'data=${error.response?.data}\n'
-    '$stackTrace',
-    );
+      snackBarError(_extractErrorMessage(error.response?.data));
+    } catch (error, stackTrace) {
+      _dismissProgress();
 
-    snackBarError(
-    _extractErrorMessage(
-    error.response?.data,
-    ),
-    );
-    } catch (
-    error,
-    stackTrace,
-    ) {
-    _dismissProgress();
+      logError(
+        '[NEW_STUDENT_LOGIN] '
+        'Lỗi không xác định: '
+        '$error\n$stackTrace',
+      );
 
-    logError(
-    '[NEW_STUDENT_LOGIN] '
-    'Lỗi không xác định: '
-    '$error\n$stackTrace',
-    );
-
-    snackBarError(
-    _extractErrorMessage(error),
-    );
+      snackBarError(_extractErrorMessage(error));
     } finally {
-    isLoading.value = false;
+      isLoading.value = false;
     }
   }
 
@@ -213,11 +166,9 @@ class ApplicantAuthController extends GetxController {
 
   Future<String> _getFcmToken() async {
     try {
-      final FirebaseMessaging messaging =
-          FirebaseMessaging.instance;
+      final FirebaseMessaging messaging = FirebaseMessaging.instance;
 
-      final NotificationSettings settings =
-      await messaging.requestPermission(
+      final NotificationSettings settings = await messaging.requestPermission(
         alert: true,
         badge: true,
         sound: true,
@@ -225,88 +176,56 @@ class ApplicantAuthController extends GetxController {
 
       logInfo(
         '[NEW_STUDENT_LOGIN] '
-            'Notification permission: '
-            '${settings.authorizationStatus}',
+        'Notification permission: '
+        '${settings.authorizationStatus}',
       );
 
       if (Platform.isIOS) {
-        final String? apnsToken =
-        await messaging.getAPNSToken();
+        final String? apnsToken = await messaging.getAPNSToken();
 
         logInfo(
           '[NEW_STUDENT_LOGIN] '
-              'APNs token tồn tại: '
-              '${apnsToken?.isNotEmpty == true}',
+          'APNs token tồn tại: '
+          '${apnsToken?.isNotEmpty == true}',
         );
       }
 
-      final String? token =
-      await messaging.getToken();
+      final String? token = await messaging.getToken();
 
-      if (token != null &&
-          token.trim().isNotEmpty) {
-        final String normalizedToken =
-        token.trim();
+      if (token != null && token.trim().isNotEmpty) {
+        final String normalizedToken = token.trim();
 
-        ServicesUrl().firebaseToken =
-            normalizedToken;
+        ServicesUrl().firebaseToken = normalizedToken;
 
         logInfo(
           '[NEW_STUDENT_LOGIN] '
-              'FCM token=${_maskToken(normalizedToken)}',
+          'FCM token=${_maskToken(normalizedToken)}',
         );
 
         return normalizedToken;
       }
-    } catch (
-    error,
-    stackTrace,
-    ) {
-    // Firebase lỗi không được phép chặn đăng nhập.
-    logError(
-    '[NEW_STUDENT_LOGIN] '
-    'Không lấy được FCM token: '
-    '$error\n$stackTrace',
-    );
-    }
-
-    return ServicesUrl().firebaseToken?.trim() ??
-    '';
-  }
-
-  String _normalizePhoneNumber(
-      String value,
-      ) {
-    String phone = value.replaceAll(
-      RegExp(r'\D'),
-      '',
-    );
-
-    if (phone.startsWith('84') &&
-        phone.length >= 11) {
-      phone = '0${phone.substring(2)}';
-    }
-
-    return phone;
-  }
-
-  String _extractErrorMessage(
-      dynamic data,
-      ) {
-    if (data is DioException) {
-      return _extractErrorMessage(
-        data.response?.data,
+    } catch (error, stackTrace) {
+      // Firebase lỗi không được phép chặn đăng nhập.
+      logError(
+        '[NEW_STUDENT_LOGIN] '
+        'Không lấy được FCM token: '
+        '$error\n$stackTrace',
       );
+    }
+
+    return ServicesUrl().firebaseToken?.trim() ?? '';
+  }
+
+  String _extractErrorMessage(dynamic data) {
+    if (data is DioException) {
+      return _extractErrorMessage(data.response?.data);
     }
 
     if (data is Map) {
       final dynamic message =
-          data['message'] ??
-              data['error'] ??
-              data['detail'];
+          data['message'] ?? data['error'] ?? data['detail'];
 
-      if (message != null &&
-          message.toString().trim().isNotEmpty) {
+      if (message != null && message.toString().trim().isNotEmpty) {
         return message.toString().trim();
       }
 
@@ -314,34 +233,21 @@ class ApplicantAuthController extends GetxController {
 
       if (nestedData is Map) {
         final dynamic nestedMessage =
-            nestedData['message'] ??
-                nestedData['error'];
+            nestedData['message'] ?? nestedData['error'];
 
         if (nestedMessage != null &&
-            nestedMessage
-                .toString()
-                .trim()
-                .isNotEmpty) {
-          return nestedMessage
-              .toString()
-              .trim();
+            nestedMessage.toString().trim().isNotEmpty) {
+          return nestedMessage.toString().trim();
         }
       }
     }
 
-    final String raw =
-        data?.toString().trim() ?? '';
+    final String raw = data?.toString().trim() ?? '';
 
     if (raw.isNotEmpty && raw != 'null') {
       return raw
-          .replaceFirst(
-        'Exception: ',
-        '',
-      )
-          .replaceFirst(
-        'FormatException: ',
-        '',
-      );
+          .replaceFirst('Exception: ', '')
+          .replaceFirst('FormatException: ', '');
     }
 
     return 'Không thể đăng nhập. '
@@ -349,9 +255,7 @@ class ApplicantAuthController extends GetxController {
         'và số điện thoại.';
   }
 
-  String _maskToken(
-      String token,
-      ) {
+  String _maskToken(String token) {
     if (token.length <= 16) {
       return '***';
     }
@@ -364,30 +268,24 @@ class ApplicantAuthController extends GetxController {
   void _showProgress() {
     try {
       Utils.showProgress(context);
-    } catch (
-    error,
-    stackTrace,
-    ) {
-    logError(
-    '[NEW_STUDENT_LOGIN] '
-    'Show progress error: '
-    '$error\n$stackTrace',
-    );
+    } catch (error, stackTrace) {
+      logError(
+        '[NEW_STUDENT_LOGIN] '
+        'Show progress error: '
+        '$error\n$stackTrace',
+      );
     }
   }
 
   void _dismissProgress() {
     try {
       Utils.dismissProgress(context);
-    } catch (
-    error,
-    stackTrace,
-    ) {
-    logError(
-    '[NEW_STUDENT_LOGIN] '
-    'Dismiss progress error: '
-    '$error\n$stackTrace',
-    );
+    } catch (error, stackTrace) {
+      logError(
+        '[NEW_STUDENT_LOGIN] '
+        'Dismiss progress error: '
+        '$error\n$stackTrace',
+      );
     }
   }
 
