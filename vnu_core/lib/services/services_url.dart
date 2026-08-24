@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class ServicesUrl {
   static const String defaultBaseUrl = 'https://onevnu-mobile-api.vnu.edu.vn';
+  // static const String defaultBaseUrl = 'http://112.137.132.211:8082';
   static const String defaultZaloGroupUrl =
       'https://zalo.me/g/3cu4aftrlhlomcnjm8vx';
 

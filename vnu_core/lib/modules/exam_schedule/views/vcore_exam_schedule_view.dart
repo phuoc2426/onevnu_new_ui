@@ -17,12 +17,17 @@ class VcoreExamScheduleView extends StatelessWidget {
   static const Color _examColor = Color(0xFFFFB703);
   static const Color _examLightColor = Color(0xFFFFF8E1);
   static const Color _examBorderColor = Color(0xFFFFECB3);
-  /// Optional: jump calendar to this date on open
+  /// Optional context: Home có thể truyền đúng ngày + học kỳ + loại trường
+  /// đang hiển thị để màn lịch mở đúng cùng một dataset.
   final DateTime? initialDate;
+  final String? initialHocKyId;
+  final String? initialKieuTruong;
 
   const VcoreExamScheduleView({
     super.key,
     this.initialDate,
+    this.initialHocKyId,
+    this.initialKieuTruong,
   });
 
   @override
@@ -30,8 +35,14 @@ class VcoreExamScheduleView extends StatelessWidget {
     return GetBuilder<VcoreExamScheduleController>(
       init: VcoreExamScheduleController(),
       builder: (controller) {
-        if (initialDate != null) {
-          controller.setInitialDate(initialDate!);
+        if (initialDate != null ||
+            initialHocKyId != null ||
+            initialKieuTruong != null) {
+          controller.setInitialContext(
+            date: initialDate,
+            hocKyId: initialHocKyId,
+            kieuTruongValue: initialKieuTruong,
+          );
         }
         return ProgressHubWidget(
           contextComplete: (hubContext) {
@@ -66,6 +77,11 @@ class VcoreExamScheduleView extends StatelessWidget {
                     padding: EdgeInsets.zero,
                     children: [
                       _buildSelectedFilterIndicator(controller),
+
+                      if (controller.hocKySelected.value != null) ...[
+                        const SizedBox(height: 8),
+                        _buildTermDateRangeCard(context, controller),
+                      ],
 
                       const SizedBox(height: 8),
 
@@ -125,7 +141,597 @@ class VcoreExamScheduleView extends StatelessWidget {
     );
   }
 
+  Widget _buildTermDateRangeCard(
+    BuildContext context,
+    VcoreExamScheduleController controller,
+  ) {
+    final start = controller.currentTermStartDate;
+    final end = controller.currentTermEndDate;
+    if (start == null || end == null) return const SizedBox.shrink();
+
+    final rangeText =
+        '${DateFormat('dd/MM/yyyy').format(start)} - ${DateFormat('dd/MM/yyyy').format(end)}';
+    final isPersonal = controller.hasPersonalTermDateOverride.value;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isPersonal
+              ? AppColors.greenAccent.withOpacity(0.45)
+              : Colors.grey.shade200,
+        ),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => _showTermDateRangeBottomSheet(context, controller),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.greenAccent.withOpacity(0.10),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.date_range_rounded,
+                  color: AppColors.greenAccent,
+                  size: 21,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Kho\u1ea3ng ng\u00e0y l\u1ecbch h\u1ecdc',
+                            style: TextStyles.semiBold.copyWith(
+                              fontSize: AppFontSizes.medium,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ),
+                        if (isPersonal)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.greenAccent.withOpacity(0.10),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              'C\u00e1 nh\u00e2n',
+                              style: TextStyles.semiBold.copyWith(
+                                fontSize: AppFontSizes.font11,
+                                color: AppColors.greenAccent,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      rangeText,
+                      style: TextStyles.bold.copyWith(
+                        fontSize: AppFontSizes.mediumSmall,
+                        color: AppColors.greenAccent,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      isPersonal
+                          ? 'B\u1ea1n \u0111ang d\u00f9ng m\u1ed1c th\u1eddi gian t\u00f9y ch\u1ec9nh tr\u00ean \u1ee9ng d\u1ee5ng.'
+                          : 'M\u1ed1c hi\u1ec7n t\u1ea1i t\u1eeb h\u1ec7 th\u1ed1ng. Ch\u1ea1m \u0111\u1ec3 t\u00f9y ch\u1ec9nh.',
+                      style: TextStyles.regular.copyWith(
+                        fontSize: AppFontSizes.font11,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                Icons.edit_calendar_outlined,
+                size: 21,
+                color: Colors.grey.shade600,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showTermDateRangeBottomSheet(
+    BuildContext context,
+    VcoreExamScheduleController controller,
+  ) {
+    final currentStart = controller.currentTermStartDate;
+    final currentEnd = controller.currentTermEndDate;
+    if (currentStart == null || currentEnd == null) return;
+
+    DateTime startDate = DateTime(
+      currentStart.year,
+      currentStart.month,
+      currentStart.day,
+    );
+    DateTime endDate = DateTime(
+      currentEnd.year,
+      currentEnd.month,
+      currentEnd.day,
+    );
+    DateTime focusedDay = startDate;
+
+    final firstDay = DateTime(startDate.year - 1, 1, 1);
+    final lastDay = DateTime(endDate.year + 1, 12, 31);
+
+    Get.bottomSheet(
+      StatefulBuilder(
+        builder: (sheetContext, setModalState) {
+          final rangeText =
+              '${DateFormat('dd/MM/yyyy').format(startDate)}  →  ${DateFormat('dd/MM/yyyy').format(endDate)}';
+          final totalDays = endDate.difference(startDate).inDays + 1;
+          final isPersonal = controller.hasPersonalTermDateOverride.value;
+
+          return Container(
+            height: MediaQuery.of(sheetContext).size.height * 0.88,
+            decoration: const BoxDecoration(
+              color: Color(0xFFF7F8FA),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+            ),
+            child: SafeArea(
+              top: false,
+              child: Column(
+                children: [
+                  const SizedBox(height: 10),
+                  Container(
+                    width: 42,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.black12,
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 18),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: AppColors.greenAccent.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: const Icon(
+                            Icons.calendar_month_rounded,
+                            color: AppColors.greenAccent,
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Điều chỉnh thời gian lịch học',
+                                style: TextStyles.bold.copyWith(
+                                  fontSize: AppFontSizes.large,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                'Chọn ngày bắt đầu và ngày kết thúc phù hợp với lịch thực tế của bạn.',
+                                style: TextStyles.regular.copyWith(
+                                  fontSize: AppFontSizes.small,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Đóng',
+                          onPressed: () => Get.back(),
+                          icon: const Icon(Icons.close_rounded),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(color: Colors.grey.shade200),
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: _buildDateRangeSummaryItem(
+                                    icon: Icons.play_circle_outline_rounded,
+                                    label: 'Ngày bắt đầu',
+                                    value: DateFormat('dd/MM/yyyy')
+                                        .format(startDate),
+                                  ),
+                                ),
+                                Padding(
+                                  padding:
+                                      const EdgeInsets.symmetric(horizontal: 8),
+                                  child: Icon(
+                                    Icons.arrow_forward_rounded,
+                                    size: 20,
+                                    color: Colors.grey.shade400,
+                                  ),
+                                ),
+                                Expanded(
+                                  child: _buildDateRangeSummaryItem(
+                                    icon: Icons.flag_outlined,
+                                    label: 'Ngày kết thúc',
+                                    value: DateFormat('dd/MM/yyyy')
+                                        .format(endDate),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: Colors.grey.shade200),
+                            ),
+                            padding: const EdgeInsets.fromLTRB(8, 6, 8, 10),
+                            child: TableCalendar<void>(
+                              locale: 'vi_VN',
+                              firstDay: firstDay,
+                              lastDay: lastDay,
+                              focusedDay: focusedDay,
+                              calendarFormat: CalendarFormat.month,
+                              startingDayOfWeek: StartingDayOfWeek.monday,
+                              rangeStartDay: startDate,
+                              rangeEndDay: endDate,
+                              rangeSelectionMode: RangeSelectionMode.toggledOn,
+                              availableGestures: AvailableGestures.horizontalSwipe,
+                              rowHeight: 44,
+                              daysOfWeekHeight: 30,
+                              headerStyle: HeaderStyle(
+                                formatButtonVisible: false,
+                                titleCentered: true,
+                                leftChevronIcon: const Icon(
+                                  Icons.chevron_left_rounded,
+                                  color: AppColors.greenAccent,
+                                ),
+                                rightChevronIcon: const Icon(
+                                  Icons.chevron_right_rounded,
+                                  color: AppColors.greenAccent,
+                                ),
+                                titleTextStyle: TextStyles.bold.copyWith(
+                                  fontSize: AppFontSizes.medium,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              daysOfWeekStyle: DaysOfWeekStyle(
+                                weekdayStyle: TextStyles.semiBold.copyWith(
+                                  fontSize: AppFontSizes.font11,
+                                  color: Colors.grey.shade600,
+                                ),
+                                weekendStyle: TextStyles.semiBold.copyWith(
+                                  fontSize: AppFontSizes.font11,
+                                  color: Colors.redAccent.shade200,
+                                ),
+                              ),
+                              calendarStyle: CalendarStyle(
+                                outsideDaysVisible: false,
+                                isTodayHighlighted: true,
+                                todayDecoration: BoxDecoration(
+                                  color: AppColors.greenAccent.withOpacity(0.10),
+                                  shape: BoxShape.circle,
+                                ),
+                                todayTextStyle: const TextStyle(
+                                  color: AppColors.greenAccent,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                                rangeHighlightColor:
+                                    AppColors.greenAccent.withOpacity(0.10),
+                                rangeStartDecoration: const BoxDecoration(
+                                  color: AppColors.greenAccent,
+                                  shape: BoxShape.circle,
+                                ),
+                                rangeEndDecoration: const BoxDecoration(
+                                  color: AppColors.greenAccent,
+                                  shape: BoxShape.circle,
+                                ),
+                                rangeStartTextStyle: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                                rangeEndTextStyle: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                                withinRangeTextStyle: const TextStyle(
+                                  color: AppColors.greenAccent,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                                defaultTextStyle: const TextStyle(
+                                  color: Colors.black87,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                weekendTextStyle: TextStyle(
+                                  color: Colors.redAccent.shade200,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              onPageChanged: (day) {
+                                focusedDay = day;
+                              },
+                              onRangeSelected: (start, end, focused) {
+                                setModalState(() {
+                                  focusedDay = focused;
+                                  if (start != null) {
+                                    startDate = DateTime(
+                                      start.year,
+                                      start.month,
+                                      start.day,
+                                    );
+                                  }
+                                  if (end != null) {
+                                    endDate = DateTime(
+                                      end.year,
+                                      end.month,
+                                      end.day,
+                                    );
+                                  } else {
+                                    // Sau lần chạm đầu tiên, tạm coi là khoảng 1 ngày.
+                                    endDate = startDate;
+                                  }
+                                });
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 12,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.greenAccent.withOpacity(0.07),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.info_outline_rounded,
+                                  color: AppColors.greenAccent,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    '$rangeText • $totalDays ngày. Thiết lập này chỉ thay đổi lịch hiển thị trên ứng dụng của bạn.',
+                                    style: TextStyles.medium.copyWith(
+                                      fontSize: AppFontSizes.font11_5,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (isPersonal) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              'Bạn đang dùng khoảng ngày cá nhân. Có thể khôi phục để dùng lại thời gian do hệ thống cung cấp.',
+                              style: TextStyles.regular.copyWith(
+                                fontSize: AppFontSizes.font11,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: EdgeInsets.fromLTRB(
+                      16,
+                      12,
+                      16,
+                      MediaQuery.of(sheetContext).padding.bottom + 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border(
+                        top: BorderSide(color: Colors.grey.shade200),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        if (isPersonal) ...[
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () async {
+                                await controller.clearPersonalTermDateRange();
+                                Get.back();
+                              },
+                              icon: const Icon(Icons.restart_alt_rounded),
+                              label: const Text('Khôi phục mặc định'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.grey.shade800,
+                                side: BorderSide(color: Colors.grey.shade300),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                        ],
+                        Expanded(
+                          flex: isPersonal ? 1 : 2,
+                          child: ElevatedButton.icon(
+                            onPressed: () async {
+                              final saved = await controller
+                                  .savePersonalTermDateRange(startDate, endDate);
+                              if (saved) Get.back();
+                            },
+                            icon: const Icon(Icons.check_rounded),
+                            label: const Text('Lưu khoảng ngày'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.greenAccent,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+    );
+  }
+
+  Widget _buildDateRangeSummaryItem({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Row(
+      children: [
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: AppColors.greenAccent.withOpacity(0.10),
+            borderRadius: BorderRadius.circular(11),
+          ),
+          child: Icon(icon, color: AppColors.greenAccent, size: 19),
+        ),
+        const SizedBox(width: 9),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyles.regular.copyWith(
+                  fontSize: AppFontSizes.font11,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyles.bold.copyWith(
+                  fontSize: AppFontSizes.small,
+                  color: Colors.black87,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDateRangePickerTile({
+    required String label,
+    required DateTime value,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8F9FA),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: AppColors.greenAccent, size: 21),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyles.medium.copyWith(
+                      fontSize: AppFontSizes.font11,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    DateFormat('dd/MM/yyyy').format(value),
+                    style: TextStyles.bold.copyWith(
+                      fontSize: AppFontSizes.medium,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.calendar_month_outlined, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildCalendar(VcoreExamScheduleController controller) {
+    final range = controller.calendarDisplayRange;
+    final safeFocusedDay = controller.clampToCalendarRange(
+      controller.focusedDay.value,
+    );
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -143,9 +749,9 @@ class VcoreExamScheduleView extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           TableCalendar<ScheduleEvent>(
-            firstDay: DateTime.now().subtract(const Duration(days: 365 * 3)),
-            lastDay: DateTime.now().add(const Duration(days: 365 * 3)),
-            focusedDay: controller.focusedDay.value,
+            firstDay: range.start,
+            lastDay: range.end,
+            focusedDay: safeFocusedDay,
             selectedDayPredicate: (day) =>
                 isSameDay(controller.selectedDay.value, day),
             locale: 'vi_VN',
@@ -178,15 +784,9 @@ class VcoreExamScheduleView extends StatelessWidget {
                   fontSize: AppFontSizes.medium, color: Colors.red.shade700),
             ),
             onDaySelected: (selectedDay, focusedDay) {
-              controller.showIncompleteExams.value = false;
-              controller.showExtraTermCourses.value = false;
-              controller.selectedDay.value = selectedDay;
-              controller.focusedDay.value = focusedDay;
-              controller.updateSelectedEvents();
+              controller.selectCalendarDay(selectedDay, focusedDay);
             },
-            onPageChanged: (focusedDay) {
-              controller.focusedDay.value = focusedDay;
-            },
+            onPageChanged: controller.setCalendarFocusedDay,
             eventLoader: (day) {
               final key = DateTime(day.year, day.month, day.day);
               return controller.eventsMap[key] ?? [];
@@ -961,14 +1561,7 @@ class VcoreExamScheduleView extends StatelessWidget {
                           label: year,
                           isSelected: isSelected,
                           onTap: () {
-                            controller.namHocSelected.value = year;
-                            controller.namHocSelected.refresh();
-
                             controller.selectYear(year);
-
-                            controller.namHocSelected.value = year;
-                            controller.namHocSelected.refresh();
-                            controller.resetToToday();
                           },
                         ),
                       );
@@ -1008,14 +1601,7 @@ class VcoreExamScheduleView extends StatelessWidget {
                           label: label,
                           isSelected: isSelected,
                           onTap: () {
-                            controller.hocKySelected.value = sem;
-                            controller.hocKySelected.refresh();
-
                             controller.selectSemester(sem);
-
-                            controller.hocKySelected.value = sem;
-                            controller.hocKySelected.refresh();
-                            controller.resetToToday();
                           },
                         ),
                       );
@@ -1852,4 +2438,3 @@ class VcoreExamScheduleView extends StatelessWidget {
     );
   }
 }
-

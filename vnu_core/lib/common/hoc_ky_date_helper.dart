@@ -22,6 +22,37 @@ class HocKyDateHelper {
     return DateTime(date.year, date.month, date.day);
   }
 
+  /// Giữ [date] luôn nằm trong [range].
+  ///
+  /// Đây là invariant dùng chung cho calendar:
+  /// range.start <= result <= range.end.
+  static DateTime clampToRange(DateTime date, HocKyDateRange range) {
+    final target = dateOnly(date);
+    if (target.isBefore(range.start)) return range.start;
+    if (target.isAfter(range.end)) return range.end;
+    return target;
+  }
+
+  /// Mở rộng [range] để chứa toàn bộ [dates].
+  ///
+  /// Dùng cho trường hợp lịch thi thực tế nằm hơi ngoài metadata học kỳ.
+  /// Không thu hẹp range học kỳ ban đầu.
+  static HocKyDateRange expandRangeToInclude(
+    HocKyDateRange range,
+    Iterable<DateTime> dates,
+  ) {
+    var start = dateOnly(range.start);
+    var end = dateOnly(range.end);
+
+    for (final value in dates) {
+      final date = dateOnly(value);
+      if (date.isBefore(start)) start = date;
+      if (date.isAfter(end)) end = date;
+    }
+
+    return HocKyDateRange(start: start, end: end);
+  }
+
   static DateTime? parseApiDate(String? value) {
     final text = value?.trim();
     if (text == null || text.isEmpty) return null;

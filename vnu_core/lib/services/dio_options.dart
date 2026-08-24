@@ -1,8 +1,5 @@
-import 'dart:io';
-
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
-import 'package:dio/io.dart';
 import 'package:flutter/foundation.dart';
 import 'package:talker_dio_logger/talker_dio_logger.dart';
 import 'package:vnu_core/globals.dart';
@@ -47,15 +44,6 @@ class DioOptions {
           ),
         ),
       );
-    }
-
-    if (client.httpClientAdapter is IOHttpClientAdapter) {
-      (client.httpClientAdapter as IOHttpClientAdapter).onHttpClientCreate =
-          (clients) {
-        clients.badCertificateCallback =
-            (X509Certificate cert, String host, int port) => true;
-        return clients;
-      };
     }
 
     return client;

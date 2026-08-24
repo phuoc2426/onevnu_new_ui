@@ -28,8 +28,7 @@ import 'package:vnu_core/modules/question/views/vcore_question_detail_view.dart'
 import 'package:vnu_core/modules/system_news/views/vcore_system_news_detail_view.dart';
 import 'package:vnu_core/repository/app_repository.dart';
 import 'package:vnu_core/repository/data_repository.dart';
-import 'package:vnu_core/screens/vcore_login_screen.dart';
-import 'package:vnu_core/screens/vcore_login_screen_v3.dart';
+import 'package:vnu_core/screens/vcore_login_screen_v4.dart';
 import 'package:vnu_core/screens/vcore_preview_pdf_screen.dart';
 import 'package:vnu_core/screens/vcore_splash_screen.dart';
 import 'package:vnu_core/services/services_url.dart';
@@ -44,7 +43,7 @@ class VnuCore {
   VnuCore._internal() {
     // Init monitor network
     NetworkMonitor().startListen();
-    // Global listener for token expiration to redirect to login V3
+    // Global listener for token expiration to redirect to login V4
     globalEvent.on().listen((event) async {
       if (event is TokenExpiredEvent) {
         Globals().clearSession(deleteUserLogin: false);
@@ -93,10 +92,10 @@ class VnuCore {
   }
 
   gotoLogin() {
-    // Navigate to the new login screen (V3) after token expiration.
+    // Navigate to login V4 after token expiration.
     Navigator.pushAndRemoveUntil(
       navigatorKey.currentContext!,
-      MaterialPageRoute(builder: (ctx) => const VCoreLoginScreenV3()),
+      MaterialPageRoute(builder: (ctx) => const VCoreLoginScreenV4()),
       (route) => false,
     );
   }
@@ -134,7 +133,7 @@ class VnuCore {
       callBackOK: () {
         Navigator.pushAndRemoveUntil(
           navigatorKey.currentContext!,
-          MaterialPageRoute(builder: (ctx) => const VCoreLoginScreen()),
+          MaterialPageRoute(builder: (ctx) => const VCoreLoginScreenV4()),
           (route) => false,
         );
       },
@@ -386,55 +385,93 @@ class VnuCore {
     required String androidVersion,
     required String androidUrl,
   }) async {
-    logInfo(foreVersion);
-    logInfo(androidVersion);
-    logInfo(androidUrl);
-    logInfo(iosUrl);
-    logInfo(iosVersion);
-    Future.delayed(const Duration(seconds: 1), () async {
-      logSuccess('checkUpdateNewVersion');
-      Map<String, dynamic> fore = jsonDecode(foreVersion);
-
-      Version versionForeIOS = Version.parse(
-        fore['ios']?.isNotEmpty == true
-            ? (fore['ios']?.toString() ?? '1.0.0')
-            : '1.0.0',
-      );
-
-      Version versionForeAndroid = Version.parse(
-        fore['android']?.isNotEmpty == true
-            ? (fore['android']?.toString() ?? '1.0.0')
-            : '1.0.0',
-      );
-
-      Version versionIOS = Version.parse(
-        iosVersion.isNotEmpty ? iosVersion : '1.0.0',
-      );
-
-      Version versionAndroid = Version.parse(
-        androidVersion.isNotEmpty ? androidVersion : '1.0.0',
-      );
-
-      var version = await Utils.version();
-      Version versionNow = Version.parse(version);
-      Version foreRemoteVersion = Platform.isAndroid
-          ? versionForeAndroid
-          : versionForeIOS;
-      Version remoteVersion = Platform.isAndroid ? versionAndroid : versionIOS;
-      bool isNeedIgnore = foreRemoteVersion < versionNow;
-      bool isNeedUpdate = remoteVersion > versionNow;
-      if (isNeedUpdate) {
-        Utils.showGetAlertDialog(
-          'Thông báo',
-          'OneVNU đã có phiên bản mới, bạn vui lòng cập nhật phiên bản mới để sử dụng!',
-          okStr: 'Cập nhật',
-          cancelStr: isNeedIgnore ? 'Để sau' : null,
-          callBackOK: () async {
-            //url
-            launchUrl(Uri.parse(Platform.isAndroid ? androidUrl : iosUrl));
-          },
+    Version safeVersion(dynamic raw, {String fallback = '1.0.0'}) {
+      final text = raw?.toString().trim() ?? '';
+      try {
+        return Version.parse(text.isEmpty ? fallback : text);
+      } catch (_) {
+        logWarning(
+          '[APP_UPDATE] Invalid version value="$text". Fallback=$fallback',
         );
+        return Version.parse(fallback);
       }
-    });
+    }
+
+    Map<String, dynamic> parseForceConfig(String raw) {
+      final text = raw.trim();
+      if (text.isEmpty) return const <String, dynamic>{};
+
+      try {
+        final decoded = jsonDecode(text);
+        if (decoded is Map<String, dynamic>) return decoded;
+        if (decoded is Map) {
+          return decoded.map(
+            (key, value) => MapEntry(key.toString(), value),
+          );
+        }
+      } catch (e) {
+        logWarning('[APP_UPDATE] Invalid fore Remote Config: $e');
+      }
+      return const <String, dynamic>{};
+    }
+
+    await Future<void>.delayed(const Duration(seconds: 1));
+
+    try {
+      final fore = parseForceConfig(foreVersion);
+      final versionForeIOS = safeVersion(fore['ios']);
+      final versionForeAndroid = safeVersion(fore['android']);
+      final versionIOS = safeVersion(iosVersion);
+      final versionAndroid = safeVersion(androidVersion);
+      final versionNow = safeVersion(await Utils.version());
+
+      final foreRemoteVersion =
+          Platform.isAndroid ? versionForeAndroid : versionForeIOS;
+      final remoteVersion = Platform.isAndroid ? versionAndroid : versionIOS;
+      final isNeedIgnore = foreRemoteVersion < versionNow;
+      final isNeedUpdate = remoteVersion > versionNow;
+
+      logInfo(
+        '[APP_UPDATE] platform=${Platform.isAndroid ? 'android' : 'ios'} '
+        'current=$versionNow latest=$remoteVersion force=$foreRemoteVersion '
+        'needUpdate=$isNeedUpdate canIgnore=$isNeedIgnore',
+      );
+
+      if (!isNeedUpdate) return;
+
+      final rawUrl = Platform.isAndroid ? androidUrl : iosUrl;
+      final uri = Uri.tryParse(rawUrl.trim());
+      final hasValidStoreUrl = uri != null &&
+          uri.hasScheme &&
+          (uri.scheme == 'https' || uri.scheme == 'http') &&
+          uri.host.isNotEmpty;
+
+      if (!hasValidStoreUrl) {
+        logError(
+          '[APP_UPDATE] Update is required but store URL is invalid for current platform.',
+        );
+        return;
+      }
+
+      Utils.showGetAlertDialog(
+        'Thông báo',
+        'OneVNU đã có phiên bản mới, bạn vui lòng cập nhật phiên bản mới để sử dụng!',
+        okStr: 'Cập nhật',
+        cancelStr: isNeedIgnore ? 'Để sau' : null,
+        callBackOK: () async {
+          final launched = await launchUrl(
+            uri,
+            mode: LaunchMode.externalApplication,
+          );
+          if (!launched) {
+            logError('[APP_UPDATE] Cannot open store URL.');
+          }
+        },
+      );
+    } catch (e) {
+      // P0: Remote Config sai không được phép làm văng startup/runtime.
+      // Force-update thực sự không bypass sẽ được đưa vào Requirement Gate ở phase sau.
+      logError('[APP_UPDATE] Version check failed: $e');
+    }
   }
 }

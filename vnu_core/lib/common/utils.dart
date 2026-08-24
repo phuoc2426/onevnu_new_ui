@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_progress_hud/flutter_progress_hud.dart';
 import 'package:flutter_svg/svg.dart';
@@ -140,6 +142,48 @@ class Utils {
       return false;
     }
     return true;
+  }
+
+  // ---- Forced app update ----
+  static const String androidStoreUrl =
+      'https://play.google.com/store/apps/details?id=com.vnu.students';
+  static const String iosStoreUrl =
+      'https://apps.apple.com/vn/app/one-vnu/id6648781161';
+
+  /// Mở link Store tương ứng với nền tảng (Android / iOS).
+  static Future<void> openAppStoreLink() async {
+    final String url = Platform.isAndroid ? androidStoreUrl : iosStoreUrl;
+    final Uri uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  /// Hiển thị dialog bắt buộc cập nhật, không thể dismiss (barrierDismissible: false).
+  /// Sử dụng rootNavigator để đảm bảo z-index cao hơn mọi overlay (Zalo bubble, v.v.).
+  static Future<void> showForcedUpdateDialog(BuildContext ctx) async {
+    await showDialog<void>(
+      context: ctx,
+      barrierDismissible: false,
+      useRootNavigator: true,
+      builder: (_) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          title: const Text('Cập nhật phiên bản mới'),
+          content: const Text(
+            'Phiên bản hiện tại đã cũ. Vui lòng cập nhật để tiếp tục sử dụng ứng dụng.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                await openAppStoreLink();
+              },
+              child: const Text('Cập nhật'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   static hideKeyboard() {

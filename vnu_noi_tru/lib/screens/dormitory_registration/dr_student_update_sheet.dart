@@ -2406,11 +2406,19 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
     return text.isEmpty ? null : text;
   }
 
+  // Convert a date string (expected format 'yyyy-MM-dd') to the API representation.
+  // Previously this method converted the parsed DateTime to UTC before calling
+  // toIso8601String(), which shifted the date for users in timezones ahead of
+  // UTC (e.g., Vietnam UTC+7) resulting in a one‑day earlier value being sent.
+  // The backend expects the date without timezone adjustment, so we now return
+  // the ISO‑8601 string of the local DateTime without converting to UTC.
+  // This preserves the selected calendar date.
   String? _dateToApiOrNull(String value) {
     final String text = value.trim();
     if (text.isEmpty) return null;
     final DateTime? parsed = DateTime.tryParse(text);
-    return parsed?.toUtc().toIso8601String();
+    // Return the ISO string in the local timezone (no UTC conversion).
+    return parsed?.toIso8601String();
   }
 
   void _showError(String message) {

@@ -9,7 +9,7 @@ import 'package:vnu_core/modules/cam_nang/views/vcore_cam_nang_view.dart';
 import 'package:vnu_core/modules/inmapz/vcore_immap_view.dart';
 import 'package:vnu_core/modules/motel/vcore_motel_webview.dart';
 import 'package:vnu_core/modules/admission/views/applicant_login_with_zalo.dart';
-import 'package:vnu_core/screens/vcore_login_screen_v3.dart';
+import 'package:vnu_core/screens/vcore_login_screen_v4.dart';
 import 'package:vnu_core/services/app_config_service.dart';
 import 'package:vnu_core/services/services_url.dart';
 import 'package:vnu_core/widgets/zalo_chat_bubble.dart';
@@ -140,7 +140,7 @@ class _VcoreAdmissionViewState extends State<VcoreAdmissionView> {
   }
 
   void _goToStudentLogin() {
-    Get.to(() => const VCoreLoginScreenV3());
+    Get.to(() => const VCoreLoginScreenV4());
   }
 
   void _goToNewStudentLogin() {

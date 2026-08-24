@@ -18,6 +18,7 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
   RegistrationPeriodModel? selectedPeriod;
   DormitoryModel? selectedDormitory;
   RoomTypeModel? selectedRoomType;
+
   /// Cho phép người dùng chọn đồng thời nhiều đối tượng ưu tiên.
   final List<PriorityObjectModel> selectedPriorityObjects =
       <PriorityObjectModel>[];
@@ -44,15 +45,15 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
   }
 
   void togglePriorityObject(PriorityObjectModel item) {
-    final int index = selectedPriorityObjects.indexWhere(
-      (PriorityObjectModel selected) {
-        if (item.id != null && selected.id != null) {
-          return item.id == selected.id;
-        }
+    final int index = selectedPriorityObjects.indexWhere((
+      PriorityObjectModel selected,
+    ) {
+      if (item.id != null && selected.id != null) {
+        return item.id == selected.id;
+      }
 
-        return (item.name ?? '').trim() == (selected.name ?? '').trim();
-      },
-    );
+      return (item.name ?? '').trim() == (selected.name ?? '').trim();
+    });
 
     if (index >= 0) {
       selectedPriorityObjects.removeAt(index);
@@ -500,7 +501,9 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
       if (dob.isNotEmpty) {
         try {
           final parsed = DateTime.parse(dob);
-          dobFormatted = parsed.toUtc().toIso8601String();
+          // Preserve the original date without UTC conversion to avoid
+          // shifting the day for users in positive UTC offsets.
+          dobFormatted = parsed.toIso8601String();
         } catch (_) {
           dobFormatted = dob; // fallback nếu không parse được
         }
@@ -746,8 +749,7 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
           }
         }
 
-        final String message =
-            responseData['message']?.toString().trim() ?? '';
+        final String message = responseData['message']?.toString().trim() ?? '';
         if (message.isNotEmpty) return message;
       }
 
@@ -865,9 +867,7 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
         ? 'Hiện chưa có ký túc xá khả dụng.'
         : null;
 
-    logInfo(
-      '[DORMITORY_ALL] total=${allDormitories.length}',
-    );
+    logInfo('[DORMITORY_ALL] total=${allDormitories.length}');
 
     return allDormitories;
   }
@@ -1238,11 +1238,8 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
           ),
         );
 
-        final UploadedAttachmentListResponse response =
-            await _repository.uploadAvatar(
-          student: studentPayload,
-          file: avatarFile!,
-        );
+        final UploadedAttachmentListResponse response = await _repository
+            .uploadAvatar(student: studentPayload, file: avatarFile!);
 
         if (response.success != true &&
             (response.data == null || response.data!.isEmpty)) {

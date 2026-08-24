@@ -8,10 +8,12 @@ import 'package:vnu_core/common/utils.dart';
 import 'package:vnu_core/common/vnu_cache_manager.dart';
 import 'package:vnu_core/common/gpa_cache_manager.dart';
 import 'package:vnu_core/common/hoc_ky_date_helper.dart';
+import 'package:vnu_core/common/schedule_override_config.dart';
 
 import 'package:vnu_core/globals.dart';
 import 'package:vnu_core/extensions/map_ext.dart';
 
+import 'package:vnu_core/modules/exam_schedule/controllers/vcore_exam_schedule_controller.dart';
 import 'package:vnu_core/repository/app_repository.dart';
 import 'package:intl/intl.dart';
 
@@ -64,6 +66,21 @@ class VcoreHomeController extends GetxController {
   HocKyModel? currentLichThiHocKy;
   RxBool isLoadingSchedule = false.obs;
 
+  // Home dùng chính controller/pipeline tạo eventsMap của chức năng
+  // "Lịch học & lịch thi". Không tự suy luận ngày học riêng nữa.
+  final VcoreExamScheduleController _calendarScheduleSource =
+      VcoreExamScheduleController();
+
+  ScheduleOverrideConfig _scheduleOverrideConfig =
+      ScheduleOverrideConfig.empty();
+  String _currentScheduleKieuTruong = 'TruongChinh';
+
+  String? get currentScheduleHocKyId =>
+      _calendarScheduleSource.hocKySelected.value?.id;
+
+  String get currentScheduleKieuTruong =>
+      _calendarScheduleSource.kieuTruong.value ?? _currentScheduleKieuTruong;
+
   RxInt unreadSystemCount = 0.obs;
   RxInt unreadTrainingCount = 0.obs;
 
@@ -80,6 +97,13 @@ class VcoreHomeController extends GetxController {
     Globals().unreadCountStream.stream.listen((count) {
       unreadSystemCount.value = count;
     });
+  }
+
+  @override
+  void onClose() {
+    // _calendarScheduleSource được tạo nội bộ cho Home, không được GetX tự dispose.
+    _calendarScheduleSource.refreshController.dispose();
+    super.onClose();
   }
 
   getCacheAllData() {
@@ -351,54 +375,92 @@ class VcoreHomeController extends GetxController {
   }
 
   // ── Schedule ──
-  fetchScheduleData() async {
+  /// Home không gọi/tính lịch riêng. Nó nạp đúng pipeline của
+  /// VcoreExamScheduleController rồi chỉ đọc eventsMap đã được calendar tạo.
+  Future<void> fetchScheduleData() async {
     isLoadingSchedule.value = true;
     try {
-      // Get kieuTruong
-      var kieuTruongList = await ApiRepository().getDanhSachKieuTruong();
-      String kieuTruong =
-          kieuTruongList.firstWhereOrNull((obj) => obj == 'TruongChinh') ??
-              (kieuTruongList.isNotEmpty ? kieuTruongList.first : '');
+      await _calendarScheduleSource.loadDefaultScheduleForHome(
+        targetDate: DateTime.now(),
+      );
 
-      // Fetch class schedule semesters & pick the semester containing today.
-      try {
-        var hocKyListTKB = await ApiRepository()
-            .getDanhSachHocKyTheoThoiKhoaBieu(true, kieuTruong);
-        final hocKyTKB = _selectCurrentSemester(hocKyListTKB);
-        currentThoiKhoaBieuHocKy = hocKyTKB;
-
-        if (hocKyTKB != null) {
-          var tkbResponse = await ApiRepository()
-              .getThoiKhoaBieuHocKy(hocKyTKB.id ?? '', kieuTruong);
-          listThoiKhoaBieu.value = tkbResponse;
-        } else {
-          listThoiKhoaBieu.clear();
-        }
-      } catch (e) {
-        logError('fetchThoiKhoaBieu: ${e.toString()}');
-      }
-
-      // Fetch exam schedule semesters & pick the semester containing today.
-      try {
-        var hocKyListLT =
-            await ApiRepository().getDanhSachHocKyTheoLichThi(true, kieuTruong);
-        final hocKyLT = _selectCurrentSemester(hocKyListLT);
-        currentLichThiHocKy = hocKyLT;
-
-        if (hocKyLT != null) {
-          var ltResponse = await ApiRepository()
-              .getLichThiHocKy(hocKyLT.id ?? '', kieuTruong);
-          listLichThi.value = ltResponse;
-        } else {
-          listLichThi.clear();
-        }
-      } catch (e) {
-        logError('fetchLichThi: ${e.toString()}');
-      }
+      // Mirror raw data để các widget Home cũ (nếu còn dùng) không bị phá.
+      listThoiKhoaBieu.value =
+          List<ThoiKhoaBieuModel>.from(_calendarScheduleSource.listThoiKhoaBieu);
+      listLichThi.value =
+          List<LichThiHocKyModel>.from(_calendarScheduleSource.listLichThi);
+      currentThoiKhoaBieuHocKy =
+          _calendarScheduleSource.hocKySelected.value;
+      currentLichThiHocKy = _calendarScheduleSource.hocKySelected.value;
+      _currentScheduleKieuTruong =
+          _calendarScheduleSource.kieuTruong.value ?? 'TruongChinh';
+      _scheduleOverrideConfig = _calendarScheduleSource.scheduleOverrideConfig;
     } catch (e) {
       logError('fetchScheduleData: ${e.toString()}');
+    } finally {
+      isLoadingSchedule.value = false;
     }
-    isLoadingSchedule.value = false;
+  }
+
+  /// =============================
+  /// HOME V3 - SHARED EVENT SOURCE
+  /// =============================
+  /// Tất cả hàm này chỉ đọc eventsMap của chức năng Lịch học & lịch thi.
+  /// Vì vậy Home không thể hiển thị 24/08 nếu calendar không có event 24/08.
+  List<ScheduleEvent> getTodayClassEvents() {
+    return _calendarScheduleSource.getEventsForDate(
+      DateTime.now(),
+      type: ScheduleType.classSession,
+    );
+  }
+
+  List<ScheduleEvent> getTodayExamEvents() {
+    return _calendarScheduleSource.getEventsForDate(
+      DateTime.now(),
+      type: ScheduleType.exam,
+    );
+  }
+
+  List<ScheduleEvent> getUpcomingClassEvents({int days = 120}) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final tomorrow = today.add(const Duration(days: 1));
+
+    return _calendarScheduleSource.getEventsInRange(
+      from: tomorrow,
+      toExclusive: today.add(Duration(days: days + 1)),
+      type: ScheduleType.classSession,
+    );
+  }
+
+  List<ScheduleEvent> getUpcomingExamEvents({int days = 180}) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final tomorrow = today.add(const Duration(days: 1));
+
+    return _calendarScheduleSource.getEventsInRange(
+      from: tomorrow,
+      toExclusive: today.add(Duration(days: days + 1)),
+      type: ScheduleType.exam,
+    );
+  }
+
+  DateTime? getNearestUpcomingClassEventDate() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    return _calendarScheduleSource.getFirstEventDateFrom(
+      today,
+      type: ScheduleType.classSession,
+    );
+  }
+
+  DateTime? getNearestUpcomingExamEventDate() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    return _calendarScheduleSource.getFirstEventDateFrom(
+      today,
+      type: ScheduleType.exam,
+    );
   }
 
   HocKyModel? _selectCurrentSemester(List<HocKyModel> semesters) {
@@ -479,22 +541,17 @@ class VcoreHomeController extends GetxController {
   }
 
   DateTime? _parseNgayHoc(String? ngayHoc) {
-    if (ngayHoc == null || ngayHoc.trim().isEmpty) return null;
-
-    try {
-      return DateFormat('dd/MM/yyyy').parseStrict(ngayHoc.trim());
-    } catch (_) {
-      return null;
-    }
+    return HocKyDateHelper.parseApiDate(ngayHoc);
   }
+
   /// Get today's day-of-week string for ThoiKhoaBieuModel (1=Mon...7=Sun)
   String _getTodayDayOfWeek() {
     int weekday = DateTime.now().weekday; // 1=Mon...7=Sun
     if (weekday == 7) return '7'; // Chủ nhật
-    return (weekday).toString(); // 1=Thứ 2, 2=Thứ 3...
+    return weekday.toString();
   }
 
-  /// Get class schedule for a specific day of week
+  /// Get class schedule for a specific day of week.
   List<ThoiKhoaBieuModel> getClassScheduleForDay(String dayOfWeek) {
     return listThoiKhoaBieu
         .where((item) => item.ngayTrongTuan == dayOfWeek)
@@ -502,24 +559,129 @@ class VcoreHomeController extends GetxController {
       ..sort((a, b) => (int.tryParse(a.tietBatDau ?? '0') ?? 0)
           .compareTo(int.tryParse(b.tietBatDau ?? '0') ?? 0));
   }
+
+  HocKyDateRange? _rangeFromTermOverride(ScheduleTermOverride? override) {
+    if (override == null) return null;
+
+    final start = HocKyDateHelper.parseApiDate(override.startDate);
+    final end = HocKyDateHelper.parseApiDate(override.endDate);
+
+    if (start == null || end == null || end.isBefore(start)) {
+      return null;
+    }
+
+    return HocKyDateRange(start: start, end: end);
+  }
+
+  HocKyDateRange? _backendThoiKhoaBieuRange() {
+    DateTime? minStart;
+    DateTime? maxEnd;
+
+    for (final item in listThoiKhoaBieu) {
+      final start = HocKyDateHelper.parseApiDate(item.ngayBatDau);
+      final end = HocKyDateHelper.parseApiDate(item.ngayKetThuc);
+
+      if (start != null && (minStart == null || start.isBefore(minStart))) {
+        minStart = start;
+      }
+
+      if (end != null && (maxEnd == null || end.isAfter(maxEnd))) {
+        maxEnd = end;
+      }
+    }
+
+    if (minStart == null || maxEnd == null || maxEnd.isBefore(minStart)) {
+      return null;
+    }
+
+    return HocKyDateRange(start: minStart, end: maxEnd);
+  }
+
+  HocKyDateRange? _effectiveCurrentThoiKhoaBieuRange() {
+    final semester = currentThoiKhoaBieuHocKy;
+    if (semester == null) return null;
+
+    final personalOverride = _scheduleOverrideConfig.termFor(
+      semester,
+      scope: _currentScheduleKieuTruong,
+    );
+
+    return _rangeFromTermOverride(personalOverride) ??
+        _backendThoiKhoaBieuRange() ??
+        HocKyDateHelper.rangeFor(semester);
+  }
+
+  HocKyDateRange _effectiveClassRange(
+    HocKyModel semester,
+    ThoiKhoaBieuModel item,
+  ) {
+    final termOverride = _scheduleOverrideConfig.termFor(
+      semester,
+      scope: _currentScheduleKieuTruong,
+    );
+    final termOverrideRange = _rangeFromTermOverride(termOverride);
+    final defaultRange = termOverrideRange ??
+        _backendThoiKhoaBieuRange() ??
+        HocKyDateHelper.rangeFor(semester);
+
+    final courseOverride = _scheduleOverrideConfig.courseFor(semester, item);
+
+    // Khi sinh viên đổi cả khoảng học kỳ, tất cả môn bình thường dùng khoảng đó.
+    // Nếu có override riêng môn học thì override riêng vẫn ưu tiên cao hơn.
+    if (termOverrideRange != null && courseOverride == null) {
+      return defaultRange;
+    }
+
+    final itemRange = HocKyDateHelper.rangeForDates(
+      semester,
+      startDate: courseOverride?.startDate ?? item.ngayBatDau,
+      endDate: courseOverride?.endDate ?? item.ngayKetThuc,
+    );
+
+    final start = itemRange.start.isBefore(defaultRange.start)
+        ? defaultRange.start
+        : itemRange.start;
+    final end = itemRange.end.isAfter(defaultRange.end)
+        ? defaultRange.end
+        : itemRange.end;
+
+    if (end.isBefore(start)) {
+      return defaultRange;
+    }
+
+    return HocKyDateRange(start: start, end: end);
+  }
+
   List<HomeClassScheduleItem> _getClassScheduleForDate(DateTime date) {
     final targetDate = _dateOnly(date);
+    final semester = currentThoiKhoaBieuHocKy;
 
-    if (!_isDateInCurrentThoiKhoaBieuSemester(targetDate)) {
+    final effectiveTermRange = _effectiveCurrentThoiKhoaBieuRange();
+    if (effectiveTermRange != null && !effectiveTermRange.contains(targetDate)) {
       return [];
     }
 
     final dayOfWeek = targetDate.weekday.toString();
-
     final items = getClassScheduleForDay(dayOfWeek);
 
     return items
+        .where((item) {
+          if (semester == null) {
+            final start = HocKyDateHelper.parseApiDate(item.ngayBatDau);
+            final end = HocKyDateHelper.parseApiDate(item.ngayKetThuc);
+            if (start == null || end == null) return true;
+            return !targetDate.isBefore(start) && !targetDate.isAfter(end);
+          }
+
+          final range = _effectiveClassRange(semester, item);
+          return range.contains(targetDate);
+        })
         .map(
           (item) => HomeClassScheduleItem(
-        data: item,
-        date: targetDate,
-      ),
-    )
+            data: item,
+            date: targetDate,
+          ),
+        )
         .toList()
       ..sort((a, b) {
         final tietA = int.tryParse(a.data.tietBatDau ?? '') ?? 999;
@@ -529,19 +691,11 @@ class VcoreHomeController extends GetxController {
   }
 
   bool _isDateInCurrentThoiKhoaBieuSemester(DateTime date) {
-    final semester = currentThoiKhoaBieuHocKy;
-
-    if (semester == null) {
-      return true;
-    }
-
-    final semesterRange = HocKyDateHelper.rangeFor(semester);
-    final start = _dateOnly(semesterRange.start);
-    final end = _dateOnly(semesterRange.end);
-    final target = _dateOnly(date);
-
-    return !target.isBefore(start) && !target.isAfter(end);
+    final range = _effectiveCurrentThoiKhoaBieuRange();
+    if (range == null) return true;
+    return range.contains(date);
   }
+
   /// Parse ngayThi string (dd/MM/yyyy) to DateTime
   DateTime? _parseNgayThi(String? ngayThi) {
     if (ngayThi == null || ngayThi.isEmpty) return null;
@@ -585,6 +739,11 @@ class VcoreHomeController extends GetxController {
     return result;
   }
 
+  DateTime? getNearestUpcomingClassDate({int days = 120}) {
+    final upcoming = getUpcomingClassSchedule(days: days);
+    return upcoming.isEmpty ? null : upcoming.first.date;
+  }
+
   /// Get today's exam schedule
   List<LichThiHocKyModel> getTodayExamSchedule() {
     final today = DateFormat('dd/MM/yyyy').format(DateTime.now());
@@ -610,6 +769,12 @@ class VcoreHomeController extends GetxController {
         if (cmp != 0) return cmp;
         return (a.gioBatDauThi ?? '').compareTo(b.gioBatDauThi ?? '');
       });
+  }
+
+  DateTime? getNearestUpcomingExamDate() {
+    final upcoming = getUpcomingExams();
+    if (upcoming.isEmpty) return null;
+    return _parseNgayThi(upcoming.first.ngayThi);
   }
 
   /// Get next day's class schedule

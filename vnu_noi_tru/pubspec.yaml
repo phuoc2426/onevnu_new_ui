@@ -32,6 +32,8 @@ dependencies:
   vnu_core:
     path: '../vnu_core'
 
+  http: ^1.6.0
+  
 dependency_overrides:
 
 

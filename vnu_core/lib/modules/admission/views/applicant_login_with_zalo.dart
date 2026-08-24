@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:vnu_core/screens/vcore_login_screen_v3.dart';
+import 'package:vnu_core/screens/vcore_login_screen_v4.dart';
 import 'package:vnu_core/widgets/zalo_chat_bubble.dart';
 
 /// Wrapper dành riêng cho tab đăng nhập Applicant bằng CCCD.
 ///
-/// Không cần sửa trực tiếp VCoreLoginScreenV3, nhờ đó giảm xung đột với luồng
+/// Dùng V4 nhưng vẫn giữ nguyên luồng Applicant cũ, nhờ đó giảm xung đột với luồng
 /// đăng nhập sinh viên hiện có.
 class ApplicantLoginWithZalo extends StatelessWidget {
   const ApplicantLoginWithZalo({super.key});
@@ -14,7 +14,7 @@ class ApplicantLoginWithZalo extends StatelessWidget {
     return const Stack(
       fit: StackFit.expand,
       children: <Widget>[
-        VCoreLoginScreenV3(initialApplicantTab: true),
+        VCoreLoginScreenV4(initialApplicantTab: true),
         ZaloChatBubble(
           edgeInsets: EdgeInsets.fromLTRB(12, 12, 16, 24),
         ),

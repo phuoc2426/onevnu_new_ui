@@ -30,6 +30,7 @@ import 'package:vnu_core/modules/news/views/vcore_jobs_view_v2.dart';
 import 'package:vnu_core/modules/notify/views/vcore_notify_detail_view_v3.dart';
 import 'package:vnu_core/modules/notify/views/vcore_notify_view_v3.dart';
 import 'package:vnu_core/modules/one_door/views/vcore_one_door_view.dart';
+import 'package:vnu_core/modules/qr/views/vcore_qr_scanner_view.dart';
 // import 'package:vnu_core/modules/paht/views/vcore_paht_view.dart';
 import 'package:vnu_core/modules/paht_v2/views/vcore_paht_view_v2.dart';
 import 'package:vnu_core/modules/profile/views/vcore_profile_person_info_view.dart';
@@ -176,10 +177,6 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
   bool _guideActionsRegistered = false;
   AppGuideRegistry? _guideRegistryForActions;
 
-  final PageController schedulePageController = PageController(
-    viewportFraction: 0.82,
-  );
-
   final PageController newsPageController = PageController(
     initialPage: 1000,
     viewportFraction: 0.82,
@@ -192,16 +189,31 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
   bool get isSchoolNewsTab => newsTabIndex == 0;
 
   static const String _temporaryAddressFunctionLabel = 'Cập nhật tạm trú';
-  static const String _temporaryAddressPinnedMigrationKey =
-      'kPinnedFunctions_v3_temp_address_v1';
+
+  // Migration một lần: sau bản cập nhật này, Truy cập nhanh mặc định hiển thị
+  // toàn bộ icon. Sau khi migration chạy, sinh viên vẫn có thể tự Ghim/Bỏ ghim.
+  static const String _allFunctionsPinnedMigrationKey =
+      'kPinnedFunctions_v3_all_default_v1';
 
   List<String> _pinnedFunctionLabels = [
     'Lịch học & thi',
     'Điểm',
-    'Học bổng',
+    'Đăng ký môn',
     'Việc làm',
     'Đồng bộ',
+    'Học phí',
+    'Tài liệu',
+    'Điểm danh',
+    'Học bổng',
+    'Phản ánh',
+    'Nội trú',
     _temporaryAddressFunctionLabel,
+    'Phòng trọ',
+    'Thủ tục',
+    'Thư viện',
+    'Bản đồ',
+    'Hỏi đáp',
+    'Cẩm nang',
   ];
 
   static final List<_FunctionItem> _allAvailableFunctions = [
@@ -515,7 +527,6 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
     _guideRegistryForActions?.unregisterAction('home.show_vnu_news_tab');
 
     newsAutoScrollTimer?.cancel();
-    schedulePageController.dispose();
     newsPageController.dispose();
     super.dispose();
   }
@@ -637,12 +648,25 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final saved = prefs.getStringList('kPinnedFunctions_v3');
-      final bool migrationApplied =
-          prefs.getBool(_temporaryAddressPinnedMigrationKey) ?? false;
+      final bool allFunctionsDefaultApplied =
+          prefs.getBool(_allFunctionsPinnedMigrationKey) ?? false;
 
-      final List<String> loaded = saved != null && saved.isNotEmpty
-          ? List<String>.from(saved)
-          : List<String>.from(_pinnedFunctionLabels);
+      List<String> loaded;
+
+      if (!allFunctionsDefaultApplied) {
+        // Áp dụng một lần cho cả người dùng cũ để bản cập nhật mới nhìn thấy
+        // đầy đủ icon ngay. Từ lần sau vẫn tôn trọng lựa chọn Ghim của người dùng.
+        loaded = _allAvailableFunctions
+            .map((_FunctionItem item) => item.label)
+            .toList();
+      } else if (saved != null && saved.isNotEmpty) {
+        loaded = List<String>.from(saved);
+      } else {
+        // Người dùng mới / cache rỗng: mặc định hiển thị toàn bộ icon.
+        loaded = _allAvailableFunctions
+            .map((_FunctionItem item) => item.label)
+            .toList();
+      }
 
       final List<String> normalized = <String>[];
       for (final String label in loaded) {
@@ -654,16 +678,9 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
         }
       }
 
-      // Add the new temporary-address shortcut once for existing users. After
-      // this migration, users can still unpin it normally from the pin dialog.
-      if (!migrationApplied &&
-          !normalized.contains(_temporaryAddressFunctionLabel)) {
-        normalized.add(_temporaryAddressFunctionLabel);
-      }
-
       await prefs.setStringList('kPinnedFunctions_v3', normalized);
-      if (!migrationApplied) {
-        await prefs.setBool(_temporaryAddressPinnedMigrationKey, true);
+      if (!allFunctionsDefaultApplied) {
+        await prefs.setBool(_allFunctionsPinnedMigrationKey, true);
       }
 
       if (!mounted) return;
@@ -671,7 +688,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
         _pinnedFunctionLabels = normalized;
       });
     } catch (e) {
-      // Keep the built-in defaults when local preferences cannot be read.
+      // Giữ danh sách mặc định (toàn bộ icon) nếu không đọc được local prefs.
     }
   }
 
@@ -710,7 +727,9 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
   void _handleFunctionTap(String label) {
     switch (label) {
       case 'Lịch học & thi':
-        Get.to(() => const VcoreExamScheduleView());
+        Get.to(() => const VcoreExamScheduleView())?.then((_) {
+          widget.controller.fetchScheduleData();
+        });
         break;
       case 'Điểm':
         Get.to(() => const VcoreCoursePointsView());
@@ -1369,7 +1388,12 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
 
         AppGuideAnchor(
           id: 'home.qr',
-          child: _headerButton(Icons.qr_code_2_rounded),
+          child: GestureDetector(
+            onTap: () {
+              Get.to(() => const VcoreQrScannerView());
+            },
+            child: _headerButton(Icons.qr_code_2_rounded),
+          ),
         ),
       ],
     );
@@ -1470,8 +1494,11 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
 
   Widget _buildOverview() {
     return Obx(() {
-      final todayCount = widget.controller.getTodayTotalSubjects().toString();
-      final examCount = widget.controller.getUpcomingExamCount().toString();
+      // Cùng nguồn eventsMap với màn "Lịch học & lịch thi".
+      final todayClassCount =
+          widget.controller.getTodayClassEvents().length.toString();
+      final todayExamCount =
+          widget.controller.getTodayExamEvents().length.toString();
       final notifyCount =
           (widget.controller.unreadSystemCount.value +
                   widget.controller.unreadTrainingCount.value)
@@ -1488,14 +1515,14 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
       final items = [
         _OverviewItem(
           Icons.menu_book_rounded,
-          todayCount,
+          todayClassCount,
           'Tiết học\nhôm nay',
           AppColors.overviewGreen,
         ),
         _OverviewItem(
           Icons.event_note_rounded,
-          examCount,
-          'Lịch thi\nsắp tới',
+          todayExamCount,
+          'Lịch thi\nhôm nay',
           AppColors.overviewOrange,
         ),
         _OverviewItem(
@@ -1538,35 +1565,54 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                   child: GestureDetector(
                     onTap: () {
                       if (index == 0) {
+                        // Nếu hôm nay thực sự có lịch thì mở đúng hôm nay.
+                        // Nếu không có, đưa sinh viên tới buổi học gần nhất thay vì
+                        // mở một ngày trống trên calendar.
+                        final hasClassToday = widget.controller
+                            .getTodayClassEvents()
+                            .isNotEmpty;
+                        final targetDate = hasClassToday
+                            ? DateTime.now()
+                            : widget.controller
+                                    .getNearestUpcomingClassEventDate() ??
+                                DateTime.now();
+
                         Get.to(
                           () => VcoreExamScheduleView(
-                            initialDate: DateTime.now(),
+                            initialDate: targetDate,
+                            initialHocKyId:
+                                widget.controller.currentScheduleHocKyId,
+                            initialKieuTruong:
+                                widget.controller.currentScheduleKieuTruong,
                           ),
-                        );
+                        )?.then((_) {
+                          // Có thể sinh viên vừa chỉnh khoảng ngày học trong màn lịch.
+                          // Tải lại để phần Home dùng cùng một mốc thời gian.
+                          widget.controller.fetchScheduleData();
+                        });
                       } else if (index == 1) {
-                        final upcomingExams = widget.controller
-                            .getUpcomingExams();
-                        DateTime? targetDate;
-                        if (upcomingExams.isNotEmpty) {
-                          final ngayThi = upcomingExams.first.ngayThi;
-                          if (ngayThi != null && ngayThi.isNotEmpty) {
-                            try {
-                              final parts = ngayThi.split('/');
-                              if (parts.length == 3) {
-                                targetDate = DateTime(
-                                  int.parse(parts[2]),
-                                  int.parse(parts[1]),
-                                  int.parse(parts[0]),
-                                );
-                              }
-                            } catch (_) {}
-                          }
-                        }
+                        // Tương tự lịch học: nếu hôm nay không thi thì mở kỳ thi
+                        // gần nhất, tránh đưa người dùng vào một ngày calendar trống.
+                        final hasExamToday = widget.controller
+                            .getTodayExamEvents()
+                            .isNotEmpty;
+                        final targetDate = hasExamToday
+                            ? DateTime.now()
+                            : widget.controller
+                                    .getNearestUpcomingExamEventDate() ??
+                                DateTime.now();
+
                         Get.to(
                           () => VcoreExamScheduleView(
-                            initialDate: targetDate ?? DateTime.now(),
+                            initialDate: targetDate,
+                            initialHocKyId:
+                                widget.controller.currentScheduleHocKyId,
+                            initialKieuTruong:
+                                widget.controller.currentScheduleKieuTruong,
                           ),
-                        );
+                        )?.then((_) {
+                          widget.controller.fetchScheduleData();
+                        });
                       } else if (index == 2) {
                         Get.to(() => const VcoreNotifyViewV3())?.then((_) {
                           widget.controller.updateUnreadCounts();
@@ -1650,36 +1696,25 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
             child: SizedBox(
               height: 245,
               child: Obx(() {
-                return PageView(
-                  controller: schedulePageController,
-                  padEnds: false,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(right: 10),
-                      child: isStudyTab
-                          ? AppGuideAnchor(
-                              id: 'home.schedule.next_study',
-                              child: _buildNextStudyCard(),
-                            )
-                          : AppGuideAnchor(
-                              id: 'home.schedule.next_exam',
-                              child: _buildNextExamCard(),
-                            ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.only(right: 10),
-                      child: isStudyTab
-                          ? AppGuideAnchor(
-                              id: 'home.schedule.study_timeline',
-                              child: _buildTodayStudyTimeline(),
-                            )
-                          : AppGuideAnchor(
-                              id: 'home.schedule.exam_timeline',
-                              child: _buildTodayExamTimeline(),
-                            ),
-                    ),
-                  ],
-                );
+                // Card lớn chỉ hiển thị lịch SẮP TỚI.
+                // Thông tin hôm nay đã nằm ở khối tổng quan ngay dưới header.
+                return isStudyTab
+                    ? AppGuideAnchor(
+                        // Giữ ID guide cũ để không làm hỏng onboarding hiện tại.
+                        id: 'home.schedule.next_study',
+                        child: AppGuideAnchor(
+                          id: 'home.schedule.study_timeline',
+                          child: _buildUpcomingStudyTimeline(),
+                        ),
+                      )
+                    : AppGuideAnchor(
+                        // Giữ ID guide cũ để không làm hỏng onboarding hiện tại.
+                        id: 'home.schedule.next_exam',
+                        child: AppGuideAnchor(
+                          id: 'home.schedule.exam_timeline',
+                          child: _buildUpcomingExamTimeline(),
+                        ),
+                      );
               }),
             ),
           ),
@@ -1712,112 +1747,11 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
     );
   }
 
-  Widget _buildNextStudyCard() {
-    final todaySchedule = widget.controller.getTodayClassSchedule();
-
-    if (todaySchedule.isEmpty) {
-      return _schedulePanel(
-        child: const Center(
-          child: Text(
-            'Hôm nay không có lịch học',
-            style: TextStyle(
-              color: Colors.grey,
-              fontSize: AppFontSizes.mediumSmall,
-            ),
-          ),
-        ),
-      );
-    }
-
-    final nextClass = todaySchedule.first;
-    final data = nextClass.data;
-
-    return _schedulePanel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _panelTitle('Lịch học hôm nay'),
-          const SizedBox(height: 12),
-          _timeBadge(
-            'Tiết ${data.tietBatDau ?? ''} - ${data.tietKetThuc ?? ''}',
-            AppColors.brandGreen,
-          ),
-          const SizedBox(height: 10),
-          Text(
-            data.tenHocPhan ?? 'Lớp học',
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: AppColors.darkNavy,
-              fontSize: AppFontSizes.large,
-              fontWeight: FontWeight.w900,
-              height: 1.25,
-            ),
-          ),
-          const SizedBox(height: 12),
-          _infoLine('Phòng: ${data.tenPhong ?? '--'}'),
-          const SizedBox(height: 8),
-          _infoLine('GV: ${data.giangVien1 ?? 'Chưa cập nhật'}'),
-          const Spacer(),
-          _statusPill('Hôm nay', AppColors.brandGreen),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNextExamCard() {
-    final todayExams = widget.controller.getTodayExamSchedule();
-
-    if (todayExams.isEmpty) {
-      return _schedulePanel(
-        child: const Center(
-          child: Text(
-            'Hôm nay không có lịch thi',
-            style: TextStyle(
-              color: Colors.grey,
-              fontSize: AppFontSizes.mediumSmall,
-            ),
-          ),
-        ),
-      );
-    }
-
-    final nextExam = todayExams.first;
-
-    return _schedulePanel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _panelTitle('Lịch thi hôm nay'),
-          const SizedBox(height: 12),
-          _timeBadge(nextExam.gioBatDauThi ?? '--:--', const Color(0xFF2563EB)),
-          const SizedBox(height: 10),
-          Text(
-            nextExam.tenHocPhan ?? 'Môn thi',
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: AppColors.darkNavy,
-              fontSize: AppFontSizes.large,
-              fontWeight: FontWeight.w900,
-              height: 1.25,
-            ),
-          ),
-          const SizedBox(height: 12),
-          _infoLine('Phòng: ${nextExam.phongThi ?? '--'}'),
-          const SizedBox(height: 8),
-          _infoLine('Ngày thi: ${nextExam.ngayThi ?? '--'}'),
-          const Spacer(),
-          _statusPill('Hôm nay', const Color(0xFF2563EB)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTodayStudyTimeline() {
-    final upcomingSchedule = widget.controller.getUpcomingClassSchedule(
-      days: 7,
-    );
+  Widget _buildUpcomingStudyTimeline() {
+    // Không tự suy luận weekday/ngày nữa. Danh sách này lấy trực tiếp từ
+    // eventsMap mà chính màn Lịch học & lịch thi dùng để vẽ calendar.
+    final upcomingSchedule =
+        widget.controller.getUpcomingClassEvents(days: 120);
 
     return _schedulePanel(
       child: Column(
@@ -1841,14 +1775,13 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                     padding: EdgeInsets.zero,
                     physics: const NeverScrollableScrollPhysics(),
                     itemBuilder: (context, index) {
-                      final item = upcomingSchedule[index];
-                      final data = item.data;
+                      final event = upcomingSchedule[index];
 
                       return _timelineItem(
                         time:
-                            '${item.ngayHocShortText} • Tiết ${data.tietBatDau ?? '--'}',
-                        title: data.tenHocPhan ?? '',
-                        room: data.tenPhong ?? '--',
+                            '${DateFormat('dd/MM').format(event.date)} • ${event.startTime}',
+                        title: event.title,
+                        room: event.location,
                         color: index == 0
                             ? const Color(0xFF059669)
                             : index == 1
@@ -1864,8 +1797,11 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
     );
   }
 
-  Widget _buildTodayExamTimeline() {
-    final upcomingExams = widget.controller.getUpcomingExamSchedule(days: 7);
+  Widget _buildUpcomingExamTimeline() {
+    // Cùng eventsMap với calendar; event nào không có trên calendar thì Home
+    // cũng tuyệt đối không tự sinh ra.
+    final upcomingExams =
+        widget.controller.getUpcomingExamEvents(days: 180);
 
     return _schedulePanel(
       child: Column(
@@ -1889,13 +1825,13 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                     padding: EdgeInsets.zero,
                     physics: const NeverScrollableScrollPhysics(),
                     itemBuilder: (context, index) {
-                      final item = upcomingExams[index];
+                      final event = upcomingExams[index];
 
                       return _timelineItem(
                         time:
-                            '${_formatShortDate(item.ngayThi)} • ${item.gioBatDauThi ?? '--:--'}',
-                        title: item.tenHocPhan ?? '',
-                        room: item.phongThi ?? '--',
+                            '${DateFormat('dd/MM').format(event.date)} • ${event.startTime}',
+                        title: event.title,
+                        room: event.location,
                         color: index == 0
                             ? const Color(0xFF2563EB)
                             : index == 1

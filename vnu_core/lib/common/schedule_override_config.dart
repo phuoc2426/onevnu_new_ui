@@ -54,12 +54,52 @@ class ScheduleOverrideConfig {
     };
   }
 
-  ScheduleTermOverride? termFor(HocKyModel hocKy) {
-    for (final key in _termKeys(hocKy)) {
+  /// Returns the term override for [hocKy].
+  ///
+  /// [scope] is used by the timetable screen to separate the same TERM_ID
+  /// between TruongChinh / BangKep / TruongGui. The cache file itself is
+  /// already separated by username by VnuCacheFileManager.
+  ScheduleTermOverride? termFor(
+    HocKyModel hocKy, {
+    String? scope,
+  }) {
+    for (final key in _termLookupKeys(hocKy, scope: scope)) {
       final override = terms[key];
       if (override != null) return override;
     }
     return null;
+  }
+
+  bool hasScopedTermOverride(
+    HocKyModel hocKy, {
+    required String scope,
+  }) {
+    return _scopedTermKeys(hocKy, scope: scope)
+        .any((key) => terms.containsKey(key));
+  }
+
+  ScheduleOverrideConfig withTermOverride(
+    HocKyModel hocKy,
+    ScheduleTermOverride? override, {
+    String? scope,
+  }) {
+    final updatedTerms = Map<String, ScheduleTermOverride>.from(terms);
+    final keys = scope == null || scope.trim().isEmpty
+        ? _termBaseKeys(hocKy)
+        : _scopedTermKeys(hocKy, scope: scope);
+
+    for (final key in keys) {
+      updatedTerms.remove(key);
+    }
+
+    if (override != null && keys.isNotEmpty) {
+      updatedTerms[keys.first] = override;
+    }
+
+    return ScheduleOverrideConfig(
+      terms: updatedTerms,
+      courses: courses,
+    );
   }
 
   ScheduleCourseOverride? courseFor(
@@ -81,7 +121,7 @@ class ScheduleOverrideConfig {
     return {};
   }
 
-  static List<String> _termKeys(HocKyModel hocKy) {
+  static List<String> _termBaseKeys(HocKyModel hocKy) {
     return [
       hocKy.id,
       hocKy.maHocKy,
@@ -89,8 +129,33 @@ class ScheduleOverrideConfig {
     ].whereType<String>().where(_hasText).toList();
   }
 
+  static List<String> _scopedTermKeys(
+    HocKyModel hocKy, {
+    required String scope,
+  }) {
+    final cleanScope = _clean(scope);
+    if (cleanScope == null) return _termBaseKeys(hocKy);
+    return _termBaseKeys(hocKy)
+        .map((key) => '$cleanScope|$key')
+        .toList();
+  }
+
+  static List<String> _termLookupKeys(
+    HocKyModel hocKy, {
+    String? scope,
+  }) {
+    final baseKeys = _termBaseKeys(hocKy);
+    final cleanScope = _clean(scope);
+    if (cleanScope == null) return baseKeys;
+
+    return [
+      ...baseKeys.map((key) => '$cleanScope|$key'),
+      ...baseKeys,
+    ];
+  }
+
   static List<String> _courseKeys(HocKyModel hocKy, ThoiKhoaBieuModel course) {
-    final termKeys = _termKeys(hocKy);
+    final termKeys = _termBaseKeys(hocKy);
     final courseCode = _clean(course.maHocPhan);
     final group = _clean(course.nhom);
     final subject = _clean(course.tenHocPhan);

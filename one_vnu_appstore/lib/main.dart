@@ -4,42 +4,25 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:app_links/app_links.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_remote_config/firebase_remote_config.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:students/firebase_options.dart';
+import 'package:students/bootstrap/app_bootstrap.dart';
 
 import 'package:vnu_core/common/log.dart';
 import 'package:vnu_core/common/guide/guide.dart';
-import 'package:vnu_core/common/guide/global/app_guide_global_initializer.dart';
 import 'package:vnu_core/globals.dart';
 import 'package:vnu_core/modules/sync/views/vcore_sync_view.dart';
 import 'package:vnu_core/modules/sync/vneid_deep_link_service.dart';
 import 'package:vnu_core/modules/tabbar/views/vcore_tabbar_view.dart';
-import 'package:vnu_core/services/services_url.dart';
 import 'package:vnu_core/vnu_core.dart';
 import 'package:vnu_noi_tru/vnu_noi_tru.dart';
 
 // Nếu cần bật DevicePreview thì mở lại import này.
 // import 'package:device_preview/device_preview.dart';
-
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-  } catch (e) {
-    logError(e.toString());
-  }
-
-  logInfo('Handling a background message: ${message.messageId}');
-}
 
 /// Bọc một screen bằng guide scope.
 ///
@@ -64,64 +47,24 @@ Widget _buildMainScreen() {
 }
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-  } catch (e) {
-    logError(e.toString());
-  }
-
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-
-  await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
-    alert: true,
-    badge: true,
-    sound: true,
+  final bootstrap = await AppBootstrap.initialize();
+  runApp(
+    MyApp(
+      message: bootstrap.initialMessage,
+      firebaseReady: bootstrap.firebaseReady,
+    ),
   );
-
-  HttpOverrides.global = MyHttpOverrides();
-
-  PlatformDispatcher.instance.onError = (error, stack) {
-    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
-
-    return true;
-  };
-
-  await ServicesUrl().init();
-
-  final RemoteMessage? message = await FirebaseMessaging.instance
-      .getInitialMessage();
-
-  AppGuideGlobalInitializer.ensureInitialized();
-
-  // Nếu cần dùng DevicePreview, dùng dạng này:
-  //
-  // runApp(
-  //   DevicePreview(
-  //     enabled: !kReleaseMode,
-  //     builder: (context) => MyApp(message: message),
-  //   ),
-  // );
-
-  runApp(MyApp(message: message));
-}
-
-class MyHttpOverrides extends HttpOverrides {
-  @override
-  HttpClient createHttpClient(SecurityContext? context) {
-    return super.createHttpClient(context)
-      ..badCertificateCallback =
-          (X509Certificate cert, String host, int port) => true;
-  }
 }
 
 class MyApp extends StatefulHookWidget {
-  const MyApp({super.key, this.message});
+  const MyApp({
+    super.key,
+    this.message,
+    this.firebaseReady = true,
+  });
 
   final RemoteMessage? message;
+  final bool firebaseReady;
 
   @override
   State<MyApp> createState() => _MyAppState();
@@ -140,11 +83,22 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
+    _startRuntimeServices();
+  }
 
-    _initFireBaseMessaging();
+  void _startRuntimeServices() {
     _initializationLocalPushNotificationPlugin();
-    _initRemoteConfig();
-    _initVneidDeepLinks();
+    unawaited(_initVneidDeepLinks());
+
+    if (!widget.firebaseReady) {
+      logWarning(
+        '[RUNTIME] Firebase unavailable; skip FCM and Remote Config initialization.',
+      );
+      return;
+    }
+
+    unawaited(_initFireBaseMessaging());
+    unawaited(_initRemoteConfig());
   }
 
   @override
@@ -244,30 +198,33 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future<void> _initRemoteConfig() async {
-    final FirebaseRemoteConfig remoteConfig = FirebaseRemoteConfig.instance;
+    try {
+      final FirebaseRemoteConfig remoteConfig = FirebaseRemoteConfig.instance;
 
-    await remoteConfig.setConfigSettings(
-      RemoteConfigSettings(
-        fetchTimeout: const Duration(seconds: 8),
-        minimumFetchInterval: const Duration(seconds: 1),
-      ),
-    );
+      await remoteConfig.setConfigSettings(
+        RemoteConfigSettings(
+          fetchTimeout: const Duration(seconds: 8),
+          minimumFetchInterval: const Duration(seconds: 1),
+        ),
+      );
 
-    await remoteConfig.fetchAndActivate();
+      await remoteConfig.fetchAndActivate();
 
-    logInfo('_initRemoteConfig');
+      final configValue = remoteConfig.getAll();
+      logInfo('[REMOTE_CONFIG] keys=${configValue.keys.join(',')}');
 
-    final Map<String, RemoteConfigValue> configValue = remoteConfig.getAll();
-
-    logError(configValue.keys.toString());
-
-    VnuCore().checkUpdateNewVersion(
-      foreVersion: remoteConfig.getString('fore'),
-      iosVersion: remoteConfig.getString('ios'),
-      iosUrl: remoteConfig.getString('iOSUrl'),
-      androidVersion: remoteConfig.getString('android'),
-      androidUrl: remoteConfig.getString('androidUrl'),
-    );
+      await VnuCore().checkUpdateNewVersion(
+        foreVersion: remoteConfig.getString('fore'),
+        iosVersion: remoteConfig.getString('ios'),
+        iosUrl: remoteConfig.getString('iOSUrl'),
+        androidVersion: remoteConfig.getString('android'),
+        androidUrl: remoteConfig.getString('androidUrl'),
+      );
+    } catch (e) {
+      // Remote Config là cấu hình từ xa; lỗi fetch/activate không được làm app
+      // văng khỏi startup. Requirement Gate sẽ xử lý policy bắt buộc ở phase sau.
+      logError('[REMOTE_CONFIG] initialization failed: $e');
+    }
   }
 
   void _initializationLocalPushNotificationPlugin() {
@@ -300,23 +257,27 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future<void> _initFireBaseMessaging() async {
-    await FirebaseMessaging.instance.requestPermission(
-      alert: true,
-      announcement: false,
-      badge: true,
-      carPlay: false,
-      criticalAlert: false,
-      provisional: false,
-      sound: true,
-    );
+    try {
+      await FirebaseMessaging.instance.requestPermission(
+        alert: true,
+        announcement: false,
+        badge: true,
+        carPlay: false,
+        criticalAlert: false,
+        provisional: false,
+        sound: true,
+      );
 
-    FirebaseMessaging.onMessage.listen((event) {
-      _showLocalPushNotification(event);
-    });
+      FirebaseMessaging.onMessage.listen((event) {
+        _showLocalPushNotification(event);
+      });
 
-    FirebaseMessaging.onMessageOpenedApp.listen((event) {
-      _handleNotificationTapped(context, event.data);
-    });
+      FirebaseMessaging.onMessageOpenedApp.listen((event) {
+        _handleNotificationTapped(context, event.data);
+      });
+    } catch (e) {
+      logError('[FCM] runtime initialization failed: $e');
+    }
   }
 
   void _handleNotificationTapped(

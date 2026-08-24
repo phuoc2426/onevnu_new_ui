@@ -1,9 +1,9 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:video_player/video_player.dart';
 import 'package:vnu_core/common/app_text_styles.dart';
+import 'package:vnu_core/common/utils.dart';
 import 'package:vnu_core/modules/admission/controllers/applicant_auth_controller.dart';
 import 'package:vnu_core/widgets/progress_hub_widget.dart';
 
@@ -28,6 +28,19 @@ class _ApplicantLoginScreenState extends State<ApplicantLoginScreen> {
             _videoController.play();
             _videoController.setLooping(true);
           });
+    // Kiểm tra cập nhật bắt buộc khi mở màn hình admission
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAppUpdate();
+    });
+  }
+
+  Future<void> _checkAppUpdate() async {
+    // TODO: Thay bằng API kiểm tra phiên bản thực tế khi có sẵn.
+    // Hiện tại hard-code true để luôn hiển thị dialog (demo / test).
+    final bool needUpdate = true;
+    if (needUpdate && mounted) {
+      await Utils.showForcedUpdateDialog(context);
+    }
   }
 
   @override
