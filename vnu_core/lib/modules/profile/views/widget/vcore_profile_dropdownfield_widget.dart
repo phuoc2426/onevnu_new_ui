@@ -1,17 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:vnu_core/common/app_text_styles.dart';
-import 'package:vnu_core/common/space_widget.dart';
+import 'package:vnu_core/widgets/select/vnu_select.dart';
 
-import '../../../exam_schedule/views/vcore_dropdown_select_widget.dart';
-
-class VcoreProfileDropdownfieldWidget extends StatefulWidget {
-  final String title;
-  final String hintText;
-  final String? value;
-  final bool isRequired;
-  final List<String> items;
-  final void Function(String value)? onSelected;
-
+/// Legacy profile adapter backed by the shared P2/P2V2 select field.
+@Deprecated('Use VnuSingleSelect<String> from vnu_core/widgets/select/vnu_select.dart')
+class VcoreProfileDropdownfieldWidget extends StatelessWidget {
   const VcoreProfileDropdownfieldWidget({
     super.key,
     required this.title,
@@ -22,44 +14,28 @@ class VcoreProfileDropdownfieldWidget extends StatefulWidget {
     this.onSelected,
   });
 
-  @override
-  State<VcoreProfileDropdownfieldWidget> createState() =>
-      _VcoreProfileDropdownfieldWidgetState();
-}
+  final String title;
+  final String hintText;
+  final String? value;
+  final bool isRequired;
+  final List<String> items;
+  final void Function(String value)? onSelected;
 
-class _VcoreProfileDropdownfieldWidgetState
-    extends State<VcoreProfileDropdownfieldWidget> {
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text(
-              widget.title,
-              style: TextStyles.regular
-                  .copyWith(fontSize: AppFontSizes.mediumSmall, color: Colors.black),
-            ),
-            Text(
-              widget.isRequired ? ' *' : '',
-              style:
-                  TextStyles.regular.copyWith(fontSize: AppFontSizes.mediumSmall, color: Colors.red),
-            )
-          ],
-        ),
-        spaceHeight(8),
-        SizedBox(
-          height: 40,
-          child: VcoreDropdownSelectWidget(
-            items: widget.items,
-            hint: widget.hintText,
-            value: widget.value,
-            onSelected: widget.onSelected,
-          ),
-        ),
+    return VnuSingleSelect<String>(
+      label: title,
+      value: items.contains(value) ? value : null,
+      hintText: hintText,
+      sheetTitle: title,
+      requiredField: isRequired,
+      items: [
+        for (final item in items)
+          VnuSelectItem<String>(value: item, label: item),
       ],
+      onChanged: (selected) {
+        if (selected != null) onSelected?.call(selected);
+      },
     );
   }
 }

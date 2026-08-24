@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vnu_core/common/log.dart';
@@ -9,6 +7,7 @@ import 'package:vnu_core/themes/app_theme.dart';
 import 'package:vnu_core/widgets/buttons_widget.dart';
 import 'package:vnu_core/widgets/navi_widget.dart';
 import 'package:vnu_core/widgets/progress_hub_widget.dart';
+import 'package:vnu_core/widgets/select/vnu_select.dart';
 import 'package:vnu_noi_tru/cubit/nt_register_cubit.dart';
 import 'package:vnu_noi_tru/screens/nt_register_process_screen.dart';
 import 'package:vnu_noi_tru/widgets/nt_container_dropbox_widget.dart';
@@ -44,7 +43,6 @@ class _NTDangKyNoiTruScreenState extends State<NTDangKyNoiTruScreen> {
   */
   PhieuDangKyNoiTruModel? phieuDangKyNoiTruModel;
   bool isLoadedPhieuDangKy = false;
-  StreamController<int> streamController = StreamController.broadcast();
 
   @override
   void initState() {
@@ -79,12 +77,6 @@ class _NTDangKyNoiTruScreenState extends State<NTDangKyNoiTruScreen> {
 
   _getDanhSachPhieuDangKy() {
     _ntRegisterCubit.getDanhSachPhieuDangKy();
-  }
-
-  @override
-  void dispose() {
-    streamController.close();
-    super.dispose();
   }
 
   @override
@@ -343,57 +335,30 @@ class _NTDangKyNoiTruScreenState extends State<NTDangKyNoiTruScreen> {
     );
   }
 
-  _pickDoiTuongUuTien() {
-    showModalBottomSheet(
-        context: context,
-        builder: (ctx) {
-          return StreamBuilder<int>(
-              stream: streamController.stream,
-              builder: (context, snapshot) {
-                return ListView.builder(
-                    itemCount: danhSachDoiTuongUuTien.length,
-                    itemBuilder: (ctx, index) {
-                      return _itemDoiTuongUuTien(danhSachDoiTuongUuTien[index]);
-                    });
-              });
-        });
-  }
-
-  Widget _itemDoiTuongUuTien(DanhSachDoiTuongUuTien object) {
-    return InkWell(
-      onTap: () {
-        // if (doiTuongUuTiens.contains(object)) {
-        //   doiTuongUuTiens.remove(object);
-        // } else {
-        //   doiTuongUuTiens.add(object);
-        // }
-        //Sua thanh chon 1
-        doiTuongUuTiens = [object];
-        setState(() {});
-        streamController.add(0);
+  Future<void> _pickDoiTuongUuTien() async {
+    final current = doiTuongUuTiens.isEmpty ? null : doiTuongUuTiens.first;
+    final picked = await VnuSelectSheet.show<DanhSachDoiTuongUuTien>(
+      context: context,
+      title: 'Chọn đối tượng ưu tiên',
+      bodyBuilder: (sheetContext) {
+        return ListView(
+          padding: VnuSelectTheme.sheetBodyPadding,
+          children: [
+            for (final item in danhSachDoiTuongUuTien)
+              VnuSelectOptionTile(
+                title: item.tenDoiTuongUuTien ?? 'Đối tượng ưu tiên',
+                selected: identical(item, current) || item == current,
+                onTap: () => Navigator.of(sheetContext).pop(item),
+              ),
+          ],
+        );
       },
-      child: Row(
-        children: [
-          Expanded(
-              child: Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Text(object.tenDoiTuongUuTien ?? ''),
-          )),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Icon(
-              doiTuongUuTiens.contains(object)
-                  ? Icons.radio_button_checked_rounded
-                  : Icons.radio_button_unchecked_rounded,
-              color: AppTheme.colorMain,
-            ),
-          ),
-          const SizedBox(
-            width: 10,
-          ),
-        ],
-      ),
     );
+
+    if (picked == null || !mounted) return;
+    setState(() {
+      doiTuongUuTiens = <DanhSachDoiTuongUuTien>[picked];
+    });
   }
 
   _excDangKyNoiTru() {

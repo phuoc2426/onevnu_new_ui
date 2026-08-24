@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:vnu_core/widgets/vnu_module_app_bar.dart';
 import 'package:get/get.dart';
 import 'package:vnu_core/models/admitted_student.dart';
 import 'package:vnu_core/repository/app_repository.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
 
 /// Screen displaying the list of admitted students fetched from the backend.
 class AdmittedStudentPage extends StatelessWidget {
@@ -10,12 +10,8 @@ class AdmittedStudentPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = ShadTheme.of(context);
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Sinh viên trúng tuyển'),
-        backgroundColor: theme.colorScheme.background,
-      ),
+      appBar: const VnuModuleAppBar(title: 'Sinh viên trúng tuyển'),
       body: FutureBuilder<List<AdmittedStudent>>(
         future: ApiRepository().getAdmittedStudents(),
         builder: (context, snapshot) {
@@ -48,3 +44,4 @@ class AdmittedStudentPage extends StatelessWidget {
     );
   }
 }
+

@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:vnu_core/widgets/field/vnu_search_field.dart';
 import 'package:get/get.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
 import 'package:vnu_core/common/app_color.dart';
@@ -264,53 +265,22 @@ class _VcoreNewsViewV2State extends State<VcoreNewsViewV2> {
                 color: Colors.white,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Center(
-                  child: Container(
-                    width: double.infinity,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xff879ABF)),
-                    ),
-                    child: Row(
-                      children: [
-                        spaceWidth(10),
-                        Expanded(
-                          child: TextField(
-                            decoration: InputDecoration(
-                              border: InputBorder.none,
-                              isDense: true,
-                              contentPadding: EdgeInsets.zero,
-                              hintText: 'Nhập tiêu đề tin',
-                              hintStyle: TextStyles.regular
-                                  .copyWith(color: Colors.black),
-                              labelStyle: TextStyles.regular
-                                  .copyWith(color: Colors.black),
-                            ),
-                            controller: _searchController,
-                            onSubmitted: (value) => _onSearch(),
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 0.0),
-                          child: svgAsset('assets/images/ic_search.svg'),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 6.0),
-                          child: svgAction(
-                            'assets/images/ic_filter.svg',
-                            color:
-                                _showFilterDialog ? activeColor : normalColor,
-                            action: () {
-                              Utils.hideKeyboard();
-                              setState(() {
-                                _showFilterDialog = !_showFilterDialog;
-                              });
-                              // Show filter dialog - có thể mở rộng sau
-                            },
-                          ),
-                        ),
-                      ],
+                  child: VnuSearchField(
+                    controller: _searchController,
+                    hintText: 'Nhập tiêu đề tin',
+                    onSubmitted: (_) => _onSearch(),
+                    trailing: Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: svgAction(
+                        'assets/images/ic_filter.svg',
+                        color: _showFilterDialog ? activeColor : normalColor,
+                        action: () {
+                          Utils.hideKeyboard();
+                          setState(() {
+                            _showFilterDialog = !_showFilterDialog;
+                          });
+                        },
+                      ),
                     ),
                   ),
                 ),
@@ -538,3 +508,4 @@ class _VcoreNewsViewV2State extends State<VcoreNewsViewV2> {
     );
   }
 }
+

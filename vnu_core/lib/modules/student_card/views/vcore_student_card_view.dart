@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:vnu_core/widgets/vnu_module_app_bar.dart';
 import 'package:get/get.dart';
 
 import 'package:vnu_core/modules/student_card/controllers/vcore_student_card_controller.dart';
@@ -87,8 +88,8 @@ class _StudentCardScaffoldState extends State<_StudentCardScaffold>
       }
 
       return Scaffold(
-        appBar: AppBar(
-          title: const Text('Thẻ sinh viên'),
+        appBar: VnuModuleAppBar(
+          title: 'Thẻ sinh viên',
           actions: [
             IconButton(
               tooltip: 'Căn giữa & reset zoom',
@@ -101,7 +102,6 @@ class _StudentCardScaffoldState extends State<_StudentCardScaffold>
               icon: Icon(c.isBack ? Icons.flip_to_front : Icons.flip),
             ),
           ],
-          backgroundColor: Color.fromRGBO(24, 210, 67, 1.0),
         ),
         backgroundColor: const Color(0xffffffff),
         body: Stack(
@@ -181,3 +181,4 @@ class _StudentCardScaffoldState extends State<_StudentCardScaffold>
     });
   }
 }
+

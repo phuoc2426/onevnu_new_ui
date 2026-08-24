@@ -4,6 +4,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:vnu_core/common/app_colors.dart';
 import 'package:vnu_core/common/app_text_styles.dart';
+import 'package:vnu_core/widgets/field/vnu_field.dart';
+import 'package:vnu_core/widgets/select/vnu_select.dart';
 
 import '../models/hoc_bong_models.dart';
 
@@ -170,36 +172,18 @@ class _TextInputState extends State<_TextInput> {
 
   @override
   Widget build(BuildContext context) {
-    final hasValue = (widget.value != null && widget.value!.isNotEmpty) || controller.text.isNotEmpty;
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           HocBongFieldLabel(field: widget.field),
-          TextFormField(
+          VnuTextField(
             controller: controller,
+            hintText: widget.hint,
             maxLines: widget.maxLines,
+            minLines: widget.maxLines == 1 ? 1 : 2,
             keyboardType: widget.keyboardType,
-            style: TextStyles.regular.copyWith(fontSize: AppFontSizes.medium, color: Colors.black87),
-            decoration: InputDecoration(
-              hintText: widget.hint,
-              hintStyle: TextStyles.regular.copyWith(color: Colors.grey.shade500),
-              filled: true,
-              fillColor: Colors.white,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(
-                  color: hasValue ? AppColors.greenAccent : Colors.grey.shade300,
-                  width: hasValue ? 1.5 : 1.0,
-                ),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: AppColors.greenAccent, width: 1.5),
-              ),
-            ),
             onChanged: widget.onChanged,
           ),
         ],
@@ -230,38 +214,14 @@ class _SelectInput extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           HocBongFieldLabel(field: field),
-          DropdownButtonFormField<String>(
-            isExpanded: true,
-            initialValue: options.contains(value) ? value : null,
-            items: options.map((e) => DropdownMenuItem(
-              value: e,
-              child: Text(
-                e,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: AppFontSizes.mediumSmall),
-              ),
-            )).toList(),
-            hint: Text(
-              'Chọn ${field.displayLabel.toLowerCase()}',
-              style: TextStyles.regular.copyWith(color: Colors.grey.shade600),
-              overflow: TextOverflow.ellipsis,
-            ),
-            decoration: InputDecoration(
-              filled: true,
-              fillColor: Colors.white,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(
-                  color: hasValue ? AppColors.greenAccent : Colors.grey.shade300,
-                  width: hasValue ? 1.5 : 1.0,
-                ),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: AppColors.greenAccent, width: 1.5),
-              ),
-            ),
+          VnuSingleSelect<String>(
+            value: options.contains(value) ? value : null,
+            hintText: 'Chọn ${field.displayLabel.toLowerCase()}',
+            sheetTitle: 'Chọn ${field.displayLabel}',
+            items: [
+              for (final option in options)
+                VnuSelectItem<String>(value: option, label: option),
+            ],
             onChanged: onChanged,
           ),
         ],
@@ -285,7 +245,14 @@ class _DateInput extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           HocBongFieldLabel(field: field),
-          InkWell(
+          VnuReadOnlyField(
+            displayText: value?.split('T').first ?? '',
+            placeholder: 'Chọn ngày',
+            trailing: const Icon(
+              Icons.calendar_month_outlined,
+              size: 20,
+              color: AppColors.greenAccent,
+            ),
             onTap: () async {
               final now = DateTime.now();
               final picked = await showDatePicker(
@@ -313,21 +280,6 @@ class _DateInput extends StatelessWidget {
               );
               if (picked != null) onChanged(picked.toIso8601String());
             },
-            child: InputDecorator(
-              decoration: InputDecoration(
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: value != null ? AppColors.greenAccent : Colors.grey.shade300, width: value != null ? 1.5 : 1),
-                ),
-              ),
-              child: Text(
-                value?.split('T').first ?? 'Chọn ngày',
-                style: TextStyles.regular.copyWith(fontSize: AppFontSizes.medium, color: Colors.black87),
-              ),
-            ),
           ),
         ],
       ),
@@ -370,11 +322,12 @@ class _FileInput extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: Text(
-                  fileName ?? 'Chưa chọn file (PDF)',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyles.regular.copyWith(fontSize: AppFontSizes.mediumSmall, color: Colors.grey.shade700),
+                child: VnuHorizontalReadableValue(
+                  text: fileName ?? 'Chưa chọn file (PDF)',
+                  style: TextStyles.regular.copyWith(
+                    fontSize: AppFontSizes.mediumSmall,
+                    color: Colors.grey.shade700,
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
@@ -418,3 +371,4 @@ class _FileInput extends StatelessWidget {
     );
   }
 }
+

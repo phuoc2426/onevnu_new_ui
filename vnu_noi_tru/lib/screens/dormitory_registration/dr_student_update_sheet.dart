@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:vnu_core/common/app_text_styles.dart';
+import 'package:vnu_core/widgets/select/vnu_select.dart';
 import 'package:vnu_core/themes/app_theme.dart';
 import 'package:vnu_core/services/services_url.dart';
 import 'package:vnu_noi_tru/models/model.dart';
@@ -783,33 +784,22 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: DropdownButtonFormField<String>(
+              child: VnuSingleSelect<String>(
+                label: 'Giới tính',
+                requiredField: true,
                 value: _gender,
-                isExpanded: true,
-                dropdownColor: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                menuMaxHeight: 320,
-                icon: const Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  color: Color(0xFF078B3E),
-                ),
-                style: const TextStyle(
-                  fontSize: AppFontSizes.mediumSmall,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF111318),
-                ),
-                decoration: _inputDecoration('Giới tính *'),
-                items: const <DropdownMenuItem<String>>[
-                  DropdownMenuItem(value: 'male', child: Text('Nam')),
-                  DropdownMenuItem(value: 'female', child: Text('Nữ')),
+                hintText: 'Chọn giới tính',
+                sheetTitle: 'Chọn giới tính',
+                enabled: !_submitting,
+                items: const <VnuSelectItem<String>>[
+                  VnuSelectItem<String>(value: 'male', label: 'Nam'),
+                  VnuSelectItem<String>(value: 'female', label: 'Nữ'),
                 ],
-                onChanged: _submitting
-                    ? null
-                    : (String? value) {
-                        if (value != null) {
-                          setState(() => _gender = value);
-                        }
-                      },
+                onChanged: (String? value) {
+                  if (value != null) {
+                    setState(() => _gender = value);
+                  }
+                },
               ),
             ),
           ],
@@ -827,35 +817,23 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Expanded(
-              child: DropdownButtonFormField<String>(
+              child: VnuSingleSelect<String>(
+                label: 'Loại giấy tờ',
                 value: _identityType,
-                isExpanded: true,
-                dropdownColor: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                menuMaxHeight: 320,
-                icon: const Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  color: Color(0xFF078B3E),
-                ),
-                style: const TextStyle(
-                  fontSize: AppFontSizes.mediumSmall,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF111318),
-                ),
-                decoration: _inputDecoration('Loại giấy tờ'),
-                items: const <DropdownMenuItem<String>>[
-                  DropdownMenuItem(value: 'CCCD', child: Text('CCCD')),
-                  DropdownMenuItem(value: 'CMND', child: Text('CMND')),
-                  DropdownMenuItem(value: 'HC', child: Text('Hộ chiếu')),
-                  DropdownMenuItem(value: 'GTK', child: Text('Giấy tờ khác')),
+                hintText: 'Chọn loại giấy tờ',
+                sheetTitle: 'Chọn loại giấy tờ',
+                enabled: !_submitting,
+                items: const <VnuSelectItem<String>>[
+                  VnuSelectItem<String>(value: 'CCCD', label: 'CCCD'),
+                  VnuSelectItem<String>(value: 'CMND', label: 'CMND'),
+                  VnuSelectItem<String>(value: 'HC', label: 'Hộ chiếu'),
+                  VnuSelectItem<String>(value: 'GTK', label: 'Giấy tờ khác'),
                 ],
-                onChanged: _submitting
-                    ? null
-                    : (String? value) {
-                        if (value != null) {
-                          setState(() => _identityType = value);
-                        }
-                      },
+                onChanged: (String? value) {
+                  if (value != null) {
+                    setState(() => _identityType = value);
+                  }
+                },
               ),
             ),
             const SizedBox(width: 10),
@@ -1791,37 +1769,26 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
           Row(
             children: <Widget>[
               Expanded(
-                child: DropdownButtonFormField<String>(
+                child: VnuSingleSelect<String>(
+                  label: 'Quan hệ',
+                  requiredField: true,
                   value: form.relationship,
-                  isExpanded: true,
-                  dropdownColor: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  menuMaxHeight: 320,
-                  icon: const Icon(
-                    Icons.keyboard_arrow_down_rounded,
-                    color: Color(0xFF078B3E),
-                  ),
-                  style: const TextStyle(
-                    fontSize: AppFontSizes.mediumSmall,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF111318),
-                  ),
-                  decoration: _inputDecoration('Quan hệ *'),
-                  items: const <DropdownMenuItem<String>>[
-                    DropdownMenuItem(value: 'father', child: Text('Bố')),
-                    DropdownMenuItem(value: 'mother', child: Text('Mẹ')),
-                    DropdownMenuItem(
+                  hintText: 'Chọn quan hệ',
+                  sheetTitle: 'Chọn quan hệ',
+                  enabled: !_submitting,
+                  items: const <VnuSelectItem<String>>[
+                    VnuSelectItem<String>(value: 'father', label: 'Bố'),
+                    VnuSelectItem<String>(value: 'mother', label: 'Mẹ'),
+                    VnuSelectItem<String>(
                       value: 'guardian',
-                      child: Text('Người giám hộ'),
+                      label: 'Người giám hộ',
                     ),
                   ],
-                  onChanged: _submitting
-                      ? null
-                      : (String? value) {
-                          if (value != null) {
-                            setState(() => form.relationship = value);
-                          }
-                        },
+                  onChanged: (String? value) {
+                    if (value != null) {
+                      setState(() => form.relationship = value);
+                    }
+                  },
                 ),
               ),
               IconButton(

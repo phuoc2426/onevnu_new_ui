@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:vnu_core/widgets/field/vnu_readonly_field.dart';
 import 'package:get/get.dart';
 import 'package:vnu_core/common/app_color.dart';
 import 'package:vnu_core/common/space_widget.dart';
@@ -452,15 +453,11 @@ class _ReadonlyInfoBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InputDecorator(
-      decoration: InputDecoration(
-        labelText: label,
-        helperText: 'Email nhận cố định, không cho chỉnh sửa.',
-        filled: true,
-        fillColor: Colors.grey.shade100,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-      child: Text(value),
+    return VnuReadOnlyField(
+      label: label,
+      displayText: value,
+      placeholder: '',
+      enabled: false,
     );
   }
 }
@@ -625,3 +622,4 @@ class _AppOutlineButton extends StatelessWidget {
     );
   }
 }
+

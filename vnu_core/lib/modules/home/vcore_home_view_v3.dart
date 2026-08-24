@@ -37,6 +37,7 @@ import 'package:vnu_core/modules/profile/views/vcore_profile_person_info_view.da
 import 'package:vnu_core/modules/sync/views/vcore_sync_view.dart';
 import 'package:vnu_core/services/services_url.dart';
 import 'package:vnu_core/widgets/progress_hub_widget.dart';
+import 'package:vnu_core/widgets/responsive/responsive.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:vnu_core/common/app_text_styles.dart';
@@ -1682,6 +1683,15 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
   }
 
   Widget _buildScheduleBlock() {
+    final responsive = VnuResponsiveContext.of(context);
+    final scheduleHeight = responsive.isVeryLargeText
+        ? 350.0
+        : responsive.isLargeText
+            ? 300.0
+            : responsive.isCompact
+                ? 270.0
+                : 245.0;
+
     return _whiteBox(
       radius: 18,
       variant: _BoxVariant.card,
@@ -1694,7 +1704,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
           AppGuideAnchor(
             id: 'home.schedule.cards',
             child: SizedBox(
-              height: 245,
+              height: scheduleHeight,
               child: Obx(() {
                 // Card lớn chỉ hiển thị lịch SẮP TỚI.
                 // Thông tin hôm nay đã nằm ở khối tổng quan ngay dưới header.
@@ -2259,7 +2269,8 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
 
   Widget _statusPill(String text, Color color) {
     return Container(
-      height: 34,
+      constraints: const BoxConstraints(minHeight: 34),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: color.withOpacity(0.08),
@@ -2283,16 +2294,17 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
     required Color color,
     bool isLast = false,
   }) {
-    return SizedBox(
-      height: 47,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 16,
-            height: 47,
-            child: Stack(
-              children: [
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 47),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(
+              width: 16,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
                 if (!isLast)
                   Positioned(
                     top: 13,
@@ -2360,6 +2372,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
             ),
           ),
         ],
+        ),
       ),
     );
   }
@@ -2475,7 +2488,8 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: Container(
-        height: 50,
+        constraints: const BoxConstraints(minHeight: 50),
+        padding: const EdgeInsets.symmetric(vertical: 6),
         decoration: BoxDecoration(
           border: Border(
             bottom: BorderSide(color: Colors.grey.withOpacity(0.12)),

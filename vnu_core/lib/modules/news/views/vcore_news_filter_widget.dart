@@ -7,6 +7,7 @@ import 'package:vnu_core/models/don_vi_model.dart';
 import 'package:vnu_core/modules/news/controllers/vcore_news_controller.dart';
 import 'package:vnu_core/modules/profile/views/widget/vcore_profile_datefield_widget.dart';
 import 'package:vnu_core/widgets/buttons_widget.dart';
+import 'package:vnu_core/widgets/responsive/responsive.dart';
 import '../../profile/views/widget/vcore_profile_dropdownfield_widget.dart';
 
 class VcoreNewsFilterWidget extends StatefulWidget {
@@ -74,58 +75,55 @@ class _VcoreNewsFilterWidgetState extends State<VcoreNewsFilterWidget> {
         spaceHeight(12),
 
         // - Ngay
-        Row(children: [
-          Expanded(
-              child: VcoreProfileDatefieldWidget(
-            title: 'Thời gian phát hành',
-            hintText: 'Từ ngày',
-            value: selectedStartDate,
-            onChangeDate: (selectedDate) {
-              setState(() {
-                selectedStartDate = selectedDate;
-              });
-            },
-          )),
-          spaceWidth(10),
-          Expanded(
-              child: VcoreProfileDatefieldWidget(
-            title: '',
-            hintText: 'Đến ngày',
-            value: selectedEndDate,
-            onChangeDate: (selectedDate) {
-              setState(() {
-                selectedEndDate = selectedDate;
-              });
-            },
-          )),
-        ]),
+        VnuResponsiveRow(
+          minChildWidth: 220,
+          spacing: 10,
+          children: [
+            VcoreProfileDatefieldWidget(
+              title: 'Thời gian phát hành',
+              hintText: 'Từ ngày',
+              value: selectedStartDate,
+              onChangeDate: (selectedDate) {
+                setState(() {
+                  selectedStartDate = selectedDate;
+                });
+              },
+            ),
+            VcoreProfileDatefieldWidget(
+              title: '',
+              hintText: 'Đến ngày',
+              value: selectedEndDate,
+              onChangeDate: (selectedDate) {
+                setState(() {
+                  selectedEndDate = selectedDate;
+                });
+              },
+            ),
+          ],
+        ),
 
         //
         spaceHeight(24),
-        Row(
+        VnuAdaptiveActions(
+          spacing: 8,
           children: [
-            Expanded(
-              child: WhiteButton(
-                title: 'Đóng',
-                action: () {
-                  Get.back();
-                },
-              ),
+            WhiteButton(
+              title: 'Đóng',
+              action: () {
+                Get.back();
+              },
             ),
-            spaceWidth(8),
-            Expanded(
-              child: BlueButton(
-                title: 'Áp dụng',
-                action: () {
-                  widget.controller.currentDonVi.value = selectedDonvi;
-                  widget.controller.startDate.value = selectedStartDate;
-                  widget.controller.endDate.value = selectedEndDate;
+            BlueButton(
+              title: 'Áp dụng',
+              action: () {
+                widget.controller.currentDonVi.value = selectedDonvi;
+                widget.controller.startDate.value = selectedStartDate;
+                widget.controller.endDate.value = selectedEndDate;
 
-                  widget.controller.refreshData();
-                  Get.back(closeOverlays: true);
-                },
-              ),
-            )
+                widget.controller.refreshData();
+                Get.back(closeOverlays: true);
+              },
+            ),
           ],
         ),
         spaceHeight(26),

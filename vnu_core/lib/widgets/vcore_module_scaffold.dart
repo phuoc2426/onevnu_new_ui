@@ -1,27 +1,26 @@
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
-import 'package:vnu_core/common/app_text_styles.dart';
+import 'package:vnu_core/widgets/responsive/vnu_page_constraints.dart';
+import 'package:vnu_core/widgets/responsive/vnu_page_padding.dart';
+import 'package:vnu_core/widgets/vnu_module_app_bar.dart';
 
-/// CẤU HÌNH BACKGROUND TẠI ĐÂY:
-/// Bạn có thể thay đổi mã màu ở dưới để điều chỉnh màu nền cho toàn bộ các trang chức năng.
+/// Default background for standard OneVNU module pages.
 const Color kDefaultModuleBgColor = Color(0xFFF6F8FA);
 
-/// Layout trang chức năng đơn giản: Logo VNU bên trái, tiêu đề bên cạnh.
+/// Standard page shell for OneVNU feature pages.
+///
+/// P3 adds optional responsive page constraints/padding. The default remains
+/// unrestricted so existing pages do not silently change layout until they are
+/// explicitly migrated.
 class VcoreModuleScaffold extends StatelessWidget {
-  /// Tên chức năng hiển thị cạnh bên Logo
   final String title;
-
-  /// Nội dung chính của trang
   final Widget body;
-
-  /// Có hiển thị nút quay lại không (Mặc định: true)
   final bool showBackButton;
-
-  /// Các nút chức năng góc phải Appbar (tùy chọn)
   final List<Widget>? actions;
-
-  /// Floating Action Button (tùy chọn)
   final Widget? floatingActionButton;
+  final Color backgroundColor;
+  final Widget? leading;
+  final VnuPageWidth pageWidth;
+  final bool responsivePadding;
 
   const VcoreModuleScaffold({
     super.key,
@@ -30,37 +29,31 @@ class VcoreModuleScaffold extends StatelessWidget {
     this.showBackButton = true,
     this.actions,
     this.floatingActionButton,
+    this.backgroundColor = kDefaultModuleBgColor,
+    this.leading,
+    this.pageWidth = VnuPageWidth.unrestricted,
+    this.responsivePadding = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    Widget content = VnuPageConstraints(width: pageWidth, child: body);
+    if (responsivePadding) {
+      content = Padding(
+        padding: VnuPagePadding.resolve(context),
+        child: content,
+      );
+    }
+
     return Scaffold(
-      backgroundColor: kDefaultModuleBgColor,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0.5,
-        centerTitle: true,
-        leading: showBackButton
-            ? IconButton(
-                icon: const Icon(
-                  Icons.arrow_back,
-                  color: Colors.black,
-                  size: 22,
-                ),
-                onPressed: () => Get.back(),
-              )
-            : null,
-        title: Text(
-          title,
-          style: const TextStyle(
-            color: Colors.black87,
-            fontSize: AppFontSizes.large,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+      backgroundColor: backgroundColor,
+      appBar: VnuModuleAppBar(
+        title: title,
+        leading: leading,
         actions: actions,
+        showBackButton: showBackButton,
       ),
-      body: SafeArea(child: body),
+      body: SafeArea(child: content),
       floatingActionButton: floatingActionButton,
     );
   }

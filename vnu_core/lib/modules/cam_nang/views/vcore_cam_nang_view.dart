@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vnu_core/widgets/field/vnu_search_field.dart';
 import 'package:get/get.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
 import 'package:uuid/uuid.dart';
@@ -44,42 +45,11 @@ class VcoreCamNangView extends GetView<VcoreCamNangController> {
                     color: Colors.white,
                     child: //Search form
                         Center(
-                      child: Container(
-                          width: double.infinity,
-                          height: 40,
-                          decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(8),
-                              border:
-                                  Border.all(color: const Color(0xff879ABF))),
-                          child: Row(
-                            children: [
-                              spaceWidth(10),
-                              Expanded(
-                                  child: TextField(
-                                decoration: InputDecoration(
-                                    border: InputBorder.none,
-                                    isDense: true,
-                                    //Need for remove padding
-                                    contentPadding: EdgeInsets.zero,
-                                    hintText: 'Nhập tiêu đề cẩm nang',
-                                    hintStyle: TextStyles.regular
-                                        .copyWith(color: Colors.black),
-                                    labelStyle: TextStyles.regular
-                                        .copyWith(color: Colors.black)),
-                                controller: controller.textEditingController,
-                                onSubmitted: (value) {
-                                  print('Search for key --> $value');
-                                  controller.refreshData();
-                                },
-                              )),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 10.0),
-                                child: svgAsset('assets/images/ic_search.svg'),
-                              )
-                            ],
-                          )),
+                      child: VnuSearchField(
+                            controller: controller.textEditingController,
+                            hintText: 'Nhập tiêu đề cẩm nang',
+                            onSubmitted: (_) => controller.refreshData(),
+                          ),
                     ),
                     //Nhập tiêu đề cẩm nang
                   ),
@@ -139,3 +109,4 @@ class VcoreCamNangView extends GetView<VcoreCamNangController> {
     );
   }
 }
+

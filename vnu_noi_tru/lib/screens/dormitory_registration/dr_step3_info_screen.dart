@@ -1303,30 +1303,23 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
           Row(
             children: <Widget>[
               Expanded(
-                child: DropdownButtonFormField<String>(
+                child: NtCustomDropdown<String>(
+                  label: 'Quan hệ *',
+                  hintText: 'Chọn quan hệ',
                   value: form.relationship,
-                  isExpanded: true,
-                  dropdownColor: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  menuMaxHeight: 320,
-                  icon: const Icon(
-                    Icons.keyboard_arrow_down_rounded,
-                    color: Color(0xFF078B3E),
-                  ),
-                  style: const TextStyle(
-                    fontSize: AppFontSizes.mediumSmall,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF111318),
-                  ),
-                  decoration: _formDecoration(label: 'Quan hệ *'),
-                  items: const <DropdownMenuItem<String>>[
-                    DropdownMenuItem(value: 'father', child: Text('Bố')),
-                    DropdownMenuItem(value: 'mother', child: Text('Mẹ')),
-                    DropdownMenuItem(
-                      value: 'guardian',
-                      child: Text('Người giám hộ'),
-                    ),
-                  ],
+                  items: const <String>['father', 'mother', 'guardian'],
+                  itemAsString: (String value) {
+                    switch (value) {
+                      case 'father':
+                        return 'Bố';
+                      case 'mother':
+                        return 'Mẹ';
+                      case 'guardian':
+                        return 'Người giám hộ';
+                      default:
+                        return value;
+                    }
+                  },
                   onChanged: (String? value) {
                     if (value != null) {
                       setState(() => form.relationship = value);

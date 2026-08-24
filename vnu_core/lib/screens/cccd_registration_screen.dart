@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:vnu_core/widgets/vnu_module_app_bar.dart';
 import 'package:dio/dio.dart';
 import 'package:vnu_core/services/applicant/applicant_api_service.dart';
 import 'package:vnu_core/common/error/app_error_reporter.dart';
@@ -112,15 +113,8 @@ class _CccdRegistrationScreenState extends State<CccdRegistrationScreen> {
 
     return Scaffold(
       backgroundColor: pageBg,
-      appBar: AppBar(
-        backgroundColor: pageBg,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        foregroundColor: const Color(0xFF111827),
-        title: const Text(
-          'Đăng ký thí sinh trúng tuyển',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-        ),
+      appBar: const VnuModuleAppBar(
+        title: 'Đăng ký thí sinh trúng tuyển',
       ),
       body: SafeArea(
         child: LayoutBuilder(
@@ -297,4 +291,5 @@ class _CccdRegistrationScreenState extends State<CccdRegistrationScreen> {
     );
   }
 }
+
 

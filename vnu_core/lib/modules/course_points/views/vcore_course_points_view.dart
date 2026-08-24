@@ -12,9 +12,10 @@ import 'package:vnu_core/models/model.dart';
 import 'package:vnu_core/modules/course_points/controllers/vcore_course_points_controller.dart';
 import 'package:vnu_core/widgets/progress_hub_widget.dart';
 import 'package:vnu_core/widgets/vcore_module_scaffold.dart';
+import 'package:vnu_core/widgets/responsive/responsive.dart';
+import 'package:vnu_core/widgets/select/vnu_select.dart';
 
 import '../../../ai_radar/models/ai_radar_analysis.dart';
-import '../../exam_schedule/views/vcore_dropdown_select_widget.dart';
 import 'package:vnu_core/common/grade_scale_helper.dart';
 import 'vcore_course_points_detail_widget.dart';
 
@@ -36,6 +37,7 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
           },
           child: VcoreModuleScaffold(
             title: 'Xem điểm môn học',
+            pageWidth: VnuPageWidth.content,
             body: Container(
               color: const Color(0xFFF6F7FB),
               child: Obx(() {
@@ -113,193 +115,163 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
   }
 
   void _showFilterBottomSheet(
-      BuildContext context,
-      VcoreCoursePointsController controller,
-      ) {
+    BuildContext context,
+    VcoreCoursePointsController controller,
+  ) {
     Get.bottomSheet(
-      Container(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.88,
-        ),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: SafeArea(
-          top: false,
-          child: Obx(() {
-            final sources = controller.danhSachKieuTruong.toList();
-            final semesters = controller.danhSachHocKy.toList();
-            final selectedSource = controller.kieuTruong.value;
-            final selectedSemesterId = controller.hocKy.value?.id;
+      VnuSelectSheetFrame(
+        title: 'Bộ lọc xem điểm',
+        subtitle: 'Chỉ hiển thị nguồn điểm và học kỳ có dữ liệu.',
+        maxHeightFactor: 0.88,
+        child: Obx(() {
+          final sources = controller.danhSachKieuTruong.toList();
+          final semesters = controller.danhSachHocKy.toList();
+          final selectedSource = controller.kieuTruong.value;
+          final selectedSemesterId = controller.hocKy.value?.id;
 
-            return SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(18, 12, 18, 28),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 42,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE5E7EB),
-                        borderRadius: BorderRadius.circular(99),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  Row(
-                    children: [
-                      Container(
-                        width: 42,
-                        height: 42,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEFFAF3),
-                          borderRadius: BorderRadius.circular(15),
+          return SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 22),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildFilterSectionTitle(
+                  icon: Icons.account_balance_rounded,
+                  title: 'Loại điểm',
+                  subtitle: 'BRC nào không có học kỳ sẽ tự ẩn.',
+                ),
+                const SizedBox(height: 8),
+                if (sources.isEmpty)
+                  _buildCustomEmptyFilter(
+                    icon: Icons.inbox_rounded,
+                    text: 'Không có nguồn điểm nào có dữ liệu.',
+                  )
+                else
+                  ...sources.map((source) {
+                    final isSelected = selectedSource == source;
+                    final icon = source == 'BangKep'
+                        ? Icons.swap_horiz_rounded
+                        : source == 'TruongGui'
+                            ? Icons.account_balance_rounded
+                            : Icons.school_rounded;
+                    final subtitle = source == 'BangKep'
+                        ? 'Chương trình bằng kép'
+                        : source == 'TruongGui'
+                            ? 'Điểm từ trường gửi'
+                            : 'Chương trình chính';
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: VnuSelectOptionTile(
+                        title: source.toDisplayName(),
+                        subtitle: subtitle,
+                        selected: isSelected,
+                        leading: Icon(
+                          icon,
+                          size: 21,
+                          color: isSelected
+                              ? AppColors.greenAccent
+                              : AppColors.textSecondary,
                         ),
-                        child: const Icon(
-                          Icons.tune_rounded,
-                          color: Color(0xFF18A957),
-                          size: 22,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Bộ lọc xem điểm',
-                              style: TextStyles.extraBold.copyWith(
-                                fontSize: AppFontSizes.large,
-                                color: AppColors.textTitle,
-                              ),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              'Chỉ hiển thị nguồn điểm và học kỳ có dữ liệu.',
-                              style: TextStyles.medium.copyWith(
-                                fontSize: AppFontSizes.small,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: () => Get.back(),
-                        icon: const Icon(Icons.close_rounded),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-
-                  _buildFilterSectionTitle(
-                    icon: Icons.account_balance_rounded,
-                    title: 'Loại điểm',
-                    subtitle: 'BRC nào không có học kỳ sẽ tự ẩn.',
-                  ),
-                  const SizedBox(height: 10),
-                  if (sources.isEmpty)
-                    _buildCustomEmptyFilter(
-                      icon: Icons.inbox_rounded,
-                      text: 'Không có nguồn điểm nào có dữ liệu.',
-                    )
-                  else
-                    ...sources.map((source) {
-                      final isSelected = selectedSource == source;
-                      return _buildSourceChoiceCard(
-                        source: source,
-                        isSelected: isSelected,
                         onTap: () async {
                           await controller.changeKieuTruong(
                             source.toDisplayName(),
                           );
                         },
-                      );
-                    }),
-
-                  const SizedBox(height: 20),
-                  _buildFilterSectionTitle(
-                    icon: Icons.calendar_month_rounded,
-                    title: 'Học kỳ',
-                    subtitle: 'Chọn nhanh học kỳ cần xem điểm.',
-                  ),
-                  const SizedBox(height: 10),
-                  if (semesters.isEmpty)
-                    _buildCustomEmptyFilter(
-                      icon: Icons.event_busy_rounded,
-                      text: 'Nguồn điểm này chưa có học kỳ.',
-                    )
-                  else
-                    ...semesters.map((hk) {
-                      final isSelected = selectedSemesterId == hk.id;
-                      return _buildSemesterChoiceCard(
-                        hocKy: hk,
-                        isSelected: isSelected,
+                      ),
+                    );
+                  }),
+                const SizedBox(height: 18),
+                _buildFilterSectionTitle(
+                  icon: Icons.calendar_month_rounded,
+                  title: 'Học kỳ',
+                  subtitle: 'Chọn nhanh học kỳ cần xem điểm.',
+                ),
+                const SizedBox(height: 8),
+                if (semesters.isEmpty)
+                  _buildCustomEmptyFilter(
+                    icon: Icons.event_busy_rounded,
+                    text: 'Nguồn điểm này chưa có học kỳ.',
+                  )
+                else
+                  ...semesters.map((hk) {
+                    final isSelected = selectedSemesterId == hk.id;
+                    final title = hk.ten?.trim().isNotEmpty == true
+                        ? 'Học kỳ ${hk.ten}'
+                        : 'Học kỳ';
+                    final year = hk.nam?.trim() ?? '';
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: VnuSelectOptionTile(
+                        title: title,
+                        subtitle: year.isEmpty ? null : 'Năm học $year',
+                        selected: isSelected,
+                        leading: Icon(
+                          Icons.calendar_today_rounded,
+                          size: 20,
+                          color: isSelected
+                              ? AppColors.greenAccent
+                              : AppColors.textSecondary,
+                        ),
                         onTap: () async {
                           Get.back();
                           await controller.changeHocKy(hk.disPlayName());
                         },
-                      );
-                    }),
-
-                  const SizedBox(height: 18),
-                  InkWell(
-                    borderRadius: BorderRadius.circular(18),
-                    onTap: () async {
-                      await controller.toggleXemCaMonNgoaiCtdt();
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: const Color(0xFFE5E7EB)),
                       ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            controller.isTheoChuongTrinhDaoTao.value
-                                ? Icons.check_box_outline_blank_rounded
-                                : Icons.check_box_rounded,
-                            color: const Color(0xFF18A957),
-                            size: 24,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Xem cả môn ngoài CTĐT',
-                                  style: TextStyles.bold.copyWith(
-                                    fontSize: AppFontSizes.mediumSmall,
-                                    color: AppColors.textTitle,
-                                  ),
+                    );
+                  }),
+                const SizedBox(height: 14),
+                InkWell(
+                  borderRadius: BorderRadius.circular(18),
+                  onTap: () async {
+                    await controller.toggleXemCaMonNgoaiCtdt();
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: const Color(0xFFE5E7EB)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          controller.isTheoChuongTrinhDaoTao.value
+                              ? Icons.check_box_outline_blank_rounded
+                              : Icons.check_box_rounded,
+                          color: AppColors.greenAccent,
+                          size: 24,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Xem cả môn ngoài CTĐT',
+                                style: TextStyles.bold.copyWith(
+                                  fontSize: AppFontSizes.mediumSmall,
+                                  color: AppColors.textTitle,
                                 ),
-                                const SizedBox(height: 3),
-                                Text(
-                                  'Bật/tắt xong hệ thống sẽ kiểm tra lại BRC nào có dữ liệu.',
-                                  style: TextStyles.medium.copyWith(
-                                    fontSize: AppFontSizes.extraSmall,
-                                    color: AppColors.textSecondary,
-                                  ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                'Bật/tắt xong hệ thống sẽ kiểm tra lại BRC nào có dữ liệu.',
+                                style: TextStyles.medium.copyWith(
+                                  fontSize: AppFontSizes.extraSmall,
+                                  color: AppColors.textSecondary,
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
-            );
-          }),
-        ),
+                ),
+              ],
+            ),
+          );
+        }),
       ),
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -339,180 +311,6 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildSourceChoiceCard({
-    required String source,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    final icon = source == 'BangKep'
-        ? Icons.swap_horiz_rounded
-        : source == 'TruongGui'
-        ? Icons.account_balance_rounded
-        : Icons.school_rounded;
-
-    final subtitle = source == 'BangKep'
-        ? 'Chương trình bằng kép'
-        : source == 'TruongGui'
-        ? 'Điểm từ trường gửi'
-        : 'Chương trình chính';
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOutCubic,
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: isSelected ? const Color(0xFFEFFAF3) : Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: isSelected
-                  ? const Color(0xFF18A957)
-                  : const Color(0xFFE5E7EB),
-              width: isSelected ? 1.4 : 1,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(isSelected ? 0.045 : 0.02),
-                blurRadius: isSelected ? 18 : 10,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? const Color(0xFFDFF7E8)
-                      : const Color(0xFFF3F6FA),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(
-                  icon,
-                  color: isSelected
-                      ? const Color(0xFF18A957)
-                      : const Color(0xFF667085),
-                  size: 22,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      source.toDisplayName(),
-                      style: TextStyles.bold.copyWith(
-                        fontSize: AppFontSizes.medium,
-                        color: AppColors.textTitle,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      subtitle,
-                      style: TextStyles.medium.copyWith(
-                        fontSize: AppFontSizes.small,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (isSelected)
-                const Icon(
-                  Icons.check_circle_rounded,
-                  color: Color(0xFF18A957),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSemesterChoiceCard({
-    required HocKyModel hocKy,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: isSelected ? const Color(0xFFEFF6FF) : Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: isSelected ? AppColors.primary : const Color(0xFFE5E7EB),
-              width: isSelected ? 1.4 : 1,
-            ),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? const Color(0xFFDBEAFE)
-                      : const Color(0xFFF3F6FA),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(
-                  Icons.calendar_today_rounded,
-                  color: isSelected
-                      ? AppColors.primary
-                      : const Color(0xFF667085),
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Kỳ ${_displayText(hocKy.ten)}',
-                      style: TextStyles.bold.copyWith(
-                        fontSize: AppFontSizes.medium,
-                        color: AppColors.textTitle,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      hocKy.nam?.isNotEmpty == true
-                          ? 'Năm học ${hocKy.nam}'
-                          : hocKy.disPlayName(),
-                      style: TextStyles.medium.copyWith(
-                        fontSize: AppFontSizes.small,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (isSelected)
-                const Icon(
-                  Icons.check_circle_rounded,
-                  color: AppColors.primary,
-                ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 
@@ -911,86 +709,6 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
     );
   }
 
-  void _showSemesterSelectorBottomSheet(
-      BuildContext context,
-      VcoreCoursePointsController controller,
-      ) {
-    Get.bottomSheet(
-      Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        padding: const EdgeInsets.only(
-          left: 20,
-          right: 20,
-          top: 16,
-          bottom: 32,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Chọn học kỳ tra cứu',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF212529),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Flexible(
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: controller.danhSachHocKy.length,
-                itemBuilder: (context, index) {
-                  final hk = controller.danhSachHocKy[index];
-                  final isSelected = controller.hocKy.value?.id == hk.id;
-                  return ListTile(
-                    title: Text(
-                      'Học kỳ ${hk.ten} • ${hk.nam}',
-                      style: TextStyle(
-                        fontWeight: isSelected
-                            ? FontWeight.bold
-                            : FontWeight.normal,
-                        color: isSelected
-                            ? const Color(0xFF18A957)
-                            : const Color(0xFF212529),
-                      ),
-                    ),
-                    trailing: isSelected
-                        ? const Icon(
-                      Icons.check_circle,
-                      color: Color(0xFF18A957),
-                    )
-                        : null,
-                    onTap: () async {
-                      Get.back();
-                      await controller.changeHocKy(hk.disPlayName());
-                    },
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-      isScrollControlled: true,
-    );
-  }
-
   Widget _buildCertificateOverviewCard(VcoreCoursePointsController controller) {
     return Obx(() {
       final kieuTruong = controller.kieuTruong.value ?? '';
@@ -1297,20 +1015,17 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
                 ),
                 const SizedBox(height: 16),
                 if (hasGrade) ...[
-                  Row(
+                  VnuResponsiveRow(
+                    minChildWidth: 120,
+                    spacing: 10,
+                    runSpacing: 10,
                     children: [
-                      Expanded(
-                        child: _buildMetricTile(
-                          'Hệ 10',
-                          course.diemHe10 ?? '--',
-                        ),
+                      _buildMetricTile(
+                        'Hệ 10',
+                        course.diemHe10 ?? '--',
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _buildMetricTile('Điểm chữ', letterGrade),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(child: _buildMetricTile('Hệ 4', score4)),
+                      _buildMetricTile('Điểm chữ', letterGrade),
+                      _buildMetricTile('Hệ 4', score4),
                     ],
                   ),
                   const SizedBox(height: 14),

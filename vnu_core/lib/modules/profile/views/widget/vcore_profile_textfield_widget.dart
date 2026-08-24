@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:vnu_core/common/app_text_styles.dart';
-import 'package:vnu_core/common/space_widget.dart';
+import 'package:vnu_core/widgets/field/vnu_text_field.dart';
 
 typedef StringCallback = void Function(String text);
 
+/// Legacy profile adapter.
+///
+/// P2V2 routes profile text inputs through the shared VNU Field System. A
+/// single-line value keeps a stable height and uses Flutter's native
+/// horizontal text scrolling. Multiline fields continue to wrap vertically.
+@Deprecated('Use VnuTextField from vnu_core/widgets/field/vnu_field.dart')
 class VcoreProfileTextFieldWidget extends StatefulWidget {
   final String title;
   final String hintText;
@@ -15,18 +20,20 @@ class VcoreProfileTextFieldWidget extends StatefulWidget {
   final TextInputType? keyboardType;
   final StringCallback? onChange;
   final StringCallback onSubmitted;
-  const VcoreProfileTextFieldWidget(
-      {super.key,
-      required this.title,
-      required this.hintText,
-      this.value,
-      this.isRequired = false,
-      this.isDisable = false,
-      this.maxLine,
-      this.autoFocus,
-      this.keyboardType,
-      this.onChange,
-      required this.onSubmitted});
+
+  const VcoreProfileTextFieldWidget({
+    super.key,
+    required this.title,
+    required this.hintText,
+    this.value,
+    this.isRequired = false,
+    this.isDisable = false,
+    this.maxLine,
+    this.autoFocus,
+    this.keyboardType,
+    this.onChange,
+    required this.onSubmitted,
+  });
 
   @override
   State<VcoreProfileTextFieldWidget> createState() =>
@@ -40,8 +47,19 @@ class _VcoreProfileTextFieldWidgetState
   @override
   void initState() {
     super.initState();
-    if (widget.value != null) {
-      textEditingController.text = widget.value ?? '';
+    textEditingController.text = widget.value ?? '';
+  }
+
+  @override
+  void didUpdateWidget(covariant VcoreProfileTextFieldWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final next = widget.value ?? '';
+    if (next != textEditingController.text) {
+      textEditingController.value = textEditingController.value.copyWith(
+        text: next,
+        selection: TextSelection.collapsed(offset: next.length),
+        composing: TextRange.empty,
+      );
     }
   }
 
@@ -53,72 +71,20 @@ class _VcoreProfileTextFieldWidgetState
 
   @override
   Widget build(BuildContext context) {
-    if (widget.value != null && (widget.value != textEditingController.text)) {
-      textEditingController.text = widget.value ?? '';
-    }
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text(
-              widget.title,
-              style: TextStyles.regular
-                  .copyWith(fontSize: AppFontSizes.mediumSmall, color: Colors.black),
-            ),
-            Text(
-              widget.isRequired ? ' *' : '',
-              style:
-                  TextStyles.regular.copyWith(fontSize: AppFontSizes.mediumSmall, color: Colors.red),
-            )
-          ],
-        ),
-        spaceHeight(8),
-        Container(
-            width: double.infinity,
-            height: widget.maxLine == null ? 40 : null,
-            padding:
-                EdgeInsets.symmetric(vertical: widget.maxLine == null ? 0 : 8),
-            decoration: BoxDecoration(
-                color:
-                    widget.isDisable ? const Color(0xffF6F6F6) : Colors.white,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xff879ABF))),
-            child: Row(
-              children: [
-                spaceWidth(10),
-                Expanded(
-                    child: TextField(
-                  decoration: InputDecoration(
-                      border: InputBorder.none,
-                      isDense: true, //Need for remove padding
-                      contentPadding: EdgeInsets.zero,
-                      hintText: widget.hintText,
-                      hintStyle: TextStyles.regular
-                          .copyWith(color: const Color(0xff879ABF)),
-                      labelStyle: TextStyles.regular.copyWith(
-                          color: widget.isDisable
-                              ? const Color(0xff879ABF)
-                              : Colors.black)),
-                  controller: textEditingController,
-                  keyboardType: widget.keyboardType,
-                  readOnly: widget.isDisable,
-                  maxLines: widget.maxLine ?? 1,
-                  autofocus: widget.autoFocus ?? false,
-                  style: TextStyles.regular.copyWith(
-                      color: widget.isDisable
-                          ? const Color(0xff879ABF)
-                          : Colors.black),
-                  onChanged: widget.onChange,
-                  onSubmitted: (value) {
-                    print('Search for key --> $value');
-                    widget.onSubmitted(value);
-                  },
-                )),
-              ],
-            )),
-      ],
+    final maxLines = widget.maxLine ?? 1;
+    return VnuTextField(
+      label: widget.title,
+      hintText: widget.hintText,
+      controller: textEditingController,
+      requiredField: widget.isRequired,
+      enabled: true,
+      readOnly: widget.isDisable,
+      keyboardType: widget.keyboardType,
+      maxLines: maxLines,
+      minLines: maxLines == 1 ? 1 : 1,
+      autofocus: widget.autoFocus ?? false,
+      onChanged: widget.onChange,
+      onSubmitted: widget.onSubmitted,
     );
   }
 }

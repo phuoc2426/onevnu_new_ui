@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vnu_core/widgets/vnu_module_app_bar.dart';
 
 /// Luồng Applicant mới không tự cấp mật khẩu.
 /// Thí sinh đăng nhập trực tiếp bằng CCCD + số điện thoại trong danh sách trúng tuyển.
@@ -8,7 +9,7 @@ class RegisterScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Hỗ trợ đăng nhập')),
+      appBar: const VnuModuleAppBar(title: 'Hỗ trợ đăng nhập'),
       body: const SafeArea(
         child: Padding(
           padding: EdgeInsets.all(24),
@@ -41,3 +42,4 @@ class RegisterScreen extends StatelessWidget {
     );
   }
 }
+

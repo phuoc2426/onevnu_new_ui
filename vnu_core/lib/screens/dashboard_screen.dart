@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vnu_core/widgets/vnu_module_app_bar.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:get/get.dart';
@@ -12,12 +13,8 @@ class DashboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = ShadTheme.of(context);
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Bảng điều khiển'),
-        backgroundColor: theme.colorScheme.background,
-      ),
+      appBar: const VnuModuleAppBar(title: 'Bảng điều khiển'),
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -39,3 +36,4 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 }
+

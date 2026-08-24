@@ -1,17 +1,13 @@
-import 'package:dropdown_button2/dropdown_button2.dart';
 import 'package:flutter/material.dart';
-import 'package:vnu_core/common/app_colors.dart';
-import 'package:vnu_core/common/app_text_styles.dart';
-import 'package:vnu_core/extensions/iterables.dart';
+import 'package:vnu_core/widgets/select/vnu_select.dart';
 
-import '../../../common/utils.dart';
-
-class VcoreDropdownSelectWidget<T> extends StatefulWidget {
-  final List<String> items;
-  final String hint;
-  final String? value;
-  final void Function(String value)? onSelected;
-
+/// Legacy compatibility wrapper.
+///
+/// P2 keeps the public constructor so existing modules do not need a risky
+/// big-bang migration, while the rendering/interaction is delegated to the
+/// unified VNU Select System.
+@Deprecated('Use VnuSingleSelect<String> from vnu_core/widgets/select/vnu_select.dart')
+class VcoreDropdownSelectWidget<T> extends StatelessWidget {
   const VcoreDropdownSelectWidget({
     super.key,
     required this.items,
@@ -20,88 +16,25 @@ class VcoreDropdownSelectWidget<T> extends StatefulWidget {
     this.onSelected,
   });
 
-  @override
-  State<VcoreDropdownSelectWidget> createState() =>
-      _VcoreDropdownSelectWidgetState();
-}
-
-class _VcoreDropdownSelectWidgetState extends State<VcoreDropdownSelectWidget> {
-  late final ValueNotifier<String?> selectedValueNotifier;
-
-  @override
-  void initState() {
-    super.initState();
-    selectedValueNotifier = ValueNotifier<String?>(widget.value);
-  }
-
-  @override
-  void didUpdateWidget(covariant VcoreDropdownSelectWidget oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.value != widget.value) {
-      selectedValueNotifier.value = widget.value;
-    }
-  }
-
-  @override
-  void dispose() {
-    selectedValueNotifier.dispose();
-    super.dispose();
-  }
+  final List<String> items;
+  final String hint;
+  final String? value;
+  final void Function(String value)? onSelected;
 
   @override
   Widget build(BuildContext context) {
-    return DropdownButtonHideUnderline(
-      child: Container(
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppColors.dropdownBorder),
-        ),
-        child: DropdownButton2<String>(
-          isExpanded: true,
-          hint: Text(
-            widget.hint,
-            style:
-                TextStyles.regular.copyWith(color: Theme.of(context).hintColor),
-          ),
-          underline: Divider(
-            color: Theme.of(context).hintColor,
-          ),
-          dropdownStyleData: const DropdownStyleData(
-            maxHeight: 300,
-            padding: EdgeInsets.symmetric(vertical: 6),
-          ),
-          items: widget.items
-              .map(
-                (String item) => DropdownItem<String>(
-                  value: item,
-                  height: 40,
-                  child: Text(
-                    item,
-                    style: TextStyles.regular,
-                    maxLines: 3,
-                  ),
-                ),
-              )
-              .toList(),
-          valueListenable: selectedValueNotifier,
-          onChanged: (String? value) {
-            if (widget.onSelected != null) {
-              widget.onSelected!(value ?? '');
-            }
-            selectedValueNotifier.value = value;
-          },
-          buttonStyleData: const ButtonStyleData(
-            padding: EdgeInsets.symmetric(horizontal: 12),
-            height: 40,
-            width: 140,
-          ),
-          menuItemStyleData: const MenuItemStyleData(),
-          iconStyleData:
-              IconStyleData(icon: svgAsset('assets/images/ic_dropdown.svg')),
-        ),
-      ),
+    return VnuSingleSelect<String>(
+      value: items.contains(value) ? value : null,
+      hintText: hint,
+      sheetTitle: hint,
+      items: [
+        for (final item in items)
+          VnuSelectItem<String>(value: item, label: item),
+      ],
+      onChanged: (selected) {
+        if (selected != null) onSelected?.call(selected);
+      },
+      compact: true,
     );
   }
 }
@@ -116,12 +49,8 @@ class VcoreDropdownModel {
   final String guid;
 }
 
-class VcoreDropdown2SelectWidget extends StatefulWidget {
-  final List<VcoreDropdownModel> items;
-  final String hint;
-  final String? selectedGuid;
-  final void Function(VcoreDropdownModel value)? onSelected;
-
+@Deprecated('Use VnuSingleSelect<T> from vnu_core/widgets/select/vnu_select.dart')
+class VcoreDropdown2SelectWidget extends StatelessWidget {
   const VcoreDropdown2SelectWidget({
     super.key,
     required this.items,
@@ -130,97 +59,37 @@ class VcoreDropdown2SelectWidget extends StatefulWidget {
     this.onSelected,
   });
 
-  @override
-  State<VcoreDropdown2SelectWidget> createState() =>
-      _VcoreDropdown2SelectWidgetState();
-}
+  final List<VcoreDropdownModel> items;
+  final String hint;
+  final String? selectedGuid;
+  final void Function(VcoreDropdownModel value)? onSelected;
 
-class _VcoreDropdown2SelectWidgetState
-    extends State<VcoreDropdown2SelectWidget> {
-  late final ValueNotifier<VcoreDropdownModel?> selectedValueNotifier;
-
-  @override
-  void initState() {
-    super.initState();
-    selectedValueNotifier = ValueNotifier<VcoreDropdownModel?>(
-      widget.items.firstWhereOrNull(
-        (item) => item.guid == widget.selectedGuid,
-      ),
-    );
-  }
-
-  @override
-  void didUpdateWidget(covariant VcoreDropdown2SelectWidget oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.selectedGuid != widget.selectedGuid ||
-        oldWidget.items != widget.items) {
-      selectedValueNotifier.value = widget.items.firstWhereOrNull(
-        (item) => item.guid == widget.selectedGuid,
-      );
+  VcoreDropdownModel? _selected() {
+    final guid = selectedGuid;
+    if (guid == null) return null;
+    for (final item in items) {
+      if (item.guid == guid) return item;
     }
-  }
-
-  @override
-  void dispose() {
-    selectedValueNotifier.dispose();
-    super.dispose();
+    return null;
   }
 
   @override
   Widget build(BuildContext context) {
-    return DropdownButtonHideUnderline(
-      child: Container(
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppColors.dropdownBorder),
-        ),
-        child: DropdownButton2<VcoreDropdownModel>(
-          isExpanded: true,
-          hint: Text(
-            widget.hint,
-            style:
-                TextStyles.regular.copyWith(color: Theme.of(context).hintColor),
+    return VnuSingleSelect<VcoreDropdownModel>(
+      value: _selected(),
+      hintText: hint,
+      sheetTitle: hint,
+      items: [
+        for (final item in items)
+          VnuSelectItem<VcoreDropdownModel>(
+            value: item,
+            label: item.text,
           ),
-          underline: Divider(
-            color: Theme.of(context).hintColor,
-          ),
-          dropdownStyleData: const DropdownStyleData(
-            maxHeight: 300,
-            padding: EdgeInsets.symmetric(vertical: 6),
-          ),
-          items: widget.items
-              .map(
-                (VcoreDropdownModel item) =>
-                    DropdownItem<VcoreDropdownModel>(
-                  value: item,
-                  height: 40,
-                  child: Text(
-                    item.text,
-                    style: TextStyles.regular,
-                    maxLines: 3,
-                  ),
-                ),
-              )
-              .toList(),
-          valueListenable: selectedValueNotifier,
-          onChanged: (VcoreDropdownModel? value) {
-            if (widget.onSelected != null && value != null) {
-              widget.onSelected!(value);
-            }
-            selectedValueNotifier.value = value;
-          },
-          buttonStyleData: const ButtonStyleData(
-            padding: EdgeInsets.symmetric(horizontal: 12),
-            height: 40,
-            width: 140,
-          ),
-          menuItemStyleData: const MenuItemStyleData(),
-          iconStyleData:
-              IconStyleData(icon: svgAsset('assets/images/ic_dropdown.svg')),
-        ),
-      ),
+      ],
+      onChanged: (selected) {
+        if (selected != null) onSelected?.call(selected);
+      },
+      compact: true,
     );
   }
 }

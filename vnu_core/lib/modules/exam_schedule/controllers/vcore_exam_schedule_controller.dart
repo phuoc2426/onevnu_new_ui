@@ -652,6 +652,61 @@ class VcoreExamScheduleController extends GetxController {
     }
   }
 
+  Future<List<HocKyModel>> previewHocKyCatalog(String school) async {
+    final requestedSchool = school.trim();
+    if (requestedSchool.isEmpty) return const <HocKyModel>[];
+
+    logInfo(
+      '[SELECT_PREVIEW] id=academic_period level=school '
+      'school=$requestedSchool',
+    );
+
+    return ApiRepository().getDanhSachHocKyTheoThoiKhoaBieu(
+      isTheoChuongTrinhDaoTao.value,
+      requestedSchool,
+    );
+  }
+
+  void commitAcademicPeriodSelection({
+    required String school,
+    required String year,
+    required List<HocKyModel> catalog,
+    required HocKyModel semester,
+  }) {
+    _invalidateScheduleLoads('academic-period-commit');
+    _semesterCatalogGeneration++;
+
+    kieuTruong.value = school;
+    danhSachHocKy.value = List<HocKyModel>.from(catalog);
+
+    final years = catalog
+        .map((item) => item.nam?.trim())
+        .whereType<String>()
+        .where((value) => value.isNotEmpty)
+        .toSet()
+        .toList()
+      ..sort((a, b) => b.compareTo(a));
+    danhSachNamHoc.value = years;
+
+    namHocSelected.value = year;
+    final semesters = catalog.where((item) => item.nam == year).toList()
+      ..sort((a, b) => (a.ten ?? '').compareTo(b.ten ?? ''));
+    danhSachHocKyFilter.value = semesters;
+
+    // Manual selection supersedes any pending deep-link/bootstrap target.
+    pendingInitialDate = null;
+    pendingInitialHocKyId = null;
+    pendingInitialKieuTruong = null;
+
+    logInfo(
+      '[SCHEDULE_SELECT] type=academic-period '
+      'school=$school year=$year '
+      'semesterId=${semester.id ?? '-'} semester=${semester.ten ?? '-'}',
+    );
+
+    selectSemester(semester);
+  }
+
   void selectYear(String year) {
     logInfo('[SCHEDULE_SELECT] type=year year=$year');
     namHocSelected.value = year;

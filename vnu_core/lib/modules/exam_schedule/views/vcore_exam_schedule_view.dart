@@ -8,8 +8,10 @@ import 'package:vnu_core/common/app_text_styles.dart';
 import 'package:vnu_core/extensions/extension_string.dart';
 import 'package:vnu_core/widgets/vcore_module_scaffold.dart';
 import 'package:vnu_core/widgets/progress_hub_widget.dart';
+import 'package:vnu_core/widgets/responsive/responsive.dart';
 
 import '../controllers/vcore_exam_schedule_controller.dart';
+import '../widgets/academic_period_select.dart';
 import '../../../models/model.dart';
 
 class VcoreExamScheduleView extends StatelessWidget {
@@ -53,6 +55,7 @@ class VcoreExamScheduleView extends StatelessWidget {
           },
           child: VcoreModuleScaffold(
             title: 'Lịch học & lịch thi',
+            pageWidth: VnuPageWidth.content,
             body: Container(
               color: const Color(0xFFF6F7FB),
               child: Obx(() {
@@ -76,7 +79,7 @@ class VcoreExamScheduleView extends StatelessWidget {
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: EdgeInsets.zero,
                     children: [
-                      _buildSelectedFilterIndicator(controller),
+                      _buildAcademicPeriodSelector(context, controller),
 
                       if (controller.hocKySelected.value != null) ...[
                         const SizedBox(height: 8),
@@ -85,7 +88,7 @@ class VcoreExamScheduleView extends StatelessWidget {
 
                       const SizedBox(height: 8),
 
-                      _buildCalendar(controller),
+                      _buildCalendar(context, controller),
 
                       const SizedBox(height: 12),
 
@@ -110,33 +113,28 @@ class VcoreExamScheduleView extends StatelessWidget {
     );
   }
 
-  Widget _buildSelectedFilterIndicator(VcoreExamScheduleController controller) {
-    final year = controller.namHocSelected.value ?? '';
-    final sem = controller.hocKySelected.value?.ten != null
-        ? 'Học kỳ ${controller.hocKySelected.value!.ten}'
-        : '';
-    final school = controller.kieuTruong.value?.toDisplayName() ?? '';
-
-    if (year.isEmpty && sem.isEmpty && school.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
+  Widget _buildAcademicPeriodSelector(
+    BuildContext context,
+    VcoreExamScheduleController controller,
+  ) {
     return Container(
-      width: double.infinity,
       color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        children: [
-          const Icon(Icons.info_outline, size: 16, color: AppColors.greenAccent),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'Đang xem: $school • $year • $sem',
-              style: TextStyles.medium.copyWith(
-                  fontSize: AppFontSizes.small, color: Colors.grey.shade600),
-            ),
-          ),
-        ],
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: AcademicPeriodSelect(
+        schools: controller.danhSachKieuTruong.toList(),
+        currentSchool: controller.kieuTruong.value,
+        currentCatalog: controller.danhSachHocKy.toList(),
+        currentYear: controller.namHocSelected.value,
+        currentSemester: controller.hocKySelected.value,
+        loadCatalogForSchool: controller.previewHocKyCatalog,
+        onSelected: (selection) {
+          controller.commitAcademicPeriodSelection(
+            school: selection.school,
+            year: selection.year,
+            catalog: selection.catalog,
+            semester: selection.semester,
+          );
+        },
       ),
     );
   }
@@ -726,7 +724,10 @@ class VcoreExamScheduleView extends StatelessWidget {
     );
   }
 
-  Widget _buildCalendar(VcoreExamScheduleController controller) {
+  Widget _buildCalendar(
+    BuildContext context,
+    VcoreExamScheduleController controller,
+  ) {
     final range = controller.calendarDisplayRange;
     final safeFocusedDay = controller.clampToCalendarRange(
       controller.focusedDay.value,
@@ -869,7 +870,7 @@ class VcoreExamScheduleView extends StatelessWidget {
           ),
           const Divider(height: 1, thickness: 0.5, indent: 16, endIndent: 16),
           _buildCalendarLegend(),
-          _buildModeSelector(controller),
+          _buildModeSelector(context, controller),
         ],
       ),
     );
@@ -938,8 +939,10 @@ class VcoreExamScheduleView extends StatelessWidget {
     );
   }
 
-  Widget _buildEventsHeader(BuildContext context,
-      VcoreExamScheduleController controller) {
+  Widget _buildEventsHeader(
+    BuildContext context,
+    VcoreExamScheduleController controller,
+  ) {
     final rawDate = controller.selectedDay.value;
     final dayOfWeek = _getVietnameseDayOfWeek(rawDate.weekday);
     final dateStr = DateFormat('dd/MM/yyyy').format(rawDate);
@@ -948,44 +951,22 @@ class VcoreExamScheduleView extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
+          const Icon(
+            Icons.event_note_rounded,
+            size: 18,
+            color: AppColors.greenAccent,
+          ),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(
               displayDate,
               style: TextStyles.bold.copyWith(
-                  fontSize: AppFontSizes.medium, color: AppColors.greenAccent),
-              maxLines: 1,
+                fontSize: AppFontSizes.medium,
+                color: AppColors.greenAccent,
+              ),
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          const SizedBox(width: 8),
-          GestureDetector(
-            onTap: () => _showFilterBottomSheet(context, controller),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                border: Border.all(color: AppColors.greenAccent, width: 1),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.calendar_today_outlined,
-                    size: 14,
-                    color: AppColors.greenAccent,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Xem lịch khác',
-                    style: TextStyles.semiBold.copyWith(
-                      fontSize: AppFontSizes.small,
-                      color: AppColors.greenAccent,
-                    ),
-                  ),
-                ],
-              ),
             ),
           ),
         ],
@@ -1448,242 +1429,6 @@ class VcoreExamScheduleView extends StatelessWidget {
     if (startLesson == null || endLesson == null) return '';
     return 'Tiết $startLesson - $endLesson';
   }
-  void _showFilterBottomSheet(BuildContext context,
-      VcoreExamScheduleController controller) {
-    Get.bottomSheet(
-      Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        padding: const EdgeInsets.only(
-            left: 20, right: 20, top: 16, bottom: 30),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Chọn thời gian hiển thị',
-                    style: TextStyles.bold.copyWith(
-                        fontSize: AppFontSizes.large, color: Colors.black87),
-                  ),
-                  IconButton(
-                    onPressed: () => Get.back(),
-                    icon: const Icon(Icons.close, size: 20),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              if (controller.danhSachKieuTruong.isNotEmpty) ...[
-                Text(
-                  'Cơ sở đào tạo',
-                  style: TextStyles.bold.copyWith(
-                      fontSize: AppFontSizes.mediumSmall, color: Colors.grey.shade700),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey.shade300),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: Obx(() {
-                      final selectedSchool = controller.kieuTruong.value;
-                      final schools = controller.danhSachKieuTruong.toList();
-
-                      return DropdownButton<String>(
-                        value: schools.contains(selectedSchool)
-                            ? selectedSchool
-                            : null,
-                        isExpanded: true,
-                        items: schools.map((kt) {
-                          return DropdownMenuItem<String>(
-                            value: kt,
-                            child: Text(
-                              kt.toDisplayName(),
-                              style: TextStyles.medium.copyWith(fontSize: AppFontSizes.medium),
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: (val) {
-                          if (val != null) {
-                            controller.kieuTruong.value = val;
-                            controller.kieuTruong.refresh();
-                            controller.getDanhSachHocKy();
-                          }
-                        },
-                      );
-                    }),
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
-
-              Text(
-                'Năm học',
-                style: TextStyles.bold.copyWith(
-                    fontSize: AppFontSizes.mediumSmall, color: Colors.grey.shade700),
-              ),
-              const SizedBox(height: 8),
-              SizedBox(
-                height: 38,
-                child: Obx(() {
-                  final selectedYear = controller.namHocSelected.value;
-                  final years = controller.danhSachNamHoc.toList();
-
-                  return ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: years.length,
-                    itemBuilder: (context, index) {
-                      final year = years[index];
-                      final isSelected = selectedYear == year;
-
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 8.0),
-                        child: _buildBottomSheetChip(
-                          label: year,
-                          isSelected: isSelected,
-                          onTap: () {
-                            controller.selectYear(year);
-                          },
-                        ),
-                      );
-                    },
-                  );
-                }),
-              ),
-              const SizedBox(height: 16),
-
-              Text(
-                'Học kỳ',
-                style: TextStyles.bold.copyWith(
-                    fontSize: AppFontSizes.mediumSmall, color: Colors.grey.shade700),
-              ),
-              const SizedBox(height: 8),
-              SizedBox(
-                height: 38,
-                child: Obx(() {
-                  final selectedSemId = controller.hocKySelected.value?.id;
-                  final selectedSemTen = controller.hocKySelected.value?.ten;
-                  final semesters = controller.danhSachHocKyFilter.toList();
-
-                  return ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: semesters.length,
-                    itemBuilder: (context, index) {
-                      final sem = semesters[index];
-                      final isSelected = sem.id != null ? selectedSemId ==
-                          sem.id : selectedSemTen == sem.ten;
-                      final label = sem.ten != null
-                          ? 'Học kỳ ${sem.ten}'
-                          : 'Học kỳ';
-
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 8.0),
-                        child: _buildBottomSheetChip(
-                          label: label,
-                          isSelected: isSelected,
-                          onTap: () {
-                            controller.selectSemester(sem);
-                          },
-                        ),
-                      );
-                    },
-                  );
-                }),
-              ),
-              const SizedBox(height: 24),
-
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.greenAccent,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                  onPressed: () => Get.back(),
-                  child: Text(
-                    'Xác nhận',
-                    style: TextStyles.bold.copyWith(fontSize: AppFontSizes.mediumLarge,color: Colors.white),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-      isScrollControlled: true,
-    );
-  }
-
-  Widget _buildBottomSheetChip({
-    required String label,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        curve: Curves.easeInOut,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.greenAccent : Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? AppColors.greenAccentDark : Colors.grey.shade300,
-            width: 1,
-          ),
-          boxShadow: isSelected
-              ? [
-            BoxShadow(
-              color: AppColors.greenAccentDark.withOpacity(0.2),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ]
-              : [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.02),
-              blurRadius: 2,
-              offset: const Offset(0, 1),
-            ),
-          ],
-        ),
-        child: Center(
-          child: Text(
-            label,
-            style: TextStyles.semiBold.copyWith(
-              fontSize: AppFontSizes.mediumSmall,
-              color: isSelected ? Colors.white : Colors.grey.shade700,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   void _showEventDetailBottomSheet(BuildContext context, ScheduleEvent event) {
     final isClass = event.type == ScheduleType.classSession;
     final accentColor = isClass ? _classColor : _examColor;
@@ -1922,7 +1667,10 @@ class VcoreExamScheduleView extends StatelessWidget {
     );
   }
 
-  Widget _buildModeSelector(VcoreExamScheduleController controller) {
+  Widget _buildModeSelector(
+    BuildContext context,
+    VcoreExamScheduleController controller,
+  ) {
     return Obx(() {
       final incompleteCount = controller.incompleteExams.length;
       final extraTermCount = controller.extraTermCourses.length;
@@ -1935,9 +1683,16 @@ class VcoreExamScheduleView extends StatelessWidget {
       final isChuaCapNhat = controller.showIncompleteExams.value;
       final isHocKyHe = controller.showExtraTermCourses.value;
 
+      final responsive = VnuResponsiveContext.of(context);
+      final selectorHeight = responsive.isVeryLargeText
+          ? 76.0
+          : responsive.isLargeText
+              ? 64.0
+              : 52.0;
+
       return Container(
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        height: 52,
+        height: selectorHeight,
         padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
           color: const Color(0xFFF1F3F5),
