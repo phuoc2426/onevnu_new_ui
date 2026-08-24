@@ -1,3 +1,4 @@
+import 'package:vnu_core/common/error/app_feedback.dart';
 import 'package:custom_info_window/custom_info_window.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
@@ -112,7 +113,7 @@ class VcoreMapController extends GetxController {
       var response = await ApiRepository().getTatKhuVucBanDo();
       listKhuVuc.addAll(response);
     } catch (e) {
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     }
   }
 
@@ -121,7 +122,7 @@ class VcoreMapController extends GetxController {
       var response = await ApiRepository().getTatLoaiDiaDiemBanDo();
       listLoaiDiaDiem.addAll(response);
     } catch (e) {
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     }
   }
 
@@ -270,7 +271,8 @@ class VcoreMapController extends GetxController {
       Utils.dismissProgress(context);
     } catch (e) {
       Utils.dismissProgress(context);
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     }
   }
 }
+

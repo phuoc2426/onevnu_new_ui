@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:vnu_core/common/error/app_error_mapper.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
@@ -1394,7 +1395,12 @@ class _DRInvoicesScreenState extends State<DRInvoicesScreen> {
       );
     } catch (error) {
       if (mounted) {
-        _showError(error.toString().replaceFirst('Exception: ', ''));
+        _showError(
+          AppErrorMapper.map(
+            error,
+            fallbackMessage: 'Không thể thực hiện thao tác này. Vui lòng thử lại.',
+          ).userMessage,
+        );
       }
     } finally {
       _isPickingPaymentProof = false;
@@ -1803,3 +1809,4 @@ class PaymentProofConfirmResult {
 
   const PaymentProofConfirmResult({required this.confirmed, this.note});
 }
+

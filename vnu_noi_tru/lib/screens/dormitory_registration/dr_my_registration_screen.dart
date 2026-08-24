@@ -1,3 +1,4 @@
+import 'package:vnu_core/common/error/app_feedback.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -3298,7 +3299,7 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
       await _refreshData();
     } catch (error) {
       if (mounted) {
-        snackBarError(error.toString().replaceFirst('Exception: ', ''));
+        AppFeedback.showError(error);
       }
     } finally {
       if (mounted) {
@@ -4529,3 +4530,4 @@ class _AccommodationRequestFormSheetState
     );
   }
 }
+

@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:vnu_core/common/error/app_error_mapper.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
@@ -537,7 +538,7 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
 
       final String message = error.code == 'already_active'
           ? 'Trình chọn ảnh đã được mở. Vui lòng đóng cửa sổ chọn ảnh cũ rồi thử lại.'
-          : 'Không thể mở thư viện ảnh: ${error.message ?? error.code}';
+          : 'Không thể mở thư viện ảnh. Vui lòng thử lại.';
 
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
@@ -565,7 +566,11 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
             duration: const Duration(seconds: 8),
             backgroundColor: Colors.red,
             content: Text(
-              error.toString().replaceFirst('Exception: ', ''),
+              AppErrorMapper.map(
+                error,
+                fallbackMessage:
+                    'Không thể xử lý ảnh đã chọn. Vui lòng thử lại.',
+              ).userMessage,
             ),
           ),
         );
@@ -2041,3 +2046,4 @@ class _FamilyMemberForm {
     phoneController.dispose();
   }
 }
+

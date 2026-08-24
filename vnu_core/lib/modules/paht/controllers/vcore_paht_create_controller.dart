@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:vnu_core/common/error/app_feedback.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
@@ -52,7 +53,7 @@ class VcorePahtCreateController extends GetxController {
         currentChuDe.value = listChuDe.first;
       }
     } catch (e) {
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     }
   }
 
@@ -71,7 +72,7 @@ class VcorePahtCreateController extends GetxController {
         currentKhuVuc.value = listKhuVuc.first;
       }
     } catch (e) {
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     }
   }
 
@@ -287,7 +288,8 @@ class VcorePahtCreateController extends GetxController {
       snackBarSuccess('Thông tin phản ánh đã được gửi thành công.');
     } catch (e) {
       Utils.dismissProgress(context);
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     }
   }
 }
+

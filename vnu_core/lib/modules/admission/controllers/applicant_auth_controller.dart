@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:vnu_core/common/error/app_feedback.dart';
 import 'package:vnu_core/common/log.dart';
 import 'package:vnu_core/common/utils.dart';
 import 'package:vnu_core/globals.dart';
@@ -113,40 +114,33 @@ class ApplicantAuthController extends GetxController {
       Get.offAll(() => ApplicantHomeScreen(fullName: fullName));
     } on FormatException catch (error, stackTrace) {
       _dismissProgress();
-
-      logError(
-        '[NEW_STUDENT_LOGIN] '
-        'Lỗi định dạng response: '
-        '$error\n$stackTrace',
-      );
-
-      snackBarError(
-        'Dữ liệu đăng nhập từ máy chủ '
-        'không đúng định dạng: '
-        '${error.message}',
+      logError('[NEW_STUDENT_LOGIN] Invalid response format');
+      AppFeedback.showError(
+        error,
+        stackTrace: stackTrace,
+        fallbackMessage:
+            'Dữ liệu đăng nhập từ máy chủ chưa đúng định dạng. Vui lòng thử lại.',
       );
     } on DioException catch (error, stackTrace) {
       _dismissProgress();
-
       logError(
-        '[NEW_STUDENT_LOGIN] '
-        'HTTP error: '
-        'status=${error.response?.statusCode}, '
-        'data=${error.response?.data}\n'
-        '$stackTrace',
+        '[NEW_STUDENT_LOGIN] HTTP error status=${error.response?.statusCode ?? '-'}',
       );
-
-      snackBarError(_extractErrorMessage(error.response?.data));
+      AppFeedback.showError(
+        error,
+        stackTrace: stackTrace,
+        fallbackMessage:
+            'Không thể đăng nhập. Vui lòng kiểm tra CCCD và số điện thoại.',
+      );
     } catch (error, stackTrace) {
       _dismissProgress();
-
-      logError(
-        '[NEW_STUDENT_LOGIN] '
-        'Lỗi không xác định: '
-        '$error\n$stackTrace',
+      logError('[NEW_STUDENT_LOGIN] Unexpected login error');
+      AppFeedback.showError(
+        error,
+        stackTrace: stackTrace,
+        fallbackMessage:
+            'Không thể đăng nhập. Vui lòng kiểm tra CCCD và số điện thoại.',
       );
-
-      snackBarError(_extractErrorMessage(error));
     } finally {
       isLoading.value = false;
     }
@@ -197,10 +191,7 @@ class ApplicantAuthController extends GetxController {
 
         ServicesUrl().firebaseToken = normalizedToken;
 
-        logInfo(
-          '[NEW_STUDENT_LOGIN] '
-          'FCM token=${_maskToken(normalizedToken)}',
-        );
+        logInfo('[NEW_STUDENT_LOGIN] FCM token is available');
 
         return normalizedToken;
       }
@@ -216,54 +207,6 @@ class ApplicantAuthController extends GetxController {
     return ServicesUrl().firebaseToken?.trim() ?? '';
   }
 
-  String _extractErrorMessage(dynamic data) {
-    if (data is DioException) {
-      return _extractErrorMessage(data.response?.data);
-    }
-
-    if (data is Map) {
-      final dynamic message =
-          data['message'] ?? data['error'] ?? data['detail'];
-
-      if (message != null && message.toString().trim().isNotEmpty) {
-        return message.toString().trim();
-      }
-
-      final dynamic nestedData = data['data'];
-
-      if (nestedData is Map) {
-        final dynamic nestedMessage =
-            nestedData['message'] ?? nestedData['error'];
-
-        if (nestedMessage != null &&
-            nestedMessage.toString().trim().isNotEmpty) {
-          return nestedMessage.toString().trim();
-        }
-      }
-    }
-
-    final String raw = data?.toString().trim() ?? '';
-
-    if (raw.isNotEmpty && raw != 'null') {
-      return raw
-          .replaceFirst('Exception: ', '')
-          .replaceFirst('FormatException: ', '');
-    }
-
-    return 'Không thể đăng nhập. '
-        'Vui lòng kiểm tra CCCD '
-        'và số điện thoại.';
-  }
-
-  String _maskToken(String token) {
-    if (token.length <= 16) {
-      return '***';
-    }
-
-    return '${token.substring(0, 8)}'
-        '...'
-        '${token.substring(token.length - 8)}';
-  }
 
   void _showProgress() {
     try {
@@ -296,3 +239,4 @@ class ApplicantAuthController extends GetxController {
     super.onClose();
   }
 }
+

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:vnu_core/common/error/app_feedback.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
@@ -85,7 +86,7 @@ class VcoreNotifyController extends GetxController {
       refreshController.loadComplete();
       Utils.dismissProgress(context);
     } catch (e) {
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
       refreshController.refreshCompleted();
 
       Utils.dismissProgress(context);
@@ -104,12 +105,9 @@ class VcoreNotifyController extends GetxController {
     if (loaiNotification == LoaiThongBao.CamNang.name) {
       SmartDialog.showLoading();
       try {
-        final List<dynamic> results = await Future.wait([
-          ApiRepository().getDetailCamNang(guidItem),
-          ApiRepository().setIsRead(guidItem, loaiNotification)
-        ]);
-        Globals().fetchUnreadCount();
-        final CamNangModel model = results.first;
+        final CamNangModel model =
+            await ApiRepository().getDetailCamNang(guidItem);
+        _markNotificationReadBestEffort(guidItem, loaiNotification);
         Get.to(
           () => VCorePreviewPdfScreen(
             title: model.tieuDe ?? '',
@@ -119,7 +117,7 @@ class VcoreNotifyController extends GetxController {
         SmartDialog.dismiss();
       } catch (e) {
         SmartDialog.dismiss();
-        snackBarError(e.toString());
+        AppFeedback.showError(e);
         logError(e.toString());
       }
       return;
@@ -128,18 +126,15 @@ class VcoreNotifyController extends GetxController {
     if (loaiNotification == LoaiThongBao.TinTuc.name) {
       SmartDialog.showLoading();
       try {
-        final List<dynamic> results = await Future.wait([
-          ApiRepository().getDetailTinTuc(guidItem),
-          ApiRepository().setIsRead(guidItem, loaiNotification)
-        ]);
-        Globals().fetchUnreadCount();
-        final TinTucModel response = results.first;
+        final TinTucModel response =
+            await ApiRepository().getDetailTinTuc(guidItem);
+        _markNotificationReadBestEffort(guidItem, loaiNotification);
         SmartDialog.dismiss();
 
         Get.to(() => VcoreNewsDetailView(tinTucModel: response));
       } catch (e) {
         SmartDialog.dismiss();
-        snackBarError(e.toString());
+        AppFeedback.showError(e);
         logError(e.toString());
       }
       return;
@@ -148,13 +143,13 @@ class VcoreNotifyController extends GetxController {
     if (loaiNotification == LoaiThongBao.Cmsvnu_TinTuc.name) {
       SmartDialog.showLoading();
       try {
-        final List<dynamic> results = await Future.wait([
-          ApiRepository().getChiTietCmsTinTuc(
-              guidItem, kImageCmsWidhtHeight, kImageCmsWidhtHeight),
-          ApiRepository().setIsRead(guidItem, loaiNotification)
-        ]);
-        Globals().fetchUnreadCount();
-        final TopTinTucDetailModel response = results.first;
+        final TopTinTucDetailModel response =
+            await ApiRepository().getChiTietCmsTinTuc(
+          guidItem,
+          kImageCmsWidhtHeight,
+          kImageCmsWidhtHeight,
+        );
+        _markNotificationReadBestEffort(guidItem, loaiNotification);
         SmartDialog.dismiss();
 
         Get.to(
@@ -166,7 +161,7 @@ class VcoreNotifyController extends GetxController {
       } catch (e) {
         SmartDialog.dismiss();
         logError(e.toString());
-        snackBarError(e.toString());
+        AppFeedback.showError(e);
       }
       return;
     }
@@ -174,17 +169,14 @@ class VcoreNotifyController extends GetxController {
     if (loaiNotification == LoaiThongBao.TinHeThong.name) {
       SmartDialog.showLoading();
       try {
-        final List<dynamic> results = await Future.wait([
-          ApiRepository().getChiTietTinHeThong(guidItem),
-          ApiRepository().setIsRead(guidItem, loaiNotification)
-        ]);
-        Globals().fetchUnreadCount();
-        final TinHeThongModel response = results.first;
+        final TinHeThongModel response =
+            await ApiRepository().getChiTietTinHeThong(guidItem);
+        _markNotificationReadBestEffort(guidItem, loaiNotification);
         Get.to(() => VcoreSystemNewsDetailView(tinTucModel: response));
         SmartDialog.dismiss();
       } catch (e) {
         SmartDialog.dismiss();
-        snackBarError(e.toString());
+        AppFeedback.showError(e);
         logError(e.toString());
       }
       return;
@@ -195,17 +187,14 @@ class VcoreNotifyController extends GetxController {
         loaiNotification == LoaiThongBao.TraLoiCauHoi.name) {
       SmartDialog.showLoading();
       try {
-        final List<dynamic> results = await Future.wait([
-          ApiRepository().getDetailCauHoiDap(guidItem),
-          ApiRepository().setIsRead(guidItem, loaiNotification)
-        ]);
-        Globals().fetchUnreadCount();
-        final HoiDapModel response = results.first;
+        final HoiDapModel response =
+            await ApiRepository().getDetailCauHoiDap(guidItem);
+        _markNotificationReadBestEffort(guidItem, loaiNotification);
         Get.to(() => VcoreQuestionDetailView(question: response));
         SmartDialog.dismiss();
       } catch (e) {
         SmartDialog.dismiss();
-        snackBarError(e.toString());
+        AppFeedback.showError(e);
         logError(e.toString());
       }
       return;
@@ -217,7 +206,7 @@ class VcoreNotifyController extends GetxController {
         SmartDialog.dismiss();
       } catch (e) {
         SmartDialog.dismiss();
-        snackBarError(e.toString());
+        AppFeedback.showError(e);
         logError(e.toString());
       }
       return;
@@ -267,7 +256,7 @@ class VcoreNotifyController extends GetxController {
         } catch (e) {
           SmartDialog.dismiss();
           logError(e.toString());
-          snackBarError(e.toString());
+          AppFeedback.showError(e);
         }
       }
 
@@ -280,4 +269,22 @@ class VcoreNotifyController extends GetxController {
       return;
     }
   }
+  void _markNotificationReadBestEffort(
+    String guidItem,
+    String loaiNotification,
+  ) {
+    unawaited(() async {
+      try {
+        await ApiRepository().setIsRead(guidItem, loaiNotification);
+        await Globals().fetchUnreadCount();
+      } catch (e) {
+        logWarning(
+          '[NOTIFICATION] mark-read failed type=$loaiNotification '
+          'hasGuid=${guidItem.isNotEmpty} error=$e',
+        );
+      }
+    }());
+  }
+
 }
+

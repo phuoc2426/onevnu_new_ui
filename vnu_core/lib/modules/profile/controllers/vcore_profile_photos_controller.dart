@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:vnu_core/common/error/app_feedback.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
@@ -28,7 +29,7 @@ class VcoreProfilePhotosController extends GetxController {
 
       listAnhCaNhan.value = response;
     } catch (e) {
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     }
   }
 
@@ -50,7 +51,7 @@ class VcoreProfilePhotosController extends GetxController {
         Utils.dismissProgress(context);
       } catch (e) {
         Utils.dismissProgress(context);
-        snackBarError(e.toString());
+        AppFeedback.showError(e);
       }
     } else {
       // User canceled the picker
@@ -66,7 +67,8 @@ class VcoreProfilePhotosController extends GetxController {
       var _ = await ApiRepository().deleteAnhCanNhan(image.guid ?? '');
       listAnhCaNhan.remove(image);
     } catch (e) {
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     }
   }
 }
+

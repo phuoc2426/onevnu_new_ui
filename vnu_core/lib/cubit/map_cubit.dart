@@ -19,7 +19,8 @@ class MapCubit extends Cubit<MapState> {
     //     emit(MapError(reponse.resultMessage ?? ''));
     //   }
     // } catch (e) {
-    //   emit(MapError(e.toString()));
+    //   emit(MapError(AppErrorMapper.map(e).userMessage));
     // }
   }
 }
+

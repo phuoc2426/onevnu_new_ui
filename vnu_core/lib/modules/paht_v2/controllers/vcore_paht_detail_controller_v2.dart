@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:vnu_core/common/error/app_feedback.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:open_filex/open_filex.dart';
@@ -40,7 +41,7 @@ class VcorePahtDetailControllerV2 extends GetxController {
     } catch (e) {
       Get.back();
       logError(e.toString());
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     }
   }
 
@@ -74,7 +75,7 @@ class VcorePahtDetailControllerV2 extends GetxController {
     } catch (e) {
       Utils.dismissProgress(context);
       logError(e.toString());
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     }
   }
 
@@ -104,7 +105,7 @@ class VcorePahtDetailControllerV2 extends GetxController {
       }
     } catch (e) {
       Utils.dismissProgress(context);
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     }
   }
 
@@ -128,8 +129,12 @@ class VcorePahtDetailControllerV2 extends GetxController {
       },
       onError: (e) {
         Utils.dismissProgress(context);
-        snackBarError(e);
+        AppFeedback.showError(
+          e,
+          fallbackMessage: 'Không thể xử lý tệp đính kèm. Vui lòng thử lại.',
+        );
       },
     );
   }
 }
+

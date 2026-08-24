@@ -1,3 +1,4 @@
+import 'package:vnu_core/common/error/app_feedback.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
@@ -51,12 +52,12 @@ class NtBoardingRegisterController extends GetxController {
       Utils.dismissProgress(context);
 
       logError(e.toString());
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     } catch (e) {
       Utils.dismissProgress(context);
 
       logError(e.toString());
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     }
   }
 
@@ -67,10 +68,10 @@ class NtBoardingRegisterController extends GetxController {
           response.data.danhSachDotDangKyLuuTru ?? [];
     } on DioException catch (e) {
       logError(e.toString());
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     } catch (e) {
       logError(e.toString());
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     }
   }
 
@@ -83,10 +84,10 @@ class NtBoardingRegisterController extends GetxController {
       danhSachTrungTamLuuTru.value = response.data.danhSachTrungTamLuuTru ?? [];
     } on DioException catch (e) {
       logError(e.toString());
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     } catch (e) {
       logError(e.toString());
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     }
   }
 
@@ -105,10 +106,10 @@ class NtBoardingRegisterController extends GetxController {
     } on DioException catch (e) {
       Utils.dismissProgress(context);
       logError(e.toString());
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     } catch (e) {
       Utils.dismissProgress(context);
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
       logError(e.toString());
     }
   }
@@ -155,11 +156,11 @@ class NtBoardingRegisterController extends GetxController {
   //   } on DioException catch (e) {
   //     logError(e.response.toString());
   //     emit(NtRegisterDismissHub());
-  //     emit(NtRegisterLoadedError(e.toString()));
+  //     emit(NtRegisterLoadedError(AppErrorMapper.map(e).userMessage));
   //   } catch (e) {
   //     logError(e.toString());
   //     emit(NtRegisterDismissHub());
-  //     emit(NtRegisterLoadedError(e.toString()));
+  //     emit(NtRegisterLoadedError(AppErrorMapper.map(e).userMessage));
   //   }
   // }
 
@@ -199,3 +200,4 @@ class NtBoardingRegisterController extends GetxController {
     }
   }
 }
+

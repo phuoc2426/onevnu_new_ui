@@ -1,3 +1,4 @@
+import 'package:vnu_core/common/error/app_feedback.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
@@ -56,7 +57,7 @@ class VcoreBookmarkController extends GetxController {
       refreshController.loadComplete();
       Utils.dismissProgress(context);
     } catch (e) {
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
       refreshController.refreshCompleted();
 
       Utils.dismissProgress(context);
@@ -75,7 +76,7 @@ class VcoreBookmarkController extends GetxController {
       snackBarSuccess('Cập nhật tiêu đề thành công');
       update();
     } catch (e) {
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
       Utils.dismissProgress(context);
     }
   }
@@ -100,8 +101,9 @@ class VcoreBookmarkController extends GetxController {
       listLienKetDanhDau.removeWhere((item) => item.guid == model.guid);
       update();
     } catch (e) {
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
       Utils.dismissProgress(context);
     }
   }
 }
+

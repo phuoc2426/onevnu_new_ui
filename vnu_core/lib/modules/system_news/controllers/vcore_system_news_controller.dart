@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:vnu_core/common/error/app_feedback.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
@@ -80,7 +81,7 @@ class VcoreSystemNewsController extends GetxController {
       refreshController.loadComplete();
       Utils.dismissProgress(context);
     } catch (e) {
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
       refreshController.refreshCompleted();
 
       Utils.dismissProgress(context);
@@ -114,7 +115,8 @@ class VcoreSystemNewsController extends GetxController {
       }
     } catch (e) {
       Utils.dismissProgress(context);
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     }
   }
 }
+

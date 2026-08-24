@@ -1,3 +1,4 @@
+import 'package:vnu_core/common/error/app_feedback.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:vnu_core/common/app_color.dart';
@@ -172,7 +173,7 @@ class VcoreBrowserController extends GetxController {
       snackBarSuccess('Tạo liên kết đánh dấu thành công');
     } catch (e) {
       Utils.dismissProgress(context);
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     }
   }
 
@@ -192,3 +193,4 @@ class VcoreBrowserController extends GetxController {
     super.onClose();
   }
 }
+

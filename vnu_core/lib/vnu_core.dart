@@ -5,8 +5,10 @@
 // platforms in the `pubspec.yaml` at
 // https://flutter.dev/docs/development/packages-and-plugins/developing-packages#plugin-platforms.
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:vnu_core/common/error/app_feedback.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
@@ -193,7 +195,10 @@ class VnuCore {
   ) async {
     final String loaiNotification = message?['loaiNotification'] ?? '';
     final String guidItem = message?['guidItem'] ?? '';
-    logSuccess('//// handle Notification VNU Core $message');
+    logInfo(
+      '[NOTIFICATION] tapped type=$loaiNotification '
+      'hasGuid=${guidItem.isNotEmpty}',
+    );
 
     if (guidItem.isEmpty || loaiNotification.isEmpty) {
       return;
@@ -202,12 +207,9 @@ class VnuCore {
     if (loaiNotification == LoaiThongBao.CamNang.name) {
       SmartDialog.showLoading();
       try {
-        final List<dynamic> results = await Future.wait([
-          ApiRepository().getDetailCamNang(guidItem),
-          ApiRepository().setIsRead(guidItem, loaiNotification),
-        ]);
-        Globals().fetchUnreadCount();
-        final CamNangModel model = results.first;
+        final CamNangModel model =
+            await ApiRepository().getDetailCamNang(guidItem);
+        _markNotificationReadBestEffort(guidItem, loaiNotification);
         Get.to(
           () => VCorePreviewPdfScreen(
             title: model.tieuDe ?? '',
@@ -217,7 +219,7 @@ class VnuCore {
         SmartDialog.dismiss();
       } catch (e) {
         SmartDialog.dismiss();
-        snackBarError(e.toString());
+        AppFeedback.showError(e);
         logError(e.toString());
       }
       return;
@@ -226,18 +228,15 @@ class VnuCore {
     if (loaiNotification == LoaiThongBao.TinTuc.name) {
       SmartDialog.showLoading();
       try {
-        final List<dynamic> results = await Future.wait([
-          ApiRepository().getDetailTinTuc(guidItem),
-          ApiRepository().setIsRead(guidItem, loaiNotification),
-        ]);
-        Globals().fetchUnreadCount();
-        final TinTucModel response = results.first;
+        final TinTucModel response =
+            await ApiRepository().getDetailTinTuc(guidItem);
+        _markNotificationReadBestEffort(guidItem, loaiNotification);
         SmartDialog.dismiss();
 
         Get.to(() => VcoreNewsDetailView(tinTucModel: response));
       } catch (e) {
         SmartDialog.dismiss();
-        snackBarError(e.toString());
+        AppFeedback.showError(e);
         logError(e.toString());
       }
       return;
@@ -246,16 +245,13 @@ class VnuCore {
     if (loaiNotification == LoaiThongBao.Cmsvnu_TinTuc.name) {
       SmartDialog.showLoading();
       try {
-        final List<dynamic> results = await Future.wait([
-          ApiRepository().getChiTietCmsTinTuc(
-            guidItem,
-            kImageCmsWidhtHeight,
-            kImageCmsWidhtHeight,
-          ),
-          ApiRepository().setIsRead(guidItem, loaiNotification),
-        ]);
-        Globals().fetchUnreadCount();
-        final TopTinTucDetailModel response = results.first;
+        final TopTinTucDetailModel response =
+            await ApiRepository().getChiTietCmsTinTuc(
+          guidItem,
+          kImageCmsWidhtHeight,
+          kImageCmsWidhtHeight,
+        );
+        _markNotificationReadBestEffort(guidItem, loaiNotification);
         SmartDialog.dismiss();
 
         Get.to(
@@ -267,7 +263,7 @@ class VnuCore {
       } catch (e) {
         SmartDialog.dismiss();
         logError(e.toString());
-        snackBarError(e.toString());
+        AppFeedback.showError(e);
       }
       return;
     }
@@ -275,17 +271,14 @@ class VnuCore {
     if (loaiNotification == LoaiThongBao.TinHeThong.name) {
       SmartDialog.showLoading();
       try {
-        final List<dynamic> results = await Future.wait([
-          ApiRepository().getChiTietTinHeThong(guidItem),
-          ApiRepository().setIsRead(guidItem, loaiNotification),
-        ]);
-        Globals().fetchUnreadCount();
-        final TinHeThongModel response = results.first;
+        final TinHeThongModel response =
+            await ApiRepository().getChiTietTinHeThong(guidItem);
+        _markNotificationReadBestEffort(guidItem, loaiNotification);
         Get.to(() => VcoreSystemNewsDetailView(tinTucModel: response));
         SmartDialog.dismiss();
       } catch (e) {
         SmartDialog.dismiss();
-        snackBarError(e.toString());
+        AppFeedback.showError(e);
         logError(e.toString());
       }
       return;
@@ -296,17 +289,14 @@ class VnuCore {
         loaiNotification == LoaiThongBao.TraLoiCauHoi.name) {
       SmartDialog.showLoading();
       try {
-        final List<dynamic> results = await Future.wait([
-          ApiRepository().getDetailCauHoiDap(guidItem),
-          ApiRepository().setIsRead(guidItem, loaiNotification),
-        ]);
-        Globals().fetchUnreadCount();
-        final HoiDapModel response = results.first;
+        final HoiDapModel response =
+            await ApiRepository().getDetailCauHoiDap(guidItem);
+        _markNotificationReadBestEffort(guidItem, loaiNotification);
         Get.to(() => VcoreQuestionDetailView(question: response));
         SmartDialog.dismiss();
       } catch (e) {
         SmartDialog.dismiss();
-        snackBarError(e.toString());
+        AppFeedback.showError(e);
         logError(e.toString());
       }
       return;
@@ -318,7 +308,7 @@ class VnuCore {
         SmartDialog.dismiss();
       } catch (e) {
         SmartDialog.dismiss();
-        snackBarError(e.toString());
+        AppFeedback.showError(e);
         logError(e.toString());
       }
       return;
@@ -366,7 +356,7 @@ class VnuCore {
         } catch (e) {
           SmartDialog.dismiss();
           logError(e.toString());
-          snackBarError(e.toString());
+          AppFeedback.showError(e);
         }
       }
     }
@@ -376,6 +366,23 @@ class VnuCore {
       snackBarWarning('Chưa hỗ trợ định dạng thông báo.');
       return;
     }
+  }
+
+  void _markNotificationReadBestEffort(
+    String guidItem,
+    String loaiNotification,
+  ) {
+    unawaited(() async {
+      try {
+        await ApiRepository().setIsRead(guidItem, loaiNotification);
+        await Globals().fetchUnreadCount();
+      } catch (e) {
+        logWarning(
+          '[NOTIFICATION] mark-read failed type=$loaiNotification '
+          'hasGuid=${guidItem.isNotEmpty} error=$e',
+        );
+      }
+    }());
   }
 
   Future<void> checkUpdateNewVersion({

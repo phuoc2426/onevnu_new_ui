@@ -1,3 +1,4 @@
+import 'package:vnu_core/common/error/app_feedback.dart';
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 import 'package:vnu_core/common/utils.dart';
@@ -78,7 +79,8 @@ class VcoreProfileFamilyInfoController extends GetxController {
       snackBarSuccess('Cập nhật thông tin thành công.');
     } catch (e) {
       Utils.dismissProgress(context);
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     }
   }
 }
+

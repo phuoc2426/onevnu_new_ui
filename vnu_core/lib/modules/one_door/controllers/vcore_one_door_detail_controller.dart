@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:vnu_core/common/error/app_feedback.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:share_plus/share_plus.dart';
@@ -40,7 +41,7 @@ class VcoreOneDoorDetailController extends GetxController {
         }
       } catch (e) {
         Utils.dismissProgress(context);
-        snackBarError(e.toString());
+        AppFeedback.showError(e);
       }
     } else {
       snackBarError('Không tìm thấy thông tin tệp đính kèm.');
@@ -48,3 +49,4 @@ class VcoreOneDoorDetailController extends GetxController {
     }
   }
 }
+

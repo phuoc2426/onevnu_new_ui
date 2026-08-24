@@ -1,3 +1,4 @@
+import 'package:vnu_core/common/error/app_feedback.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -48,7 +49,7 @@ class VcoreQuestionController extends GetxController {
 
       refreshData();
     } catch (e) {
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
       Utils.dismissProgress(context);
     }
   }
@@ -116,7 +117,7 @@ class VcoreQuestionController extends GetxController {
       refreshController.loadComplete();
       Utils.dismissProgress(context);
     } catch (e) {
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
       refreshController.refreshCompleted();
 
       Utils.dismissProgress(context);
@@ -124,3 +125,4 @@ class VcoreQuestionController extends GetxController {
     }
   }
 }
+

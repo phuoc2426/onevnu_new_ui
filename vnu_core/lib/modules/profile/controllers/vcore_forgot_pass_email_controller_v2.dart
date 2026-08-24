@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:vnu_core/common/error/app_feedback.dart';
+import 'package:vnu_core/common/log.dart';
 import 'package:vnu_core/globals.dart';
 import 'package:vnu_core/vnu_core.dart';
 import 'package:vnu_core/common/utils.dart';
@@ -311,10 +313,17 @@ ${bodyController.text.trim()}''';
       }
     } on PlatformException catch (e) {
       await copyManualContent();
-      snackBarWarning('${e.message ?? e.code}\nNội dung email đã được copy.');
+      logWarning('[MAIL] native compose failed code=${e.code}');
+      snackBarWarning(
+        'Không thể mở ứng dụng gửi email. Nội dung email đã được copy.',
+      );
     } catch (e) {
       await copyManualContent();
-      snackBarError('Lỗi: $e');
+      AppFeedback.showError(
+        e,
+        fallbackMessage:
+            'Không thể mở ứng dụng gửi email. Nội dung email đã được copy.',
+      );
     } finally {
       isSending.value = false;
     }
@@ -337,3 +346,4 @@ ${bodyController.text.trim()}''';
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 }
+

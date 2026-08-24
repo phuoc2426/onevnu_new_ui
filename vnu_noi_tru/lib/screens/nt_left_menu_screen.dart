@@ -1,5 +1,6 @@
 import 'dart:ffi';
 
+import 'package:vnu_core/common/error/app_feedback.dart';
 import 'package:flutter/material.dart';
 import 'package:vnu_core/common/log.dart';
 import 'package:vnu_core/common/utils.dart';
@@ -41,7 +42,7 @@ class _NTLeftMenuScreenState extends State<NTLeftMenuScreen> {
           setState(() {});
         }
       } catch (e) {
-        snackBarError(e.toString());
+        AppFeedback.showError(e);
       }
     });
   }
@@ -216,3 +217,4 @@ class _NTLeftMenuScreenState extends State<NTLeftMenuScreen> {
     }
   }
 }
+

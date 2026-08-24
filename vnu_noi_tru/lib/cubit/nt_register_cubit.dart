@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:vnu_core/common/error/app_error_mapper.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:path/path.dart' as p;
 import 'package:flutter/foundation.dart';
@@ -23,10 +24,10 @@ class NtRegisterCubit extends Cubit<NtRegisterState> {
       emit(NtRegisterLoadedListProcessing(response.data));
     } on DioException catch (e) {
       emit(NtRegisterDismissHub());
-      emit(NtRegisterLoadedError(e.toString()));
+      emit(NtRegisterLoadedError(AppErrorMapper.map(e).userMessage));
     } catch (e) {
       emit(NtRegisterDismissHub());
-      emit(NtRegisterLoadedError(e.toString()));
+      emit(NtRegisterLoadedError(AppErrorMapper.map(e).userMessage));
     }
   }
 
@@ -37,11 +38,11 @@ class NtRegisterCubit extends Cubit<NtRegisterState> {
           await NoitruDormitoryRepository().getDanhSachDoiTuongUuTien();
       emit(NtRegisterLoadedListDoiTuongUuTien(response.data));
     } on DioException catch (e) {
-      emit(NtRegisterLoadedError(e.toString()));
+      emit(NtRegisterLoadedError(AppErrorMapper.map(e).userMessage));
       logError(e.toString());
     } catch (e) {
       logError(e.toString());
-      emit(NtRegisterLoadedError(e.toString()));
+      emit(NtRegisterLoadedError(AppErrorMapper.map(e).userMessage));
     }
   }
 
@@ -53,11 +54,11 @@ class NtRegisterCubit extends Cubit<NtRegisterState> {
           await NoitruDormitoryRepository().getDanhSachTrungTamLuuTru();
       emit(NtRegisterLoadedListTrungTamLuuTru(response.data));
     } on DioException catch (e) {
-      emit(NtRegisterLoadedError(e.toString()));
+      emit(NtRegisterLoadedError(AppErrorMapper.map(e).userMessage));
       logError(e.toString());
     } catch (e) {
       logError(e.toString());
-      emit(NtRegisterLoadedError(e.toString()));
+      emit(NtRegisterLoadedError(AppErrorMapper.map(e).userMessage));
     }
   }
 
@@ -68,11 +69,11 @@ class NtRegisterCubit extends Cubit<NtRegisterState> {
           await NoitruDormitoryRepository().getDanhSachPhong(ID_TrungTamLuuTru);
       emit(NtRegisterLoadedListDanhSachLoaiPhong(response.data));
     } on DioException catch (e) {
-      emit(NtRegisterLoadedError(e.toString()));
+      emit(NtRegisterLoadedError(AppErrorMapper.map(e).userMessage));
       logError(e.toString());
     } catch (e) {
       logError(e.toString());
-      emit(NtRegisterLoadedError(e.toString()));
+      emit(NtRegisterLoadedError(AppErrorMapper.map(e).userMessage));
     }
   }
 
@@ -83,10 +84,10 @@ class NtRegisterCubit extends Cubit<NtRegisterState> {
       emit(NtRegisterLoadedListDanhSachDotDangKy(response.data));
     } on DioException catch (e) {
       logError(e.toString());
-      emit(NtRegisterLoadedError(e.toString()));
+      emit(NtRegisterLoadedError(AppErrorMapper.map(e).userMessage));
     } catch (e) {
       logError(e.toString());
-      emit(NtRegisterLoadedError(e.toString()));
+      emit(NtRegisterLoadedError(AppErrorMapper.map(e).userMessage));
     }
   }
 
@@ -132,11 +133,11 @@ class NtRegisterCubit extends Cubit<NtRegisterState> {
     } on DioException catch (e) {
       logError(e.response.toString());
       emit(NtRegisterDismissHub());
-      emit(NtRegisterLoadedError(e.toString()));
+      emit(NtRegisterLoadedError(AppErrorMapper.map(e).userMessage));
     } catch (e) {
       logError(e.toString());
       emit(NtRegisterDismissHub());
-      emit(NtRegisterLoadedError(e.toString()));
+      emit(NtRegisterLoadedError(AppErrorMapper.map(e).userMessage));
     }
   }
 
@@ -164,7 +165,7 @@ class NtRegisterCubit extends Cubit<NtRegisterState> {
       }
     } catch (e) {
       emit(NtRegisterDismissHub());
-      emit(NtRegisterLoadedError(e.toString()));
+      emit(NtRegisterLoadedError(AppErrorMapper.map(e).userMessage));
       emit(NtRegisterLoadPhieuDangKySuccess(const []));
     }
   }
@@ -222,7 +223,8 @@ class NtRegisterCubit extends Cubit<NtRegisterState> {
       }
     } catch (e) {
       logError(e.toString());
-      emit(NtRegisterUpLoadedError(e.toString()));
+      emit(NtRegisterUpLoadedError(AppErrorMapper.map(e).userMessage));
     }
   }
 }
+

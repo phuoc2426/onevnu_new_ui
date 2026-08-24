@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:math';
 
+import 'package:vnu_core/common/error/app_feedback.dart';
 import 'package:get/get.dart';
 import 'package:get_thumbnail_video/video_thumbnail.dart';
 import 'package:image_picker/image_picker.dart';
@@ -88,7 +89,8 @@ class FileUploadModel {
       logSuccess('upload success...');
     } catch (e) {
       status.value = UploadFileState.failed;
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     }
   }
 }
+

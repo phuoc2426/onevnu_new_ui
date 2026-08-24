@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:vnu_core/common/error/app_error_mapper.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vnu_core/common/log.dart';
@@ -727,7 +728,6 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
   String _uploadErrorMessage(Object error) {
     if (error is DioException) {
       final dynamic responseData = error.response?.data;
-
       if (responseData is Map) {
         final dynamic rawErrors = responseData['errors'];
         if (rawErrors is Map && rawErrors.isNotEmpty) {
@@ -736,11 +736,15 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
             if (value is Iterable) {
               for (final dynamic item in value) {
                 final String text = item?.toString().trim() ?? '';
-                if (text.isNotEmpty) messages.add(text);
+                if (text.isNotEmpty) {
+                  messages.add(AppErrorMapper.map(text).userMessage);
+                }
               }
             } else {
               final String text = value?.toString().trim() ?? '';
-              if (text.isNotEmpty) messages.add(text);
+              if (text.isNotEmpty) {
+                messages.add(AppErrorMapper.map(text).userMessage);
+              }
             }
           });
 
@@ -748,18 +752,11 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
             return messages.toSet().join('\n');
           }
         }
-
-        final String message = responseData['message']?.toString().trim() ?? '';
-        if (message.isNotEmpty) return message;
       }
-
-      final String dioMessage = error.message?.trim() ?? '';
-      if (dioMessage.isNotEmpty) return dioMessage;
     }
 
-    return error.toString().replaceFirst('Exception: ', '');
+    return AppErrorMapper.map(error).userMessage;
   }
-
   void clearWizardData() {
     selectedPeriod = null;
     selectedDormitory = null;
@@ -828,7 +825,7 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
       periods = [];
       selectedPeriod = null;
       logError('Get active registration period error: $e');
-      emit(DormitoryRegistrationError(e.toString()));
+      emit(DormitoryRegistrationError(AppErrorMapper.map(e).userMessage));
       return null;
     }
   }
@@ -850,7 +847,7 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
       emit(DormitoryRegistrationDormitoriesLoaded(dormitories));
     } catch (e) {
       logError(e.toString());
-      emit(DormitoryRegistrationError(e.toString()));
+      emit(DormitoryRegistrationError(AppErrorMapper.map(e).userMessage));
     }
   }
 
@@ -880,7 +877,7 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
       emit(DormitoryRegistrationRoomTypesLoaded(roomTypes));
     } catch (e) {
       logError(e.toString());
-      emit(DormitoryRegistrationError(e.toString()));
+      emit(DormitoryRegistrationError(AppErrorMapper.map(e).userMessage));
     }
   }
 
@@ -892,7 +889,7 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
       emit(DormitoryRegistrationPriorityObjectsLoaded(priorityObjects));
     } catch (e) {
       logError(e.toString());
-      emit(DormitoryRegistrationError(e.toString()));
+      emit(DormitoryRegistrationError(AppErrorMapper.map(e).userMessage));
     }
   }
 
@@ -973,7 +970,7 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
       }
 
       logError(e.toString());
-      emit(DormitoryRegistrationError(e.toString()));
+      emit(DormitoryRegistrationError(AppErrorMapper.map(e).userMessage));
     }
   }
 
@@ -990,7 +987,7 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
     } catch (e) {
       logError(e.toString());
       emit(DormitoryRegistrationDismissHub());
-      emit(DormitoryRegistrationError(e.toString()));
+      emit(DormitoryRegistrationError(AppErrorMapper.map(e).userMessage));
     }
   }
 
@@ -1003,7 +1000,7 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
     } catch (e) {
       logError(e.toString());
       emit(DormitoryRegistrationDismissHub());
-      emit(DormitoryRegistrationError(e.toString()));
+      emit(DormitoryRegistrationError(AppErrorMapper.map(e).userMessage));
     }
   }
 
@@ -1105,11 +1102,11 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
       );
 
       final finalPayload = payload.copyWith(attachmentFileIds: attachmentIds);
-      debugPrint('=== PAYLOAD GỬI ĐI ===');
-      debugPrint(
-        'Payload fields: ${finalPayload.toJson()}',
-      ); // nếu RegistrationPayloadModel có toJson()
-      debugPrint('Attachment IDs: $attachmentIds');
+      logInfo(
+        '[DORMITORY_REGISTER] submitting '
+        'attachments=${attachmentIds.length} '
+        'priorityObjects=${finalPayload.priorityObjectIds.length}',
+      );
       await _repository.registerDormitory(finalPayload);
 
       emit(DormitoryRegistrationDismissHub());
@@ -1117,7 +1114,7 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
     } catch (e) {
       logError(e.toString());
       emit(DormitoryRegistrationDismissHub());
-      emit(DormitoryRegistrationError(e.toString()));
+      emit(DormitoryRegistrationError(AppErrorMapper.map(e).userMessage));
     }
   }
 
@@ -1366,3 +1363,4 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
     }
   }
 }
+

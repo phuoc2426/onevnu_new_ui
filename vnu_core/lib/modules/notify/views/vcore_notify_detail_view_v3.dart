@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:vnu_core/common/error/app_feedback.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:flutter_html/flutter_html.dart';
@@ -69,7 +70,7 @@ class _VcoreNotifyDetailViewV3State extends State<VcoreNotifyDetailViewV3> {
       }
     } catch (e) {
       Utils.dismissProgress(context);
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     }
   }
 
@@ -410,3 +411,4 @@ class _VcoreNotifyDetailViewV3State extends State<VcoreNotifyDetailViewV3> {
     );
   }
 }
+

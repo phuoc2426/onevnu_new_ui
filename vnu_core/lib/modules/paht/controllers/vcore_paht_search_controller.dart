@@ -1,3 +1,4 @@
+import 'package:vnu_core/common/error/app_feedback.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
@@ -66,7 +67,7 @@ class VcorePahtSearchController extends GetxController {
 
       isLoading.value = false;
     } catch (e) {
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
       refreshController.refreshCompleted();
 
       Utils.dismissProgress(context);
@@ -76,3 +77,4 @@ class VcorePahtSearchController extends GetxController {
     }
   }
 }
+

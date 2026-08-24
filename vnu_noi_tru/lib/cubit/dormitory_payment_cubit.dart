@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:vnu_core/common/error/app_error_mapper.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vnu_noi_tru/models/dormitory_payment/dormitory_invoice_model.dart';
 import 'package:vnu_noi_tru/models/dormitory_payment/dormitory_payment_method_model.dart';
@@ -157,39 +158,7 @@ class DormitoryPaymentCubit extends Cubit<DormitoryPaymentState> {
   }
 
   String _cleanError(Object error) {
-    if (error is DioException) {
-      final dynamic responseData = error.response?.data;
-
-      if (responseData is Map) {
-        final dynamic message = responseData['message'];
-
-        if (message != null && message.toString().trim().isNotEmpty) {
-          return message.toString();
-        }
-
-        final dynamic errors = responseData['errors'];
-        if (errors is Map && errors.isNotEmpty) {
-          final List<String> messages = <String>[];
-
-          for (final dynamic value in errors.values) {
-            if (value is Iterable) {
-              messages.addAll(
-                value.map((dynamic item) => item.toString()),
-              );
-            } else if (value != null) {
-              messages.add(value.toString());
-            }
-          }
-
-          if (messages.isNotEmpty) {
-            return messages.join('\n');
-          }
-        }
-      }
-
-      return error.message ?? 'Không kết nối được máy chủ';
-    }
-
-    return error.toString().replaceFirst('Exception: ', '');
+    return AppErrorMapper.map(error).userMessage;
   }
 }
+

@@ -1,9 +1,7 @@
 import 'dart:io';
 
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 import 'package:http_parser/http_parser.dart';
-import 'package:path/path.dart' as path;
 import 'package:vnu_core/common/log.dart';
 import 'package:vnu_core/services/app_config_service.dart';
 import 'package:vnu_core/services/dio_options.dart';
@@ -138,13 +136,9 @@ class DormitoryPaymentRepository {
     final String uploadFileName =
         'payment_proof_${DateTime.now().millisecondsSinceEpoch}.jpg';
 
-    debugPrint(
+    logInfo(
       '[PAYMENT-PROOF-UPLOAD] '
-      'platform=${Platform.operatingSystem}, '
-      'source=${path.basename(proofImage.path)}, '
-      'uploadName=$uploadFileName, '
-      'bytes=$proofSize, '
-      'receipt=$normalizedReceiptId',
+      'platform=${Platform.operatingSystem} bytes=$proofSize',
     );
 
     final FormData formData = FormData.fromMap(<String, dynamic>{
@@ -173,21 +167,18 @@ class DormitoryPaymentRepository {
             ),
           );
 
-      debugPrint(
-        '[PAYMENT-PROOF-UPLOAD-SUCCESS] '
-        'status=${response.statusCode}, receipt=$normalizedReceiptId',
+      logInfo(
+        '[PAYMENT-PROOF-UPLOAD-SUCCESS] status=${response.statusCode}',
       );
 
       return response.data ?? const <String, dynamic>{};
     } on DioException catch (error) {
-      debugPrint(
+      logWarning(
         '[PAYMENT-PROOF-UPLOAD-ERROR] '
-        'type=${error.type}, '
-        'status=${error.response?.statusCode}, '
-        'message=${error.message}, '
-        'response=${error.response?.data}',
+        'type=${error.type} status=${error.response?.statusCode}',
       );
       rethrow;
     }
   }
 }
+

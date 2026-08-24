@@ -1,3 +1,4 @@
+import 'package:vnu_core/common/error/app_error_mapper.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:bloc/bloc.dart';
 import 'package:vnu_core/common/file_utils.dart';
@@ -53,7 +54,7 @@ class AuthCubit extends Cubit<AuthState> {
       // }
     } catch (e) {
       emit(AuthDismissHub());
-      emit(AuthError(e.toString()));
+      emit(AuthError(AppErrorMapper.map(e).userMessage));
     }
   }
 
@@ -68,8 +69,7 @@ class AuthCubit extends Cubit<AuthState> {
     }
     emit(AuthShowHub());
     try {
-      logSuccess('Firebase Token');
-      logInfo(ServicesUrl().firebaseToken ?? '');
+      logSuccess('Firebase token is available');
       //Globals().fireBaseToken
       logSuccess('Start login time --> ${DateTime.now().toIso8601String()}');
       var reponse = await ApiRepository()
@@ -143,7 +143,7 @@ class AuthCubit extends Cubit<AuthState> {
       }
     } catch (e) {
       emit(AuthDismissHub());
-      emit(AuthError(e.toString()));
+      emit(AuthError(AppErrorMapper.map(e).userMessage));
     }
   }
 
@@ -184,7 +184,8 @@ class AuthCubit extends Cubit<AuthState> {
     //   }
     // } catch (e) {
     //   emit(AuthDismissHub());
-    //   emit(AuthError(e.toString()));
+    //   emit(AuthError(AppErrorMapper.map(e).userMessage));
     // }
   }
 }
+

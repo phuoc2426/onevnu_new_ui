@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:flutter_pdfview/flutter_pdfview.dart';
 import 'package:vnu_core/common/utils.dart';
+import 'package:vnu_core/common/error/app_error_reporter.dart';
+import 'package:vnu_core/common/error/app_error_mapper.dart';
 import 'package:vnu_core/cubit/file_cubit.dart';
 import 'package:vnu_core/widgets/error_widget.dart';
 import 'package:vnu_core/widgets/loading_indicator.dart';
@@ -77,10 +81,25 @@ class _VCorePreviewPdfScreenState extends State<VCorePreviewPdfScreen> {
                     );
                   },
                   onError: (error) {
-                    errorMessage.value = error.toString();
+                    final appError = AppErrorMapper.map(
+                      error,
+                      fallbackMessage:
+                          'Không thể hiển thị tài liệu. Vui lòng thử lại.',
+                    );
+                    errorMessage.value = appError.userMessage;
+                    unawaited(AppErrorReporter.report(appError));
                   },
                   onPageError: (page, error) {
-                    errorMessage.value = '$page: ${error.toString()}';
+                    final appError = AppErrorMapper.map(
+                      error,
+                      fallbackMessage:
+                          'Không thể hiển thị trang tài liệu này.',
+                    );
+                    errorMessage.value = appError.userMessage;
+                    unawaited(AppErrorReporter.report(
+                      appError,
+                      context: <String, Object?>{'pdfPage': page},
+                    ));
                   },
                   onPageChanged: (int? page, int? total) {
                     currentPage.value = page ?? 0;
@@ -90,7 +109,11 @@ class _VCorePreviewPdfScreenState extends State<VCorePreviewPdfScreen> {
                     ? !isReady.value
                         ? const Center(child: LoadingIndicator())
                         : Container()
-                    : Center(child: Text(errorMessage.value))
+                    : VnuErrorState(
+                        title: 'Không thể hiển thị tài liệu',
+                        message: errorMessage.value,
+                        compact: true,
+                      )
               ],
             );
           }
@@ -101,3 +124,4 @@ class _VCorePreviewPdfScreenState extends State<VCorePreviewPdfScreen> {
     );
   }
 }
+

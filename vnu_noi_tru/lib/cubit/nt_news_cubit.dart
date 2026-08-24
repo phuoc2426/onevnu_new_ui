@@ -1,3 +1,4 @@
+import 'package:vnu_core/common/error/app_error_mapper.dart';
 import 'package:bloc/bloc.dart';
 import 'package:meta/meta.dart';
 import 'package:vnu_core/common/log.dart';
@@ -24,9 +25,9 @@ class NtNewsCubit extends Cubit<NtNewsState> {
       emit(NtNewsLoadedListSuccess(
           response.data.danhSachTinTuc ?? [], PageNumber));
     } on DioException catch (e) {
-      emit(NtNewsLoadedError(e.toString()));
+      emit(NtNewsLoadedError(AppErrorMapper.map(e).userMessage));
     } catch (e) {
-      emit(NtNewsLoadedError(e.toString()));
+      emit(NtNewsLoadedError(AppErrorMapper.map(e).userMessage));
     }
   }
 
@@ -44,9 +45,9 @@ class NtNewsCubit extends Cubit<NtNewsState> {
       emit(NtNewsLoadedListThongBaoSuccess(
           response.data.danhSachThongBao ?? [], PageNumber));
     } on DioException catch (e) {
-      emit(NtNewsLoadedError(e.toString()));
+      emit(NtNewsLoadedError(AppErrorMapper.map(e).userMessage));
     } catch (e) {
-      emit(NtNewsLoadedError(e.toString()));
+      emit(NtNewsLoadedError(AppErrorMapper.map(e).userMessage));
     }
   }
 
@@ -62,3 +63,4 @@ class NtNewsCubit extends Cubit<NtNewsState> {
     }
   }
 }
+

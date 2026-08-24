@@ -1,3 +1,4 @@
+import 'package:vnu_core/common/error/app_feedback.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:vnu_core/common/log.dart';
@@ -40,7 +41,7 @@ class VcoreProfilePassController extends GetxController {
         loaiMatKhau.value = listLoaiMatKhau.first;
       }
     } catch (e) {
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     }
   }
 
@@ -59,7 +60,7 @@ class VcoreProfilePassController extends GetxController {
           'Mật khẩu mới đã được gửi qua ${loaiMatKhau.value?.label} cho bạn.');
     } catch (e) {
       Utils.dismissProgress(context);
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     }
   }
 
@@ -77,11 +78,6 @@ class VcoreProfilePassController extends GetxController {
       snackBarWarning('Mật khẩu mới không trùng nhau.');
       return;
     }
-    //
-    logWarning(oldPassword);
-    logWarning(newPassword);
-    logWarning(reNewPassword);
-    //
 
     try {
       Utils.showProgress(context);
@@ -96,7 +92,8 @@ class VcoreProfilePassController extends GetxController {
       });
     } catch (e) {
       Utils.dismissProgress(context);
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     }
   }
 }
+

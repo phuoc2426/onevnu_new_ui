@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui';
 
+import 'package:vnu_core/common/error/app_feedback.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -130,7 +131,10 @@ class _VcoreQrScannerViewState extends State<VcoreQrScannerView>
       await _scannerController.start();
     } catch (error) {
       if (mounted && !_disposed) {
-        snackBarError('Không thể mở camera: $error');
+        AppFeedback.showError(
+          error,
+          fallbackMessage: 'Không thể mở camera. Vui lòng thử lại.',
+        );
       }
     }
   }
@@ -211,7 +215,7 @@ class _VcoreQrScannerViewState extends State<VcoreQrScannerView>
       await _execute(action);
     } catch (error) {
       if (!mounted || _disposed) return;
-      snackBarError(error.toString());
+      AppFeedback.showError(error);
       await _resumeAfterAction();
     }
   }
@@ -261,14 +265,14 @@ class _VcoreQrScannerViewState extends State<VcoreQrScannerView>
           return;
         } catch (idpError) {
           if (mounted && !_disposed) {
-            snackBarError(idpError.toString());
+            AppFeedback.showError(idpError);
           }
           await _resumeAfterAction();
           return;
         }
       }
 
-      snackBarError(error.toString());
+      AppFeedback.showError(error);
       await _resumeAfterAction();
     }
   }
@@ -2435,3 +2439,4 @@ class _Dialog extends StatelessWidget {
     );
   }
 }
+

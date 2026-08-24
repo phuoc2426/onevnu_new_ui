@@ -1,3 +1,4 @@
+import 'package:vnu_core/common/error/app_feedback.dart';
 import 'package:flutter/material.dart';
 import 'package:vnu_core/common/app_colors.dart';
 import 'package:vnu_core/common/app_text_styles.dart';
@@ -58,7 +59,7 @@ class _VcoreCoursePointsDetailWidgetState
         isLoadingDiemHocPhan = false;
       });
 
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     }
   }
 
@@ -613,3 +614,4 @@ class _ScoreTheme {
     required this.icon,
   });
 }
+

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:vnu_core/common/error/app_error_mapper.dart';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -32,9 +33,10 @@ class FileCubit extends Cubit<FileState> {
         emit(FileLoadedErrorState(kMessageError));
       }
     } on DioException catch (e) {
-      emit(FileLoadedErrorState(e.toString()));
+      emit(FileLoadedErrorState(AppErrorMapper.map(e).userMessage));
     } catch (e) {
-      emit(FileLoadedErrorState(e.toString()));
+      emit(FileLoadedErrorState(AppErrorMapper.map(e).userMessage));
     }
   }
 }
+

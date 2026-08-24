@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:firebase_core/firebase_core.dart';
@@ -5,9 +6,12 @@ import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/widgets.dart';
 import 'package:students/firebase_options.dart';
+import 'package:vnu_core/common/error/app_error_mapper.dart';
+import 'package:vnu_core/common/error/app_error_reporter.dart';
 import 'package:vnu_core/common/guide/global/app_guide_global_initializer.dart';
 import 'package:vnu_core/common/log.dart';
 import 'package:vnu_core/services/services_url.dart';
+import 'package:vnu_core/widgets/error_widget.dart';
 
 class AppBootstrapResult {
   const AppBootstrapResult({
@@ -39,7 +43,8 @@ class AppBootstrap {
     WidgetsFlutterBinding.ensureInitialized();
 
     final firebaseReady = await _initializeFirebase();
-    _installAsyncErrorHandler(firebaseReady: firebaseReady);
+    _configureErrorReporter(firebaseReady: firebaseReady);
+    _installGlobalErrorHandlers();
 
     RemoteMessage? initialMessage;
     if (firebaseReady) {
@@ -55,17 +60,17 @@ class AppBootstrap {
         initialMessage = await FirebaseMessaging.instance.getInitialMessage();
       } catch (e, stack) {
         logError('[BOOTSTRAP] Firebase Messaging init failed: $e');
-        await _recordNonFatalIfPossible(e, stack, firebaseReady: firebaseReady);
+        final appError = AppErrorMapper.map(e, stackTrace: stack);
+        await AppErrorReporter.report(appError, stackTrace: stack);
       }
     }
 
     try {
       await ServicesUrl().init();
     } catch (e, stack) {
-      // Core ONEVNU base URL đã có default cố định. Không chặn toàn bộ startup
-      // chỉ vì SharedPreferences/config phụ không khởi tạo được.
       logError('[BOOTSTRAP] ServicesUrl init failed: $e');
-      await _recordNonFatalIfPossible(e, stack, firebaseReady: firebaseReady);
+      final appError = AppErrorMapper.map(e, stackTrace: stack);
+      await AppErrorReporter.report(appError, stackTrace: stack);
     }
 
     AppGuideGlobalInitializer.ensureInitialized();
@@ -93,38 +98,85 @@ class AppBootstrap {
     }
   }
 
-  static void _installAsyncErrorHandler({required bool firebaseReady}) {
-    PlatformDispatcher.instance.onError = (error, stack) {
-      if (firebaseReady) {
+  static void _configureErrorReporter({required bool firebaseReady}) {
+    if (!firebaseReady) {
+      AppErrorReporter.configure(null);
+      return;
+    }
+
+    AppErrorReporter.configure(
+      (
+        Object error,
+        StackTrace stackTrace, {
+        required bool fatal,
+        Map<String, Object?>? context,
+      }) async {
         try {
-          FirebaseCrashlytics.instance.recordError(
+          if (context != null) {
+            for (final entry in context.entries) {
+              final value = entry.value;
+              if (value == null) continue;
+              await FirebaseCrashlytics.instance.setCustomKey(
+                'app_error_${entry.key}',
+                value.toString(),
+              );
+            }
+          }
+
+          await FirebaseCrashlytics.instance.recordError(
             error,
-            stack,
-            fatal: true,
+            stackTrace,
+            fatal: fatal,
           );
         } catch (_) {
-          // Không để chính crash reporter tạo thêm exception.
+          // Crash reporting is best effort and must never create a new crash.
         }
-      }
-      logError('[ASYNC_ERROR] $error');
-      return true;
-    };
+      },
+    );
   }
 
-  static Future<void> _recordNonFatalIfPossible(
-    Object error,
-    StackTrace stack, {
-    required bool firebaseReady,
-  }) async {
-    if (!firebaseReady) return;
-    try {
-      await FirebaseCrashlytics.instance.recordError(
-        error,
-        stack,
-        fatal: false,
+  static void _installGlobalErrorHandlers() {
+    FlutterError.onError = (FlutterErrorDetails details) {
+      FlutterError.presentError(details);
+
+      final stack = details.stack ?? StackTrace.current;
+      final appError = AppErrorMapper.map(
+        details.exception,
+        stackTrace: stack,
       );
-    } catch (_) {
-      // Best effort only.
-    }
+
+      unawaited(
+        AppErrorReporter.report(
+          appError,
+          stackTrace: stack,
+          fatal: true,
+          context: <String, Object?>{
+            'library': details.library,
+          },
+        ),
+      );
+    };
+
+    ErrorWidget.builder = (FlutterErrorDetails details) {
+      return const VnuUnexpectedErrorWidget();
+    };
+
+    PlatformDispatcher.instance.onError = (error, stack) {
+      final appError = AppErrorMapper.map(
+        error,
+        stackTrace: stack,
+      );
+      unawaited(
+        AppErrorReporter.report(
+          appError,
+          stackTrace: stack,
+          fatal: true,
+          context: const <String, Object?>{
+            'source': 'PlatformDispatcher',
+          },
+        ),
+      );
+      return true;
+    };
   }
 }

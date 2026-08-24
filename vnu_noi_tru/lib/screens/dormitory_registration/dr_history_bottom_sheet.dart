@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vnu_core/common/error/app_error_mapper.dart';
 import 'package:intl/intl.dart';
 import 'package:vnu_core/themes/app_theme.dart';
 import 'package:vnu_core/widgets/empty_data_widget.dart';
@@ -74,7 +75,9 @@ class _DRHistoryBottomSheetState extends State<DRHistoryBottomSheet> {
 
               if (snapshot.hasError) {
                 return _buildShell(
-                  child: _buildErrorState(snapshot.error.toString()),
+                  child: _buildErrorState(
+                    AppErrorMapper.map(snapshot.error!).userMessage,
+                  ),
                 );
               }
 
@@ -1258,3 +1261,4 @@ class _ResolvedValue {
     this.subtitle,
   });
 }
+

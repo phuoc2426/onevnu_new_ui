@@ -1,3 +1,4 @@
+import 'package:vnu_core/common/error/app_feedback.dart';
 import 'package:flutter/material.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:get/get.dart';
@@ -410,7 +411,7 @@ class VcoreProfilePersonInfoController extends GetxController {
       snackBarSuccess('Cập nhật thông tin thành công.');
     } catch (e) {
       Utils.dismissProgress(context);
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     }
   }
 
@@ -432,7 +433,8 @@ class VcoreProfilePersonInfoController extends GetxController {
       snackBarSuccess('Cập nhật địa chỉ tạm trú thành công.');
     } catch (e) {
       Utils.dismissProgress(context);
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     }
   }
 }
+

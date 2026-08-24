@@ -1,3 +1,4 @@
+import 'package:vnu_core/common/error/app_feedback.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
@@ -45,7 +46,7 @@ class VcoreNewsController extends GetxController {
       var response = await ApiRepository().getTatCaDonVi();
       listDonVi.value = response;
     } catch (e) {
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     }
   }
 
@@ -92,7 +93,7 @@ class VcoreNewsController extends GetxController {
       refreshController.refreshCompleted();
       refreshController.loadComplete();
     } catch (e) {
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
       refreshController.refreshCompleted();
       refreshController.loadComplete();
     }
@@ -102,3 +103,4 @@ class VcoreNewsController extends GetxController {
     }
   }
 }
+

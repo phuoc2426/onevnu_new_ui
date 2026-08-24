@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:vnu_core/common/error/app_error_mapper.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:image_picker/image_picker.dart';
@@ -641,13 +642,18 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
       _showError(
         error.code == 'already_active'
             ? 'Trình chọn ảnh đã được mở. Vui lòng đóng cửa sổ chọn ảnh cũ rồi thử lại.'
-            : 'Không thể mở thư viện ảnh: ${error.message ?? error.code}',
+            : 'Không thể mở thư viện ảnh. Vui lòng thử lại.',
       );
     } catch (error, stackTrace) {
       debugPrint('[DORMITORY-AVATAR-PICKER-ERROR] $error');
       debugPrintStack(stackTrace: stackTrace);
       if (!mounted) return;
-      _showError(error.toString().replaceFirst('Exception: ', ''));
+      _showError(
+        AppErrorMapper.map(
+          error,
+          fallbackMessage: 'Không thể thực hiện thao tác này. Vui lòng thử lại.',
+        ).userMessage,
+      );
     } finally {
       _isImagePickerActive = false;
     }
@@ -1568,13 +1574,18 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
       _showError(
         error.code == 'already_active'
             ? 'Trình chọn ảnh đã được mở. Vui lòng đóng cửa sổ chọn ảnh cũ rồi thử lại.'
-            : 'Không thể mở thư viện ảnh: ${error.message ?? error.code}',
+            : 'Không thể mở thư viện ảnh. Vui lòng thử lại.',
       );
     } catch (error, stackTrace) {
       debugPrint('[DORMITORY-PRIORITY-PICKER-ERROR] $error');
       debugPrintStack(stackTrace: stackTrace);
       if (!mounted) return;
-      _showError(error.toString().replaceFirst('Exception: ', ''));
+      _showError(
+        AppErrorMapper.map(
+          error,
+          fallbackMessage: 'Không thể thực hiện thao tác này. Vui lòng thử lại.',
+        ).userMessage,
+      );
     } finally {
       _isImagePickerActive = false;
     }
@@ -2247,7 +2258,12 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
       );
     } catch (error) {
       if (!mounted) return;
-      _showError(error.toString().replaceFirst('Exception: ', ''));
+      _showError(
+        AppErrorMapper.map(
+          error,
+          fallbackMessage: 'Không thể thực hiện thao tác này. Vui lòng thử lại.',
+        ).userMessage,
+      );
       setState(() => _submitting = false);
     }
   }
@@ -2814,3 +2830,4 @@ class _StudentFamilyMemberForm {
     phoneController.dispose();
   }
 }
+

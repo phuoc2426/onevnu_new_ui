@@ -1,3 +1,4 @@
+import 'package:vnu_core/common/error/app_feedback.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -283,7 +284,7 @@ class VcoreProfileController extends GetxController {
       snackBarSuccess('Cập nhật ảnh đại diện thành công.');
     } catch (e) {
       Utils.dismissProgress(context);
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     } finally {
       isChangingAvatar.value = false;
     }
@@ -484,7 +485,7 @@ class VcoreProfileController extends GetxController {
         tongket.value = response.first;
       }
     } catch (e) {
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     }
   }
 
@@ -556,3 +557,4 @@ class VcoreProfileController extends GetxController {
     }
   }
 }
+

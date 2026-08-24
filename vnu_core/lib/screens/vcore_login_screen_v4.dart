@@ -1,3 +1,4 @@
+import 'package:vnu_core/common/error/app_feedback.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -216,7 +217,7 @@ class _VCoreLoginScreenV4State extends State<VCoreLoginScreenV4> {
       }
     } catch (error, stackTrace) {
       logError('Đăng nhập VNU IDP lỗi: $error\n$stackTrace');
-      snackBarError(error.toString());
+      AppFeedback.showError(error);
     } finally {
       if (mounted) setState(() => _idpLoading = false);
     }
@@ -1352,3 +1353,4 @@ class _UtilityButton extends StatelessWidget {
     );
   }
 }
+

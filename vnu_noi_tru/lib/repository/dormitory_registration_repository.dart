@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:vnu_core/common/log.dart';
 import 'package:path/path.dart' as path;
 import 'package:vnu_core/globals.dart';
 import 'package:vnu_core/repository/app_repository.dart';
@@ -292,9 +293,13 @@ RegistrationPayloadModel payload,
 // Load authentication token if needed
 await _loadTokenIfNeeded();
 
-// Log the start of the registration request
-debugPrint(
-'DormitoryRegistration registerDormitory called with payload: ${payload.toJson()}',
+logInfo(
+'[DORMITORY_REGISTER] started '
+'period=${payload.registrationPeriodId} '
+'dormitory=${payload.dormitoryId} '
+'roomType=${payload.roomTypeId} '
+'attachments=${payload.attachmentFileIds.length} '
+'familyMembers=${payload.student.familyMembers.length}',
 );
 
 final FormData formData = FormData();
@@ -341,17 +346,10 @@ value,
 });
 }
 }
-// Log form data fields for debugging
-for (final MapEntry<String, String> entry in formData.fields) {
-debugPrint(
-'DormitoryRegistration Form field: ${entry.key} = ${entry.value}',
+logInfo(
+'[DORMITORY_REGISTER] request prepared '
+'fieldCount=${formData.fields.length} fileCount=${formData.files.length}',
 );
-}
-for (final MapEntry<String, MultipartFile> entry in formData.files) {
-debugPrint(
-'DormitoryRegistration Form file: ${entry.key} -> ${entry.value.filename}',
-);
-}
 
 final response = await _dormitoryClient.post<Map<String, dynamic>>(
 'registrations',
@@ -359,9 +357,10 @@ data: formData,
 options: _multipartOptions(),
 );
 
-// Log response details
-debugPrint('DormitoryRegistration Response status: ${response.statusCode}');
-debugPrint('DormitoryRegistration Response data: ${response.data}');
+logInfo(
+'[DORMITORY_REGISTER] response status=${response.statusCode} '
+'hasData=${response.data != null}',
+);
 
 return SingleRegistrationResponse.fromJson(response.data ?? {});
 }
@@ -554,9 +553,8 @@ final headers = <String, String>{
 'Content-Type': 'application/json',
 };
 final token = Globals().token;
-debugPrint(
-'🔎 DormitoryRepo _jsonOptions – token '
-'${token.isNotEmpty ? "present (${token.substring(0, 8)}…)" : "EMPTY"}',
+logInfo(
+'[DORMITORY_AUTH] tokenPresent=${token.isNotEmpty}',
 );
 if (token.isNotEmpty) {
 headers['Authorization'] = 'Bearer $token';
@@ -600,18 +598,12 @@ final stored = await DataRepository().getSecureSaveKey(kLoginToken);
 if (stored != null && stored.isNotEmpty) {
 Globals().token = stored;
 ApiRepository().setToken(stored);
-debugPrint(
-'🔐 _loadTokenIfNeeded – token loaded from secure storage: '
-'${stored.substring(0, 8)}…',
-);
+logInfo('[DORMITORY_AUTH] token loaded from secure storage');
 } else {
-debugPrint('_loadTokenIfNeeded – secure storage token NOT found');
+logWarning('[DORMITORY_AUTH] token not found in secure storage');
 }
 } else {
-debugPrint(
-'✅ _loadTokenIfNeeded – token already present in Globals: '
-'${Globals().token.substring(0, 8)}…',
-);
+logInfo('[DORMITORY_AUTH] token already available');
 }
 }
 
@@ -629,4 +621,5 @@ result.add(file);
 return result;
 }
 }
+
 

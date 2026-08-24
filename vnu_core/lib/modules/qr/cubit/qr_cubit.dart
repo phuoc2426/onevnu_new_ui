@@ -1,3 +1,4 @@
+import 'package:vnu_core/common/error/app_error_mapper.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vnu_core/modules/qr/models/qr_resolution.dart';
@@ -20,7 +21,7 @@ class QrCubit extends Cubit<QrState> {
       final resolution = await _repository.resolve(rawQr);
       emit(QrResolved(resolution));
     } catch (e) {
-      emit(QrFailure(e.toString()));
+      emit(QrFailure(AppErrorMapper.map(e).userMessage));
     }
   }
 
@@ -30,7 +31,7 @@ class QrCubit extends Cubit<QrState> {
       final result = await _repository.execute(resolution.sessionId);
       emit(QrExecuted(resolution, result));
     } catch (e) {
-      emit(QrFailure(e.toString()));
+      emit(QrFailure(AppErrorMapper.map(e).userMessage));
     }
   }
 
@@ -45,3 +46,4 @@ class QrCubit extends Cubit<QrState> {
 
   void reset() => emit(QrInitial());
 }
+

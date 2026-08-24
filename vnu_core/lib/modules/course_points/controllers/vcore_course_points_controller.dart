@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:vnu_core/common/error/app_feedback.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
@@ -175,7 +176,7 @@ class VcoreCoursePointsController extends GetxController {
 
       // Ở chế độ xem môn ngoài CTĐT, không có dữ liệu là trạng thái hợp lệ.
       if (isTheoChuongTrinhDaoTao.value) {
-        snackBarError(e.toString());
+        AppFeedback.showError(e);
       }
     }
   }
@@ -305,7 +306,7 @@ class VcoreCoursePointsController extends GetxController {
       refreshController.loadComplete();
 
       if (isTheoChuongTrinhDaoTao.value) {
-        snackBarError(e.toString());
+        AppFeedback.showError(e);
       }
     }
   }
@@ -839,7 +840,7 @@ class VcoreCoursePointsController extends GetxController {
       aiRadarAnalysis.value = analysis;
     } catch (e) {
       hasRequestedAiAnalysis.value = false;
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     } finally {
       isLoadingAi.value = false;
     }
@@ -902,3 +903,4 @@ class BrcChungChiModel {
     return value.toString();
   }
 }
+

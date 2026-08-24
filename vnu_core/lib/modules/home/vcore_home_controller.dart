@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:vnu_core/common/error/app_feedback.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -842,7 +843,7 @@ class VcoreHomeController extends GetxController {
       }
     } catch (e) {
       logError(e.toString());
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     }
   }
 
@@ -863,7 +864,7 @@ class VcoreHomeController extends GetxController {
       }
     } catch (e) {
       logError(e.toString());
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     }
   }
 
@@ -920,7 +921,7 @@ class VcoreHomeController extends GetxController {
       }
     } catch (e) {
       logError(e.toString());
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     }
   }
 
@@ -943,7 +944,7 @@ class VcoreHomeController extends GetxController {
       }
     } catch (e) {
       logError(e.toString());
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     }
   }
 
@@ -964,7 +965,7 @@ class VcoreHomeController extends GetxController {
       }
     } catch (e) {
       logError(e.toString());
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     }
   }
 
@@ -1025,7 +1026,7 @@ class VcoreHomeController extends GetxController {
   //   } catch (e) {
   //     Utils.dismissProgress(context);
   //     logError(e.toString());
-  //     snackBarError(e.toString());
+  //     AppFeedback.showError(e);
   //   }
   // }
 
@@ -1083,3 +1084,4 @@ class VcoreHomeController extends GetxController {
     }
   }
 }
+

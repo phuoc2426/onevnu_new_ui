@@ -1,11 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:vnu_core/services/applicant/applicant_api_service.dart';
+import 'package:vnu_core/common/error/app_error_reporter.dart';
+import 'package:vnu_core/common/error/app_error_mapper.dart';
 import 'package:get/get.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:vnu_core/screens/dashboard_screen.dart';
-import 'package:flutter/foundation.dart'; // for debugPrint
 
 class CccdRegistrationScreen extends StatefulWidget {
   const CccdRegistrationScreen({super.key});
@@ -54,20 +57,23 @@ class _CccdRegistrationScreenState extends State<CccdRegistrationScreen> {
         // Navigate to the new dashboard screen.
         Get.off(() => const DashboardScreen());
       }
-    } on DioException catch (e) {
-      String message = 'Lỗi kết nối đến máy chủ';
-      if (e.response?.data is Map) {
-        message =
-            e.response?.data['message'] ??
-            'Sai CCCD hoặc bạn không nằm trong danh sách trúng tuyển';
+    } on DioException catch (e, stack) {
+      final appError = AppErrorMapper.fromDio(e);
+      unawaited(AppErrorReporter.report(appError, stackTrace: stack));
+      if (mounted) {
+        setState(() => _errorMessage = appError.displayMessage);
       }
-      debugPrint(
-        '🔹 DioException: ${e.message}, response: ${e.response?.data}',
-      );
-      setState(() => _errorMessage = message);
     } catch (e, stack) {
-      debugPrint('🔹 Unexpected error: $e\nStackTrace: $stack');
-      setState(() => _errorMessage = 'Đã xảy ra lỗi không xác định');
+      final appError = AppErrorMapper.map(
+        e,
+        stackTrace: stack,
+        fallbackMessage:
+            'Không thể xác thực thông tin lúc này. Vui lòng thử lại.',
+      );
+      unawaited(AppErrorReporter.report(appError, stackTrace: stack));
+      if (mounted) {
+        setState(() => _errorMessage = appError.displayMessage);
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -291,3 +297,4 @@ class _CccdRegistrationScreenState extends State<CccdRegistrationScreen> {
     );
   }
 }
+

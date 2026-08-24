@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:vnu_core/common/error/app_feedback.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:share_plus/share_plus.dart';
@@ -34,7 +35,7 @@ class VcoreNewsDetailController extends GetxController {
       viewTinTuc(response);
       Utils.dismissProgress(context);
     } catch (e) {
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
       Utils.dismissProgress(context);
     }
   }
@@ -80,7 +81,7 @@ class VcoreNewsDetailController extends GetxController {
       isLoadingTinTuc.value = false;
     } catch (e) {
       isLoadingTinTuc.value = false;
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     }
   }
 
@@ -111,7 +112,8 @@ class VcoreNewsDetailController extends GetxController {
       }
     } catch (e) {
       Utils.dismissProgress(context);
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     }
   }
 }
+

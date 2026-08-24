@@ -14,16 +14,18 @@ import 'app_colors.dart';
 import 'package:vnu_core/common/app_text_styles.dart';
 
 snackBarError(String? message) {
-  if (message !=
-          'Không có kết nối Internet. Vui lòng kiểm tra lại kết nối Internet.' &&
-      message?.isNotEmpty == true) {
-    Get.snackbar('Lỗi', message!,
-        duration: const Duration(seconds: 2),
-        margin: const EdgeInsets.all(16),
-        snackPosition: SnackPosition.TOP,
-        colorText: Colors.white,
-        backgroundColor: AppTheme.colorError);
-  }
+  final text = message?.trim() ?? '';
+  if (text.isEmpty) return;
+
+  Get.snackbar(
+    'Lỗi',
+    text,
+    duration: const Duration(seconds: 3),
+    margin: const EdgeInsets.all(16),
+    snackPosition: SnackPosition.TOP,
+    colorText: Colors.white,
+    backgroundColor: AppTheme.colorError,
+  );
 }
 
 snackBarWarning(String? message) {
@@ -415,3 +417,4 @@ class VcoreCustomDialog extends StatelessWidget {
     );
   }
 }
+

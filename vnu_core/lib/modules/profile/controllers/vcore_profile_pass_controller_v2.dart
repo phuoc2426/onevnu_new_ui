@@ -1,3 +1,4 @@
+import 'package:vnu_core/common/error/app_feedback.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:vnu_core/common/utils.dart';
@@ -46,7 +47,7 @@ class VcoreProfilePassControllerV2 extends GetxController {
         forgotLoaiMatKhau.value = listLoaiMatKhau.first;
       }
     } catch (e) {
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     }
   }
 
@@ -82,7 +83,7 @@ class VcoreProfilePassControllerV2 extends GetxController {
       return true;
     } catch (e) {
       Utils.dismissProgress(context);
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
       return false;
     }
   }
@@ -122,7 +123,7 @@ class VcoreProfilePassControllerV2 extends GetxController {
       return true;
     } catch (e) {
       Utils.dismissProgress(context);
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
       return false;
     }
   }
@@ -143,3 +144,4 @@ class VcoreProfilePassControllerV2 extends GetxController {
     return 'Yêu cầu lấy lại mật khẩu ${labelOf(type)} đã được gửi.';
   }
 }
+

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:vnu_core/common/error/app_feedback.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
@@ -548,7 +549,7 @@ class VcoreExamScheduleController extends GetxController {
       }
     } catch (e) {
       Utils.dismissProgress(context);
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     }
   }
 
@@ -647,7 +648,7 @@ class VcoreExamScheduleController extends GetxController {
         );
         return;
       }
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     }
   }
 
@@ -863,7 +864,7 @@ class VcoreExamScheduleController extends GetxController {
       debugPrint('Error fetching schedule from network: $e');
       refreshController.refreshFailed();
       if (listThoiKhoaBieu.isEmpty && listLichThi.isEmpty) {
-        snackBarError(e.toString());
+        AppFeedback.showError(e);
       }
     }
   }

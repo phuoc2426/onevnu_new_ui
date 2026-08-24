@@ -1,3 +1,4 @@
+import 'package:vnu_core/common/error/app_feedback.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
@@ -55,7 +56,7 @@ class VcorePahtComunitationController extends GetxController {
       var response = await ApiRepository().getTatKhuVucBanDo();
       listKhuVuc.addAll(response);
     } catch (e) {
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     }
   }
 
@@ -69,7 +70,7 @@ class VcorePahtComunitationController extends GetxController {
       var response = await ApiRepository().getPahtTatCaChuDe();
       listChuDe.addAll(response);
     } catch (e) {
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     }
   }
 
@@ -114,7 +115,7 @@ class VcorePahtComunitationController extends GetxController {
       refreshController.loadComplete();
       Utils.dismissProgress(context);
     } catch (e) {
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
       refreshController.refreshCompleted();
 
       Utils.dismissProgress(context);
@@ -122,3 +123,4 @@ class VcorePahtComunitationController extends GetxController {
     }
   }
 }
+

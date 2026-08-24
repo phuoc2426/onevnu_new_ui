@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:vnu_core/common/error/app_feedback.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -49,7 +50,7 @@ class VcoreQuestionCreateController extends GetxController {
       }
       Utils.dismissProgress(context);
     } catch (e) {
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
       Utils.dismissProgress(context);
     }
   }
@@ -119,7 +120,7 @@ class VcoreQuestionCreateController extends GetxController {
       logSuccess('upload success...');
     } catch (e) {
       uploadFileState.value = UploadFileState.none;
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     }
   }
 
@@ -157,7 +158,8 @@ class VcoreQuestionCreateController extends GetxController {
           'Gửi câu hỏi thành công, bạn sẽ nhận được thông báo khi có câu trả lời.');
     } catch (e) {
       Utils.dismissProgress(context);
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     }
   }
 }
+

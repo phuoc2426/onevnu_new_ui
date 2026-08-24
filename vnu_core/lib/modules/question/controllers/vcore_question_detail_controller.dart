@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:vnu_core/common/error/app_feedback.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:share_plus/share_plus.dart';
@@ -39,7 +40,7 @@ class VcoreQuestionDetailController extends GetxController {
       cauTraLoi.value = response;
     } catch (e) {
       isLoadingAnswer.value = false;
-      //snackBarError(e.toString());
+      //AppFeedback.showError(e);
     }
   }
 
@@ -56,7 +57,7 @@ class VcoreQuestionDetailController extends GetxController {
       snackBarSuccess('Xoá câu hỏi thành công');
     } catch (e) {
       Utils.dismissProgress(context);
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     }
   }
 
@@ -87,7 +88,8 @@ class VcoreQuestionDetailController extends GetxController {
       }
     } catch (e) {
       Utils.dismissProgress(context);
-      snackBarError(e.toString());
+      AppFeedback.showError(e);
     }
   }
 }
+

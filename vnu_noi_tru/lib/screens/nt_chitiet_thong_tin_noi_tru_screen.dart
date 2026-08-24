@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:vnu_core/common/error/app_feedback.dart';
 import 'package:flutter_html/flutter_html.dart';
 import 'package:octo_image/octo_image.dart';
 import 'package:vnu_core/common/download_manager.dart';
@@ -181,7 +182,10 @@ class _NTChiTietThongTinNoiTruScreenState
           },
           onError: (e) {
             Utils.dismissProgress(hubContext);
-            snackBarError(e);
+            AppFeedback.showError(
+          e,
+          fallbackMessage: 'Không thể xử lý tệp đính kèm. Vui lòng thử lại.',
+        );
           },
         );
       },
@@ -202,3 +206,4 @@ class _NTChiTietThongTinNoiTruScreenState
     );
   }
 }
+
