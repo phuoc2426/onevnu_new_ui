@@ -24,6 +24,7 @@ import 'package:vnu_core/widgets/refresher_footer_widget.dart';
 
 import 'package:vnu_core/modules/news/views/vcore_news_detail_view.dart';
 import 'package:vnu_core/common/app_text_styles.dart';
+import 'package:vnu_core/widgets/field/vnu_text_field.dart';
 
 const kCacheKeyListTinTucBySchoolV3 = 'listTinTucBySchool.json';
 
@@ -405,7 +406,7 @@ class _VcoreNewsViewV3State extends State<VcoreNewsViewV3> {
           const Icon(Icons.search_rounded, color: Colors.grey, size: 20),
           const SizedBox(width: 8),
           Expanded(
-            child: TextField(
+            child: VnuFloatingTextFieldAdapter(
               controller: _searchController,
               onSubmitted: (_) {
                 _onRefresh();

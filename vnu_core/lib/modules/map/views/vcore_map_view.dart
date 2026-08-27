@@ -21,6 +21,7 @@ import 'package:vnu_core/widgets/button_icon_widger.dart';
 import 'package:vnu_core/widgets/buttons_widget.dart';
 import 'package:vnu_core/widgets/navi_widget.dart';
 import 'package:vnu_core/widgets/progress_hub_widget.dart';
+import 'package:vnu_core/widgets/field/vnu_text_field.dart';
 
 class VcoreMapView extends GetView<VcoreMapController> {
   const VcoreMapView({super.key});
@@ -190,7 +191,7 @@ class VcoreMapView extends GetView<VcoreMapController> {
                 borderRadius: BorderRadius.circular(8),
                 color: Colors.white,
                 border: Border.all(color: Colors.grey.shade300)),
-            child: TextField(
+            child: VnuFloatingTextFieldAdapter(
               onChanged: ((value) {
                 // _debouncer.run(() {
                 //   logInfo(value);

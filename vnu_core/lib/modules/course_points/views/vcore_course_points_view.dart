@@ -17,6 +17,7 @@ import 'package:vnu_core/widgets/select/vnu_select.dart';
 
 import '../../../ai_radar/models/ai_radar_analysis.dart';
 import 'package:vnu_core/common/grade_scale_helper.dart';
+import 'package:vnu_core/common/guide/guide.dart';
 import 'vcore_course_points_detail_widget.dart';
 
 class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
@@ -35,7 +36,9 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
               controller.getDanhSachKieuTruong();
             }
           },
-          child: VcoreModuleScaffold(
+          child: AppGuideAnchor(
+            id: 'course_points.page',
+            child: VcoreModuleScaffold(
             title: 'Xem điểm môn học',
             pageWidth: VnuPageWidth.content,
             body: Container(
@@ -65,6 +68,7 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
                 );
               }),
             ),
+          ),
           ),
         );
       },
@@ -543,13 +547,16 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
         _buildTopControlSection(context, controller),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: analysis == null
-              ? _AiRadarPromotionalCard(
-            onStart: () => controller.runAiAnalysis(),
-          )
-              : _AnimatedCourseRadarCard(
-            analysis: analysis,
-            courseCount: courses.length,
+          child: AppGuideAnchor(
+            id: 'course_points.radar_chart',
+            child: analysis == null
+                ? _AiRadarPromotionalCard(
+                    onStart: () => controller.runAiAnalysis(),
+                  )
+                : _AnimatedCourseRadarCard(
+                    analysis: analysis,
+                    courseCount: courses.length,
+                  ),
           ),
         ),
         if (gpa != null) ...[
@@ -648,8 +655,16 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
               ),
             )
           else
-            ...courses.map(
-                  (course) => _buildCourseGradeCard(context, course, controller),
+            AppGuideAnchor(
+              id: 'course_points.list',
+              child: Column(
+                children: courses
+                    .map(
+                      (course) =>
+                          _buildCourseGradeCard(context, course, controller),
+                    )
+                    .toList(growable: false),
+              ),
             ),
         ],
       );
@@ -1265,7 +1280,9 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
       gpa.tongSoTinChiTichLuyTichLuyDenHocKyHienTai,
     );
 
-    return Container(
+    return AppGuideAnchor(
+      id: 'course_points.summary',
+      child: Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1319,6 +1336,7 @@ class VcoreCoursePointsView extends GetView<VcoreCoursePointsController> {
             tinChiTruotHocKy != '0' && tinChiTruotHocKy != '--',
           ),
         ],
+      ),
       ),
     );
   }
@@ -2162,3 +2180,4 @@ class _MiniPill extends StatelessWidget {
     );
   }
 }
+

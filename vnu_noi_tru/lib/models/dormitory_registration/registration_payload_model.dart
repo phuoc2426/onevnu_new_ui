@@ -25,27 +25,33 @@ class RegistrationPayloadModel {
     required this.student,
   });
 
-  Map<String, dynamic> toJson() => <String, dynamic>{
-        'registration_period_id': registrationPeriodId,
-        'priority_object_ids': priorityObjectIds,
-        'dormitory_id': dormitoryId,
-        // Loại phòng do cán bộ KTX phân lúc duyệt.
-        'room_type_id': roomTypeId,
-        'status': status,
-        'reason': reason,
-        'term_type': termType,
-        // Chỉ có giá trị khi term_type = 5 (Khác).
-        'start_date': startDate,
-        'end_date': endDate,
-        'attachment_file_ids': attachmentFileIds,
-        'student': student.toJson(),
-      };
+  Map<String, dynamic> toJson() {
+    final Map<String, dynamic> json = <String, dynamic>{
+      'registration_period_id': registrationPeriodId,
+      'priority_object_ids': priorityObjectIds,
+      'dormitory_id': dormitoryId,
+      // API V2: room type is assigned by KTX staff. Keep nullable only for
+      // backward compatibility; omit it from new requests when null.
+      'room_type_id': roomTypeId,
+      'status': status,
+      'reason': reason,
+      'term_type': termType,
+      // Only valid for term_type = 5 (Khác).
+      'start_date': startDate,
+      'end_date': endDate,
+      'attachment_file_ids': attachmentFileIds,
+      'student': student.toJson(),
+    };
+    json.removeWhere((String key, dynamic value) => value == null);
+    return json;
+  }
 
   RegistrationPayloadModel copyWith({
     int? registrationPeriodId,
     List<int>? priorityObjectIds,
     int? dormitoryId,
     int? roomTypeId,
+    bool clearRoomType = false,
     String? status,
     String? reason,
     int? termType,
@@ -55,11 +61,10 @@ class RegistrationPayloadModel {
     RegistrationStudentPayload? student,
   }) {
     return RegistrationPayloadModel(
-      registrationPeriodId:
-          registrationPeriodId ?? this.registrationPeriodId,
+      registrationPeriodId: registrationPeriodId ?? this.registrationPeriodId,
       priorityObjectIds: priorityObjectIds ?? this.priorityObjectIds,
       dormitoryId: dormitoryId ?? this.dormitoryId,
-      roomTypeId: roomTypeId ?? this.roomTypeId,
+      roomTypeId: clearRoomType ? null : (roomTypeId ?? this.roomTypeId),
       status: status ?? this.status,
       reason: reason ?? this.reason,
       termType: termType ?? this.termType,
@@ -91,14 +96,12 @@ class FamilyMemberPayload {
 
     return FamilyMemberPayload(
       relationship: json['relationship']?.toString() ?? 'guardian',
-      fullName:
-          (json['full_name'] ?? json['fullName'])?.toString() ?? '',
+      fullName: (json['full_name'] ?? json['fullName'])?.toString() ?? '',
       birthYear: rawBirthYear is num
           ? rawBirthYear.toInt()
           : int.tryParse(rawBirthYear?.toString() ?? ''),
       occupation: json['occupation']?.toString(),
-      phoneNumber:
-          (json['phone_number'] ?? json['phoneNumber'])?.toString(),
+      phoneNumber: (json['phone_number'] ?? json['phoneNumber'])?.toString(),
     );
   }
 
@@ -134,21 +137,22 @@ class FamilyMemberPayload {
 class RegistrationStudentPayload {
   final String studentCode;
   final String fullName;
-  final String dob; // API: dob
-  final String cccd; // API: identity_no
-  final String cccdIssueDate; // API: identity_issue_date
+  final String dob;
+  final String cccd;
+  final String cccdIssueDate;
   final String? identityIssuePlace;
   final String? identityType;
   final String? identityName;
   final String? avatar;
   final String? country;
+  final String? countryCode;
   final String? national;
-  final String hometown; // API: permanent_address
+  final String permanentAddress;
   final String? vneidPermanentAddress;
   final String? permanentProvinceCode;
   final String? permanentWardCode;
   final String? contactAddress;
-  final String className; // API: class
+  final String className;
   final String? faculty;
   final String major;
   final String academicYear;
@@ -156,13 +160,14 @@ class RegistrationStudentPayload {
   final String level;
   final String universityName;
   final int? univId;
+  final int? studentType;
   final String? priorityObjectName;
   final String temporaryAddress;
   final String? vneidTemporaryAddress;
   final String? temporaryProvinceCode;
   final String? temporaryWardCode;
   final String? reasonStay;
-  final String gender; // male / female
+  final String gender;
   final String? ethnicity;
   final String? religion;
   final String phone;
@@ -180,8 +185,9 @@ class RegistrationStudentPayload {
     this.identityName,
     this.avatar,
     this.country,
+    this.countryCode,
     this.national,
-    required this.hometown,
+    required this.permanentAddress,
     this.vneidPermanentAddress,
     this.permanentProvinceCode,
     this.permanentWardCode,
@@ -194,6 +200,7 @@ class RegistrationStudentPayload {
     required this.level,
     required this.universityName,
     this.univId,
+    this.studentType,
     this.priorityObjectName,
     required this.temporaryAddress,
     this.vneidTemporaryAddress,
@@ -232,11 +239,13 @@ class RegistrationStudentPayload {
           (json['identity_type'] ?? json['identityType'])?.toString(),
       identityName:
           (json['identity_name'] ?? json['identityName'])?.toString(),
-      avatar: (json['avatar'] ?? json['avatar_url'] ?? json['avatarUrl'])
-          ?.toString(),
+      avatar:
+          (json['avatar'] ?? json['avatar_url'] ?? json['avatarUrl'])?.toString(),
       country: json['country']?.toString(),
+      countryCode:
+          (json['country_code'] ?? json['countryCode'])?.toString(),
       national: (json['national'] ?? json['nationality'])?.toString(),
-      hometown: (json['permanent_address'] ??
+      permanentAddress: (json['permanent_address'] ??
                   json['permanentAddress'] ??
                   json['hometown'])
               ?.toString() ??
@@ -261,13 +270,15 @@ class RegistrationStudentPayload {
       level: json['level']?.toString() ?? '',
       universityName:
           (json['university_name'] ?? json['university'])?.toString() ?? '',
-      univId: _toNullableInt(json['univ_id'] ?? json['univId']),
+      univId: _toNullableInt(
+        json['univ_id'] ?? json['univId'] ?? json['university_id'],
+      ),
+      studentType:
+          _toNullableInt(json['student_type'] ?? json['studentType']),
       priorityObjectName:
-          (json['priority_object_name'] ?? json['priorityObject'])
-              ?.toString(),
+          (json['priority_object_name'] ?? json['priorityObject'])?.toString(),
       temporaryAddress:
-          (json['temporary_address'] ?? json['temporaryAddress'])
-                  ?.toString() ??
+          (json['temporary_address'] ?? json['temporaryAddress'])?.toString() ??
               '',
       vneidTemporaryAddress:
           (json['vneid_temporary_address'] ?? json['vneidTemporaryAddress'])
@@ -279,7 +290,8 @@ class RegistrationStudentPayload {
           (json['temporary_ward_code'] ?? json['temporaryWardCode'])
               ?.toString(),
       reasonStay: (json['reason_stay'] ?? json['reasonStay'])?.toString(),
-      gender: json['gender']?.toString() ?? 'male',
+      // Never silently convert unknown/null to male.
+      gender: json['gender']?.toString() ?? '',
       ethnicity: json['ethnicity']?.toString(),
       religion: json['religion']?.toString(),
       phone: (json['phone_number'] ?? json['phoneNumber'] ?? json['phone'])
@@ -305,9 +317,17 @@ class RegistrationStudentPayload {
       'full_name': fullName,
       'dob': dob,
       'identity_no': cccd,
+      'identity_type': identityType,
+      'identity_name': identityName,
       'identity_issue_date': cccdIssueDate.isEmpty ? null : cccdIssueDate,
       'identity_issue_place': identityIssuePlace,
-      'permanent_address': hometown,
+      'country': country,
+      'country_code': countryCode,
+      'national': national,
+      'permanent_address': permanentAddress,
+      'vneid_permanent_address': vneidPermanentAddress,
+      'permanent_province_code': permanentProvinceCode,
+      'permanent_ward_code': permanentWardCode,
       'contact_address': contactAddress,
       'class': className,
       'faculty': faculty,
@@ -317,19 +337,121 @@ class RegistrationStudentPayload {
       'level': level,
       'university_name': universityName,
       'univ_id': univId,
+      'student_type': studentType,
       'priority_object_name': priorityObjectName,
       'temporary_address': temporaryAddress,
+      'vneid_temporary_address': vneidTemporaryAddress,
+      'temporary_province_code': temporaryProvinceCode,
+      'temporary_ward_code': temporaryWardCode,
+      'reason_stay': reasonStay,
       'gender': gender,
       'ethnicity': ethnicity,
       'religion': religion,
       'phone_number': phone,
       'email': email,
-      'family_members': familyMembers
-          .map((FamilyMemberPayload item) => item.toJson())
-          .toList(),
+      'family_members':
+          familyMembers.map((FamilyMemberPayload item) => item.toJson()).toList(),
     };
 
-    json.removeWhere((String key, dynamic value) => value == null);
+    json.removeWhere((String key, dynamic value) {
+      return value == null || (value is String && value.trim().isEmpty);
+    });
+    return json;
+  }
+
+  /// Student fields accepted by POST /dormitory/registrations.
+  ///
+  /// Keep this separate from [toJson] because the draft/profile model carries
+  /// more fields than the registration endpoint currently validates.
+  Map<String, dynamic> toRegistrationJson() {
+    final Map<String, dynamic> json = <String, dynamic>{
+      'student_code': studentCode.isEmpty ? null : studentCode,
+      'full_name': fullName,
+      'dob': dob,
+      'identity_no': cccd,
+      'country_code': countryCode,
+      'identity_issue_date': cccdIssueDate.isEmpty ? null : cccdIssueDate,
+      'identity_issue_place': identityIssuePlace,
+      'permanent_address': permanentAddress,
+      'permanent_province_code': permanentProvinceCode,
+      'permanent_ward_code': permanentWardCode,
+      'contact_address': contactAddress,
+      'class': className,
+      'faculty': faculty,
+      'major': major,
+      'academic_year': academicYear,
+      'system': system,
+      'level': level,
+      'university_name': universityName,
+      'univ_id': univId,
+      'student_type': studentType,
+      'priority_object_name': priorityObjectName,
+      'temporary_address': temporaryAddress,
+      'temporary_province_code': temporaryProvinceCode,
+      'temporary_ward_code': temporaryWardCode,
+      'gender': gender,
+      'ethnicity': ethnicity,
+      'religion': religion,
+      'phone_number': phone,
+      'email': email,
+      'family_members':
+          familyMembers.map((FamilyMemberPayload item) => item.toJson()).toList(),
+    };
+
+    json.removeWhere((String key, dynamic value) {
+      return value == null || (value is String && value.trim().isEmpty);
+    });
+    return json;
+  }
+
+  /// Fields supported by the current KTX PATCH /students/{identityNo}
+  /// contract but not fully covered by POST /dormitory/registrations.
+  ///
+  /// This is intentionally a strict whitelist. Do not add academic fields here
+  /// until UpdateStudentRequest in the KTX OpenAPI accepts them.
+  Map<String, dynamic> toPostRegistrationUpdateJson() {
+    final Map<String, dynamic> json = <String, dynamic>{
+      'identity_type': identityType,
+      'identity_name': identityName,
+      'country': country,
+      'country_code': countryCode,
+      'national': national,
+      'vneid_permanent_address': vneidPermanentAddress,
+      'vneid_temporary_address': vneidTemporaryAddress,
+      'reason_stay': reasonStay,
+    };
+
+    json.removeWhere((String key, dynamic value) {
+      return value == null || (value is String && value.trim().isEmpty);
+    });
+    return json;
+  }
+
+  /// Student fields accepted by POST /dormitory/attachments/upload.
+  Map<String, dynamic> toUploadJson() {
+    final Map<String, dynamic> json = <String, dynamic>{
+      'student_code': studentCode.isEmpty ? null : studentCode,
+      'full_name': fullName,
+      'dob': dob,
+      'identity_no': cccd,
+      'identity_issue_date': cccdIssueDate.isEmpty ? null : cccdIssueDate,
+      'permanent_address': permanentAddress,
+      'class': className,
+      'major': major,
+      'academic_year': academicYear,
+      'system': system,
+      'level': level,
+      'university_name': universityName,
+      'priority_object_name': priorityObjectName,
+      'temporary_address': temporaryAddress,
+      'gender': gender,
+      'phone_number': phone,
+      'email': email,
+    };
+
+    json.removeWhere((String key, dynamic value) {
+      return value == null || (value is String && value.trim().isEmpty);
+    });
     return json;
   }
 

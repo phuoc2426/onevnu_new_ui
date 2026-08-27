@@ -5,7 +5,6 @@ import 'dart:math';
 
 import 'package:app_links/app_links.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:firebase_remote_config/firebase_remote_config.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -13,38 +12,21 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:students/bootstrap/app_bootstrap.dart';
 
 import 'package:vnu_core/common/log.dart';
-import 'package:vnu_core/common/guide/guide.dart';
 import 'package:vnu_core/globals.dart';
 import 'package:vnu_core/modules/sync/views/vcore_sync_view.dart';
 import 'package:vnu_core/modules/sync/vneid_deep_link_service.dart';
 import 'package:vnu_core/modules/tabbar/views/vcore_tabbar_view.dart';
+import 'package:vnu_core/services/app_update_coordinator.dart';
 import 'package:vnu_core/vnu_core.dart';
 import 'package:vnu_noi_tru/vnu_noi_tru.dart';
 
 // Nếu cần bật DevicePreview thì mở lại import này.
 // import 'package:device_preview/device_preview.dart';
 
-/// Bọc một screen bằng guide scope.
-///
-/// Lý do cần helper này:
-/// - VnuCore().runVnuApp(mainScreen: ...)
-/// - VnuCore().gotoMainScreen(...)
-///
-/// đều có thể tạo lại main screen sau login / logout / navigation.
-/// Nếu truyền thẳng `const VcoreTabbarView()` thì màn Home sau đó có thể không còn
-/// nằm dưới AppGuideRegistryScope, gây lỗi:
-///
-/// AppGuideRegistryScope not found.
-Widget _buildGuideHost({required Widget child}) {
-  return AppGuideRegistryScope(
-    registry: globalAppGuideRegistry,
-    child: AppShowcaseScope(child: child),
-  );
-}
-
-Widget _buildMainScreen() {
-  return _buildGuideHost(child: const VcoreTabbarView());
-}
+/// Guide scope is installed globally in `VnuCore.runVnuApp()` around the
+/// Navigator. Keep the main screen plain here; nested ShowCaseWidget instances
+/// would split guide state between the root tabbar and pushed routes.
+Widget _buildMainScreen() => const VcoreTabbarView();
 
 Future<void> main() async {
   final bootstrap = await AppBootstrap.initialize();
@@ -70,40 +52,64 @@ class MyApp extends StatefulHookWidget {
   State<MyApp> createState() => _MyAppState();
 }
 
-class _MyAppState extends State<MyApp> {
+class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
   FlutterLocalNotificationsPlugin();
 
   final AppLinks _appLinks = AppLinks();
 
   StreamSubscription<Uri>? _appLinksSubscription;
+  StreamSubscription<String>? _fcmTokenRefreshSubscription;
 
   bool _isOpeningVneidSyncView = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _startRuntimeServices();
   }
 
   void _startRuntimeServices() {
-    _initializationLocalPushNotificationPlugin();
+    // Requirement Gate is independent from Firebase. It starts fetching during
+    // Splash, but AppUpdateGate stays hidden until Splash has navigated away.
+    unawaited(AppUpdateCoordinator.instance.start());
+
     unawaited(_initVneidDeepLinks());
+    unawaited(_initializeNotificationRuntime());
+  }
+
+  Future<void> _initializeNotificationRuntime() async {
+    await _initializationLocalPushNotificationPlugin();
 
     if (!widget.firebaseReady) {
       logWarning(
-        '[RUNTIME] Firebase unavailable; skip FCM and Remote Config initialization.',
+        '[RUNTIME] Firebase unavailable; skip FCM initialization only.',
       );
       return;
     }
 
-    unawaited(_initFireBaseMessaging());
-    unawaited(_initRemoteConfig());
+    await _initFireBaseMessaging();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+
+    if (state == AppLifecycleState.resumed) {
+      // Covers Recent Apps, returning from Play Store/App Store and any normal
+      // background -> foreground transition. If the installed version is still
+      // below minimumVersion, the global gate remains blocking.
+      unawaited(AppUpdateCoordinator.instance.onAppResumed());
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    AppUpdateCoordinator.instance.stop();
     _appLinksSubscription?.cancel();
+    _fcmTokenRefreshSubscription?.cancel();
     super.dispose();
   }
 
@@ -112,9 +118,7 @@ class _MyAppState extends State<MyApp> {
     VnuCore().loginSucces = (token) async {
       logInfo('Login success');
 
-      /// Quan trọng:
-      /// Không truyền thẳng `const VcoreTabbarView()` nữa.
-      /// Phải truyền screen đã được bọc AppGuideRegistryScope + AppShowcaseScope.
+      // Guide scope already wraps the root Navigator in VnuCore.runVnuApp().
       VnuCore().gotoMainScreen(_buildMainScreen());
 
       _openPendingVneidCallback();
@@ -124,9 +128,6 @@ class _MyAppState extends State<MyApp> {
       }
     };
 
-    /// Quan trọng:
-    /// mainScreen cũng phải dùng `_buildMainScreen()`.
-    /// Không dùng `const VcoreTabbarView()` trực tiếp.
     return VnuCore().runVnuApp(mainScreen: _buildMainScreen());
   }
 
@@ -197,37 +198,7 @@ class _MyAppState extends State<MyApp> {
     });
   }
 
-  Future<void> _initRemoteConfig() async {
-    try {
-      final FirebaseRemoteConfig remoteConfig = FirebaseRemoteConfig.instance;
-
-      await remoteConfig.setConfigSettings(
-        RemoteConfigSettings(
-          fetchTimeout: const Duration(seconds: 8),
-          minimumFetchInterval: const Duration(seconds: 1),
-        ),
-      );
-
-      await remoteConfig.fetchAndActivate();
-
-      final configValue = remoteConfig.getAll();
-      logInfo('[REMOTE_CONFIG] keys=${configValue.keys.join(',')}');
-
-      await VnuCore().checkUpdateNewVersion(
-        foreVersion: remoteConfig.getString('fore'),
-        iosVersion: remoteConfig.getString('ios'),
-        iosUrl: remoteConfig.getString('iOSUrl'),
-        androidVersion: remoteConfig.getString('android'),
-        androidUrl: remoteConfig.getString('androidUrl'),
-      );
-    } catch (e) {
-      // Remote Config là cấu hình từ xa; lỗi fetch/activate không được làm app
-      // văng khỏi startup. Requirement Gate sẽ xử lý policy bắt buộc ở phase sau.
-      logError('[REMOTE_CONFIG] initialization failed: $e');
-    }
-  }
-
-  void _initializationLocalPushNotificationPlugin() {
+  Future<void> _initializationLocalPushNotificationPlugin() async {
     const AndroidInitializationSettings initializationSettingsAndroid =
     AndroidInitializationSettings('app_icon');
 
@@ -240,7 +211,7 @@ class _MyAppState extends State<MyApp> {
       iOS: initializationSettingsIOS,
     );
 
-    flutterLocalNotificationsPlugin.initialize(
+    await flutterLocalNotificationsPlugin.initialize(
       settings: initializationSettings,
       onDidReceiveNotificationResponse: (details) {
         if (details.payload == null) return;
@@ -254,6 +225,23 @@ class _MyAppState extends State<MyApp> {
         }
       },
     );
+
+    if (Platform.isAndroid) {
+      const channel = AndroidNotificationChannel(
+        'OneVNU',
+        'OneVNU',
+        description: 'OneVNU Notification',
+        importance: Importance.high,
+        playSound: true,
+      );
+
+      unawaited(
+        flutterLocalNotificationsPlugin
+            .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin>()
+            ?.createNotificationChannel(channel),
+      );
+    }
   }
 
   Future<void> _initFireBaseMessaging() async {
@@ -267,6 +255,34 @@ class _MyAppState extends State<MyApp> {
         provisional: false,
         sound: true,
       );
+
+      if (Platform.isIOS) {
+        // iOS does not show foreground notification banners unless these
+        // presentation options are enabled. AppBootstrap also sets them early;
+        // repeating here after permission keeps runtime initialization robust.
+        await FirebaseMessaging.instance
+            .setForegroundNotificationPresentationOptions(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
+      }
+
+      await _fcmTokenRefreshSubscription?.cancel();
+      _fcmTokenRefreshSubscription =
+          FirebaseMessaging.instance.onTokenRefresh.listen((token) async {
+        final normalized = token.trim();
+        if (normalized.isEmpty) return;
+
+        try {
+          // Works for both normal USER and APPLICANT sessions. The backend
+          // resolves the current access token from the Authorization header.
+          await VnuCore().addFirebaseToken(normalized);
+          logInfo('[FCM] refreshed device token synchronized');
+        } catch (error) {
+          logError('[FCM] token refresh sync failed: $error');
+        }
+      });
 
       FirebaseMessaging.onMessage.listen((event) {
         _showLocalPushNotification(event);
@@ -290,19 +306,46 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future<void> _showLocalPushNotification(RemoteMessage message) async {
-    if (Platform.isIOS) {
+    // On iOS, a normal FCM notification payload is already rendered as a
+    // foreground system banner because presentation options are enabled. Do not
+    // create a second local notification for the same message.
+    if (Platform.isIOS && message.notification != null) {
+      return;
+    }
+
+    final title = (message.notification?.title ??
+            message.data['title'] ??
+            message.data['notificationTitle'] ??
+            '')
+        .toString()
+        .trim();
+    final body = (message.notification?.body ??
+            message.data['body'] ??
+            message.data['message'] ??
+            message.data['content'] ??
+            '')
+        .toString()
+        .trim();
+
+    // Data-only messages do not automatically create a banner on iOS. In that
+    // case, use flutter_local_notifications as the foreground fallback.
+    if (title.isEmpty && body.isEmpty) {
+      logWarning('[FCM] foreground message has no visible title/body');
       return;
     }
 
     const AndroidNotificationDetails androidPlatformChannelSpecifics =
-    AndroidNotificationDetails(
+        AndroidNotificationDetails(
       'OneVNU',
       'OneVNU',
       channelDescription: 'OneVNU Notification',
+      importance: Importance.high,
+      priority: Priority.high,
+      playSound: true,
     );
 
     const DarwinNotificationDetails iOSPlatformChannelSpecifics =
-    DarwinNotificationDetails(
+        DarwinNotificationDetails(
       presentAlert: true,
       presentSound: true,
       presentBadge: true,
@@ -315,13 +358,13 @@ class _MyAppState extends State<MyApp> {
 
     await flutterLocalNotificationsPlugin.show(
       id: Random().nextInt(10000),
-      title: message.notification?.title ?? '',
-      body: message.notification?.body ?? '',
+      title: title,
+      body: body,
       notificationDetails: platformChannelSpecifics,
       payload: jsonEncode(message.data),
     );
 
-    logSuccess('flutterLocalNotificationsPlugin show push');
+    logSuccess('[FCM] foreground local notification shown');
   }
 
   void onDidReceiveLocalNotification(
@@ -350,3 +393,6 @@ class _MyAppState extends State<MyApp> {
     );
   }
 }
+
+
+

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:vnu_core/common/app_text_styles.dart';
 import 'package:vnu_core/themes/app_theme.dart';
 import 'package:vnu_noi_tru/repository/dormitory_registration_repository.dart';
+import 'package:vnu_core/widgets/field/vnu_text_field.dart';
 
 class DRAccommodationRequestSheet extends StatefulWidget {
   final Object registrationId;
@@ -400,7 +401,7 @@ class _DRAccommodationRequestSheetState
         ),
 
         const SizedBox(height: 16),
-        TextField(
+        VnuFloatingTextFieldAdapter(
           controller: _noteController,
           maxLength: 500,
           minLines: 3,

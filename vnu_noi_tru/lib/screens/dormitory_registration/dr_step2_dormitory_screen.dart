@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vnu_core/widgets/field/vnu_date_picker_sheet.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:vnu_core/themes/app_theme.dart';
@@ -424,14 +425,12 @@ class _DRStep2DormitoryScreenState extends State<DRStep2DormitoryScreen> {
         ? cubit.customStartDate!
         : firstDate;
 
-    final DateTime? selected = await showDatePicker(
+    final DateTime? selected = await VnuDatePickerSheet.show(
       context: context,
+      title: 'Ngày bắt đầu ở',
       initialDate: initialDate,
       firstDate: firstDate,
       lastDate: DateTime(today.year + 5, 12, 31),
-      helpText: 'Chọn ngày bắt đầu ở',
-      cancelText: 'Hủy',
-      confirmText: 'Chọn',
     );
 
     if (selected == null || !mounted) return;
@@ -452,14 +451,12 @@ class _DRStep2DormitoryScreenState extends State<DRStep2DormitoryScreen> {
         ? cubit.customEndDate!
         : firstDate;
 
-    final DateTime? selected = await showDatePicker(
+    final DateTime? selected = await VnuDatePickerSheet.show(
       context: context,
+      title: 'Ngày kết thúc ở',
       initialDate: initialDate,
       firstDate: firstDate,
       lastDate: DateTime(today.year + 6, 12, 31),
-      helpText: 'Chọn ngày kết thúc ở',
-      cancelText: 'Hủy',
-      confirmText: 'Chọn',
     );
 
     if (selected == null || !mounted) return;
@@ -922,3 +919,4 @@ class _DRStep2DormitoryScreenState extends State<DRStep2DormitoryScreen> {
 
 
 }
+

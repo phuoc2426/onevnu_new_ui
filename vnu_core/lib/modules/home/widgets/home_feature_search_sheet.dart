@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../models/home_feature_item.dart';
 import '../services/home_feature_registry.dart';
 import '../services/home_feature_search_service.dart';
+import 'package:vnu_core/widgets/field/vnu_text_field.dart';
 
 class HomeFeatureSearchSheet extends StatefulWidget {
   const HomeFeatureSearchSheet({
@@ -89,7 +90,7 @@ class _HomeFeatureSearchSheetState extends State<HomeFeatureSearchSheet> {
                   ),
                 ),
                 const SizedBox(height: 14),
-                TextField(
+                VnuFloatingTextFieldAdapter(
                   controller: _controller,
                   autofocus: true,
                   onChanged: _onChanged,

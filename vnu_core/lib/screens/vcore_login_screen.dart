@@ -25,6 +25,7 @@ import 'package:vnu_core/widgets/buttons_widget.dart';
 import 'package:vnu_core/widgets/progress_hub_widget.dart';
 
 import '../constants/config.dart';
+import 'package:vnu_core/widgets/field/vnu_text_field.dart';
 
 class VCoreLoginScreen extends StatefulWidget {
   static const int serialTaps = 10;
@@ -482,77 +483,29 @@ class _VCoreLoginScreenState extends State<VCoreLoginScreen> {
   }
 
   Widget _formEmail() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Tài khoản',
-          style: TextStyle(
-            fontSize: AppFontSizes.medium,
-            color: Color(0xff2A3556),
-          ),
-        ),
-        Container(
-          margin: const EdgeInsets.only(top: 6),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: TextField(
-            style: const TextStyle(
-              fontSize: AppFontSizes.medium,
-              color: Color(0xff2A3556),
-            ),
-            controller: _emailController,
-            decoration: const InputDecoration(
-              hintText: 'Nhập tài khoản',
-              isDense: true,
-              contentPadding: EdgeInsets.all(15),
-              focusedBorder: OutlineInputBorder(borderSide: BorderSide.none),
-              enabledBorder: OutlineInputBorder(borderSide: BorderSide.none),
-            ),
-          ),
-        ),
-      ],
+    return VnuTextField(
+      controller: _emailController,
+      label: 'Tài khoản',
+      hintText: 'Nhập tài khoản',
+      textInputAction: TextInputAction.next,
+      style: const TextStyle(
+        fontSize: AppFontSizes.medium,
+        color: Color(0xff2A3556),
+      ),
     );
   }
 
   Widget _formPassword() {
-    return Padding(
-      padding: const EdgeInsets.only(top: 16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Mật khẩu',
-            style: TextStyle(
-              fontSize: AppFontSizes.medium,
-              color: Color(0xff2A3556),
-            ),
-          ),
-          Container(
-            margin: const EdgeInsets.only(top: 6),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: TextField(
-              style: const TextStyle(
-                fontSize: AppFontSizes.medium,
-                color: Color(0xff2A3556),
-              ),
-              controller: _paswordController,
-              obscureText: true,
-              decoration: const InputDecoration(
-                hintText: 'Nhập mật khẩu',
-                isDense: true,
-                contentPadding: EdgeInsets.all(15),
-                focusedBorder: OutlineInputBorder(borderSide: BorderSide.none),
-                enabledBorder: OutlineInputBorder(borderSide: BorderSide.none),
-              ),
-            ),
-          ),
-        ],
+    return VnuTextField(
+      controller: _paswordController,
+      label: 'Mật khẩu',
+      hintText: 'Nhập mật khẩu',
+      obscureText: true,
+      margin: const EdgeInsets.only(top: 16),
+      textInputAction: TextInputAction.done,
+      style: const TextStyle(
+        fontSize: AppFontSizes.medium,
+        color: Color(0xff2A3556),
       ),
     );
   }

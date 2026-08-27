@@ -1,21 +1,13 @@
-import 'dart:io';
-import 'package:vnu_core/common/error/app_feedback.dart';
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
 import 'package:flutter_html/flutter_html.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:vnu_core/common/app_colors.dart';
 import 'package:vnu_core/common/app_text_styles.dart';
-import 'package:vnu_core/themes/app_theme.dart';
 import 'package:vnu_core/common/datetime_utils.dart';
-import 'package:vnu_core/common/utils.dart';
-import 'package:vnu_core/common/log.dart';
+import 'package:vnu_core/common/attachment_preview.dart';
 import 'package:vnu_core/constants/datetime_const.dart';
 import 'package:vnu_core/widgets/vcore_module_scaffold.dart';
-import 'package:vnu_core/common/vnu_cache_manager.dart';
-import 'package:vnu_core/services/services_url.dart';
-import 'package:vnu_core/extensions/extension_string.dart';
 import '../../../common/space_widget.dart';
 
 class VcoreNotifyDetailViewV3 extends StatefulWidget {
@@ -46,32 +38,21 @@ class VcoreNotifyDetailViewV3 extends StatefulWidget {
 
 class _VcoreNotifyDetailViewV3State extends State<VcoreNotifyDetailViewV3> {
   
-  Future<void> _downloadAndShare(String guid, String fileName) async {
-    if (guid.isEmpty) {
-      snackBarError('Không tìm thấy thông tin tệp đính kèm.');
-      return;
-    }
-    Utils.showProgress(context);
+  Future<void> _previewAttachment(String guid, String fileName) async {
+    await VnuAttachmentPreview.open(
+      context: context,
+      guid: guid,
+      fileName: fileName,
+      title: fileName,
+    );
+  }
 
-    String url = '${ServicesUrl().baseUrlFileDownload}$guid';
-    try {
-      File? file = await VnuCacheManager.downloadAndCache(
-        url,
-        guid,
-        fileName.fileExtension(),
-      );
-      Utils.dismissProgress(context);
-
-      if (file != null) {
-        logSuccess(file.path);
-        await Share.shareXFiles([XFile(file.path)], subject: fileName);
-      } else {
-        snackBarError('Không thể tải tệp đính kèm');
-      }
-    } catch (e) {
-      Utils.dismissProgress(context);
-      AppFeedback.showError(e);
-    }
+  Future<void> _shareAttachment(String guid, String fileName) async {
+    await VnuAttachmentPreview.share(
+      context: context,
+      guid: guid,
+      fileName: fileName,
+    );
   }
 
   Future<void> _shareTextContent() async {
@@ -94,10 +75,7 @@ class _VcoreNotifyDetailViewV3State extends State<VcoreNotifyDetailViewV3> {
 
   @override
   Widget build(BuildContext context) {
-    final hasFiles = widget.fileGuids != null && 
-                     widget.fileGuids!.isNotEmpty && 
-                     widget.fileNames != null && 
-                     widget.fileNames!.isNotEmpty;
+    final hasFiles = widget.fileGuids != null && widget.fileGuids!.isNotEmpty;
 
     final hasMetadata = widget.showMetadata && (
       widget.date != null || 
@@ -312,13 +290,17 @@ class _VcoreNotifyDetailViewV3State extends State<VcoreNotifyDetailViewV3> {
                         spaceHeight(10),
                         ...List.generate(widget.fileGuids!.length, (index) {
                           final fileGuid = widget.fileGuids![index];
-                          final fileName = widget.fileNames!.length > index
-                              ? widget.fileNames![index]
-                              : 'Tài liệu đính kèm';
+                          final rawName = (widget.fileNames != null &&
+                                  widget.fileNames!.length > index)
+                              ? widget.fileNames![index].trim()
+                              : '';
+                          final fileName = rawName.isNotEmpty
+                              ? rawName
+                              : 'Tài liệu đính kèm ${index + 1}';
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 10),
                             child: InkWell(
-                              onTap: () => _downloadAndShare(fileGuid, fileName),
+                              onTap: () => _previewAttachment(fileGuid, fileName),
                               borderRadius: BorderRadius.circular(12),
                               child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -329,21 +311,55 @@ class _VcoreNotifyDetailViewV3State extends State<VcoreNotifyDetailViewV3> {
                                 ),
                                 child: Row(
                                   children: [
-                                    const Icon(Icons.attach_file_rounded, color: Color(0xff003392), size: 18),
-                                    spaceWidth(10),
-                                    Expanded(
-                                      child: Text(
-                                        fileName,
-                                        style: const TextStyle(
-                                          fontSize: AppFontSizes.mediumSmall,
-                                          fontWeight: FontWeight.w600,
-                                          color: Color(0xff003392),
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
+                                    Container(
+                                      width: 36,
+                                      height: 36,
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: const Icon(
+                                        Icons.visibility_rounded,
+                                        color: Color(0xff003392),
+                                        size: 19,
                                       ),
                                     ),
-                                    const Icon(Icons.share_rounded, color: Color(0xff003392), size: 16),
+                                    spaceWidth(10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: <Widget>[
+                                          Text(
+                                            fileName,
+                                            style: const TextStyle(
+                                              fontSize: AppFontSizes.mediumSmall,
+                                              fontWeight: FontWeight.w700,
+                                              color: Color(0xff003392),
+                                            ),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 2),
+                                          const Text(
+                                            'Chạm để xem trước',
+                                            style: TextStyle(
+                                              fontSize: AppFontSizes.extraSmall,
+                                              color: Color(0xff718096),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    IconButton(
+                                      tooltip: 'Chia sẻ tệp',
+                                      onPressed: () =>
+                                          _shareAttachment(fileGuid, fileName),
+                                      icon: const Icon(
+                                        Icons.ios_share_rounded,
+                                        color: Color(0xff003392),
+                                        size: 19,
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),
@@ -411,4 +427,3 @@ class _VcoreNotifyDetailViewV3State extends State<VcoreNotifyDetailViewV3> {
     );
   }
 }
-

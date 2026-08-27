@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -8,6 +10,7 @@ import 'package:vnu_core/repository/app_repository.dart';
 import 'package:vnu_core/repository/applicant_session_repository.dart';
 import 'package:vnu_core/repository/data_repository.dart';
 import 'package:vnu_core/screens/vcore_admission_view.dart';
+import 'package:vnu_core/services/app_update_coordinator.dart';
 import 'package:vnu_core/services/services_url.dart';
 import 'package:vnu_core/vnu_core.dart';
 
@@ -171,16 +174,35 @@ class _VCoreSplashScreenState extends State<VCoreSplashScreen> {
 
   Future<String?> _getFirebaseToken() async {
     try {
-      final token = await FirebaseMessaging.instance.getToken();
-      if (token != null && token.isNotEmpty) {
-        ServicesUrl().firebaseToken = token;
-        logInfo('Đã lấy FCM token cho thiết bị');
+      final messaging = FirebaseMessaging.instance;
+
+      if (Platform.isIOS) {
+        await _waitForApnsToken(messaging);
       }
-      return token;
+
+      final token = await messaging.getToken();
+      if (token != null && token.trim().isNotEmpty) {
+        // Do not overwrite ServicesUrl.firebaseToken here. addFirebaseToken()
+        // needs the previous value to update oldToken -> newToken on server.
+        logInfo('Đã lấy FCM token cho thiết bị');
+        return token.trim();
+      }
+      return null;
     } catch (error) {
       logError('Không lấy được FCM token: $error');
       return null;
     }
+  }
+
+  Future<String?> _waitForApnsToken(FirebaseMessaging messaging) async {
+    for (var attempt = 0; attempt < 8; attempt++) {
+      final token = await messaging.getAPNSToken();
+      if (token != null && token.trim().isNotEmpty) {
+        return token.trim();
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+    }
+    return null;
   }
 
   Future<void> _syncFirebaseToken(String? firebaseToken) async {
@@ -202,6 +224,18 @@ class _VCoreSplashScreenState extends State<VCoreSplashScreen> {
     }
   }
 
+  void _markPostSplashReadyAfterNavigation() {
+    // Force Update may already be known while Splash is loading, but the
+    // blocking UI must only appear after Splash has handed control to the real
+    // application route. A short post-navigation settle also prevents the gate
+    // from flashing over the final Splash transition frame.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future<void>.delayed(const Duration(milliseconds: 320), () {
+        AppUpdateCoordinator.instance.markPostSplashReady();
+      });
+    });
+  }
+
   void _goToAdmission() {
     if (_hasNavigated || !mounted) return;
     _hasNavigated = true;
@@ -209,6 +243,7 @@ class _VCoreSplashScreenState extends State<VCoreSplashScreen> {
       MaterialPageRoute(builder: (_) => const VcoreAdmissionView()),
       (_) => false,
     );
+    _markPostSplashReadyAfterNavigation();
   }
 
   void _goToApplicantHome(String fullName) {
@@ -222,6 +257,7 @@ class _VCoreSplashScreenState extends State<VCoreSplashScreen> {
       ),
       (_) => false,
     );
+    _markPostSplashReadyAfterNavigation();
   }
 
   void _goToMain() {
@@ -230,6 +266,7 @@ class _VCoreSplashScreenState extends State<VCoreSplashScreen> {
 
     if (VnuCore().loginSucces != null) {
       VnuCore().loginSucces!(Globals().token);
+      _markPostSplashReadyAfterNavigation();
       return;
     }
 
@@ -237,6 +274,7 @@ class _VCoreSplashScreenState extends State<VCoreSplashScreen> {
       MaterialPageRoute(builder: (_) => widget.mainScreen),
       (_) => false,
     );
+    _markPostSplashReadyAfterNavigation();
   }
 
   @override
@@ -258,3 +296,5 @@ class _VCoreSplashScreenState extends State<VCoreSplashScreen> {
     );
   }
 }
+
+

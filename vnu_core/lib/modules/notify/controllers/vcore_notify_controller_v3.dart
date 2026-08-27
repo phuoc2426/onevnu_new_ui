@@ -499,6 +499,11 @@ class VcoreNotifyControllerV3
 
       if (notificationType ==
           LoaiThongBao.TinTuc.name) {
+        if (guidItem.isEmpty) {
+          _openFallbackDetail(notification, 'Tin tức');
+          return;
+        }
+
         final TinTucModel detail =
         await ApiRepository()
             .getDetailTinTuc(
@@ -522,8 +527,7 @@ class VcoreNotifyControllerV3
                     'Cổng thông tin VNU',
                 date:
                 detail.thoiGianTao ??
-                    notification.ngayGui ??
-                    DateTime.now(),
+                    notification.ngayGui,
                 category: 'Tin tức',
                 fileGuids:
                 detail.guidFileDinhKems,
@@ -546,6 +550,11 @@ class VcoreNotifyControllerV3
           LoaiThongBao
               .Cmsvnu_TinTuc
               .name) {
+        if (guidItem.isEmpty) {
+          _openFallbackDetail(notification, 'Tin tức VNU');
+          return;
+        }
+
         final TopTinTucDetailModel
         detail =
         await ApiRepository()
@@ -569,8 +578,7 @@ class VcoreNotifyControllerV3
                 notification.tenNguoiGui ??
                     'Cổng thông tin VNU',
                 date:
-                notification.ngayGui ??
-                    DateTime.now(),
+                notification.ngayGui,
                 category: 'Tin tức VNU',
               ),
         );
@@ -657,8 +665,7 @@ class VcoreNotifyControllerV3
                   'Hệ thống',
               date:
               detail.thoiGian ??
-                  notification.ngayGui ??
-                  DateTime.now(),
+                  notification.ngayGui,
               category:
               'Tin hệ thống',
               fileGuids:
@@ -695,8 +702,7 @@ class VcoreNotifyControllerV3
         notification.tenNguoiGui ??
             'Hệ thống',
         date:
-        notification.ngayGui ??
-            DateTime.now(),
+        notification.ngayGui,
         category:
         notificationType.isNotEmpty
             ? notificationType

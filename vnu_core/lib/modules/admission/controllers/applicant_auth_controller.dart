@@ -175,7 +175,7 @@ class ApplicantAuthController extends GetxController {
       );
 
       if (Platform.isIOS) {
-        final String? apnsToken = await messaging.getAPNSToken();
+        final String? apnsToken = await _waitForApnsToken(messaging);
 
         logInfo(
           '[NEW_STUDENT_LOGIN] '
@@ -208,6 +208,18 @@ class ApplicantAuthController extends GetxController {
   }
 
 
+
+  Future<String?> _waitForApnsToken(FirebaseMessaging messaging) async {
+    for (var attempt = 0; attempt < 8; attempt++) {
+      final String? token = await messaging.getAPNSToken();
+      if (token != null && token.trim().isNotEmpty) {
+        return token.trim();
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+    }
+    return null;
+  }
+
   void _showProgress() {
     try {
       Utils.showProgress(context);
@@ -239,4 +251,5 @@ class ApplicantAuthController extends GetxController {
     super.onClose();
   }
 }
+
 

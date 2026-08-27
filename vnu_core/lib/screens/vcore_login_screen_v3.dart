@@ -25,6 +25,7 @@ import 'package:vnu_core/services/services_url.dart';
 import 'package:vnu_core/vnu_core.dart';
 import 'package:vnu_core/widgets/buttons_widget.dart';
 import 'package:vnu_core/widgets/progress_hub_widget.dart';
+import 'package:vnu_core/widgets/field/vnu_text_field.dart';
 
 enum _LoginMode { student, applicant }
 
@@ -544,11 +545,8 @@ class _LoginCard extends StatelessWidget {
             transitionBuilder: (Widget child, Animation<double> animation) {
               return FadeTransition(
                 opacity: animation,
-                child: SizeTransition(
-                  sizeFactor: animation,
-                  axisAlignment: -1,
-                  child: child,
-                ),
+                child: child, // bỏ SizeTransition tạm thời
+
               );
             },
             child: _isStudent ? _buildStudentForm() : _buildApplicantForm(),
@@ -850,49 +848,41 @@ class _InputField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _GlassLikeBox(
-      height: 56,
-      child: TextField(
-        controller: controller,
-        obscureText: obscureText,
-        keyboardType: keyboardType,
-        inputFormatters: inputFormatters,
-        textInputAction: textInputAction,
-        onSubmitted: onSubmitted,
-        autocorrect: false,
-        enableSuggestions: !obscureText,
-        style: const TextStyle(
-          color: _VCoreLoginScreenV3State.textDark,
-          fontSize: AppFontSizes.mediumLarge,
-          fontWeight: FontWeight.w500,
-        ),
-        decoration: InputDecoration(
-          border: InputBorder.none,
-          hintText: hintText,
-          hintStyle: const TextStyle(
-            color: _VCoreLoginScreenV3State.hint,
-            fontSize: AppFontSizes.mediumLarge,
-            fontWeight: FontWeight.w500,
-          ),
-          prefixIcon: Icon(
-            icon,
-            color: _VCoreLoginScreenV3State.green,
-            size: 24,
-          ),
-          suffixIcon: suffixIcon == null
-              ? null
-              : InkWell(
-                  onTap: onSuffixTap,
-                  borderRadius: BorderRadius.circular(24),
-                  child: Icon(
-                    suffixIcon,
-                    color: _VCoreLoginScreenV3State.textMuted,
-                    size: 22,
-                  ),
-                ),
-          contentPadding: const EdgeInsets.symmetric(vertical: 17),
-        ),
+    // Do not wrap a floating outlined field with a second painted border.
+    // The previous glass container crossed the floating label notch on some
+    // Android font metrics and visually cut the top of the first label.
+    return VnuTextField(
+      controller: controller,
+      label: hintText,
+      obscureText: obscureText,
+      keyboardType: keyboardType,
+      inputFormatters: inputFormatters,
+      textInputAction: textInputAction,
+      onSubmitted: onSubmitted,
+      autocorrect: false,
+      enableSuggestions: !obscureText,
+      cursorColor: _VCoreLoginScreenV3State.green,
+      style: const TextStyle(
+        color: _VCoreLoginScreenV3State.textDark,
+        fontSize: AppFontSizes.mediumLarge,
+        fontWeight: FontWeight.w500,
       ),
+      leading: Icon(
+        icon,
+        color: _VCoreLoginScreenV3State.green,
+        size: 24,
+      ),
+      trailing: suffixIcon == null
+          ? null
+          : InkWell(
+              onTap: onSuffixTap,
+              borderRadius: BorderRadius.circular(24),
+              child: Icon(
+                suffixIcon,
+                color: _VCoreLoginScreenV3State.textMuted,
+                size: 22,
+              ),
+            ),
     );
   }
 }
@@ -911,7 +901,7 @@ class _GlassLikeBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: height,
+      constraints: BoxConstraints(minHeight: height),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.62),
         borderRadius: BorderRadius.circular(borderRadius),
@@ -1205,3 +1195,4 @@ class _UtilityButton extends StatelessWidget {
     );
   }
 }
+

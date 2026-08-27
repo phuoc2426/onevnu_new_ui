@@ -12,6 +12,7 @@ import 'package:vnu_core/widgets/progress_hub_widget.dart';
 import '../constants/config.dart';
 import '../widgets/navi_widget.dart';
 import 'package:vnu_core/common/app_text_styles.dart';
+import 'package:vnu_core/widgets/field/vnu_text_field.dart';
 
 class VCoreChangePassScreen extends StatefulWidget {
   const VCoreChangePassScreen({Key? key}) : super(key: key);
@@ -153,7 +154,7 @@ class _VCoreChangePassScreenState extends State<VCoreChangePassScreen> {
           margin: const EdgeInsets.only(top: 6),
           decoration: BoxDecoration(
               color: Colors.white, borderRadius: BorderRadius.circular(8)),
-          child: TextField(
+          child: VnuFloatingTextFieldAdapter(
             style: TextStyle(fontSize: AppFontSizes.medium, color: Color(0xff2A3556)),
             controller: _matKhauCuController,
             decoration: const InputDecoration(
@@ -183,7 +184,7 @@ class _VCoreChangePassScreenState extends State<VCoreChangePassScreen> {
             margin: const EdgeInsets.only(top: 6),
             decoration: BoxDecoration(
                 color: Colors.white, borderRadius: BorderRadius.circular(8)),
-            child: TextField(
+            child: VnuFloatingTextFieldAdapter(
               style: TextStyle(fontSize: AppFontSizes.medium, color: Color(0xff2A3556)),
               controller: _matKhauMoiController,
               obscureText: true,

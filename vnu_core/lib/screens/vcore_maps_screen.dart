@@ -20,6 +20,7 @@ import 'package:vnu_core/widgets/info_window.dart';
 import 'package:vnu_core/widgets/loading_indicator.dart';
 import 'package:vnu_core/widgets/navi_widget.dart';
 import 'package:custom_info_window/custom_info_window.dart';
+import 'package:vnu_core/widgets/field/vnu_text_field.dart';
 
 class VCoreMapsScreen extends StatefulWidget {
   const VCoreMapsScreen({super.key});
@@ -281,7 +282,7 @@ class _VCoreMapsScreenState extends State<VCoreMapsScreen> {
                 borderRadius: BorderRadius.circular(8),
                 color: Colors.white,
                 border: Border.all(color: Colors.grey.shade300)),
-            child: TextField(
+            child: VnuFloatingTextFieldAdapter(
               onChanged: ((value) {
                 _debouncer.run(() {
                   logInfo(value);

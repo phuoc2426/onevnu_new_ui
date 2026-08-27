@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:vnu_core/widgets/field/vnu_date_picker_sheet.dart';
 import 'package:vnu_core/common/error/app_error_mapper.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
@@ -9,9 +11,11 @@ import 'package:intl/intl.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:vnu_core/common/app_text_styles.dart';
+import 'package:vnu_core/widgets/field/vnu_text_field.dart';
 import 'package:vnu_core/widgets/select/vnu_select.dart';
 import 'package:vnu_core/themes/app_theme.dart';
 import 'package:vnu_core/services/services_url.dart';
+import 'package:vnu_noi_tru/domain/registration/dormitory_date_codec.dart';
 import 'package:vnu_noi_tru/models/model.dart';
 import 'package:vnu_noi_tru/repository/dormitory_registration_repository.dart';
 
@@ -78,6 +82,8 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
   late final TextEditingController _identityNoController;
   late final TextEditingController _identityIssueDateController;
   late final TextEditingController _identityIssuePlaceController;
+  late final TextEditingController _ethnicityController;
+  late final TextEditingController _religionController;
 
   late final TextEditingController _classNameController;
   late final TextEditingController _facultyController;
@@ -86,8 +92,11 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
   late final TextEditingController _systemController;
   late final TextEditingController _levelController;
   late final TextEditingController _universityController;
+  late final TextEditingController _universityIdController;
+  late final TextEditingController _priorityObjectNameController;
 
   late final TextEditingController _countryController;
+  late final TextEditingController _countryCodeController;
   late final TextEditingController _nationalController;
 
   late final TextEditingController _permanentAddressController;
@@ -103,12 +112,15 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
 
   late final TextEditingController _reasonStayController;
 
-  String _gender = 'male';
+  String? _gender;
   String _identityType = 'CCCD';
+  int? _studentType;
   bool _submitting = false;
 
   final List<_StudentFamilyMemberForm> _familyForms =
       <_StudentFamilyMemberForm>[];
+  late String _initialFamilySnapshot;
+  late final Map<String, String> _unsupportedInitialValues;
 
   @override
   void initState() {
@@ -155,7 +167,13 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
     final String rawGender = _readText(widget.student, const <String>[
       'gender',
     ], (dynamic object) => object.gender).toLowerCase();
-    _gender = rawGender == 'female' || rawGender == 'nữ' ? 'female' : 'male';
+    if (rawGender == 'female' || rawGender == 'nữ') {
+      _gender = 'female';
+    } else if (rawGender == 'male' || rawGender == 'nam') {
+      _gender = 'male';
+    } else {
+      _gender = null;
+    }
 
     _phoneController = TextEditingController(
       text: _readText(widget.student, const <String>[
@@ -217,6 +235,16 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
         'identityIssuePlace',
       ], (dynamic object) => object.identityIssuePlace),
     );
+    _ethnicityController = TextEditingController(
+      text: _readText(widget.student, const <String>[
+        'ethnicity',
+      ], (dynamic object) => object.ethnicity),
+    );
+    _religionController = TextEditingController(
+      text: _readText(widget.student, const <String>[
+        'religion',
+      ], (dynamic object) => object.religion),
+    );
 
     _classNameController = TextEditingController(
       text: _readText(widget.student, const <String>[
@@ -258,11 +286,32 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
         'universityName',
       ], (dynamic object) => object.university),
     );
+    _universityIdController = TextEditingController(
+      text: _readValue(
+        widget.student,
+        const <String>['university_id', 'universityId', 'univ_id', 'univId'],
+        (dynamic object) => object.universityId,
+      )?.toString() ?? '',
+    );
+    _priorityObjectNameController = TextEditingController(
+      text: _readText(widget.student, const <String>[
+        'priority_object_name',
+        'priorityObjectName',
+        'priorityObject',
+      ], (dynamic object) => object.priorityObjectName),
+    );
 
     _countryController = TextEditingController(
       text: _readText(widget.student, const <String>[
         'country',
       ], (dynamic object) => object.country),
+    );
+
+    _countryCodeController = TextEditingController(
+      text: _readText(widget.student, const <String>[
+        'country_code',
+        'countryCode',
+      ], (dynamic object) => object.countryCode),
     );
 
     _nationalController = TextEditingController(
@@ -277,7 +326,7 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
         'permanent_address',
         'permanentAddress',
         'hometown',
-      ], (dynamic object) => object.hometown),
+      ], (dynamic object) => object.permanentAddress),
     );
 
     _contactAddressController = TextEditingController(
@@ -343,8 +392,21 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
       ], (dynamic object) => object.reasonStay),
     );
 
+    final dynamic rawStudentType = _readValue(
+      widget.student,
+      const <String>['student_type', 'studentType'],
+      (dynamic object) => object.studentType,
+    );
+    _studentType = rawStudentType is num
+        ? rawStudentType.toInt()
+        : int.tryParse(rawStudentType?.toString() ?? '');
+    if (_studentType != 0 && _studentType != 1) {
+      _studentType = null;
+    }
+
     _familyForms.addAll(_readFamilyMembers(widget.student));
-    _loadPriorityObjects();
+    _initialFamilySnapshot = _familyMembersSnapshot();
+    _unsupportedInitialValues = _unsupportedFieldValues();
   }
 
   @override
@@ -358,6 +420,8 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
     _identityNoController.dispose();
     _identityIssueDateController.dispose();
     _identityIssuePlaceController.dispose();
+    _ethnicityController.dispose();
+    _religionController.dispose();
     _classNameController.dispose();
     _facultyController.dispose();
     _majorController.dispose();
@@ -365,7 +429,10 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
     _systemController.dispose();
     _levelController.dispose();
     _universityController.dispose();
+    _universityIdController.dispose();
+    _priorityObjectNameController.dispose();
     _countryController.dispose();
+    _countryCodeController.dispose();
     _nationalController.dispose();
     _permanentAddressController.dispose();
     _contactAddressController.dispose();
@@ -757,7 +824,6 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
               child: _field(
                 controller: _studentCodeController,
                 label: 'Mã sinh viên',
-                readOnly: true,
               ),
             ),
             const SizedBox(width: 10),
@@ -795,10 +861,11 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
                   VnuSelectItem<String>(value: 'male', label: 'Nam'),
                   VnuSelectItem<String>(value: 'female', label: 'Nữ'),
                 ],
+                validator: (String? value) => value == null
+                    ? 'Vui lòng chọn giới tính'
+                    : null,
                 onChanged: (String? value) {
-                  if (value != null) {
-                    setState(() => _gender = value);
-                  }
+                  setState(() => _gender = value);
                 },
               ),
             ),
@@ -870,13 +937,22 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
         const SizedBox(height: 10),
         _field(
           controller: _identityIssuePlaceController,
-          label: 'Nơi cấp',
+          label: 'Nơi cấp giấy tờ',
           maxLength: 255,
+        ),
+        const SizedBox(height: 10),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Expanded(child: _field(controller: _ethnicityController, label: 'Dân tộc', maxLength: 50)),
+            const SizedBox(width: 10),
+            Expanded(child: _field(controller: _religionController, label: 'Tôn giáo', maxLength: 50)),
+          ],
         ),
         const SizedBox(height: 10),
         _field(
           controller: _permanentAddressController,
-          label: 'Quê quán/địa chỉ thường trú',
+          label: 'Địa chỉ thường trú',
           maxLines: 2,
         ),
         const SizedBox(height: 10),
@@ -889,22 +965,43 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
+            Expanded(child: _field(controller: _permanentProvinceCodeController, label: 'Mã tỉnh thường trú', maxLength: 50)),
+            const SizedBox(width: 10),
+            Expanded(child: _field(controller: _permanentWardCodeController, label: 'Mã xã/phường thường trú', maxLength: 50)),
+          ],
+        ),
+        const SizedBox(height: 10),
+        _field(
+          controller: _contactAddressController,
+          label: 'Địa chỉ liên hệ',
+          maxLines: 2,
+        ),
+        const SizedBox(height: 10),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
             Expanded(
               child: _field(
                 controller: _countryController,
-                label: 'Mã quốc gia',
+                label: 'Quốc gia',
                 maxLength: 10,
               ),
             ),
             const SizedBox(width: 10),
             Expanded(
               child: _field(
-                controller: _nationalController,
-                label: 'Quốc tịch',
-                maxLength: 50,
+                controller: _countryCodeController,
+                label: 'Mã quốc gia',
+                maxLength: 10,
               ),
             ),
           ],
+        ),
+        const SizedBox(height: 10),
+        _field(
+          controller: _nationalController,
+          label: 'Quốc tịch',
+          maxLength: 50,
         ),
       ],
     );
@@ -915,6 +1012,19 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
       icon: Icons.school_outlined,
       title: 'Thông tin học tập',
       children: <Widget>[
+        VnuSingleSelect<int>(
+          label: 'Loại người học',
+          value: _studentType,
+          hintText: 'Chọn loại người học',
+          sheetTitle: 'Chọn loại người học',
+          enabled: !_submitting,
+          items: const <VnuSelectItem<int>>[
+            VnuSelectItem<int>(value: 0, label: 'Học sinh'),
+            VnuSelectItem<int>(value: 1, label: 'Sinh viên'),
+          ],
+          onChanged: (int? value) => setState(() => _studentType = value),
+        ),
+        const SizedBox(height: 10),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
@@ -922,7 +1032,6 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
               child: _field(
                 controller: _classNameController,
                 label: 'Lớp',
-                readOnly: true,
               ),
             ),
             const SizedBox(width: 8),
@@ -930,7 +1039,6 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
               child: _field(
                 controller: _majorController,
                 label: 'Ngành',
-                readOnly: true,
               ),
             ),
             const SizedBox(width: 8),
@@ -938,7 +1046,6 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
               child: _field(
                 controller: _academicYearController,
                 label: 'Năm học',
-                readOnly: true,
               ),
             ),
           ],
@@ -951,7 +1058,6 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
               child: _field(
                 controller: _facultyController,
                 label: 'Khoa/đơn vị',
-                readOnly: true,
               ),
             ),
             const SizedBox(width: 10),
@@ -959,7 +1065,6 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
               child: _field(
                 controller: _systemController,
                 label: 'Hệ đào tạo',
-                readOnly: true,
               ),
             ),
           ],
@@ -972,7 +1077,6 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
               child: _field(
                 controller: _levelController,
                 label: 'Bậc đào tạo',
-                readOnly: true,
               ),
             ),
             const SizedBox(width: 10),
@@ -980,7 +1084,26 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
               child: _field(
                 controller: _universityController,
                 label: 'Trường',
-                readOnly: true,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Expanded(
+              child: _field(
+                controller: _universityIdController,
+                label: 'ID trường',
+                keyboardType: TextInputType.number,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _field(
+                controller: _priorityObjectNameController,
+                label: 'Tên đối tượng ưu tiên',
               ),
             ),
           ],
@@ -992,7 +1115,7 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
   Widget _buildContactPriorityCard() {
     return _sectionCard(
       icon: Icons.phone_outlined,
-      title: 'Liên hệ & ưu tiên',
+      title: 'Liên hệ & lưu trú',
       children: <Widget>[
         _field(
           controller: _temporaryAddressController,
@@ -1006,10 +1129,13 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
           maxLines: 2,
         ),
         const SizedBox(height: 10),
-        _field(
-          controller: _contactAddressController,
-          label: 'Địa chỉ liên hệ',
-          maxLines: 2,
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Expanded(child: _field(controller: _temporaryProvinceCodeController, label: 'Mã tỉnh tạm trú', maxLength: 50)),
+            const SizedBox(width: 10),
+            Expanded(child: _field(controller: _temporaryWardCodeController, label: 'Mã xã/phường tạm trú', maxLength: 50)),
+          ],
         ),
         const SizedBox(height: 10),
         Row(
@@ -1036,17 +1162,6 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
             ),
           ],
         ),
-        const SizedBox(height: 14),
-        const Text(
-          'Đối tượng ưu tiên',
-          style: TextStyle(
-            fontSize: AppFontSizes.font11,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF374151),
-          ),
-        ),
-        const SizedBox(height: 8),
-        _buildPriorityObjectSelector(),
       ],
     );
   }
@@ -1902,26 +2017,22 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
     String? Function(String?)? validator,
     List<TextInputFormatter>? inputFormatters,
   }) {
-    return TextFormField(
+    final bool requiredField = label.trim().endsWith('*');
+    final String effectiveLabel =
+        label.replaceFirst(RegExp(r'\s*\*$'), '').trim();
+
+    return VnuTextField(
       controller: controller,
+      label: effectiveLabel,
+      requiredField: requiredField,
       enabled: !_submitting,
       readOnly: readOnly,
       keyboardType: keyboardType,
       maxLength: maxLength,
       maxLines: maxLines,
+      minLines: maxLines > 1 ? maxLines : null,
       validator: validator,
       inputFormatters: inputFormatters,
-      cursorColor: const Color(0xFF078B3E),
-      style: const TextStyle(
-        fontSize: AppFontSizes.mediumSmall,
-        fontWeight: FontWeight.w600,
-        color: Color(0xFF111318),
-        height: 1.35,
-      ),
-      decoration: _inputDecoration(label).copyWith(
-        counterText: '',
-        fillColor: readOnly ? const Color(0xFFF4F6F5) : Colors.white,
-      ),
     );
   }
 
@@ -1930,71 +2041,22 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
     required String label,
     String? Function(String?)? validator,
   }) {
-    return TextFormField(
+    final bool requiredField = label.trim().endsWith('*');
+    final String effectiveLabel =
+        label.replaceFirst(RegExp(r'\s*\*$'), '').trim();
+
+    return VnuTextField(
       controller: controller,
+      label: effectiveLabel,
+      requiredField: requiredField,
       readOnly: true,
       enabled: !_submitting,
       validator: validator,
       onTap: () => _selectDate(controller),
-      cursorColor: const Color(0xFF078B3E),
-      style: const TextStyle(
-        fontSize: AppFontSizes.mediumSmall,
-        fontWeight: FontWeight.w600,
-        color: Color(0xFF111318),
-      ),
-      decoration: _inputDecoration(label).copyWith(
-        suffixIcon: const Icon(
-          Icons.calendar_today_outlined,
-          size: 18,
-          color: Color(0xFF078B3E),
-        ),
-      ),
-    );
-  }
-
-  InputDecoration _inputDecoration(String label) {
-    final OutlineInputBorder border = OutlineInputBorder(
-      borderRadius: BorderRadius.circular(14),
-      borderSide: const BorderSide(color: Color(0xFFDCE3DF)),
-    );
-
-    return InputDecoration(
-      labelText: label,
-      isDense: true,
-      filled: true,
-      fillColor: Colors.white,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      labelStyle: const TextStyle(
-        fontSize: AppFontSizes.font11,
-        fontWeight: FontWeight.w600,
-        color: Color(0xFF6B7280),
-      ),
-      floatingLabelStyle: const TextStyle(
-        fontSize: AppFontSizes.font11,
-        fontWeight: FontWeight.w700,
+      trailing: const Icon(
+        Icons.calendar_today_outlined,
+        size: 18,
         color: Color(0xFF078B3E),
-      ),
-      hintStyle: const TextStyle(
-        fontSize: AppFontSizes.mediumSmall,
-        color: Color(0xFF9CA3AF),
-      ),
-      errorStyle: const TextStyle(
-        fontSize: AppFontSizes.extraSmall,
-        color: Color(0xFFDC2626),
-      ),
-      border: border,
-      enabledBorder: border,
-      disabledBorder: border.copyWith(
-        borderSide: const BorderSide(color: Color(0xFFE7ECE9)),
-      ),
-      focusedBorder: border.copyWith(
-        borderSide: const BorderSide(color: Color(0xFF078B3E), width: 1.6),
-      ),
-      errorBorder: border.copyWith(
-        borderSide: const BorderSide(color: Color(0xFFDC2626)),
-      ),
-      focusedErrorBorder: border.copyWith(
-        borderSide: const BorderSide(color: Color(0xFFDC2626), width: 1.5),
       ),
     );
   }
@@ -2047,17 +2109,12 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
     final DateTime? parsed = DateTime.tryParse(controller.text.trim());
     if (parsed != null) initialDate = parsed;
 
-    final DateTime? selected = await showDatePicker(
+    final DateTime? selected = await VnuDatePickerSheet.show(
       context: context,
+      title: 'Chọn ngày',
       initialDate: initialDate,
       firstDate: DateTime(1900),
       lastDate: DateTime.now(),
-      builder: (BuildContext context, Widget? child) {
-        return Theme(
-          data: _buildGreenFormTheme(context),
-          child: child ?? const SizedBox.shrink(),
-        );
-      },
     );
 
     if (selected != null) {
@@ -2088,16 +2145,15 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
       return;
     }
 
+    final List<String> unsupportedChanges = _unsupportedChanges();
+    if (unsupportedChanges.isNotEmpty) {
+      final bool continueSaving = await _confirmUnsupportedChanges(unsupportedChanges);
+      if (!continueSaving || !mounted) return;
+    }
+
     setState(() => _submitting = true);
 
     try {
-      final List<int> selectedPriorityIds = _selectedPriorityObjects
-          .map((PriorityObjectModel item) => item.id)
-          .whereType<int>()
-          .toSet()
-          .toList();
-      final String selectedPriorityNames = _selectedPriorityObjectNames;
-
       final Map<String, dynamic> data = <String, dynamic>{
         'full_name': _textOrNull(_fullNameController),
         'gender': _gender,
@@ -2110,11 +2166,10 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
         'identity_issue_date': _dateToApiOrNull(
           _identityIssueDateController.text,
         ),
-        'identity_issue_place': _textOrNull(_identityIssuePlaceController),
         'country': _textOrNull(_countryController),
+        'country_code': _textOrNull(_countryCodeController),
         'national': _textOrNull(_nationalController),
         'permanent_address': _textOrNull(_permanentAddressController),
-        'contact_address': _textOrNull(_contactAddressController),
         'vneid_permanent_address': _textOrNull(
           _vneidPermanentAddressController,
         ),
@@ -2131,20 +2186,21 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
         ),
         'temporary_ward_code': _textOrNull(_temporaryWardCodeController),
         'reason_stay': _textOrNull(_reasonStayController),
-        // Gửi kèm để backend mới có thể đồng bộ lựa chọn ưu tiên.
-        // Với backend cũ chưa khai báo hai field này, Laravel sẽ bỏ qua.
-        'priority_object_ids': selectedPriorityIds,
-        'priority_object_name': selectedPriorityNames.isEmpty
-            ? null
-            : selectedPriorityNames,
-        // API quy định: gửi key này sẽ thay toàn bộ danh sách hiện tại.
-        'family_members': _familyForms
-            .map((_StudentFamilyMemberForm item) => item.toPayload().toJson())
-            .toList(),
+        'student_type': _studentType,
       };
 
-      final bool hasUploadFiles =
-          _avatarFile != null || _priorityDocumentFiles.isNotEmpty;
+      final String currentFamilySnapshot = _familyMembersSnapshot();
+      if (currentFamilySnapshot != _initialFamilySnapshot) {
+        // PATCH contract: when this key is present the server replaces the
+        // entire family list. Omit it when the user did not edit the list.
+        data['family_members'] = _familyForms
+            .map((_StudentFamilyMemberForm item) => item.toPayload().toJson())
+            .toList();
+      }
+
+      data.removeWhere((String key, dynamic value) => value == null);
+
+      final bool hasUploadFiles = _avatarFile != null;
       final RegistrationStudentPayload? uploadStudent = hasUploadFiles
           ? _buildUploadStudentPayload(
               identityNo: updatedIdentityNo.isEmpty
@@ -2162,37 +2218,16 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
         }
       }
 
-      final List<Object> uploadedPriorityAttachmentIds = <Object>[];
-
       if (_priorityDocumentFiles.isNotEmpty && uploadStudent != null) {
-        final List<File> filesToUpload = List<File>.from(
-          _priorityDocumentFiles,
-        );
-        for (int index = 0; index < filesToUpload.length; index++) {
-          final UploadedAttachmentListResponse proofResponse = await _repository
-              .uploadPriorityDocuments(
-                student: uploadStudent,
-                files: <File>[filesToUpload[index]],
-              );
-
-          if (proofResponse.success != true &&
-              (proofResponse.data == null || proofResponse.data!.isEmpty)) {
-            throw Exception(
-              'Không tải được giấy tờ ưu tiên ${index + 1}/${filesToUpload.length}',
+        final UploadedAttachmentListResponse documentResponse = await _repository
+            .uploadPriorityDocuments(
+              student: uploadStudent,
+              files: List<File>.unmodifiable(_priorityDocumentFiles),
             );
-          }
-
-          uploadedPriorityAttachmentIds.addAll(
-            (proofResponse.data ?? <UploadedAttachmentModel>[])
-                .map((UploadedAttachmentModel item) => item.id)
-                .whereType<Object>(),
-          );
+        if (documentResponse.success != true &&
+            (documentResponse.data == null || documentResponse.data!.isEmpty)) {
+          throw Exception('Không tải được giấy tờ ưu tiên');
         }
-      }
-
-      if (uploadedPriorityAttachmentIds.isNotEmpty) {
-        // Backend cập nhật mới có thể dùng các ID này để gắn giấy tờ vào hồ sơ.
-        data['attachment_file_ids'] = uploadedPriorityAttachmentIds;
       }
 
       final Map<String, dynamic> response = await _repository.updateStudent(
@@ -2206,13 +2241,10 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
           response['message']?.toString().trim().isNotEmpty == true
           ? response['message'].toString()
           : 'Cập nhật thông tin sinh viên thành công.';
-      final String uploadMessage = _priorityDocumentFiles.isEmpty
-          ? ''
-          : ' Đã tải lên ${_priorityDocumentFiles.length} giấy tờ ưu tiên.';
-      final String priorityMessage = selectedPriorityNames.isEmpty
-          ? ''
-          : ' Đối tượng ưu tiên đã chọn: $selectedPriorityNames.';
-      final String message = '$baseMessage$uploadMessage$priorityMessage';
+      final String message = unsupportedChanges.isEmpty
+          ? baseMessage
+          : '$baseMessage Các trường chưa được API KTX hỗ trợ cập nhật nên '
+              'chưa được lưu: ${unsupportedChanges.join(', ')}.';
 
       Navigator.pop(
         context,
@@ -2251,8 +2283,9 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
       identityType: _identityType,
       identityName: _textOrNull(_identityNameController),
       country: _textOrNull(_countryController),
+      countryCode: _textOrNull(_countryCodeController),
       national: _textOrNull(_nationalController),
-      hometown: _permanentAddressController.text.trim(),
+      permanentAddress: _permanentAddressController.text.trim(),
       vneidPermanentAddress: _textOrNull(_vneidPermanentAddressController),
       permanentProvinceCode: _textOrNull(_permanentProvinceCodeController),
       permanentWardCode: _textOrNull(_permanentWardCodeController),
@@ -2264,15 +2297,16 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
       system: _systemController.text.trim(),
       level: _levelController.text.trim(),
       universityName: _universityController.text.trim(),
-      priorityObjectName: _selectedPriorityObjectNames.isEmpty
-          ? null
-          : _selectedPriorityObjectNames,
+      priorityObjectName: null,
       temporaryAddress: _temporaryAddressController.text.trim(),
       vneidTemporaryAddress: _textOrNull(_vneidTemporaryAddressController),
       temporaryProvinceCode: _textOrNull(_temporaryProvinceCodeController),
       temporaryWardCode: _textOrNull(_temporaryWardCodeController),
       reasonStay: _textOrNull(_reasonStayController),
-      gender: _gender,
+      studentType: _studentType,
+      gender: _gender ?? '',
+      ethnicity: _textOrNull(_ethnicityController),
+      religion: _textOrNull(_religionController),
       phone: _phoneController.text.trim(),
       email: _emailController.text.trim(),
       familyMembers: _familyForms
@@ -2363,6 +2397,82 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
     return (value ?? '').trim().toLowerCase();
   }
 
+  Map<String, String> _unsupportedFieldValues() {
+    String text(TextEditingController controller) => controller.text.trim();
+    return <String, String>{
+      'Mã sinh viên': text(_studentCodeController),
+      'Nơi cấp giấy tờ': text(_identityIssuePlaceController),
+      'Dân tộc': text(_ethnicityController),
+      'Tôn giáo': text(_religionController),
+      'Địa chỉ liên hệ': text(_contactAddressController),
+      'Lớp': text(_classNameController),
+      'Khoa/đơn vị': text(_facultyController),
+      'Ngành': text(_majorController),
+      'Năm học': text(_academicYearController),
+      'Hệ đào tạo': text(_systemController),
+      'Bậc đào tạo': text(_levelController),
+      'Trường': text(_universityController),
+      'ID trường': text(_universityIdController),
+      'Tên đối tượng ưu tiên': text(_priorityObjectNameController),
+    };
+  }
+
+  List<String> _unsupportedChanges() {
+    final Map<String, String> current = _unsupportedFieldValues();
+    return current.entries
+        .where((MapEntry<String, String> entry) =>
+            entry.value != (_unsupportedInitialValues[entry.key] ?? ''))
+        .map((MapEntry<String, String> entry) => entry.key)
+        .toList();
+  }
+
+  Future<bool> _confirmUnsupportedChanges(List<String> fields) async {
+    final bool? result = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('Một số trường chưa thể lưu'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const Text(
+                  'API KTX hiện tại chưa khai báo các trường dưới đây trong '
+                  'UpdateStudentRequest. Bạn vẫn có thể nhập để kiểm tra/form '
+                  'đầy đủ, nhưng các thay đổi này sẽ không được gửi trong PATCH:',
+                ),
+                const SizedBox(height: 10),
+                ...fields.map(
+                  (String field) => Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text('• $field'),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'Các trường còn lại được API hỗ trợ vẫn sẽ được lưu bình thường.',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Quay lại chỉnh'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Lưu phần được hỗ trợ'),
+            ),
+          ],
+        );
+      },
+    );
+    return result == true;
+  }
+
   String? _requiredValidator(String? value) {
     return value == null || value.trim().isEmpty ? 'Không được để trống' : null;
   }
@@ -2397,11 +2507,15 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
   // the ISO‑8601 string of the local DateTime without converting to UTC.
   // This preserves the selected calendar date.
   String? _dateToApiOrNull(String value) {
-    final String text = value.trim();
-    if (text.isEmpty) return null;
-    final DateTime? parsed = DateTime.tryParse(text);
-    // Return the ISO string in the local timezone (no UTC conversion).
-    return parsed?.toIso8601String();
+    return DormitoryDateCodec.normalizeNullable(value);
+  }
+
+  String _familyMembersSnapshot() {
+    return jsonEncode(
+      _familyForms
+          .map((_StudentFamilyMemberForm item) => item.toPayload().toJson())
+          .toList(),
+    );
   }
 
   void _showError(String message) {
@@ -2797,4 +2911,3 @@ class _StudentFamilyMemberForm {
     phoneController.dispose();
   }
 }
-

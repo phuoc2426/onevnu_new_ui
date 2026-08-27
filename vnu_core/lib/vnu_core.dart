@@ -14,6 +14,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:vnu_core/common/guide/core/app_showcase_scope.dart';
+import 'package:vnu_core/common/guide/registry/app_guide_global_registry.dart';
+import 'package:vnu_core/common/guide/registry/app_guide_registry_scope.dart';
 import 'package:vnu_core/common/log.dart';
 import 'package:vnu_core/common/network_monitor.dart';
 import 'package:vnu_core/common/utils.dart';
@@ -34,6 +37,8 @@ import 'package:vnu_core/screens/vcore_login_screen_v4.dart';
 import 'package:vnu_core/screens/vcore_preview_pdf_screen.dart';
 import 'package:vnu_core/screens/vcore_splash_screen.dart';
 import 'package:vnu_core/services/services_url.dart';
+import 'package:vnu_core/widgets/app_update_gate.dart';
+import 'package:vnu_core/themes/app_theme.dart';
 
 /*
   - Quản lý đăng nhập
@@ -70,9 +75,59 @@ class VnuCore {
       title: 'One VNU',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        primarySwatch: Colors.blue,
+        primaryColor: AppTheme.colorMain,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: AppTheme.colorMain,
+          brightness: Brightness.light,
+        ).copyWith(
+          primary: AppTheme.colorMain,
+          secondary: AppTheme.colorMain,
+        ),
+        textSelectionTheme: const TextSelectionThemeData(
+          cursorColor: AppTheme.colorMain,
+          selectionColor: Color(0x33007F3E),
+          selectionHandleColor: AppTheme.colorMain,
+        ),
+        textButtonTheme: TextButtonThemeData(
+          style: TextButton.styleFrom(
+            foregroundColor: AppTheme.colorMain,
+          ),
+        ),
+        checkboxTheme: CheckboxThemeData(
+          fillColor: MaterialStateProperty.resolveWith<Color?>((states) {
+            if (states.contains(MaterialState.selected)) {
+              return AppTheme.colorMain;
+            }
+            return null;
+          }),
+        ),
+        radioTheme: RadioThemeData(
+          fillColor: MaterialStateProperty.resolveWith<Color?>((states) {
+            if (states.contains(MaterialState.selected)) {
+              return AppTheme.colorMain;
+            }
+            return null;
+          }),
+        ),
+        switchTheme: SwitchThemeData(
+          thumbColor: MaterialStateProperty.resolveWith<Color?>((states) {
+            if (states.contains(MaterialState.selected)) {
+              return AppTheme.colorMain;
+            }
+            return null;
+          }),
+          trackColor: MaterialStateProperty.resolveWith<Color?>((states) {
+            if (states.contains(MaterialState.selected)) {
+              return AppTheme.colorMain.withOpacity(0.38);
+            }
+            return null;
+          }),
+        ),
+        progressIndicatorTheme: const ProgressIndicatorThemeData(
+          color: AppTheme.colorMain,
+        ),
         appBarTheme: const AppBarTheme(
-          iconTheme: IconThemeData(color: Colors.white), // 1
+          iconTheme: IconThemeData(color: Colors.white),
         ),
       ),
       locale: Get.deviceLocale,
@@ -81,12 +136,23 @@ class VnuCore {
       // Chèn ShadTheme vào ĐÂY, bên trong builder, để nó nằm dưới
       // Localizations/Directionality/Theme mà GetMaterialApp đã tạo ra.
       builder: (context, child) {
+        // Guide scope must wrap the Navigator itself, not only the Home route.
+        // This makes the same Registry + ShowCaseWidget available to every
+        // pushed page so a Dynamic Guide can move Home -> Điểm -> Hồ sơ and
+        // still resume the pending anchor on the destination route.
         return ShadTheme(
           data: ShadThemeData(
             brightness: Brightness.light,
             colorScheme: const ShadZincColorScheme.light(),
           ),
-          child: child!,
+          // The update gate must live above the Navigator/Guide tree. A
+          // pushAndRemoveUntil after Splash/Login therefore cannot remove it.
+          child: AppUpdateGate(
+            child: AppGuideRegistryScope(
+              registry: globalAppGuideRegistry,
+              child: AppShowcaseScope(child: child!),
+            ),
+          ),
         );
       },
       home: VCoreSplashScreen(mainScreen: mainScreen),
@@ -482,3 +548,6 @@ class VnuCore {
     }
   }
 }
+
+
+

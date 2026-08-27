@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
 import 'package:vnu_core/common/app_text_styles.dart';
+import 'package:vnu_core/common/guide/guide.dart';
 import 'package:vnu_core/modules/notify/controllers/vcore_notify_controller_v3.dart';
 import 'package:vnu_core/modules/notify/views/vcore_notify_detail_view_v3.dart';
 import 'package:vnu_core/modules/notify/views/vcore_notify_item_widget_v3.dart';
@@ -66,22 +67,30 @@ class _VcoreNotifyViewV3State
           ) {
         controller.context = context;
 
-        return VcoreModuleScaffold(
+        return AppGuideAnchor(
+          id: 'notify.page',
+          child: VcoreModuleScaffold(
           title: widget.systemOnly
               ? 'Thông báo hệ thống'
               : 'Thông báo',
           showBackButton: true,
           body: widget.systemOnly
-              ? _buildSystemNewsList(
-            controller,
-          )
+              ? AppGuideAnchor(
+                  id: 'notify.list',
+                  child: _buildSystemNewsList(controller),
+                )
               : Column(
             children: <Widget>[
-              _buildTabBar(
-                controller,
+              AppGuideAnchor(
+                id: 'notify.tabs',
+                child: _buildTabBar(
+                  controller,
+                ),
               ),
               Expanded(
-                child: TabBarView(
+                child: AppGuideAnchor(
+                  id: 'notify.list',
+                  child: TabBarView(
                   controller:
                   _tabController,
                   children:
@@ -94,8 +103,10 @@ class _VcoreNotifyViewV3State
                     ),
                   ],
                 ),
+                ),
               ),
             ],
+          ),
           ),
         );
       },
@@ -111,7 +122,7 @@ class _VcoreNotifyViewV3State
         horizontal: 16,
         vertical: 12,
       ),
-      height: 44,
+      height: 48,
       decoration: BoxDecoration(
         color:
         const Color(0xFFF0F4FA),
@@ -179,8 +190,18 @@ class _VcoreNotifyViewV3State
             dividerColor:
             Colors.transparent,
             tabs: <Widget>[
-              Tab(text: systemLabel),
-              Tab(text: trainingLabel),
+              Tab(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(systemLabel),
+                ),
+              ),
+              Tab(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(trainingLabel),
+                ),
+              ),
             ],
           );
         },
@@ -336,8 +357,9 @@ class _VcoreNotifyViewV3State
                               '',
                           sender:
                           'Phòng Đào tạo',
-                          date:
-                          DateTime.now(),
+                          // API đào tạo hiện không trả ngày; không tự gán
+                          // thời điểm mở màn hình vì sẽ hiển thị sai dữ liệu.
+                          date: null,
                           category:
                           'Tin đào tạo',
                         ),

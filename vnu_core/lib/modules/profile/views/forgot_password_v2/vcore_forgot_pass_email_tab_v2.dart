@@ -6,6 +6,7 @@ import 'package:get/get.dart';
 import 'package:vnu_core/common/app_color.dart';
 import 'package:vnu_core/common/space_widget.dart';
 import 'package:vnu_core/modules/profile/controllers/vcore_forgot_pass_email_controller_v2.dart';
+import 'package:vnu_core/widgets/field/vnu_text_field.dart';
 
 const Color _brandColor = Color(0xFF1565C0);
 const Color _brandDarkColor = Color(0xFF0D47A1);
@@ -48,7 +49,7 @@ class VcoreForgotPassEmailTabV2 extends StatelessWidget {
               ),
               spaceHeight(12),
 
-              TextField(
+              VnuFloatingTextFieldAdapter(
                 controller: controller.subjectController,
                 readOnly: true,
                 decoration: _inputDecoration('Tiêu đề').copyWith(
@@ -57,7 +58,7 @@ class VcoreForgotPassEmailTabV2 extends StatelessWidget {
               ),
               spaceHeight(12),
 
-              TextField(
+              VnuFloatingTextFieldAdapter(
                 controller: controller.bodyController,
                 readOnly: true,
                 keyboardType: TextInputType.multiline,
@@ -352,7 +353,7 @@ class _FormInput extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
+    return VnuFloatingTextFieldAdapter(
       controller: controller,
       keyboardType: keyboardType,
       onChanged: onChanged,

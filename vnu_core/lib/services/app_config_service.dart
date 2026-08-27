@@ -6,6 +6,8 @@ import 'package:vnu_core/common/log.dart';
 import 'package:vnu_core/services/dio_options.dart';
 import 'package:vnu_core/services/services_url.dart';
 
+import 'app_update_policy.dart';
+
 /// Loads /api/config from the fixed ONEVNU mobile API.
 ///
 /// Concurrent callers share one request. A successful result is reused only
@@ -25,8 +27,15 @@ class AppConfigService {
   Future<void>? _inFlight;
   DateTime? _lastRemoteAttemptAt;
   bool _loadedSuccessfully = false;
+  AppUpdatePolicy? _appUpdatePolicy;
 
   bool get isLoadedSuccessfully => _loadedSuccessfully;
+
+  AppUpdatePolicy? get appUpdatePolicy => _appUpdatePolicy;
+
+  bool get hasEnabledAppUpdatePolicy =>
+      _appUpdatePolicy?.android.isConfigured == true ||
+      _appUpdatePolicy?.ios.isConfigured == true;
 
   String get effectiveZaloGroupUrl {
     final String current = zaloGroupUrlNotifier.value.trim();
@@ -89,6 +98,7 @@ class AppConfigService {
         'cccdConfigApiUrl',
       );
       final String zaloUrl = _readString(config, 'zaloGroupUrl');
+      _appUpdatePolicy = _readAppUpdatePolicy(config);
 
       ServicesUrl().baseUrlFileDownload = downloadDomain;
       ServicesUrl().ktxApiUrl = ktxUrl;
@@ -99,15 +109,29 @@ class AppConfigService {
       _loadedSuccessfully = true;
       _publishZaloUrl(ServicesUrl().effectiveZaloGroupUrl);
 
+      final updatePolicy = _appUpdatePolicy;
+      final androidUpdate = updatePolicy == null
+          ? '<none>'
+          : 'enabled=${updatePolicy.android.enabled},'
+              'min=${updatePolicy.android.minimumVersion},'
+              'latest=${updatePolicy.android.latestVersion}';
+      final iosUpdate = updatePolicy == null
+          ? '<none>'
+          : 'enabled=${updatePolicy.ios.enabled},'
+              'min=${updatePolicy.ios.minimumVersion},'
+              'latest=${updatePolicy.ios.latestVersion}';
+
       logInfo(
         'App config loaded from ${ServicesUrl.defaultBaseUrl}/api/config: '
         'ktxApiUrl=${ServicesUrl().effectiveKtxApiUrl}, '
         'vneidApiUrl=${ServicesUrl().effectiveVneidApiUrl}, '
         'cccdConfigApiUrl=${cccdConfigUrl.isEmpty ? "<not-configured>" : cccdConfigUrl}, '
-        'domainDownload=${downloadDomain.isEmpty ? "<mobile-api>" : downloadDomain}',
+        'domainDownload=${downloadDomain.isEmpty ? "<mobile-api>" : downloadDomain}, '
+        'androidUpdate=$androidUpdate, iosUpdate=$iosUpdate',
       );
     } catch (error, stackTrace) {
       _loadedSuccessfully = false;
+      _appUpdatePolicy = null;
       ServicesUrl().clearRemoteConfig();
       _publishZaloUrl(ServicesUrl.defaultZaloGroupUrl);
       logError('Load app config error: $error\n$stackTrace');
@@ -147,6 +171,19 @@ class AppConfigService {
       throw const FormatException('/api/config must return a JSON object');
     } finally {
       dio.close(force: true);
+    }
+  }
+
+
+  AppUpdatePolicy? _readAppUpdatePolicy(Map<String, dynamic> config) {
+    final dynamic raw = config['appUpdate'];
+    if (raw is! Map) return null;
+
+    try {
+      return AppUpdatePolicy.fromMap(Map<String, dynamic>.from(raw));
+    } catch (error) {
+      logError('Invalid appUpdate in /api/config: $error');
+      return null;
     }
   }
 

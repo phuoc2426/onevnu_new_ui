@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -7,6 +8,7 @@ import 'package:salomon_bottom_bar/salomon_bottom_bar.dart';
 import 'package:vnu_core/common/app_text_styles.dart';
 import 'package:vnu_core/common/events.dart';
 import 'package:vnu_core/common/guide/guide.dart';
+import 'package:vnu_core/common/guide/configs/home_guide_config.dart';
 import 'package:vnu_core/common/guide/configs/profile_guide_config.dart';
 import 'package:vnu_core/common/log.dart';
 import 'package:vnu_core/globals.dart';
@@ -47,12 +49,44 @@ class _VcoreTabbarViewState extends State<VcoreTabbarView> {
   void _onItemTapped(int index) {
     if (index == _selectedIndex) return;
 
+    // P7: an active guide is modal. Do not let bottom navigation move the
+    // underlying IndexedStack while the spotlight/flow is explaining a step.
+    if (AppGuideOverlayVisibility.isActive ||
+        AppGuideFlowController.instance.isRunning) {
+      return;
+    }
+
     setState(() {
       _selectedIndex = index;
     });
   }
 
+  Future<void> _openHomeTabForGuide() async {
+    if (!mounted) return;
+
+    Navigator.of(context).popUntil((route) => route.isFirst);
+
+    if (!mounted) return;
+
+    if (_selectedIndex != _homeTabIndex) {
+      setState(() {
+        _selectedIndex = _homeTabIndex;
+      });
+    }
+
+    await WidgetsBinding.instance.endOfFrame;
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    await WidgetsBinding.instance.endOfFrame;
+  }
+
   Future<void> _openProfileTabForGuide() async {
+    if (!mounted) return;
+
+    // Profile lives inside the root IndexedStack. If a pushed page is covering
+    // the tabbar, return to the root route first so its anchors can actually
+    // become visible before the guide resolves them.
+    Navigator.of(context).popUntil((route) => route.isFirst);
+
     if (!mounted) return;
 
     if (_selectedIndex != _profileTabIndex) {
@@ -62,11 +96,15 @@ class _VcoreTabbarViewState extends State<VcoreTabbarView> {
     }
 
     await WidgetsBinding.instance.endOfFrame;
-    await Future<void>.delayed(const Duration(milliseconds: 320));
+    await Future<void>.delayed(const Duration(milliseconds: 120));
     await WidgetsBinding.instance.endOfFrame;
   }
 
   void _registerGuideActions() {
+    globalAppGuideRegistry.registerAction(
+      id: HomeGuideConfig.actionOpenHomeTab,
+      action: _openHomeTabForGuide,
+    );
     globalAppGuideRegistry.registerAction(
       id: ProfileGuideConfig.actionOpenProfileTab,
       action: _openProfileTabForGuide,
@@ -74,6 +112,7 @@ class _VcoreTabbarViewState extends State<VcoreTabbarView> {
   }
 
   void _unregisterGuideActions() {
+    globalAppGuideRegistry.unregisterAction(HomeGuideConfig.actionOpenHomeTab);
     globalAppGuideRegistry.unregisterAction(
       ProfileGuideConfig.actionOpenProfileTab,
     );
@@ -272,3 +311,5 @@ class _VcoreTabbarViewState extends State<VcoreTabbarView> {
     );
   }
 }
+
+

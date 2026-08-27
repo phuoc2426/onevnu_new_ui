@@ -9,6 +9,7 @@ import 'package:vnu_core/screens/vcore_select_location_view.dart';
 import 'package:vnu_core/themes/app_theme.dart';
 import 'package:vnu_core/widgets/navi_widget.dart';
 import 'package:vnu_core/widgets/progress_hub_widget.dart';
+import 'package:vnu_core/widgets/field/vnu_text_field.dart';
 
 class VcorePahtCreateViewV2 extends GetView<VcorePahtCreateControllerV2> {
   const VcorePahtCreateViewV2({super.key});
@@ -250,7 +251,7 @@ class _PahtTextFieldV2 extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
+    return VnuFloatingTextFieldAdapter(
       maxLines: maxLines,
       onChanged: onChanged,
       decoration: InputDecoration(

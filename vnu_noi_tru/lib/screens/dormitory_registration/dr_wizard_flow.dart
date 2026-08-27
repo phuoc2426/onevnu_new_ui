@@ -79,6 +79,14 @@ class _DRWizardFlowState extends State<DRWizardFlow> {
         return;
       }
 
+      try {
+        await _step3Key.currentState?.saveDataToCubit();
+      } catch (error) {
+        if (!mounted) return;
+        _showSnackbarError('Không lưu được dữ liệu hồ sơ ở Bước 3');
+        return;
+      }
+
       if (_cubit.avatarFile == null) {
         _showSnackbarError('Vui lòng tải lên ảnh thẻ sinh viên');
         return;
@@ -93,8 +101,6 @@ class _DRWizardFlowState extends State<DRWizardFlow> {
         _showSnackbarError('Vui lòng tải lên CCCD mặt sau');
         return;
       }
-
-      _step3Key.currentState?.saveDataToCubit();
 
       final confirmed = await _showReviewWarningDialogV3();
       if (!mounted) return;

@@ -30,7 +30,9 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
       tag: const Uuid().v4(),
       builder: (controller) {
         controller.getTongKetDenHienTai();
-        return Scaffold(
+        return AppGuideAnchor(
+          id: 'profile.page',
+          child: Scaffold(
           backgroundColor: const Color(0xFFF6F8FA),
           body: Obx(
             () => SingleChildScrollView(
@@ -384,6 +386,7 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
               ),
             ),
           ),
+          ),
         );
       },
     );
@@ -493,3 +496,4 @@ class VcoreProfileItemWidget extends StatelessWidget {
     return AppGuideAnchor(id: guideId!, child: content);
   }
 }
+

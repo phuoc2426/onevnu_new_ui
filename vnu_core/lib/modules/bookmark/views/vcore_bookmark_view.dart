@@ -16,6 +16,7 @@ import 'package:vnu_core/widgets/refresher_footer_widget.dart';
 import 'package:vnu_core/widgets/container_dissmis.dart';
 
 import '../../../widgets/buttons_widget.dart';
+import 'package:vnu_core/widgets/field/vnu_text_field.dart';
 
 class VcoreBookmarkView extends GetView<VcoreBookmarkController> {
   const VcoreBookmarkView({super.key});
@@ -118,7 +119,7 @@ class VcoreBookmarkView extends GetView<VcoreBookmarkController> {
                                                           0xff879ABF),
                                                     ),
                                                   ),
-                                                  child: TextField(
+                                                  child: VnuFloatingTextFieldAdapter(
                                                     controller: controller
                                                         .editTitleController,
                                                     keyboardType:

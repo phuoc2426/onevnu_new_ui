@@ -23,6 +23,7 @@ export 'dormitory_registration/my_registration_model.dart';
 export 'dormitory_registration/registration_history_model.dart';
 export 'dormitory_registration/uploaded_attachment_model.dart';
 export 'dormitory_registration/registration_payload_model.dart';
+export 'dormitory_registration/accommodation_status_model.dart';
 
 export 'dormitory_payment/dormitory_invoice_model.dart';
 export 'dormitory_payment/dormitory_payment_method_model.dart';

@@ -41,6 +41,12 @@ class AppShowcaseScope extends StatelessWidget {
   Widget build(BuildContext context) {
     return ShowCaseWidget(
       enableAutoScroll: true,
+
+      // Block taps on the dark barrier/background while a guide is visible.
+      // IMPORTANT: do not wrap the whole app with AbsorbPointer here. The
+      // showcase tooltip is rendered from this subtree; absorbing the entire
+      // subtree also prevents its Previous/Next/Skip/Finish buttons from
+      // receiving pointer events.
       disableBarrierInteraction: true,
       onFinish: () {
         AppGuideOverlayVisibility.hide();
@@ -51,7 +57,19 @@ class AppShowcaseScope extends StatelessWidget {
         onDismiss?.call();
       },
       builder: (context) {
-        return child;
+        return ValueListenableBuilder<bool>(
+          valueListenable: AppGuideOverlayVisibility.notifier,
+          child: child,
+          builder: (context, guideActive, appChild) {
+            // Keep Android/iOS system back disabled during an active guide,
+            // but leave pointer handling to Showcase itself so the tooltip
+            // controls remain clickable.
+            return PopScope(
+              canPop: !guideActive,
+              child: appChild!,
+            );
+          },
+        );
       },
     );
   }

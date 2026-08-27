@@ -9,12 +9,19 @@ import 'package:vnu_noi_tru/repository/dormitory_registration_repository.dart';
 import 'package:dio/dio.dart';
 import 'package:vnu_core/repository/app_repository.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vnu_noi_tru/domain/registration/dormitory_date_codec.dart';
+import 'package:vnu_noi_tru/domain/registration/dormitory_student_draft.dart';
+import 'package:vnu_noi_tru/services/registration/dormitory_local_file_store.dart';
+import 'package:vnu_noi_tru/services/registration/dormitory_registration_draft_cache.dart';
 part 'dormitory_registration_state.dart';
 
 class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
   DormitoryRegistrationCubit() : super(DormitoryRegistrationInitial());
 
   final _repository = DormitoryRegistrationRepository();
+
+  /// Step-3 student draft. Review/upload/submit must read this state only.
+  DormitoryStudentDraft? studentDraft;
 
   RegistrationPeriodModel? selectedPeriod;
   DormitoryModel? selectedDormitory;
@@ -73,7 +80,7 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
   String? tempEmail;
   String? tempCccd;
   String? tempCccdIssueDate;
-  String? tempHometown;
+  String? tempPermanentAddress;
   String? tempTemporaryAddress;
   String? tempReason;
   String? tempDOB;
@@ -338,8 +345,7 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
   }
 
   String _dateToApi(DateTime value) {
-    // Dùng UTC 00:00 để ngày gửi lên không bị lệch do múi giờ thiết bị.
-    return DateTime.utc(value.year, value.month, value.day).toIso8601String();
+    return DormitoryDateCodec.normalize(value);
   }
 
   Future<RegistrationPayloadModel> buildRegistrationPayload({
@@ -433,14 +439,18 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
     return text;
   }
 
-  String _mapGender(String? value) {
+  String? _mapGender(String? value) {
     final text = value?.toLowerCase().trim() ?? '';
 
     if (text == 'female' || text == 'f' || text == 'nữ' || text == 'nu') {
       return 'female';
     }
 
-    return 'male';
+    if (text == 'male' || text == 'm' || text == 'nam') {
+      return 'male';
+    }
+
+    return null;
   }
 
   Future<void> _ensureStudentCache() async {
@@ -462,7 +472,7 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
     }
   }
 
-  Future<RegistrationStudentPayload> _buildStudentPayload() async {
+  Future<RegistrationStudentPayload> _buildInitialStudentPayloadFromExternalSources() async {
     await _ensureStudentCache();
 
     final prefs = await SharedPreferences.getInstance();
@@ -504,7 +514,7 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
           final parsed = DateTime.parse(dob);
           // Preserve the original date without UTC conversion to avoid
           // shifting the day for users in positive UTC offsets.
-          dobFormatted = parsed.toIso8601String();
+          dobFormatted = DormitoryDateCodec.normalize(parsed);
         } catch (_) {
           dobFormatted = dob; // fallback nếu không parse được
         }
@@ -515,7 +525,7 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
         dob: dobFormatted,
         cccd: cccd,
         cccdIssueDate: tempCccdIssueDate ?? '',
-        hometown: tempHometown ?? '',
+        permanentAddress: tempPermanentAddress ?? '',
         className: '',
         major: '',
         academicYear: '',
@@ -530,7 +540,7 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
         contactAddress: tempContactAddress,
         identityIssuePlace: tempIdentityIssuePlace,
         faculty: tempFaculty,
-        gender: tempGender ?? 'male',
+        gender: tempGender ?? '',
         ethnicity: tempEthnicity,
         religion: tempReligion,
         phone: phone,
@@ -686,8 +696,8 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
       dob: _dateOnly(student.ngaySinh),
       cccd: tempCccd ?? student.soCmtCccd ?? '',
       cccdIssueDate: tempCccdIssueDate ?? _dateOnly(student.ngayCapCmtCccd),
-      hometown:
-          tempHometown ??
+      permanentAddress:
+          tempPermanentAddress ??
           (permanentAddress.isNotEmpty
               ? permanentAddress
               : student.hoKhauThuongTruPhuongXa ?? ''),
@@ -716,12 +726,112 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
       contactAddress: tempContactAddress ?? contactAddress,
       identityIssuePlace: tempIdentityIssuePlace,
       faculty: tempFaculty,
-      gender: tempGender ?? _mapGender(student.gioiTinh),
+      gender: tempGender ?? _mapGender(student.gioiTinh) ?? '',
       ethnicity: tempEthnicity,
       religion: tempReligion,
       phone: tempPhone ?? student.mobile ?? student.tel ?? '',
       email: tempEmail ?? student.email ?? student.emailKhac ?? '',
       familyMembers: List<FamilyMemberPayload>.unmodifiable(familyMembers),
+    );
+  }
+
+
+  Future<String> _draftOwnerKey() async {
+    final String draftStudentCode = studentDraft?.studentCode.trim() ?? '';
+    if (draftStudentCode.isNotEmpty) return 'student:$draftStudentCode';
+
+    final String studentCode =
+        Globals().thongTinSinhVienModel.value?.maSinhVien?.trim() ?? '';
+    if (studentCode.isNotEmpty) return 'student:$studentCode';
+
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final String identityNo = prefs.getString('applicant_cccd')?.trim() ?? '';
+    if (identityNo.isNotEmpty) return 'applicant:$identityNo';
+    return '';
+  }
+
+  Future<DormitoryStudentDraft> ensureStudentDraft() async {
+    if (studentDraft != null) return studentDraft!;
+
+    final String ownerKey = await _draftOwnerKey();
+    if (ownerKey.isNotEmpty) {
+      final DormitoryStudentDraft? cached =
+          await DormitoryRegistrationDraftCache.read(ownerKey);
+      if (cached != null) {
+        studentDraft = cached;
+        _syncLegacyFieldsFromDraft(cached);
+        return cached;
+      }
+    }
+
+    final RegistrationStudentPayload seed =
+        await _buildInitialStudentPayloadFromExternalSources();
+    final DormitoryStudentDraft draft = DormitoryStudentDraft.fromPayload(seed);
+    studentDraft = draft;
+    _syncLegacyFieldsFromDraft(draft);
+    if (ownerKey.isNotEmpty) {
+      await DormitoryRegistrationDraftCache.write(ownerKey, draft);
+    }
+    return draft;
+  }
+
+  Future<void> setStudentDraft(
+    DormitoryStudentDraft draft, {
+    bool persist = true,
+  }) async {
+    studentDraft = draft;
+    _syncLegacyFieldsFromDraft(draft);
+    familyMembers
+      ..clear()
+      ..addAll(draft.familyMembers);
+
+    if (!persist) return;
+    final String ownerKey = await _draftOwnerKey();
+    if (ownerKey.isNotEmpty) {
+      await DormitoryRegistrationDraftCache.write(ownerKey, draft);
+    }
+  }
+
+  void _syncLegacyFieldsFromDraft(DormitoryStudentDraft draft) {
+    tempFullName = draft.fullName;
+    tempPhone = draft.phone;
+    tempEmail = draft.email;
+    tempCccd = draft.identityNo;
+    tempCccdIssueDate = draft.identityIssueDate;
+    tempPermanentAddress = draft.permanentAddress;
+    tempTemporaryAddress = draft.temporaryAddress;
+    tempReason = draft.reasonStay;
+    tempDOB = draft.dob;
+    tempGender = draft.gender;
+    tempEthnicity = draft.ethnicity;
+    tempReligion = draft.religion;
+    tempContactAddress = draft.contactAddress;
+    tempIdentityIssuePlace = draft.identityIssuePlace;
+    tempFaculty = draft.faculty;
+  }
+
+  Future<void> clearStudentDraftCache() async {
+    final String ownerKey = await _draftOwnerKey();
+    studentDraft = null;
+    if (ownerKey.isNotEmpty) {
+      await DormitoryRegistrationDraftCache.clear(ownerKey);
+    }
+  }
+
+  Future<RegistrationStudentPayload> _buildStudentPayload() async {
+    final DormitoryStudentDraft draft = await ensureStudentDraft();
+    final List<String> errors = draft.validationErrors();
+    if (errors.isNotEmpty) {
+      throw ArgumentError(
+        'Thiếu thông tin đăng ký ở Bước 3: ${errors.join(', ')}',
+      );
+    }
+
+    final String draftPriorityName = draft.priorityObjectName?.trim() ?? '';
+    return draft.toPayload(
+      priorityObjectName: draftPriorityName.isNotEmpty
+          ? draftPriorityName
+          : selectedPriorityObjectNames,
     );
   }
 
@@ -758,6 +868,9 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
     return AppErrorMapper.map(error).userMessage;
   }
   void clearWizardData() {
+    // Reset in-memory wizard state, but keep the dedicated persisted Step-3
+    // cache so reopening the wizard restores what the user already entered.
+    studentDraft = null;
     selectedPeriod = null;
     selectedDormitory = null;
     selectedRoomType = null;
@@ -778,7 +891,7 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
     tempEmail = null;
     tempCccd = null;
     tempCccdIssueDate = null;
-    tempHometown = null;
+    tempPermanentAddress = null;
     tempTemporaryAddress = null;
     tempReason = null;
     tempGender = null;
@@ -1109,8 +1222,44 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
       );
       await _repository.registerDormitory(finalPayload);
 
+      String successMessage = 'Đăng ký nội trú thành công!';
+
+      // The registration endpoint accepts academic/profile fields, but the
+      // current KTX contract keeps a few profile-only fields on the student
+      // PATCH endpoint. Sync only that strict whitelist after the registration
+      // has been committed. This step is best-effort and must never roll back
+      // a successful accommodation registration.
+      final Map<String, dynamic> profileExtension =
+          finalPayload.student.toPostRegistrationUpdateJson();
+      if (profileExtension.isNotEmpty && finalPayload.student.cccd.trim().isNotEmpty) {
+        try {
+          await _repository.updateStudent(
+            identityNo: finalPayload.student.cccd,
+            data: profileExtension,
+          );
+          logInfo(
+            '[DORMITORY_REGISTER] profile extension synced '
+            'keys=${profileExtension.keys.toList()}',
+          );
+        } catch (extensionError) {
+          logWarning(
+            '[DORMITORY_REGISTER] registration succeeded but profile extension '
+            'sync failed: $extensionError',
+          );
+          successMessage =
+              'Đăng ký nội trú thành công. Một số thông tin hồ sơ bổ sung '
+              'chưa đồng bộ được; bạn có thể cập nhật lại trong Hồ sơ lưu trú.';
+        }
+      }
+
+      // Registration is committed: the dedicated Step-3 draft and managed
+      // local files are no longer needed. Do not clear them on registration
+      // failure.
+      await clearStudentDraftCache();
+      await DormitoryLocalFileStore.clearAll();
+
       emit(DormitoryRegistrationDismissHub());
-      emit(DormitoryRegistrationSavedSuccess('Đăng ký nội trú thành công!'));
+      emit(DormitoryRegistrationSavedSuccess(successMessage));
     } catch (e) {
       logError(e.toString());
       emit(DormitoryRegistrationDismissHub());
@@ -1333,6 +1482,11 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
 
           if (res.data != null && res.data!.isNotEmpty) {
             proofAttachments.addAll(res.data!);
+            // Remove each successful local file immediately. If a later file
+            // fails, retry only sees files that are still pending.
+            proofFiles.removeWhere(
+              (File pending) => pending.absolute.path == file.absolute.path,
+            );
           } else {
             throw Exception(
               'Không nhận được thông tin file sau khi upload tài liệu ưu tiên ${i + 1}',
@@ -1340,7 +1494,6 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
           }
         }
 
-        proofFiles.clear();
         currentStep++;
 
         emit(
@@ -1363,4 +1516,3 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
     }
   }
 }
-

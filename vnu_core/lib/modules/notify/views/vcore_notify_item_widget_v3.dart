@@ -33,6 +33,8 @@ class VcoreNotifyItemWidgetV3 extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final String systemPreview = _stripHtml(thongBaoModel?.noiDung);
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: BoxDecoration(
@@ -80,9 +82,9 @@ class VcoreNotifyItemWidgetV3 extends StatelessWidget {
                         ),
                         spaceHeight(6),
                         // Subtitle / Preview text
-                        if (thongBaoModel != null && thongBaoModel!.noiDung?.isNotEmpty == true)
+                        if (thongBaoModel != null && systemPreview.isNotEmpty)
                           Text(
-                            thongBaoModel!.noiDung ?? '',
+                            systemPreview,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyles.regular.copyWith(
@@ -122,7 +124,7 @@ class VcoreNotifyItemWidgetV3 extends StatelessWidget {
                               Text(
                                 DateTimeUtils.stringFromDateTime(
                                   thongBaoModel!.ngayGui?.toLocal(),
-                                  DateTimeConst.U_SECOND_FORMAT,
+                                  DateTimeConst.DATE_FORMAT,
                                 ),
                                 style: TextStyles.regular.copyWith(
                                   fontSize: AppFontSizes.font11,

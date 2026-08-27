@@ -3,11 +3,12 @@ import 'package:vnu_core/common/app_colors.dart';
 import 'package:vnu_core/common/app_text_styles.dart';
 import 'package:vnu_core/common/guide/widgets/app_guide_anchor.dart';
 
-/// Shared label / required marker / validation-message shell for OneVNU fields.
+/// Outer shell for OneVNU fields.
 ///
-/// Labels and errors are allowed to wrap. The input surface inside [child]
-/// keeps its own stable height, so a long label does not make neighbouring
-/// input boxes themselves inconsistent.
+/// Labels are rendered by the field's InputDecoration so every editable,
+/// select, date and read-only control follows the same floating-label contract.
+/// This shell only owns margin, guide anchoring and the optional external error
+/// message used by non-FormField controls.
 class VnuFieldShell extends StatelessWidget {
   const VnuFieldShell({
     super.key,
@@ -20,9 +21,10 @@ class VnuFieldShell extends StatelessWidget {
     this.guideTargetId,
   });
 
-  final Widget child;
+  /// Kept for source compatibility. Labels are rendered inside the field.
   final String? label;
   final bool requiredField;
+  final Widget child;
   final String? errorText;
   final bool enabled;
   final EdgeInsetsGeometry? margin;
@@ -30,7 +32,6 @@ class VnuFieldShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasLabel = label != null && label!.trim().isNotEmpty;
     final hasError = errorText != null && errorText!.trim().isNotEmpty;
 
     Widget result = Padding(
@@ -38,33 +39,12 @@ class VnuFieldShell extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (hasLabel) ...[
-            Text.rich(
-              TextSpan(
-                text: label,
-                style: TextStyles.semiBold.copyWith(
-                  fontSize: AppFontSizes.mediumSmall,
-                  color: enabled ? AppColors.textPrimary : AppColors.textHint,
-                ),
-                children: requiredField
-                    ? const [
-                        TextSpan(
-                          text: ' *',
-                          style: TextStyle(color: AppColors.error),
-                        ),
-                      ]
-                    : const [],
-              ),
-              softWrap: true,
-            ),
-            const SizedBox(height: 7),
-          ],
+        children: <Widget>[
           child,
-          if (hasError) ...[
+          if (hasError) ...<Widget>[
             const SizedBox(height: 6),
             Padding(
-              padding: const EdgeInsets.only(left: 2),
+              padding: const EdgeInsets.only(left: 12),
               child: Text(
                 errorText!,
                 softWrap: true,

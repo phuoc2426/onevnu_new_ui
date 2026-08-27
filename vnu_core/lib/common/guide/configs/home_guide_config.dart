@@ -24,6 +24,8 @@ import 'app_guide_module_config.dart';
 class HomeGuideConfig implements AppGuideModuleConfig {
   const HomeGuideConfig();
 
+  static const String actionOpenHomeTab = 'app.open_home_tab';
+
   @override
   String get moduleId => AppGuideModuleIds.home;
 
@@ -623,6 +625,7 @@ class HomeGuideConfig implements AppGuideModuleConfig {
       pageId: 'home',
       type: AppGuideItemType.section,
       priority: priority,
+      beforeHighlightActionId: actionOpenHomeTab,
       title: title,
       description: description,
       icon: icon,
@@ -650,7 +653,8 @@ class HomeGuideConfig implements AppGuideModuleConfig {
       type: AppGuideItemType.widget,
       priority: priority,
       fallbackId: fallbackId,
-      beforeHighlightActionId: beforeHighlightActionId,
+      beforeHighlightActionId:
+          beforeHighlightActionId ?? actionOpenHomeTab,
       title: title,
       description: description,
       icon: icon,
@@ -672,10 +676,13 @@ class HomeGuideConfig implements AppGuideModuleConfig {
       moduleId: AppGuideModuleIds.home,
       groupId: 'home.quick_access.group',
       pageId: 'home',
-      type: AppGuideItemType.function,
-      priority: 750,
-      preferInSearch: true,
+      type: openAction == null
+          ? AppGuideItemType.widget
+          : AppGuideItemType.function,
+      priority: openAction == null ? 300 : 750,
+      preferInSearch: openAction != null,
       fallbackId: 'home.quick_access',
+      beforeHighlightActionId: actionOpenHomeTab,
       title: title,
       description: description,
       icon: icon,
@@ -684,3 +691,4 @@ class HomeGuideConfig implements AppGuideModuleConfig {
     );
   }
 }
+

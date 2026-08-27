@@ -11,15 +11,18 @@ import 'package:vnu_core/widgets/progress_hub_widget.dart';
 import 'package:vnu_core/widgets/vcore_module_scaffold.dart';
 import 'package:vnu_noi_tru/cubit/dormitory_registration_cubit.dart';
 import 'package:vnu_noi_tru/models/dormitory_payment/dormitory_invoice_model.dart';
+import 'package:vnu_noi_tru/models/dormitory_registration/accommodation_status_model.dart';
 import 'package:vnu_noi_tru/repository/dormitory_payment_repository.dart';
 import 'package:vnu_core/services/services_url.dart';
 import 'package:vnu_noi_tru/repository/dormitory_registration_repository.dart';
+import 'package:vnu_noi_tru/widgets/dormitory_leather_wallet_3d.dart';
 
 import 'dr_history_bottom_sheet.dart';
 import 'dr_wizard_flow.dart';
 import 'dr_invoices_screen.dart';
 import 'dr_student_update_sheet.dart';
 import 'dr_student_history_sheet.dart';
+import 'package:vnu_core/widgets/field/vnu_text_field.dart';
 
 class DRMyRegistrationScreen extends StatefulWidget {
   const DRMyRegistrationScreen({super.key});
@@ -39,6 +42,9 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
 
   List<dynamic> _roomTypes = <dynamic>[];
   DormitoryInvoiceModel? _latestReceipt;
+  List<DormitoryInvoiceModel> _dashboardReceipts = <DormitoryInvoiceModel>[];
+  List<DormitoryAccommodationStatusModel> _statusCatalog =
+      <DormitoryAccommodationStatusModel>[];
 
   late BuildContext _hubContext;
 
@@ -75,6 +81,7 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
     await _cubit.getDormitories();
     await _loadRoomTypesForDisplay();
     await _cubit.getPriorityObjects();
+    await _loadStatusCatalog();
 
     final bool hasOpenPeriod = await _cubit.checkAnyOpenRegistrationPeriod();
 
@@ -99,6 +106,7 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
     }
 
     await _loadRoomTypesForDisplay();
+    await _loadStatusCatalog();
 
     final bool hasOpenPeriod = await _cubit.checkAnyOpenRegistrationPeriod();
 
@@ -113,6 +121,39 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
     await _cubit.getMyRegistrations();
     await _loadLatestPendingApprovalDaysFromCurrentState();
     await _loadLatestReceiptFromCurrentState();
+  }
+
+  Future<void> _loadStatusCatalog() async {
+    try {
+      final List<DormitoryAccommodationStatusModel> values =
+          await _repository.getAccommodationStatuses();
+      if (!mounted) {
+        _statusCatalog = values;
+        return;
+      }
+      setState(() => _statusCatalog = values);
+    } catch (_) {
+      // Progressive enhancement only. Local labels/colors remain the fallback.
+    }
+  }
+
+  DormitoryAccommodationStatusModel? _statusCatalogItem(String? status) {
+    final String value = status?.trim() ?? '';
+    if (value.isEmpty) return null;
+    for (final DormitoryAccommodationStatusModel item in _statusCatalog) {
+      if (item.matches(value)) return item;
+    }
+    return null;
+  }
+
+  Color? _statusCatalogColor(String? status) {
+    final String raw = _statusCatalogItem(status)?.color.trim() ?? '';
+    if (raw.isEmpty) return null;
+    String hex = raw.replaceFirst('#', '');
+    if (hex.length == 6) hex = 'FF$hex';
+    if (hex.length != 8) return null;
+    final int? value = int.tryParse(hex, radix: 16);
+    return value == null ? null : Color(value);
   }
 
   Future<void> _loadLatestPendingApprovalDaysFromCurrentState() async {
@@ -231,9 +272,11 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
       if (mounted) {
         setState(() {
           _latestReceipt = null;
+          _dashboardReceipts = <DormitoryInvoiceModel>[];
         });
       } else {
         _latestReceipt = null;
+        _dashboardReceipts = <DormitoryInvoiceModel>[];
       }
       return;
     }
@@ -253,22 +296,26 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
 
       if (!mounted) {
         _latestReceipt = latest;
+        _dashboardReceipts = receipts;
         return;
       }
 
       setState(() {
         _latestReceipt = latest;
+        _dashboardReceipts = receipts;
       });
     } catch (_) {
       // Không dùng lại giá phòng cơ bản khi API biên lai lỗi.
       // Ẩn giá để tránh hiển thị một con số không đúng với khoản thu mới nhất.
       if (!mounted) {
         _latestReceipt = null;
+        _dashboardReceipts = <DormitoryInvoiceModel>[];
         return;
       }
 
       setState(() {
         _latestReceipt = null;
+        _dashboardReceipts = <DormitoryInvoiceModel>[];
       });
     }
   }
@@ -991,18 +1038,14 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
     dynamic student,
     dynamic latestAccommodation,
   ) async {
-    if (_isStudentInformationLocked(latestAccommodation)) {
-      snackBarError(
-        'Thông tin sinh viên đã khóa vì hồ sơ đã được duyệt hoặc đã xếp phòng.',
-      );
-      return;
-    }
-
     String identityNo = _studentIdentityNo(student).trim();
     final SharedPreferences preferences = await SharedPreferences.getInstance();
-    identityNo = identityNo.isNotEmpty
-        ? identityNo
-        : preferences.getString('applicant_cccd')?.trim() ?? '';
+    if (identityNo.isEmpty) {
+      identityNo = preferences.getString('applicant_cccd')?.trim() ?? '';
+    }
+    if (identityNo.isEmpty) {
+      identityNo = _studentCodeText(student).trim();
+    }
 
     if (identityNo.isEmpty) {
       snackBarError('Không tìm thấy CCCD hoặc mã sinh viên để cập nhật');
@@ -1641,6 +1684,152 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
     return '';
   }
 
+  String _assignedBuildingHintFromRoomNumber(String roomNumber) {
+    final String value = roomNumber.trim().toUpperCase();
+    if (value.isEmpty) return '';
+
+    // Dạng phổ biến: CT1-101, CT2_305, CT3 402.
+    final RegExpMatch? towerMatch = RegExp(
+      r'^(CT\d+)[\-_\s]',
+    ).firstMatch(value);
+    if (towerMatch != null) {
+      return towerMatch.group(1) ?? '';
+    }
+
+    // Dạng B101, A205, G2-301... Khi có dấu phân cách thì phần trước
+    // dấu phân cách được ưu tiên nếu nhìn giống mã tòa.
+    final RegExpMatch? delimitedMatch = RegExp(
+      r'^([A-Z]+\d*)[\-_\s]',
+    ).firstMatch(value);
+    if (delimitedMatch != null) {
+      return delimitedMatch.group(1) ?? '';
+    }
+
+    // Fallback cho A101/B205: lấy cụm chữ đầu trước số phòng.
+    final RegExpMatch? letterMatch = RegExp(
+      r'^([A-Z]{1,5})(?=\d{2,})',
+    ).firstMatch(value);
+    return letterMatch?.group(1) ?? '';
+  }
+
+  String _assignedBuildingName(dynamic item) {
+    // API history đang trả buildingName ở NGAY object accommodation.
+    // Đây cũng là nguồn mà DRStudentHistorySheet dùng để hiển thị "Tòa C1".
+    // Vì vậy dashboard phải ưu tiên cùng nguồn trước khi đi xuống room.
+    final String accommodationBuildingName = _readString(
+      item,
+      'buildingName',
+      (dynamic object) => object.buildingName ?? '',
+      aliases: const <String>[
+        'building_name',
+        'buildingCode',
+        'building_code',
+        'blockName',
+        'block_name',
+        'toa',
+      ],
+    );
+    if (accommodationBuildingName.trim().isNotEmpty) {
+      return _normalizeBuildingName(accommodationBuildingName);
+    }
+
+    // Một số response có building là string hoặc object ngay trên accommodation.
+    final dynamic accommodationBuilding = _readNested(
+      item,
+      'building',
+      (dynamic object) => object.building,
+    );
+    if (accommodationBuilding is String &&
+        accommodationBuilding.trim().isNotEmpty) {
+      return _normalizeBuildingName(accommodationBuilding);
+    }
+    final String accommodationNestedBuildingName = _readString(
+      accommodationBuilding,
+      'name',
+      (dynamic object) => object.name,
+      aliases: const <String>[
+        'buildingName',
+        'building_name',
+        'code',
+        'buildingCode',
+        'building_code',
+        'title',
+      ],
+    );
+    if (accommodationNestedBuildingName.trim().isNotEmpty) {
+      return _normalizeBuildingName(accommodationNestedBuildingName);
+    }
+
+    // Fallback cho response chi tiết đặt building bên trong room.
+    final dynamic room = _room(item);
+    final dynamic roomBuilding = _readNested(
+      room,
+      'building',
+      (dynamic object) => object.building,
+    );
+
+    if (roomBuilding is String && roomBuilding.trim().isNotEmpty) {
+      return _normalizeBuildingName(roomBuilding);
+    }
+
+    final String nestedRoomBuildingName = _readString(
+      roomBuilding,
+      'name',
+      (dynamic object) => object.name,
+      aliases: const <String>[
+        'building_name',
+        'buildingName',
+        'code',
+        'buildingCode',
+        'building_code',
+        'title',
+      ],
+    );
+    if (nestedRoomBuildingName.isNotEmpty) {
+      return _normalizeBuildingName(nestedRoomBuildingName);
+    }
+
+    final String roomLevelBuildingName = _readString(
+      room,
+      'building_name',
+      (dynamic object) => object.buildingName ?? '',
+      aliases: const <String>[
+        'buildingName',
+        'building_code',
+        'buildingCode',
+        'block_name',
+        'blockName',
+        'toa',
+      ],
+    );
+    if (roomLevelBuildingName.isNotEmpty) {
+      return _normalizeBuildingName(roomLevelBuildingName);
+    }
+
+    // Cuối cùng mới suy từ mã phòng kiểu CT1-206 / C1-206 / A206.
+    final String hint = _assignedBuildingHintFromRoomNumber(_roomNumber(item));
+    if (hint.isNotEmpty) {
+      return _normalizeBuildingName(hint);
+    }
+
+    return '';
+  }
+
+  String _normalizeBuildingName(String value) {
+    final String normalized = value.trim();
+    if (normalized.isEmpty) return '';
+
+    final String lower = normalized.toLowerCase();
+    if (lower.startsWith('tòa') ||
+        lower.startsWith('toa') ||
+        lower.startsWith('block') ||
+        lower.startsWith('building')) {
+      return normalized;
+    }
+
+    return 'Tòa $normalized';
+  }
+
   String _roomTypeName(dynamic item) {
     final dynamic roomType = _roomType(item);
 
@@ -1794,6 +1983,9 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
   }
 
   Color _getStatusColor(String? status) {
+    final Color? configuredColor = _statusCatalogColor(status);
+    if (configuredColor != null) return configuredColor;
+
     switch (status?.toLowerCase()) {
       case 'draft':
         return Colors.orange;
@@ -1852,6 +2044,9 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
   }
 
   String _getStatusText(String? status) {
+    final String configuredLabel = _statusCatalogItem(status)?.label.trim() ?? '';
+    if (configuredLabel.isNotEmpty) return configuredLabel;
+
     switch (status?.toLowerCase()) {
       case 'draft':
         return 'Bản nháp cũ';
@@ -2038,42 +2233,19 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
                         physics: const AlwaysScrollableScrollPhysics(),
                         padding: const EdgeInsets.all(16),
                         children: <Widget>[
-                          if (student != null) ...<Widget>[
-                            _buildStudentCard(student, null),
-                            const SizedBox(height: 16),
-                          ],
-                          _buildStudentHistoryOverviewCard(data),
-                          const SizedBox(height: 16),
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(18),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(15),
-                              border: Border.all(
-                                color: const Color(0xFFE3E7E4),
-                              ),
-                            ),
-                            child: const Column(
-                              children: <Widget>[
-                                Icon(
-                                  Icons.apartment_outlined,
-                                  size: 42,
-                                  color: Color(0xFF9AA19C),
-                                ),
-                                SizedBox(height: 10),
-                                Text(
-                                  'Chưa có thông tin đăng ký ký túc xá',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    color: Color(0xFF666D68),
-                                    fontSize: AppFontSizes.mediumSmall,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
+                          _buildDashboardStudentHeader(student, null),
+                          const SizedBox(height: 14),
+                          _buildDashboardInvoiceOverview(student, null),
+                          const SizedBox(height: 14),
+                          _buildEmptyRegistrationDashboardCard(),
+                          const SizedBox(height: 14),
+                          _buildDashboardQuickActions(
+                            data: data,
+                            student: student,
+                            latestAccommodation: null,
                           ),
+                          const SizedBox(height: 14),
+                          _buildStudentHistoryOverviewCard(data),
                         ],
                       ),
                     );
@@ -2085,30 +2257,44 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
                       physics: const AlwaysScrollableScrollPhysics(),
                       padding: const EdgeInsets.all(16),
                       children: <Widget>[
+                        _buildDashboardStudentHeader(
+                          student,
+                          accommodations.first,
+                        ),
+                        const SizedBox(height: 14),
+                        _buildDashboardInvoiceOverview(
+                          student,
+                          accommodations.first,
+                        ),
+                        const SizedBox(height: 14),
                         if (_accommodationStatus(accommodations.first) ==
                             'pending') ...<Widget>[
                           _buildPendingApprovalBanner(),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 14),
                         ],
-                        // Trạng thái mới nhất được hiển thị ở đầu màn hình.
-                        // Danh sách accommodations đã được ghép giữa bản tóm tắt
-                        // và bản chi tiết nên vẫn có đủ KTX, đợt và trạng thái.
                         _buildCurrentRegistrationStatusCard(
                           accommodations.first,
                         ),
-                        const SizedBox(height: 16),
-                        _buildStudentCard(student, accommodations.first),
-                        const SizedBox(height: 16),
+                        if (_shouldShowRoomDashboard(accommodations.first)) ...<Widget>[
+                          const SizedBox(height: 14),
+                          _buildRoomDashboardCard(
+                            accommodations.first,
+                            data,
+                          ),
+                        ],
+                        const SizedBox(height: 14),
+                        _buildDashboardQuickActions(
+                          data: data,
+                          student: student,
+                          latestAccommodation: accommodations.first,
+                        ),
+                        const SizedBox(height: 14),
                         _buildStudentHistoryOverviewCard(data),
-                        const SizedBox(height: 16),
-                        // Giữ nguyên toàn bộ card hồ sơ chi tiết phía dưới.
-                        ...accommodations.asMap().entries.map(
-                          (MapEntry<int, dynamic> entry) =>
-                              _buildAccommodationCard(
-                                entry.value,
-                                student,
-                                isLatest: entry.key == 0,
-                              ),
+                        const SizedBox(height: 14),
+                        _buildRegistrationDetailsExpansion(
+                          data: data,
+                          student: student,
+                          accommodations: accommodations,
                         ),
                       ],
                     ),
@@ -2117,6 +2303,700 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
               ),
         ),
       ),
+    );
+  }
+
+  Widget _buildDashboardStudentHeader(
+    dynamic student,
+    dynamic latestAccommodation,
+  ) {
+    final String fullName = _studentFullName(student).trim();
+    final String studentCode = _studentCodeText(student).trim();
+    final String className = _studentClass(student).trim();
+    final String avatarUrl = _studentAvatarUrl(student).trim();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE3E9E5)),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: Colors.black.withOpacity(0.035),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        children: <Widget>[
+          Container(
+            width: 62,
+            height: 62,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: const Color(0xFFEAF6EE),
+              border: Border.all(color: const Color(0xFFCDE7D5)),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: avatarUrl.isNotEmpty
+                ? Image.network(
+                    _resolveAvatarUrl(avatarUrl),
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const Icon(
+                      Icons.person_rounded,
+                      color: Color(0xFF078B3E),
+                      size: 34,
+                    ),
+                  )
+                : const Icon(
+                    Icons.person_rounded,
+                    color: Color(0xFF078B3E),
+                    size: 34,
+                  ),
+          ),
+          const SizedBox(width: 13),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  fullName.isEmpty ? 'Hồ sơ lưu trú của bạn' : fullName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: AppFontSizes.medium,
+                    color: Color(0xFF141A16),
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  <String>[
+                    if (studentCode.isNotEmpty) 'MSSV: $studentCode',
+                    if (className.isNotEmpty) className,
+                  ].join(' · ').isEmpty
+                      ? 'Xem thông tin cá nhân hoặc cập nhật thông tin cá nhân'
+                      : <String>[
+                          if (studentCode.isNotEmpty) 'MSSV: $studentCode',
+                          if (className.isNotEmpty) className,
+                        ].join(' · '),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: AppFontSizes.font11,
+                    color: Color(0xFF68716B),
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            tooltip: 'Cập nhật hồ sơ',
+            onPressed: student == null
+                ? null
+                : () => _openStudentUpdateSheet(
+                    student,
+                    latestAccommodation,
+                  ),
+            icon: const Icon(Icons.chevron_right_rounded),
+            color: const Color(0xFF078B3E),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDashboardInvoiceOverview(
+    dynamic student,
+    dynamic latestAccommodation,
+  ) {
+    final int unpaidCount = _dashboardReceipts
+        .where(
+          (DormitoryInvoiceModel invoice) =>
+              !invoice.isPaid && !invoice.hasPendingPayment,
+        )
+        .length;
+    final int pendingCount = _dashboardReceipts
+        .where((DormitoryInvoiceModel invoice) => invoice.hasPendingPayment)
+        .length;
+    final int paidCount = _dashboardReceipts
+        .where((DormitoryInvoiceModel invoice) => invoice.isPaid)
+        .length;
+    final double totalDebt = _dashboardReceipts.fold<double>(
+      0,
+      (double total, DormitoryInvoiceModel invoice) {
+        if (invoice.isPaid) return total;
+        final double remaining = invoice.remainingAmount > 0
+            ? invoice.remainingAmount
+            : (invoice.totalAmount - invoice.paidAmount);
+        return total + (remaining > 0 ? remaining : 0);
+      },
+    );
+
+    return Semantics(
+      button: true,
+      label: 'Mở hóa đơn và thanh toán',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _openInvoices(student, latestAccommodation),
+          borderRadius: BorderRadius.circular(30),
+          child: DormitoryLeatherWallet3D(
+            totalAmount: _formatPrice(totalDebt.toString()),
+            unpaid: unpaidCount,
+            pending: pendingCount,
+            paid: paidCount,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDashboardMetric({
+    required String label,
+    required String value,
+    required Color color,
+    required IconData icon,
+  }) {
+    return Container(
+      constraints: const BoxConstraints(minHeight: 74),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.065),
+        borderRadius: BorderRadius.circular(13),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Icon(icon, size: 17, color: color),
+          const SizedBox(height: 5),
+          Text(
+            value,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w800,
+              fontSize: AppFontSizes.mediumSmall,
+            ),
+          ),
+          Text(
+            label,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: AppFontSizes.extraSmall,
+              color: Color(0xFF656D68),
+              height: 1.15,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  bool _shouldShowRoomDashboard(dynamic item) {
+    final String status = _accommodationStatus(item);
+    return _roomNumber(item).trim().isNotEmpty ||
+        status == 'assigned' ||
+        status == 'active';
+  }
+
+  Widget _buildRoomDashboardCard(dynamic item, dynamic data) {
+    final String roomNumber = _roomNumber(item);
+    final String roomType = _roomTypeName(item);
+    final String dormitory = _dormitoryName(item);
+    final String buildingName = _assignedBuildingName(item);
+    final String status = _accommodationStatus(item);
+    final int roommateCount = _readTopLevelList(data, 'roommates').length;
+    final DateTime? start = _accommodationStartDate(item);
+    final DateTime? end = _accommodationEndDate(item);
+    final Color statusColor = _getStatusColor(status);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE3E9E5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEEF3FF),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.bedroom_parent_rounded,
+                  color: Color(0xFF315BEA),
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'Phòng ở hiện tại',
+                  style: TextStyle(
+                    fontSize: AppFontSizes.mediumSmall,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF151A17),
+                  ),
+                ),
+              ),
+              _buildStatusBadge(status),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: _buildRoomInfoTile(
+                  icon: Icons.apartment_rounded,
+                  label: 'Ký túc xá',
+                  value: dormitory,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _buildRoomInfoTile(
+                  icon: Icons.location_city_rounded,
+                  label: 'Tòa',
+                  value: buildingName.isEmpty ? 'Chưa cập nhật' : buildingName,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: _buildRoomInfoTile(
+                  icon: Icons.meeting_room_rounded,
+                  label: 'Phòng',
+                  value: roomNumber.isEmpty ? 'Đang bố trí' : roomNumber,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _buildRoomInfoTile(
+                  icon: Icons.groups_rounded,
+                  label: 'Loại phòng',
+                  value: roomType.isEmpty ? 'Chưa cập nhật' : roomType,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _buildRoomInfoTile(
+            icon: Icons.people_alt_outlined,
+            label: 'Bạn cùng phòng',
+            value: '$roommateCount',
+          ),
+          if (start != null || end != null) ...<Widget>[
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: statusColor.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: <Widget>[
+                  Icon(Icons.date_range_rounded, size: 18, color: statusColor),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Thời gian ở: ${start == null ? '—' : DateFormat('dd/MM/yyyy').format(start.toLocal())}'
+                      ' - ${end == null ? '—' : DateFormat('dd/MM/yyyy').format(end.toLocal())}',
+                      style: const TextStyle(
+                        fontSize: AppFontSizes.extraSmall,
+                        color: Color(0xFF4E5751),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          if (status == 'assigned' || status == 'active') ...<Widget>[
+            const SizedBox(height: 12),
+            _buildAccommodationRequestActions(item),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRoomInfoTile({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Container(
+      constraints: const BoxConstraints(minHeight: 72),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAF9),
+        borderRadius: BorderRadius.circular(13),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Icon(icon, size: 18, color: const Color(0xFF315BEA)),
+          const SizedBox(width: 7),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: AppFontSizes.extraSmall,
+                    color: Color(0xFF818883),
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  value,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: AppFontSizes.font11,
+                    color: Color(0xFF252B27),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDashboardQuickActions({
+    required dynamic data,
+    required dynamic student,
+    required dynamic latestAccommodation,
+  }) {
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        final double width = (constraints.maxWidth - 10) / 2;
+        return Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: <Widget>[
+            _buildDashboardAction(
+              width: width,
+              icon: Icons.badge_outlined,
+              label: 'Hồ sơ lưu trú',
+              color: const Color(0xFF0A9B61),
+              onTap: student == null
+                  ? null
+                  : () => _openStudentUpdateSheet(
+                      student,
+                      latestAccommodation,
+                    ),
+            ),
+            _buildDashboardAction(
+              width: width,
+              icon: Icons.receipt_long_outlined,
+              label: 'Hóa đơn',
+              color: const Color(0xFF315BEA),
+              onTap: () => _openInvoices(student, latestAccommodation),
+            ),
+            _buildDashboardAction(
+              width: width,
+              icon: Icons.history_rounded,
+              label: 'Lịch sử',
+              color: const Color(0xFF7C4DFF),
+              onTap: () => _showStudentHistory(data),
+            ),
+            _buildDashboardAction(
+              width: width,
+              icon: latestAccommodation == null
+                  ? Icons.app_registration_rounded
+                  : Icons.swap_horiz_rounded,
+              label: latestAccommodation == null
+                  ? 'Đăng ký nội trú'
+                  : 'Đổi / trả phòng',
+              color: const Color(0xFFF59E0B),
+              onTap: latestAccommodation == null
+                  ? (_hasOpenRegistrationPeriod ? _goToRegisterFlow : null)
+                  : () => _showAccommodationActionSheet(latestAccommodation),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildDashboardAction({
+    required double width,
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback? onTap,
+  }) {
+    return SizedBox(
+      width: width,
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 82),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE4E9E6)),
+            ),
+            child: Row(
+              children: <Widget>[
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.09),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, color: color, size: 21),
+                ),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Text(
+                    label,
+                    maxLines: 2,
+                    style: TextStyle(
+                      color: onTap == null
+                          ? const Color(0xFF9AA09C)
+                          : const Color(0xFF252A27),
+                      fontSize: AppFontSizes.font11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyRegistrationDashboardCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(17),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE3E9E5)),
+      ),
+      child: Row(
+        children: <Widget>[
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0F3F1),
+              borderRadius: BorderRadius.circular(13),
+            ),
+            child: const Icon(
+              Icons.apartment_outlined,
+              color: Color(0xFF69716C),
+            ),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  'Chưa có đơn đăng ký hiện tại',
+                  style: TextStyle(
+                    fontSize: AppFontSizes.mediumSmall,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF252A27),
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'Khi có đợt mở, bạn có thể bắt đầu đăng ký ngay từ màn hình này.',
+                  style: TextStyle(
+                    fontSize: AppFontSizes.extraSmall,
+                    color: Color(0xFF717873),
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRegistrationDetailsExpansion({
+    required dynamic data,
+    required dynamic student,
+    required List<dynamic> accommodations,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE3E9E5)),
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          title: const Text(
+            'Thông tin hồ sơ chi tiết',
+            style: TextStyle(
+              fontSize: AppFontSizes.mediumSmall,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          subtitle: const Text(
+            'Thông tin cá nhân và các lần đăng ký trước',
+            style: TextStyle(fontSize: AppFontSizes.extraSmall),
+          ),
+          childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+          children: <Widget>[
+            _buildStudentCard(student, accommodations.first),
+            const SizedBox(height: 12),
+            ...accommodations.asMap().entries.map(
+              (MapEntry<int, dynamic> entry) => _buildAccommodationCard(
+                entry.value,
+                student,
+                isLatest: entry.key == 0,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openInvoices(dynamic student, dynamic item) async {
+    String identityNo = _studentIdentityNo(student).trim();
+    if (identityNo.isEmpty) {
+      final SharedPreferences preferences = await SharedPreferences.getInstance();
+      identityNo = preferences.getString('applicant_cccd')?.trim() ?? '';
+    }
+
+    if (!mounted) return;
+
+    if (identityNo.isEmpty) {
+      snackBarError('Không tìm thấy mã sinh viên/CCCD để tải hóa đơn');
+      return;
+    }
+
+    final int? dormitoryId = item == null
+        ? null
+        : _resolveDormitoryIdForAccommodation(item);
+
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute<void>(
+        builder: (BuildContext context) => DRInvoicesScreen(
+          identityNo: identityNo,
+          dormitoryId: dormitoryId,
+          dormitoryName: item == null ? '' : _dormitoryName(item),
+          accommodationStartDate:
+              item == null ? null : _accommodationStartDate(item),
+          accommodationEndDate:
+              item == null ? null : _accommodationEndDate(item),
+        ),
+      ),
+    );
+
+    if (mounted) await _loadLatestReceiptFromCurrentState();
+  }
+
+  Future<void> _showAccommodationActionSheet(dynamic item) async {
+    final String status = _accommodationStatus(item);
+    if (status != 'assigned' && status != 'active') {
+      snackBarError('Chỉ có thể gửi yêu cầu khi đã được bố trí phòng');
+      return;
+    }
+
+    final bool pending = _hasPendingAccommodationRequest(item);
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (BuildContext sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Yêu cầu lưu trú',
+                    style: TextStyle(
+                      fontSize: AppFontSizes.medium,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                if (pending)
+                  ListTile(
+                    leading: const Icon(Icons.close_rounded, color: Colors.red),
+                    title: const Text('Hủy yêu cầu đang chờ'),
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      _confirmCancelAccommodationRequest(item);
+                    },
+                  )
+                else ...<Widget>[
+                  ListTile(
+                    leading: const Icon(
+                      Icons.swap_horiz_rounded,
+                      color: Color(0xFF315BEA),
+                    ),
+                    title: const Text('Yêu cầu đổi phòng'),
+                    subtitle: const Text('Gửi yêu cầu để cán bộ KTX xem xét'),
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      _openChangeRoomRequest(item);
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(
+                      Icons.logout_rounded,
+                      color: Color(0xFFE67E22),
+                    ),
+                    title: const Text('Yêu cầu trả phòng'),
+                    subtitle: const Text('Không tự động trả phòng ngay'),
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      _openCheckoutRequest(item);
+                    },
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -2191,90 +3071,239 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
     final String dormitoryName = _dormitoryName(item);
     final String periodName = _periodName(item);
 
-    return Card(
-      margin: EdgeInsets.zero,
-      elevation: 0,
-      color: statusColor.withOpacity(0.08),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(15),
-        side: BorderSide(color: statusColor.withOpacity(0.28)),
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE3E9E5)),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: Colors.black.withOpacity(0.035),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: InkWell(
         onTap: () => _showHistory(_accommodationId(item)),
-        borderRadius: BorderRadius.circular(15),
+        borderRadius: BorderRadius.circular(20),
         child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
+          padding: const EdgeInsets.all(17),
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.14),
-                  shape: BoxShape.circle,
-                ),
-                alignment: Alignment.center,
-                child: Icon(
-                  _getStatusIcon(status),
-                  color: statusColor,
-                  size: 25,
-                ),
+              Row(
+                children: <Widget>[
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: statusColor.withOpacity(0.11),
+                      borderRadius: BorderRadius.circular(13),
+                    ),
+                    child: Icon(
+                      _getStatusIcon(status),
+                      color: statusColor,
+                      size: 23,
+                    ),
+                  ),
+                  const SizedBox(width: 11),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          'Đơn đăng ký hiện tại',
+                          style: TextStyle(
+                            fontSize: AppFontSizes.mediumSmall,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF151A17),
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Theo dõi tiến trình xử lý hồ sơ',
+                          style: TextStyle(
+                            fontSize: AppFontSizes.extraSmall,
+                            color: Color(0xFF747B76),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  _buildStatusBadge(status),
+                ],
               ),
-              const SizedBox(width: 12),
-              Expanded(
+              const SizedBox(height: 15),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(0.055),
+                  borderRadius: BorderRadius.circular(14),
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    const Text(
-                      'TRẠNG THÁI HỒ SƠ HIỆN TẠI',
-                      style: TextStyle(
-                        fontSize: AppFontSizes.font11,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF666B75),
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _getStatusText(status),
-                      style: TextStyle(
-                        fontSize: AppFontSizes.medium,
-                        fontWeight: FontWeight.bold,
-                        color: statusColor,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
                     Text(
                       '$dormitoryName · $periodName',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: AppFontSizes.font11,
-                        color: Color(0xFF444A55),
-                        height: 1.35,
+                        color: Color(0xFF2F3632),
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                     if (createdAt != null) ...<Widget>[
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 5),
                       Text(
-                        'Ngày đăng ký: '
-                        '${DateFormat('dd/MM/yyyy HH:mm').format(createdAt.toLocal())}',
+                        'Gửi lúc ${DateFormat('dd/MM/yyyy HH:mm').format(createdAt.toLocal())}',
                         style: const TextStyle(
-                          fontSize: AppFontSizes.font11,
-                          color: Color(0xFF737982),
+                          fontSize: AppFontSizes.extraSmall,
+                          color: Color(0xFF737A75),
                         ),
                       ),
                     ],
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              Icon(Icons.chevron_right_rounded, color: statusColor, size: 22),
+              const SizedBox(height: 17),
+              _buildRegistrationTimeline(status),
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: <Widget>[
+                  Text(
+                    'Xem lịch sử xử lý',
+                    style: TextStyle(
+                      color: statusColor,
+                      fontSize: AppFontSizes.extraSmall,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(width: 3),
+                  Icon(Icons.chevron_right_rounded, color: statusColor, size: 19),
+                ],
+              ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildRegistrationTimeline(String status) {
+    const List<String> codes = <String>[
+      'draft',
+      'pending',
+      'approved',
+      'assigned',
+    ];
+    const List<String> labels = <String>[
+      'Khởi tạo',
+      'Đã gửi',
+      'Đã duyệt',
+      'Bố trí phòng',
+    ];
+
+    int currentIndex;
+    switch (status.toLowerCase()) {
+      case 'draft':
+        currentIndex = 0;
+        break;
+      case 'pending':
+      case 'rejected':
+        currentIndex = 1;
+        break;
+      case 'approved':
+        currentIndex = 2;
+        break;
+      case 'assigned':
+      case 'active':
+      case 'checkout':
+      case 'terminated':
+        currentIndex = 3;
+        break;
+      default:
+        currentIndex = 0;
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: List<Widget>.generate(codes.length, (int index) {
+        final bool done = index <= currentIndex;
+        final Color color = done
+            ? const Color(0xFF078B3E)
+            : const Color(0xFFD8DEDA);
+
+        return Expanded(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Expanded(
+                child: Column(
+                  children: <Widget>[
+                    Row(
+                      children: <Widget>[
+                        if (index > 0)
+                          Expanded(
+                            child: Container(
+                              height: 2,
+                              color: index <= currentIndex
+                                  ? const Color(0xFF8CCDA7)
+                                  : const Color(0xFFE2E6E3),
+                            ),
+                          ),
+                        Container(
+                          width: 23,
+                          height: 23,
+                          decoration: BoxDecoration(
+                            color: done ? color : Colors.white,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: color, width: 2),
+                          ),
+                          child: done
+                              ? const Icon(
+                                  Icons.check_rounded,
+                                  size: 14,
+                                  color: Colors.white,
+                                )
+                              : null,
+                        ),
+                        if (index < codes.length - 1)
+                          Expanded(
+                            child: Container(
+                              height: 2,
+                              color: index < currentIndex
+                                  ? const Color(0xFF8CCDA7)
+                                  : const Color(0xFFE2E6E3),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      labels[index],
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      style: TextStyle(
+                        fontSize: AppFontSizes.extraSmall,
+                        height: 1.15,
+                        color: done
+                            ? const Color(0xFF245D3B)
+                            : const Color(0xFF929894),
+                        fontWeight: done ? FontWeight.w700 : FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      }),
     );
   }
 
@@ -2362,9 +3391,16 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
                     ),
                   ),
                 */
-                // Tạm ẩn nút cập nhật thông tin sinh viên.
-                // Toàn bộ hàm _openStudentUpdateSheet vẫn được giữ lại để
-                // có thể bật lại khi backend hoàn thiện nghiệp vụ cập nhật.
+                TextButton.icon(
+                  onPressed: () =>
+                      _openStudentUpdateSheet(student, latestAccommodation),
+                  icon: const Icon(Icons.edit_outlined, size: 17),
+                  label: const Text('Cập nhật'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFF078B3E),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
               ],
             ),
             const Divider(height: 20),
@@ -2621,6 +3657,7 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
 
     final String dormitoryName = _dormitoryName(item);
     final String dormitoryAddress = _dormitoryAddress(item);
+    final String buildingName = _assignedBuildingName(item);
     final String priorityObjectName = _priorityObjectName(item, student);
 
     final String roomTypeName = _roomTypeName(item);
@@ -2747,12 +3784,15 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
 
               if (roomTypeName.isNotEmpty ||
                   roomNumber.isNotEmpty ||
+                  buildingName.isNotEmpty ||
                   latestReceiptPrice.isNotEmpty) ...<Widget>[
                 const SizedBox(height: 10),
                 _buildSectionTitle(
                   icon: Icons.meeting_room_outlined,
                   title: 'Thông tin xếp phòng',
                 ),
+                if (buildingName.isNotEmpty)
+                  _buildInfoRow('Tòa:', buildingName),
                 if (roomTypeName.isNotEmpty)
                   _buildInfoRow('Loại phòng:', roomTypeName),
                 if (latestReceiptPrice.isNotEmpty)
@@ -3314,45 +4354,7 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
     return SizedBox(
       width: double.infinity,
       child: FilledButton.icon(
-        onPressed: () {
-          final String identityNo = _studentIdentityNo(student);
-
-          // student.show thường chỉ trả tên KTX trong accommodations[].dormitory,
-          // không trả dormitoryId. Ưu tiên ID trực tiếp, sau đó đối chiếu tên
-          // với danh mục KTX đã tải. Không chặn mở hóa đơn nếu vẫn chưa có ID,
-          // vì API receipts chỉ cần CCCD/mã định danh sinh viên.
-          final int? dormitoryId = _resolveDormitoryIdForAccommodation(item);
-
-          if (identityNo.isEmpty) {
-            snackBarError(
-              'Không tìm thấy số CCCD '
-              'của sinh viên',
-            );
-            return;
-          }
-
-          if (dormitoryId == null) {
-            debugPrint(
-              '[DORMITORY-INVOICE] Không xác định được dormitoryId; '
-              'vẫn mở danh sách biên lai theo identityNo.',
-            );
-          }
-
-          Navigator.push<void>(
-            context,
-            MaterialPageRoute<void>(
-              builder: (BuildContext context) {
-                return DRInvoicesScreen(
-                  identityNo: identityNo,
-                  dormitoryId: dormitoryId,
-                  dormitoryName: _dormitoryName(item),
-                  accommodationStartDate: _accommodationStartDate(item),
-                  accommodationEndDate: _accommodationEndDate(item),
-                );
-              },
-            ),
-          );
-        },
+        onPressed: () => _openInvoices(student, item),
         style: FilledButton.styleFrom(
           backgroundColor: const Color(0xFF078B3E),
           foregroundColor: Colors.white,
@@ -3801,9 +4803,9 @@ class _AccommodationRequestFormSheetState
             secondary: widget.color,
           ),
           textSelectionTheme: TextSelectionThemeData(
-            cursorColor: widget.color,
-            selectionColor: widget.color.withOpacity(0.20),
-            selectionHandleColor: widget.color,
+            cursorColor: AppTheme.colorMain,
+            selectionColor: AppTheme.colorMain.withOpacity(0.20),
+            selectionHandleColor: AppTheme.colorMain,
           ),
           inputDecorationTheme: InputDecorationTheme(
             filled: true,
@@ -3913,13 +4915,13 @@ class _AccommodationRequestFormSheetState
                       // Tạm bỏ phần chọn tòa/phòng trong yêu cầu chuyển phòng.
                       // Sinh viên chỉ nhập lý do, Ban quản lý quyết định phòng mới.
                       const SizedBox(height: 16),
-                      TextField(
+                      VnuFloatingTextFieldAdapter(
                         controller: _noteController,
                         focusNode: _noteFocusNode,
                         minLines: 3,
                         maxLines: 5,
                         maxLength: 500,
-                        cursorColor: widget.color,
+                        cursorColor: AppTheme.colorMain,
                         textInputAction: TextInputAction.newline,
                         decoration: InputDecoration(
                           labelText: widget.noteLabel,
@@ -4530,4 +5532,3 @@ class _AccommodationRequestFormSheetState
     );
   }
 }
-

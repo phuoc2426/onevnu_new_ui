@@ -15,6 +15,11 @@ import 'package:vnu_noi_tru/cubit/dormitory_payment_cubit.dart';
 import 'package:vnu_noi_tru/models/dormitory_payment/dormitory_invoice_model.dart';
 import 'package:vnu_noi_tru/models/dormitory_payment/dormitory_payment_method_model.dart';
 import 'package:vnu_noi_tru/utils/dormitory_image_upload_util.dart';
+import 'package:vnu_noi_tru/widgets/dormitory_ticket_card.dart';
+import 'package:vnu_noi_tru/widgets/dormitory_leather_wallet_3d.dart';
+import 'package:vnu_core/widgets/field/vnu_text_field.dart';
+
+enum _InvoiceFilter { all, unpaid, pending, paid }
 
 class DRInvoicesScreen extends StatefulWidget {
   final String identityNo;
@@ -49,6 +54,7 @@ class _DRInvoicesScreenState extends State<DRInvoicesScreen> {
   bool _isPickingPaymentProof = false;
 
   final NumberFormat _currencyFormatter = NumberFormat('#,###', 'vi_VN');
+  _InvoiceFilter _filter = _InvoiceFilter.all;
 
   @override
   void initState() {
@@ -123,16 +129,178 @@ class _DRInvoicesScreenState extends State<DRInvoicesScreen> {
       return _buildEmptyState();
     }
 
+    final List<DormitoryInvoiceModel> visibleInvoices = _filteredInvoices();
+
     return RefreshIndicator(
       onRefresh: _refreshData,
       color: AppTheme.colorMain,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 30),
         children: <Widget>[
-          ..._cubit.invoices.map(_buildInvoiceCard),
+          _buildInvoiceDashboard(),
+          const SizedBox(height: 16),
+          if (visibleInvoices.isEmpty)
+            _buildFilteredEmptyState()
+          else
+            ...visibleInvoices.map(_buildInvoiceCard),
+        ],
+      ),
+    );
+  }
 
-          const SizedBox(height: 30),
+  List<DormitoryInvoiceModel> _filteredInvoices() {
+    switch (_filter) {
+      case _InvoiceFilter.unpaid:
+        return _cubit.invoices
+            .where(
+              (DormitoryInvoiceModel invoice) =>
+                  !invoice.isPaid && !invoice.hasPendingPayment,
+            )
+            .toList();
+      case _InvoiceFilter.pending:
+        return _cubit.invoices
+            .where((DormitoryInvoiceModel invoice) => invoice.hasPendingPayment)
+            .toList();
+      case _InvoiceFilter.paid:
+        return _cubit.invoices
+            .where((DormitoryInvoiceModel invoice) => invoice.isPaid)
+            .toList();
+      case _InvoiceFilter.all:
+        return List<DormitoryInvoiceModel>.from(_cubit.invoices);
+    }
+  }
+
+  Widget _buildInvoiceDashboard() {
+    final int unpaidCount = _cubit.invoices
+        .where(
+          (DormitoryInvoiceModel invoice) =>
+              !invoice.isPaid && !invoice.hasPendingPayment,
+        )
+        .length;
+    final int pendingCount = _cubit.invoices
+        .where((DormitoryInvoiceModel invoice) => invoice.hasPendingPayment)
+        .length;
+    final int paidCount = _cubit.invoices
+        .where((DormitoryInvoiceModel invoice) => invoice.isPaid)
+        .length;
+
+    final double totalDebt = _cubit.invoices.fold<double>(
+      0,
+      (double total, DormitoryInvoiceModel invoice) =>
+          total + (invoice.isPaid ? 0 : _calculateRemainingAmount(invoice)),
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        DormitoryLeatherWallet3D(
+          totalAmount: _formatMoney(totalDebt),
+          unpaid: unpaidCount,
+          pending: pendingCount,
+          paid: paidCount,
+        ),
+        const SizedBox(height: 14),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: <Widget>[
+              _buildFilterChip(_InvoiceFilter.all, 'Tất cả'),
+              const SizedBox(width: 8),
+              _buildFilterChip(_InvoiceFilter.unpaid, 'Cần thanh toán'),
+              const SizedBox(width: 8),
+              _buildFilterChip(_InvoiceFilter.pending, 'Chờ xác nhận'),
+              const SizedBox(width: 8),
+              _buildFilterChip(_InvoiceFilter.paid, 'Đã thanh toán'),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInvoiceMetric({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    return Container(
+      constraints: const BoxConstraints(minHeight: 92),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.07),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withOpacity(0.18)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Icon(icon, color: color, size: 20),
+          const SizedBox(height: 7),
+          Text(
+            value,
+            style: TextStyle(
+              color: color,
+              fontSize: AppFontSizes.mediumLarge,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Color(0xFF4F5660),
+              fontSize: AppFontSizes.extraSmall,
+              height: 1.2,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterChip(_InvoiceFilter filter, String label) {
+    final bool selected = _filter == filter;
+    return ChoiceChip(
+      selected: selected,
+      onSelected: (_) => setState(() => _filter = filter),
+      label: Text(label),
+      showCheckmark: false,
+      side: BorderSide(
+        color: selected ? const Color(0xFF078B3E) : const Color(0xFFE0E5E2),
+      ),
+      selectedColor: const Color(0xFFE8F6ED),
+      backgroundColor: Colors.white,
+      labelStyle: TextStyle(
+        color: selected ? const Color(0xFF078B3E) : const Color(0xFF5F6670),
+        fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+      ),
+    );
+  }
+
+  Widget _buildFilteredEmptyState() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 30),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE5E9E7)),
+      ),
+      child: const Column(
+        children: <Widget>[
+          Icon(Icons.inbox_outlined, size: 38, color: Color(0xFF8A918D)),
+          SizedBox(height: 10),
+          Text(
+            'Không có hóa đơn ở trạng thái này',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Color(0xFF555C57),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
       ),
     );
@@ -241,167 +409,511 @@ class _DRInvoicesScreenState extends State<DRInvoicesScreen> {
 
   Widget _buildInvoiceCard(DormitoryInvoiceModel invoice) {
     final String? qrUrl = _resolveQrUrl(invoice);
-
-    final DormitoryPaymentMethodModel? paymentMethod = _resolvePaymentMethod();
-
     final double remainingAmount = _calculateRemainingAmount(invoice);
     final String? periodRange = _invoicePeriodRange(invoice);
+    final Color accentColor = _ticketAccentColor(invoice);
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      elevation: 3,
-      shadowColor: Colors.black.withOpacity(0.05),
-      color: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.grey.shade200),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: _invoiceStatusColor(invoice).withOpacity(0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.receipt_long_rounded,
-                    size: 22,
-                    color: _invoiceStatusColor(invoice),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(
-                        invoice.displayTitle,
-                        style: const TextStyle(
-                          fontSize: AppFontSizes.mediumSmall,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF111318),
-                        ),
-                      ),
-                      if (periodRange != null) ...<Widget>[
-                        const SizedBox(height: 4),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: <Widget>[
-                            const Icon(
-                              Icons.date_range_outlined,
-                              size: 14,
-                              color: Color(0xFF078B3E),
+    return DormitoryTicketCard(
+      accentColor: accentColor,
+      stubFraction: 0.76,
+      footerHeight: 42,
+      onBodyTap: () => _showInvoiceDetailsSheet(invoice),
+      footer: _buildTicketFooter(invoice, qrUrl, accentColor),
+      child: LayoutBuilder(
+        builder: (BuildContext context, BoxConstraints constraints) {
+          final double stubWidth =
+              (constraints.maxWidth * 0.24).clamp(80.0, 96.0).toDouble();
+
+          return ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 164),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 13, 8, 10),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: <Widget>[
+                  Expanded(
+                    flex: 54,
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 10),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          _buildInvoiceStatusBadge(invoice),
+                          const SizedBox(height: 8),
+                          Text(
+                            invoice.displayTitle,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF15181D),
+                              height: 1.22,
                             ),
-                            const SizedBox(width: 5),
-                            Expanded(
-                              child: Text(
-                                periodRange,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: AppFontSizes.font11,
-                                  color: Color(0xFF4F5660),
-                                  fontWeight: FontWeight.w500,
-                                ),
+                          ),
+                          const SizedBox(height: 7),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              '${_formatMoney(invoice.isPaid ? invoice.totalAmount : remainingAmount)} đ',
+                              style: TextStyle(
+                                fontSize: 23,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.35,
+                                color: accentColor,
+                                height: 1.05,
                               ),
                             ),
-                          ],
-                        ),
-                      ],
-                      if (invoice.code != null &&
-                          invoice.code!.trim().isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          'Mã hóa đơn: '
-                          '${invoice.code}',
-                          style: const TextStyle(
-                            fontSize: AppFontSizes.font11,
-                            color: Color(0xFF737780),
                           ),
-                        ),
-                      ],
-                    ],
+                          const SizedBox(height: 9),
+                          if (widget.dormitoryName.trim().isNotEmpty)
+                            _buildTicketLine(
+                              Icons.apartment_rounded,
+                              widget.dormitoryName,
+                            ),
+                          if (periodRange != null) ...<Widget>[
+                            const SizedBox(height: 4),
+                            _buildTicketLine(
+                              Icons.date_range_outlined,
+                              periodRange,
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                _buildInvoiceStatusBadge(invoice),
-              ],
+                  Expanded(
+                    flex: 32,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(4, 0, 10, 0),
+                      child: _buildTicketCompactMeta(invoice, accentColor),
+                    ),
+                  ),
+                  SizedBox(
+                    width: stubWidth,
+                    child: _buildTicketStub(invoice, qrUrl, accentColor),
+                  ),
+                ],
+              ),
             ),
-
-            const Divider(height: 26),
-
-            _buildAmountRow(
-              label: 'Tổng tiền',
-              amount: invoice.totalAmount,
-              isPrimary: true,
-            ),
-
-            if (invoice.paidAmount > 0)
-              _buildAmountRow(
-                label: 'Đã thanh toán',
-                amount: invoice.paidAmount,
-              ),
-
-            if (!invoice.isPaid)
-              _buildAmountRow(
-                label: 'Còn phải trả',
-                amount: remainingAmount,
-                valueColor: Colors.red.shade700,
-              ),
-
-            if (invoice.billingPeriodName != null &&
-                invoice.billingPeriodName!.trim().isNotEmpty)
-              _buildInfoRow(
-                label: 'Kỳ thanh toán',
-                value: invoice.billingPeriodName!,
-              ),
-
-            if (invoice.dueDate != null)
-              _buildInfoRow(
-                label: 'Hạn thanh toán',
-                value: DateFormat('dd/MM/yyyy').format(invoice.dueDate!),
-                valueColor: _isOverdue(invoice) ? Colors.red : null,
-              ),
-
-            if (invoice.description != null &&
-                invoice.description!.trim().isNotEmpty)
-              _buildInfoRow(label: 'Nội dung', value: invoice.description!),
-
-            if (invoice.paymentCode != null &&
-                invoice.paymentCode!.trim().isNotEmpty) ...[
-              const SizedBox(height: 14),
-              _buildPaymentCodeBox(invoice.paymentCode!),
-            ],
-
-            const SizedBox(height: 16),
-
-            _buildQrSection(invoice: invoice, qrUrl: qrUrl),
-
-            if (paymentMethod != null) ...[
-              const SizedBox(height: 16),
-              _buildBankInformation(paymentMethod),
-            ],
-
-            if (invoice.payments.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              _buildLatestPaymentBox(invoice),
-            ],
-
-            const SizedBox(height: 18),
-
-            _buildProofButton(invoice),
-          ],
-        ),
+          );
+        },
       ),
     );
+  }
+
+  Widget _buildTicketCompactMeta(
+    DormitoryInvoiceModel invoice,
+    Color accentColor,
+  ) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        if (invoice.dueDate != null) ...<Widget>[
+          const Text(
+            'Hạn thanh toán',
+            style: TextStyle(
+              fontSize: 9.5,
+              color: Color(0xFF747C87),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Row(
+            children: <Widget>[
+              Icon(
+                Icons.calendar_month_rounded,
+                size: 14,
+                color: _isOverdue(invoice)
+                    ? AppTheme.colorError
+                    : accentColor,
+              ),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  DateFormat('dd/MM/yyyy').format(invoice.dueDate!),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    color: _isOverdue(invoice)
+                        ? AppTheme.colorError
+                        : const Color(0xFF303640),
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+        ],
+        if (invoice.paymentCode != null &&
+            invoice.paymentCode!.trim().isNotEmpty) ...<Widget>[
+          const Text(
+            'Mã thanh toán',
+            style: TextStyle(
+              fontSize: 9.5,
+              color: Color(0xFF747C87),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: Text(
+                  invoice.paymentCode!.trim(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 10.5,
+                    color: Color(0xFF202630),
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 2),
+              InkWell(
+                onTap: () => _copyPaymentCode(invoice.paymentCode!.trim()),
+                borderRadius: BorderRadius.circular(6),
+                child: const Padding(
+                  padding: EdgeInsets.all(3),
+                  child: Icon(
+                    Icons.copy_rounded,
+                    size: 14,
+                    color: Color(0xFF2563EB),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+        const SizedBox(height: 10),
+        InkWell(
+          onTap: () => _showInvoiceDetailsSheet(invoice),
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Icon(Icons.info_outline_rounded, size: 13, color: accentColor),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    'Chi tiết',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 9.5,
+                      color: accentColor,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTicketStub(
+    DormitoryInvoiceModel invoice,
+    String? qrUrl,
+    Color accentColor,
+  ) {
+    if (qrUrl != null && !invoice.isPaid && !invoice.hasPendingPayment) {
+      return InkWell(
+        onTap: () => _showQrPreview(qrUrl),
+        borderRadius: BorderRadius.circular(10),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Container(
+              width: 66,
+              height: 66,
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: accentColor.withOpacity(0.22)),
+              ),
+              child: Image.network(
+                qrUrl,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => Icon(
+                  Icons.qr_code_2_rounded,
+                  size: 44,
+                  color: accentColor,
+                ),
+              ),
+            ),
+            const SizedBox(height: 5),
+            Text(
+              'Quét để\nthanh toán',
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              style: TextStyle(
+                fontSize: 8.5,
+                color: accentColor,
+                fontWeight: FontWeight.w700,
+                height: 1.15,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final IconData icon;
+    final String label;
+    if (invoice.isPaid) {
+      icon = Icons.check_circle_rounded;
+      label = 'Đã thanh\ntoán';
+    } else if (invoice.hasPendingPayment) {
+      icon = Icons.upload_file_rounded;
+      label = 'Chờ xác\nnhận';
+    } else {
+      icon = Icons.upload_file_rounded;
+      label = 'Gửi minh\nchứng';
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Container(
+          width: 58,
+          height: 58,
+          decoration: BoxDecoration(
+            color: accentColor.withOpacity(0.09),
+            borderRadius: BorderRadius.circular(15),
+          ),
+          child: Icon(icon, size: 34, color: accentColor),
+        ),
+        const SizedBox(height: 7),
+        Text(
+          label,
+          textAlign: TextAlign.center,
+          maxLines: 2,
+          style: TextStyle(
+            fontSize: 8.8,
+            color: accentColor,
+            fontWeight: FontWeight.w800,
+            height: 1.15,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _showInvoiceDetailsSheet(DormitoryInvoiceModel invoice) async {
+    final String? qrUrl = _resolveQrUrl(invoice);
+    final DormitoryPaymentMethodModel? paymentMethod = _resolvePaymentMethod();
+    final double remainingAmount = _calculateRemainingAmount(invoice);
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext sheetContext) {
+        return DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.72,
+          minChildSize: 0.45,
+          maxChildSize: 0.92,
+          builder: (BuildContext context, ScrollController scrollController) {
+            return Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: SafeArea(
+                top: false,
+                child: ListView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.fromLTRB(18, 10, 18, 24),
+                  children: <Widget>[
+                    Center(
+                      child: Container(
+                        width: 42,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFDDE2DF),
+                          borderRadius: BorderRadius.circular(99),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: <Widget>[
+                        Expanded(
+                          child: Text(
+                            invoice.displayTitle,
+                            style: const TextStyle(
+                              fontSize: AppFontSizes.medium,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF15181D),
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.pop(sheetContext),
+                          icon: const Icon(Icons.close_rounded),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    _buildAmountRow(
+                      label: 'Tổng tiền',
+                      amount: invoice.totalAmount,
+                      isPrimary: true,
+                    ),
+                    if (!invoice.isPaid)
+                      _buildAmountRow(
+                        label: 'Còn phải thanh toán',
+                        amount: remainingAmount,
+                        valueColor: _ticketAccentColor(invoice),
+                      ),
+                    if (invoice.dueDate != null)
+                      _buildInfoRow(
+                        label: 'Hạn thanh toán',
+                        value: DateFormat('dd/MM/yyyy').format(invoice.dueDate!),
+                        valueColor: _isOverdue(invoice)
+                            ? AppTheme.colorError
+                            : null,
+                      ),
+                    if (invoice.paymentCode != null &&
+                        invoice.paymentCode!.trim().isNotEmpty)
+                      _buildPaymentCodeBox(invoice.paymentCode!.trim()),
+                    if (invoice.billingPeriodName != null &&
+                        invoice.billingPeriodName!.trim().isNotEmpty) ...<Widget>[
+                      const SizedBox(height: 12),
+                      _buildInfoRow(
+                        label: 'Kỳ thanh toán',
+                        value: invoice.billingPeriodName!,
+                      ),
+                    ],
+                    if (invoice.description != null &&
+                        invoice.description!.trim().isNotEmpty)
+                      _buildInfoRow(
+                        label: 'Nội dung',
+                        value: invoice.description!,
+                      ),
+                    if (qrUrl != null) ...<Widget>[
+                      const SizedBox(height: 14),
+                      _buildQrSection(invoice: invoice, qrUrl: qrUrl),
+                    ],
+                    if (paymentMethod != null) ...<Widget>[
+                      const SizedBox(height: 14),
+                      _buildBankInformation(paymentMethod),
+                    ],
+                    if (invoice.payments.isNotEmpty) ...<Widget>[
+                      const SizedBox(height: 14),
+                      _buildLatestPaymentBox(invoice),
+                    ],
+                    if (!invoice.isPaid) ...<Widget>[
+                      const SizedBox(height: 14),
+                      _buildProofButton(invoice),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildTicketLine(IconData icon, String text) {
+    return Row(
+      children: <Widget>[
+        Icon(icon, size: 15, color: const Color(0xFF617067)),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: AppFontSizes.extraSmall,
+              color: Color(0xFF626A65),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTicketFooter(
+    DormitoryInvoiceModel invoice,
+    String? qrUrl,
+    Color accentColor,
+  ) {
+    String label;
+    IconData icon;
+    VoidCallback? onTap;
+
+    if (invoice.isPaid) {
+      label = 'Đã thanh toán';
+      icon = Icons.check_circle_rounded;
+    } else if (invoice.hasPendingPayment) {
+      label = 'Đang chờ xác nhận';
+      icon = Icons.hourglass_top_rounded;
+    } else if (qrUrl != null) {
+      label = 'Thanh toán ngay';
+      icon = Icons.qr_code_2_rounded;
+      onTap = () => _showQrPreview(qrUrl);
+    } else {
+      label = invoice.hasRejectedPayment
+          ? 'Gửi lại minh chứng'
+          : 'Gửi minh chứng';
+      icon = Icons.upload_file_rounded;
+      onTap = () => _pickPaymentProof(invoice);
+    }
+
+    final Widget content = Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: <Widget>[
+        Icon(icon, size: 17, color: Colors.white),
+        const SizedBox(width: 8),
+        Flexible(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+              fontSize: AppFontSizes.font11,
+            ),
+          ),
+        ),
+        if (onTap != null) ...<Widget>[
+          const SizedBox(width: 5),
+          const Icon(Icons.chevron_right_rounded, color: Colors.white),
+        ],
+      ],
+    );
+
+    if (onTap == null) return Center(child: content);
+
+    return InkWell(
+      onTap: onTap,
+      child: Center(child: content),
+    );
+  }
+
+  Color _ticketAccentColor(DormitoryInvoiceModel invoice) {
+    if (invoice.isPaid) return const Color(0xFF0A9B61);
+    if (invoice.hasPendingPayment) return const Color(0xFFF59E0B);
+    if (_isOverdue(invoice)) return const Color(0xFFE53935);
+    return const Color(0xFF2563EB);
   }
 
   String? _invoicePeriodRange(DormitoryInvoiceModel invoice) {
@@ -519,18 +1031,33 @@ class _DRInvoicesScreenState extends State<DRInvoicesScreen> {
     final Color color = _invoiceStatusColor(invoice);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withOpacity(0.10),
         borderRadius: BorderRadius.circular(20),
       ),
-      child: Text(
-        _invoiceStatusText(invoice),
-        style: TextStyle(
-          fontSize: AppFontSizes.extraSmall,
-          fontWeight: FontWeight.bold,
-          color: color,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Container(
+            width: 7,
+            height: 7,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 5),
+          Flexible(
+            child: Text(
+              _invoiceStatusText(invoice),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 9.5,
+                fontWeight: FontWeight.w700,
+                color: color,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1671,7 +2198,7 @@ class _PaymentProofConfirmDialogState
                   ),
                 ),
                 const SizedBox(height: 16),
-                TextField(
+                VnuFloatingTextFieldAdapter(
                   controller: _noteController,
                   maxLines: 3,
                   minLines: 2,
@@ -1809,4 +2336,3 @@ class PaymentProofConfirmResult {
 
   const PaymentProofConfirmResult({required this.confirmed, this.note});
 }
-

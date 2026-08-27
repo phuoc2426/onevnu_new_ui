@@ -16,7 +16,7 @@ class HomeWithZaloBubble extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: <Widget>[
-        const VcoreHomeViewV3(),
+        VcoreHomeViewV3(isActive: isActive),
         if (isActive)
           const ZaloChatBubble(
             edgeInsets: EdgeInsets.fromLTRB(12, 12, 16, 108),
@@ -25,3 +25,4 @@ class HomeWithZaloBubble extends StatelessWidget {
     );
   }
 }
+

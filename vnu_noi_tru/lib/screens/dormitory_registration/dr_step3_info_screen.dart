@@ -5,16 +5,19 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
-import 'package:vnu_core/globals.dart';
 import 'package:vnu_core/themes/app_theme.dart';
 import 'package:vnu_noi_tru/cubit/dormitory_registration_cubit.dart';
+import 'package:vnu_noi_tru/domain/registration/dormitory_date_codec.dart';
+import 'package:vnu_noi_tru/domain/registration/dormitory_student_draft.dart';
+import 'package:vnu_noi_tru/services/registration/dormitory_local_file_store.dart';
 import 'package:vnu_noi_tru/models/model.dart';
 import 'package:path/path.dart' as p;
 import 'package:vnu_core/common/app_text_styles.dart';
+import 'package:vnu_core/widgets/field/vnu_text_field.dart';
+import 'package:vnu_core/widgets/field/vnu_date_picker_sheet.dart';
 import 'package:vnu_noi_tru/widgets/nt_custom_dropdown.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class DRStep3InfoScreen extends StatefulWidget {
   final GlobalKey<FormState> formKey;
@@ -44,86 +47,157 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
   late TextEditingController _genderController;
   late TextEditingController _cccdController;
   late TextEditingController _cccdIssueDateController;
-  late TextEditingController _hometownController;
+  late TextEditingController _identityNameController;
+  late TextEditingController _identityIssuePlaceController;
+  late TextEditingController _countryController;
+  late TextEditingController _countryCodeController;
+  late TextEditingController _nationalController;
+  late TextEditingController _permanentAddressController;
+  late TextEditingController _vneidPermanentAddressController;
+  late TextEditingController _permanentProvinceCodeController;
+  late TextEditingController _permanentWardCodeController;
+  late TextEditingController _contactAddressController;
   late TextEditingController _classNameController;
+  late TextEditingController _facultyController;
   late TextEditingController _majorController;
   late TextEditingController _academicYearController;
   late TextEditingController _systemController;
   late TextEditingController _levelController;
   late TextEditingController _universityNameController;
+  late TextEditingController _univIdController;
+  late TextEditingController _priorityObjectNameController;
   late TextEditingController _temporaryAddressController;
+  late TextEditingController _vneidTemporaryAddressController;
+  late TextEditingController _temporaryProvinceCodeController;
+  late TextEditingController _temporaryWardCodeController;
+  late TextEditingController _ethnicityController;
+  late TextEditingController _religionController;
   late TextEditingController _phoneController;
   late TextEditingController _emailController;
   late TextEditingController _reasonController;
 
-  String _genderValue = 'male';
-  bool _isApplicant = false;
+  String? _genderValue;
+  String _identityType = 'CCCD';
+  int? _studentType;
   final List<_FamilyMemberForm> _familyForms = <_FamilyMemberForm>[];
 
   @override
   void initState() {
     super.initState();
-    final student = Globals().thongTinSinhVienModel.value;
-    final classInfo = Globals().lopDaoTaoModel.value;
-    final cohortInfo = Globals().nienKhoaDaoTaoModel.value;
-    final cubit = context.read<DormitoryRegistrationCubit>();
 
-    _familyForms.addAll(
-      cubit.familyMembers.map(_FamilyMemberForm.fromPayload),
-    );
+    _studentCodeController = TextEditingController();
+    _fullNameController = TextEditingController();
+    _dobController = TextEditingController();
+    _genderController = TextEditingController();
+    _cccdController = TextEditingController();
+    _cccdIssueDateController = TextEditingController();
+    _identityNameController = TextEditingController();
+    _identityIssuePlaceController = TextEditingController();
+    _countryController = TextEditingController();
+    _countryCodeController = TextEditingController();
+    _nationalController = TextEditingController();
+    _permanentAddressController = TextEditingController();
+    _vneidPermanentAddressController = TextEditingController();
+    _permanentProvinceCodeController = TextEditingController();
+    _permanentWardCodeController = TextEditingController();
+    _contactAddressController = TextEditingController();
+    _classNameController = TextEditingController();
+    _facultyController = TextEditingController();
+    _majorController = TextEditingController();
+    _academicYearController = TextEditingController();
+    _systemController = TextEditingController();
+    _levelController = TextEditingController();
+    _universityNameController = TextEditingController();
+    _univIdController = TextEditingController();
+    _priorityObjectNameController = TextEditingController();
+    _temporaryAddressController = TextEditingController();
+    _vneidTemporaryAddressController = TextEditingController();
+    _temporaryProvinceCodeController = TextEditingController();
+    _temporaryWardCodeController = TextEditingController();
+    _ethnicityController = TextEditingController();
+    _religionController = TextEditingController();
+    _phoneController = TextEditingController();
+    _emailController = TextEditingController();
+    _reasonController = TextEditingController();
 
-    _studentCodeController =
-        TextEditingController(text: student?.maSinhVien ?? '');
-    _fullNameController = TextEditingController(text: student?.hoVaTen ?? '');
+    _hydrateRegistrationDraft();
+  }
 
-    String dobStr = '';
-    if (student?.ngaySinh != null) {
-      dobStr = DateFormat('yyyy-MM-dd').format(student!.ngaySinh!);
+  Future<void> _hydrateRegistrationDraft() async {
+    final DormitoryRegistrationCubit cubit =
+        context.read<DormitoryRegistrationCubit>();
+
+    try {
+      final DormitoryStudentDraft draft = await cubit.ensureStudentDraft();
+      if (!mounted) return;
+
+      _studentCodeController.text = draft.studentCode;
+      _fullNameController.text = draft.fullName;
+      _dobController.text = DormitoryDateCodec.normalize(draft.dob);
+      _genderValue = draft.gender;
+      _genderController.text = draft.gender ?? '';
+      _cccdController.text = draft.identityNo;
+      _cccdIssueDateController.text =
+          DormitoryDateCodec.normalize(draft.identityIssueDate);
+      final String rawIdentityType = (draft.identityType ?? '').toUpperCase();
+      _identityType = const <String>{'CCCD', 'CMND', 'HC', 'GTK'}
+              .contains(rawIdentityType)
+          ? rawIdentityType
+          : 'CCCD';
+      _identityNameController.text = draft.identityName ?? '';
+      _identityIssuePlaceController.text = draft.identityIssuePlace ?? '';
+      _countryController.text = draft.country ?? '';
+      _countryCodeController.text = draft.countryCode ?? '';
+      _nationalController.text = draft.national ?? '';
+      _permanentAddressController.text = draft.permanentAddress;
+      _vneidPermanentAddressController.text = draft.vneidPermanentAddress ?? '';
+      _permanentProvinceCodeController.text = draft.permanentProvinceCode ?? '';
+      _permanentWardCodeController.text = draft.permanentWardCode ?? '';
+      _contactAddressController.text = draft.contactAddress ?? '';
+      _classNameController.text = draft.className;
+      _facultyController.text = draft.faculty ?? '';
+      _majorController.text = draft.major;
+      _academicYearController.text = draft.academicYear;
+      _systemController.text = draft.system;
+      _levelController.text = draft.level;
+      _universityNameController.text = draft.universityName;
+      _univIdController.text = draft.univId?.toString() ?? '';
+      _studentType = draft.studentType;
+      _priorityObjectNameController.text = draft.priorityObjectName ?? '';
+      _temporaryAddressController.text = draft.temporaryAddress;
+      _vneidTemporaryAddressController.text = draft.vneidTemporaryAddress ?? '';
+      _temporaryProvinceCodeController.text = draft.temporaryProvinceCode ?? '';
+      _temporaryWardCodeController.text = draft.temporaryWardCode ?? '';
+      _ethnicityController.text = draft.ethnicity ?? '';
+      _religionController.text = draft.religion ?? '';
+      _phoneController.text = draft.phone;
+      _emailController.text = draft.email;
+      _reasonController.text = draft.reasonStay ?? '';
+      if (_priorityObjectNameController.text.trim().isEmpty &&
+          cubit.selectedPriorityObjectNames.trim().isNotEmpty) {
+        _priorityObjectNameController.text = cubit.selectedPriorityObjectNames;
+      }
+
+      for (final _FamilyMemberForm form in _familyForms) {
+        form.dispose();
+      }
+      _familyForms
+        ..clear()
+        ..addAll(draft.familyMembers.map(_FamilyMemberForm.fromPayload));
+
+      setState(() {});
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.red,
+            content: Text(AppErrorMapper.map(error).userMessage),
+          ),
+        );
     }
-    _dobController = TextEditingController(text: dobStr);
-    _isApplicant = student == null;
-
-    _genderValue = student?.gioiTinh?.toLowerCase() == 'nữ' ? 'female' : 'male';
-    _genderController = TextEditingController(text: _genderValue);
-
-    _cccdController =
-        TextEditingController(text: cubit.tempCccd ?? student?.soCmtCccd ?? '');
-
-    String issueDateStr = '';
-    if (student?.ngayCapCmtCccd != null) {
-      issueDateStr = DateFormat('yyyy-MM-dd').format(student!.ngayCapCmtCccd!);
-    }
-    _cccdIssueDateController =
-        TextEditingController(text: cubit.tempCccdIssueDate ?? issueDateStr);
-
-    _hometownController = TextEditingController(
-      text: cubit.tempHometown ?? student?.hoKhauThuongTruDuongThon ??
-          student?.hoKhauThuongTruPhuongXa ?? '',
-    );
-
-    _classNameController = TextEditingController(text: classInfo?.ten ?? '');
-    _majorController = TextEditingController(text: classInfo?.ten ?? '');
-    _academicYearController =
-        TextEditingController(text: cohortInfo?.ten ?? '');
-    _systemController =
-        TextEditingController(text: student != null ? 'Chính quy' : '');
-    _levelController =
-        TextEditingController(text: student != null ? 'Đại học' : '');
-    _universityNameController = TextEditingController(
-        text: student != null ? 'Đại học Quốc gia Hà Nội' : '');
-
-    _temporaryAddressController = TextEditingController(
-      text: cubit.tempTemporaryAddress ?? student?.noiOHienNayDuongThon ??
-          student?.noiOHienNayPhuongXa ?? '',
-    );
-
-    _phoneController = TextEditingController(
-        text: cubit.tempPhone ?? student?.mobile ?? student?.tel ?? '');
-    _emailController =
-        TextEditingController(text: cubit.tempEmail ?? student?.email ?? '');
-    _reasonController = TextEditingController(text: cubit.tempReason ?? '');
-
-    _loadApplicantCacheIfAvailable();
   }
 
   @override
@@ -134,14 +208,31 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
     _genderController.dispose();
     _cccdController.dispose();
     _cccdIssueDateController.dispose();
-    _hometownController.dispose();
+    _identityNameController.dispose();
+    _identityIssuePlaceController.dispose();
+    _countryController.dispose();
+    _countryCodeController.dispose();
+    _nationalController.dispose();
+    _permanentAddressController.dispose();
+    _vneidPermanentAddressController.dispose();
+    _permanentProvinceCodeController.dispose();
+    _permanentWardCodeController.dispose();
+    _contactAddressController.dispose();
     _classNameController.dispose();
+    _facultyController.dispose();
     _majorController.dispose();
     _academicYearController.dispose();
     _systemController.dispose();
     _levelController.dispose();
     _universityNameController.dispose();
+    _univIdController.dispose();
+    _priorityObjectNameController.dispose();
     _temporaryAddressController.dispose();
+    _vneidTemporaryAddressController.dispose();
+    _temporaryProvinceCodeController.dispose();
+    _temporaryWardCodeController.dispose();
+    _ethnicityController.dispose();
+    _religionController.dispose();
     _phoneController.dispose();
     _emailController.dispose();
     _reasonController.dispose();
@@ -243,223 +334,91 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
     return lastCompressedFile;
   }
 
-  Future<void> _loadApplicantCacheIfAvailable() async {
-    final prefs = await SharedPreferences.getInstance();
-    final applicantCccd = prefs.getString('applicant_cccd');
-    if (applicantCccd == null || applicantCccd.isEmpty) return;
-
-    final cubit = context.read<DormitoryRegistrationCubit>();
-
-    // 1. Ưu tiên giá trị từ Cubit (nếu có) → SharedPreferences → rỗng
-    final emailFromCache = prefs.getString('applicant_email') ?? '';
-
-    if (cubit.tempEmail != null && cubit.tempEmail!.isNotEmpty) {
-      _emailController.text = cubit.tempEmail!;
-    } else if (emailFromCache.isNotEmpty) {
-      _emailController.text = emailFromCache;
-      cubit.tempEmail = emailFromCache;   // đồng bộ ngược vào Cubit
-    } else {
-      _emailController.text = '';         // hoặc giữ nguyên giá trị cũ của controller
-    }
-
-    // Tương tự cho họ tên, CCCD, ngày sinh...
-    final fullNameFromCache = prefs.getString('applicant_fullname') ?? '';
-    if (cubit.tempFullName != null && cubit.tempFullName!.isNotEmpty) {
-      _fullNameController.text = cubit.tempFullName!;
-    } else if (fullNameFromCache.isNotEmpty) {
-      _fullNameController.text = fullNameFromCache;
-      cubit.tempFullName = fullNameFromCache;
-    } else {
-      _fullNameController.text = '';
-    }
-
-    // CCCD
-    if (cubit.tempCccd != null && cubit.tempCccd!.isNotEmpty) {
-      _cccdController.text = cubit.tempCccd!;
-    } else {
-      _cccdController.text = applicantCccd;  // applicant_cccd luôn có
-      cubit.tempCccd = applicantCccd;
-    }
-
-    // DOB
-    final dobFromCache = prefs.getString('applicant_dob') ?? '';
-    if (cubit.tempDOB != null && cubit.tempDOB!.isNotEmpty) {
-      _dobController.text = cubit.tempDOB!;
-    } else if (dobFromCache.isNotEmpty) {
-      _dobController.text = dobFromCache;
-      cubit.tempDOB = dobFromCache;
-    } else {
-      _dobController.text = '';
-    }
-
-    // Sau khi đồng bộ, không cần gọi setState vì controller.text đã thay đổi,
-    // nhưng nếu có UI phụ thuộc thì nên gọi setState.
-    if (mounted) setState(() {});
-  }
-
-  void saveDataToCubit() {
+  Future<void> saveDataToCubit() async {
     final DormitoryRegistrationCubit cubit =
         context.read<DormitoryRegistrationCubit>();
+    final DormitoryStudentDraft current = await cubit.ensureStudentDraft();
 
-    cubit.tempFullName = _fullNameController.text.trim();
-    cubit.tempPhone = _phoneController.text.trim();
-    cubit.tempEmail = _emailController.text.trim();
-    cubit.tempDOB = _dobController.text.trim();
-    cubit.tempGender = _genderValue;
-    cubit.tempCccd = _cccdController.text.trim();
-    cubit.tempCccdIssueDate = _cccdIssueDateController.text.trim();
-    cubit.tempHometown = _hometownController.text.trim();
-    cubit.tempTemporaryAddress = _temporaryAddressController.text.trim();
-    cubit.tempReason = _reasonController.text.trim();
-    cubit.replaceFamilyMembers(
-      _familyForms
-          .map((_FamilyMemberForm item) => item.toPayload())
-          .where((FamilyMemberPayload item) => item.fullName.isNotEmpty)
-          .toList(),
+    final List<FamilyMemberPayload> members = _familyForms
+        .map((_FamilyMemberForm item) => item.toPayload())
+        .where((FamilyMemberPayload item) => item.fullName.trim().isNotEmpty)
+        .toList();
+
+    final DormitoryStudentDraft draft = current.copyWith(
+      studentCode: _studentCodeController.text.trim(),
+      fullName: _fullNameController.text.trim(),
+      dob: DormitoryDateCodec.normalize(_dobController.text),
+      gender: _genderValue,
+      clearGender: _genderValue == null || _genderValue!.trim().isEmpty,
+      identityNo: _cccdController.text.trim(),
+      identityType: _identityType,
+      identityName: _identityNameController.text.trim(),
+      identityIssueDate:
+          DormitoryDateCodec.normalize(_cccdIssueDateController.text),
+      identityIssuePlace: _identityIssuePlaceController.text.trim(),
+      country: _countryController.text.trim(),
+      countryCode: _countryCodeController.text.trim(),
+      national: _nationalController.text.trim(),
+      permanentAddress: _permanentAddressController.text.trim(),
+      vneidPermanentAddress: _vneidPermanentAddressController.text.trim(),
+      permanentProvinceCode: _permanentProvinceCodeController.text.trim(),
+      permanentWardCode: _permanentWardCodeController.text.trim(),
+      contactAddress: _contactAddressController.text.trim(),
+      className: _classNameController.text.trim(),
+      faculty: _facultyController.text.trim(),
+      major: _majorController.text.trim(),
+      academicYear: _academicYearController.text.trim(),
+      system: _systemController.text.trim(),
+      level: _levelController.text.trim(),
+      universityName: _universityNameController.text.trim(),
+      univId: int.tryParse(_univIdController.text.trim()),
+      clearUnivId: _univIdController.text.trim().isEmpty,
+      studentType: _studentType,
+      clearStudentType: _studentType == null,
+      priorityObjectName: _priorityObjectNameController.text.trim(),
+      temporaryAddress: _temporaryAddressController.text.trim(),
+      vneidTemporaryAddress: _vneidTemporaryAddressController.text.trim(),
+      temporaryProvinceCode: _temporaryProvinceCodeController.text.trim(),
+      temporaryWardCode: _temporaryWardCodeController.text.trim(),
+      ethnicity: _ethnicityController.text.trim(),
+      religion: _religionController.text.trim(),
+      phone: _phoneController.text.trim(),
+      email: _emailController.text.trim(),
+      reasonStay: _reasonController.text.trim(),
+      familyMembers: members,
     );
+
+    await cubit.setStudentDraft(draft);
   }
 
-  Future<void> _selectDate(BuildContext context,
-      TextEditingController controller,) async {
-    DateTime selectedDate = DateTime.tryParse(controller.text) ??
+  Future<void> _selectDate(
+    BuildContext context,
+    TextEditingController controller, {
+    String title = 'Chọn ngày',
+  }) async {
+    DateTime initialDate = DateTime.tryParse(controller.text.trim()) ??
         DateTime.now();
+    final DateTime now = DateUtils.dateOnly(DateTime.now());
 
-    final picked = await showModalBottomSheet<DateTime>(
+    if (initialDate.isAfter(now)) {
+      initialDate = now;
+    }
+
+    final DateTime? picked = await VnuDatePickerSheet.show(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Container(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(
-                  top: Radius.circular(24),
-                ),
-              ),
-              child: SafeArea(
-                top: false,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 44,
-                      height: 5,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE3E6EB),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    const Row(
-                      children: [
-                        Icon(
-                          Icons.calendar_month_rounded,
-                          color: Color(0xFF078B3E),
-                        ),
-                        SizedBox(width: 8),
-                        Text(
-                          'Chọn ngày',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: AppFontSizes.medium,
-                            color: Color(0xFF111318),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Theme(
-                      data: Theme.of(context).copyWith(
-                        colorScheme: Theme
-                            .of(context)
-                            .colorScheme
-                            .copyWith(
-                          primary: AppTheme.colorMain,
-                          secondary: AppTheme.colorMain,
-                        ),
-                      ),
-                      child: CalendarDatePicker(
-                        initialDate: selectedDate,
-                        firstDate: DateTime(1970),
-                        lastDate: DateTime.now().add(
-                          const Duration(days: 365),
-                        ),
-                        onDateChanged: (date) {
-                          setModalState(() {
-                            selectedDate = date;
-                          });
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () => Navigator.pop(context),
-                            icon: const Icon(Icons.close_rounded),
-                            label: const Text('Hủy'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: const Color(0xFF666B75),
-                              side: const BorderSide(
-                                color: Color(0xFFE3E6EB),
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: FilledButton.icon(
-                            onPressed: () {
-                              Navigator.pop(context, selectedDate);
-                            },
-                            icon: const Icon(Icons.check_rounded),
-                            label: const Text('Chọn ngày'),
-                            style: FilledButton.styleFrom(
-                              backgroundColor: const Color(0xFF078B3E),
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
+      title: title,
+      initialDate: initialDate,
+      firstDate: DateTime(1900),
+      lastDate: now,
     );
 
-    if (picked != null) {
+    if (picked != null && mounted) {
       setState(() {
         controller.text = DateFormat('yyyy-MM-dd').format(picked);
       });
-      if (controller == _dobController) {
-        _saveApplicantCache();  // cập nhật cache ngay
-      }
     }
   }
-  Future<void> _saveApplicantCache() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('applicant_cccd', _cccdController.text.trim());
-    await prefs.setString('applicant_fullname', _fullNameController.text.trim());
-    await prefs.setString('applicant_email', _emailController.text.trim());
-    await prefs.setString('applicant_dob', _dobController.text.trim());
-    await prefs.setString('applicant_phone', _phoneController.text.trim()); // thêm
-  }
+
   Future<void> _pickImageLocal(String uploadSlot) async {
     final DormitoryRegistrationCubit cubit =
         context.read<DormitoryRegistrationCubit>();
@@ -499,8 +458,15 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
       final File originalFile = File(image.path);
       final double originalSizeMb = await _fileSizeMb(originalFile);
 
-      final File file = await _compressImageToUploadStandard(originalFile);
+      final File normalizedFile =
+          await _compressImageToUploadStandard(originalFile);
 
+      await _validateImageSize(normalizedFile);
+
+      final File file = await DormitoryLocalFileStore.persist(
+        normalizedFile,
+        role: uploadSlot,
+      );
       await _validateImageSize(file);
 
       final double finalSizeMb = await _fileSizeMb(file);
@@ -519,10 +485,13 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
       if (!mounted) return;
 
       if (uploadSlot == 'avatar') {
+        await DormitoryLocalFileStore.deleteIfManaged(cubit.avatarFile);
         cubit.selectAvatar(file);
       } else if (uploadSlot == 'cccd_front') {
+        await DormitoryLocalFileStore.deleteIfManaged(cubit.cccdFrontFile);
         cubit.selectCCCDFront(file);
       } else if (uploadSlot == 'cccd_back') {
+        await DormitoryLocalFileStore.deleteIfManaged(cubit.cccdBackFile);
         cubit.selectCCCDBack(file);
       } else {
         cubit.addProofFile(file);
@@ -637,12 +606,13 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
                       Row(
                         children: [
                           Expanded(child: _buildField(
-                              'Mã sinh viên', _studentCodeController,
-                              readOnly: true)),
+                              'Mã sinh viên', _studentCodeController)),
                           const SizedBox(width: 8),
                           Expanded(child: _buildField(
-                              'Họ và tên', _fullNameController,
-                              readOnly: true)),
+                              'Họ và tên *', _fullNameController,
+                              validator: (v) => v == null || v.trim().isEmpty
+                                  ? 'Nhập họ và tên'
+                                  : null)),
                         ],
                       ),
                       const SizedBox(height: 8),
@@ -654,7 +624,11 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
                               _dobController,
                               readOnly: false,
                               icon: Icons.calendar_today_outlined,
-                              onTap: _isApplicant ? () => _selectDate(context, _dobController) : null,
+                              onTap: () => _selectDate(
+                                context,
+                                _dobController,
+                                title: 'Ngày sinh',
+                              ),
                               validator: (v) => v == null || v.trim().isEmpty
                                   ? 'Vui lòng chọn ngày sinh'
                                   : null,
@@ -726,7 +700,10 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
                               readOnly: true,
                               icon: Icons.calendar_today_outlined,
                               onTap: () => _selectDate(
-                                  context, _cccdIssueDateController),
+                                  context,
+                                  _cccdIssueDateController,
+                                  title: 'Ngày cấp CCCD',
+                                ),
                               validator: (v) =>
                               v == null || v.isEmpty
                                   ? 'Chọn ngày cấp'
@@ -736,76 +713,171 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
                         ],
                       ),
                       const SizedBox(height: 8),
+                      Row(
+                        children: <Widget>[
+                          Expanded(
+                            child: NtCustomDropdown<String>(
+                              label: 'Loại giấy tờ',
+                              hintText: 'Chọn loại giấy tờ',
+                              value: _identityType,
+                              items: const <String>['CCCD', 'CMND', 'HC', 'GTK'],
+                              itemAsString: (String value) => value == 'HC'
+                                  ? 'Hộ chiếu'
+                                  : value == 'GTK'
+                                      ? 'Giấy tờ khác'
+                                      : value,
+                              onChanged: (String? value) {
+                                if (value != null) {
+                                  setState(() => _identityType = value);
+                                }
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _buildField(
+                              'Tên giấy tờ',
+                              _identityNameController,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
                       _buildField(
-                        'Quê quán *',
-                        _hometownController,
+                        'Nơi cấp giấy tờ',
+                        _identityIssuePlaceController,
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: <Widget>[
+                          Expanded(child: _buildField('Mã quốc gia', _countryCodeController)),
+                          const SizedBox(width: 8),
+                          Expanded(child: _buildField('Quốc gia', _countryController)),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: <Widget>[
+                          Expanded(child: _buildField('Quốc tịch', _nationalController)),
+                          const SizedBox(width: 8),
+                          Expanded(child: _buildField('Dân tộc', _ethnicityController)),
+                          const SizedBox(width: 8),
+                          Expanded(child: _buildField('Tôn giáo', _religionController)),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      _buildField(
+                        'Địa chỉ thường trú *',
+                        _permanentAddressController,
                         validator: (v) =>
                         v == null || v.isEmpty
-                            ? 'Nhập quê quán'
+                            ? 'Nhập địa chỉ thường trú'
                             : null,
                       ),
+                      const SizedBox(height: 8),
+                      _buildField(
+                        'Thường trú theo VNeID',
+                        _vneidPermanentAddressController,
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: <Widget>[
+                          Expanded(child: _buildField('Mã tỉnh thường trú', _permanentProvinceCodeController)),
+                          const SizedBox(width: 8),
+                          Expanded(child: _buildField('Mã xã/phường thường trú', _permanentWardCodeController)),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      _buildField('Địa chỉ liên hệ', _contactAddressController),
                     ],
                   ),
                 ),
               ),
               const SizedBox(height: 12),
               // 3. Thông tin học tập
-              Card(
-                color: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(18),
-                  side: const BorderSide(color: Color(0xFFE3E6EB)),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Row(
-                        children: [
-                          Icon(Icons.school_outlined, color: Color(0xFF078B3E),
-                              size: 20),
-                          SizedBox(width: 8),
-                          Text(
-                            'Thông tin học tập',
-                            style: TextStyle(fontSize: AppFontSizes.font11,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF111318)),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(child: _buildField(
-                              'Lớp', _classNameController, readOnly: true)),
-                          const SizedBox(width: 6),
-                          Expanded(child: _buildField(
-                              'Ngành', _majorController, readOnly: true)),
-                          const SizedBox(width: 6),
-                          Expanded(child: _buildField(
-                              'Năm học', _academicYearController,
-                              readOnly: true)),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(child: _buildField(
-                              'Hệ đào tạo', _systemController, readOnly: true)),
-                          const SizedBox(width: 8),
-                          Expanded(child: _buildField(
-                              'Bậc đào tạo', _levelController, readOnly: true)),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      _buildField(
-                          'Trường', _universityNameController, readOnly: true),
-                    ],
+                Card(
+                  color: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18),
+                    side: const BorderSide(color: Color(0xFFE3E6EB)),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(Icons.school_outlined, color: Color(0xFF078B3E),
+                                size: 20),
+                            SizedBox(width: 8),
+                            Text(
+                              'Thông tin học tập',
+                              style: TextStyle(fontSize: AppFontSizes.font11,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF111318)),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(child: _buildField(
+                                'Lớp', _classNameController)),
+                            const SizedBox(width: 6),
+                            Expanded(child: _buildField(
+                                'Ngành', _majorController)),
+                            const SizedBox(width: 6),
+                            Expanded(child: _buildField(
+                                'Năm học', _academicYearController)),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: <Widget>[
+                            Expanded(child: _buildField('Khoa/đơn vị', _facultyController)),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: NtCustomDropdown<int>(
+                                label: 'Loại người học',
+                                hintText: 'Chọn loại',
+                                value: _studentType,
+                                items: const <int>[0, 1],
+                                itemAsString: (int value) => value == 0 ? 'Học sinh' : 'Sinh viên',
+                                onChanged: (int? value) => setState(() => _studentType = value),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(child: _buildField(
+                                'Hệ đào tạo', _systemController)),
+                            const SizedBox(width: 8),
+                            Expanded(child: _buildField(
+                                'Bậc đào tạo', _levelController)),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: <Widget>[
+                            Expanded(child: _buildField('Trường', _universityNameController)),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: _buildField(
+                                'ID trường',
+                                _univIdController,
+                                keyboardType: TextInputType.number,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
               const SizedBox(height: 12),
               // 4. Liên hệ & ưu tiên
               Card(
@@ -843,6 +915,16 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
                             : null,
                       ),
                       const SizedBox(height: 8),
+                      _buildField('Tạm trú theo VNeID', _vneidTemporaryAddressController),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: <Widget>[
+                          Expanded(child: _buildField('Mã tỉnh tạm trú', _temporaryProvinceCodeController)),
+                          const SizedBox(width: 8),
+                          Expanded(child: _buildField('Mã xã/phường tạm trú', _temporaryWardCodeController)),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
                       Row(
                         children: [
                           Expanded(
@@ -872,13 +954,18 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
                       ),
                       const SizedBox(height: 8),
                       _buildField(
-                        'Đối tượng ưu tiên',
-                        TextEditingController(
-                          text: cubit.selectedPriorityObjectNames.isEmpty
-                              ? 'Không'
-                              : cubit.selectedPriorityObjectNames,
+                        'Tên đối tượng ưu tiên',
+                        _priorityObjectNameController,
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        cubit.selectedPriorityObjectNames.isEmpty
+                            ? 'Chưa chọn mã đối tượng ưu tiên.'
+                            : 'Mã đối tượng ưu tiên đã chọn: ${cubit.selectedPriorityObjectNames}',
+                        style: const TextStyle(
+                          fontSize: AppFontSizes.extraSmall,
+                          color: Color(0xFF666B75),
                         ),
-                        readOnly: true,
                       ),
                     ],
                   ),
@@ -924,10 +1011,12 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
                         onPreview: cubit.cccdFrontFile != null
                             ? () => _showImagePreview(cubit.cccdFrontFile!)
                             : null,
-                        onRemove: () {
-                          setState(() {
-                            cubit.removeCCCDFront();
-                          });
+                        onRemove: () async {
+                          await DormitoryLocalFileStore.deleteIfManaged(
+                            cubit.cccdFrontFile,
+                          );
+                          if (!mounted) return;
+                          setState(cubit.removeCCCDFront);
                         },
                       ),
                       const Divider(height: 12, color: Color(0xFFE3E6EB)),
@@ -941,10 +1030,12 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
                         onPreview: cubit.cccdBackFile != null
                             ? () => _showImagePreview(cubit.cccdBackFile!)
                             : null,
-                        onRemove: () {
-                          setState(() {
-                            cubit.removeCCCDBack();
-                          });
+                        onRemove: () async {
+                          await DormitoryLocalFileStore.deleteIfManaged(
+                            cubit.cccdBackFile,
+                          );
+                          if (!mounted) return;
+                          setState(cubit.removeCCCDBack);
                         },
                       ),
                       const Divider(height: 12, color: Color(0xFFE3E6EB)),
@@ -959,58 +1050,15 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
                       ),
                       const SizedBox(height: 16),
                       // Lý do đăng ký
-                      const Text(
-                        'Lý do đăng ký nội trú',
-                        style: TextStyle(color: Color(0xFF666B75),
-                            fontSize: AppFontSizes.font11,
-                            fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 6),
-                      Container(
-                        height: 120,
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFFE3E6EB)),
-                        ),
-                        child: Stack(
-                          children: [
-                            TextField(
-                              controller: _reasonController,
-                              maxLines: 4,
-                              maxLength: 500,
-                              cursorColor: const Color(0xFF078B3E),
-                              onChanged: (text) {
-                                setState(() {});
-                              },
-                              style: const TextStyle(
-                                fontSize: AppFontSizes.mediumSmall,
-                                fontWeight: FontWeight.w500,
-                                color: Color(0xFF111318),
-                                height: 1.4,
-                              ),
-                              decoration: const InputDecoration(
-                                hintText: 'Nhập lý do...',
-                                hintStyle: TextStyle(
-                                  color: Color(0xFF9CA3AF),
-                                  fontSize: AppFontSizes.mediumSmall,
-                                ),
-                                border: InputBorder.none,
-                                counterText: '',
-                              ),
-                            ),
-                            Positioned(
-                              right: 4,
-                              bottom: 4,
-                              child: Text(
-                                '${_reasonController.text.length}/500',
-                                style: const TextStyle(color: Colors.grey,
-                                    fontSize: AppFontSizes.font11),
-                              ),
-                            ),
-                          ],
-                        ),
+                      VnuTextField(
+                        controller: _reasonController,
+                        label: 'Lý do đăng ký nội trú',
+                        hintText: 'Nhập lý do...',
+                        minLines: 3,
+                        maxLines: 4,
+                        maxLength: 500,
+                        textInputAction: TextInputAction.newline,
+                        onChanged: (_) => setState(() {}),
                       ),
                     ],
                   ),
@@ -1043,60 +1091,6 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
       ),
       splashColor: const Color(0x14078B3E),
       highlightColor: const Color(0x0F078B3E),
-    );
-  }
-
-  InputDecoration _formDecoration({
-    required String label,
-    bool readOnly = false,
-    IconData? suffixIcon,
-  }) {
-    final OutlineInputBorder border = OutlineInputBorder(
-      borderRadius: BorderRadius.circular(14),
-      borderSide: const BorderSide(color: Color(0xFFDCE3DF)),
-    );
-
-    return InputDecoration(
-      labelText: label,
-      isDense: true,
-      filled: true,
-      fillColor: readOnly ? const Color(0xFFF4F6F5) : Colors.white,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      labelStyle: const TextStyle(
-        color: Color(0xFF6B7280),
-        fontSize: AppFontSizes.font11,
-        fontWeight: FontWeight.w600,
-      ),
-      floatingLabelStyle: const TextStyle(
-        color: Color(0xFF078B3E),
-        fontSize: AppFontSizes.font11,
-        fontWeight: FontWeight.w700,
-      ),
-      hintStyle: const TextStyle(
-        color: Color(0xFF9CA3AF),
-        fontSize: AppFontSizes.mediumSmall,
-      ),
-      errorStyle: const TextStyle(
-        color: Color(0xFFDC2626),
-        fontSize: AppFontSizes.extraSmall,
-      ),
-      suffixIcon: suffixIcon == null
-          ? null
-          : Icon(suffixIcon, size: 18, color: const Color(0xFF078B3E)),
-      border: border,
-      enabledBorder: border,
-      disabledBorder: border.copyWith(
-        borderSide: const BorderSide(color: Color(0xFFE7ECE9)),
-      ),
-      focusedBorder: border.copyWith(
-        borderSide: const BorderSide(color: Color(0xFF078B3E), width: 1.6),
-      ),
-      errorBorder: border.copyWith(
-        borderSide: const BorderSide(color: Color(0xFFDC2626)),
-      ),
-      focusedErrorBorder: border.copyWith(
-        borderSide: const BorderSide(color: Color(0xFFDC2626), width: 1.5),
-      ),
     );
   }
 
@@ -1193,7 +1187,9 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
                       ),
                       if (avatar != null)
                         OutlinedButton.icon(
-                          onPressed: () {
+                          onPressed: () async {
+                            await DormitoryLocalFileStore.deleteIfManaged(avatar);
+                            if (!mounted) return;
                             cubit.removeAvatar();
                             setState(() {});
                           },
@@ -1409,30 +1405,29 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
     TextInputType? keyboardType,
     String? Function(String?)? validator,
   }) {
-    return TextFormField(
+    final bool requiredField = label.trim().endsWith('*');
+    final String effectiveLabel =
+        label.replaceFirst(RegExp(r'\s*\*$'), '').trim();
+
+    return VnuTextField(
       controller: controller,
+      label: effectiveLabel,
+      requiredField: requiredField,
       readOnly: readOnly,
       onTap: onTap,
       keyboardType: keyboardType,
       validator: validator,
-      cursorColor: const Color(0xFF078B3E),
-      style: TextStyle(
-        fontSize: AppFontSizes.mediumSmall,
-        fontWeight: FontWeight.w600,
-        color: readOnly
-            ? const Color(0xFF4B5563)
-            : const Color(0xFF111318),
-        height: 1.3,
-      ),
-      decoration: _formDecoration(
-        label: label,
-        readOnly: readOnly,
-        suffixIcon: icon,
-      ),
+      trailing: icon == null
+          ? null
+          : const Icon(
+              Icons.calendar_today_outlined,
+              size: 18,
+              color: Color(0xFF078B3E),
+            ),
     );
   }
 
-  Widget _buildDropdownField(String label, String value,
+  Widget _buildDropdownField(String label, String? value,
       Function(String?) onChanged) {
     return NtCustomDropdown<String>(
       label: label,
@@ -1440,6 +1435,9 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
       value: value,
       items: const ['male', 'female'],
       itemAsString: (item) => item == 'male' ? 'Nam' : 'Nữ',
+      validator: (String? selected) => selected == null
+          ? 'Vui lòng chọn giới tính'
+          : null,
       onChanged: onChanged,
     );
   }
@@ -1835,7 +1833,9 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
                               return _buildLocalProofGridItem(
                                 file: file,
                                 onTap: () => _showImagePreview(file),
-                                onRemove: () {
+                                onRemove: () async {
+                                  await DormitoryLocalFileStore.deleteIfManaged(file);
+                                  if (!mounted) return;
                                   setModalState(() {
                                     cubit.removeProofFileAt(index);
                                   });
@@ -2039,4 +2039,3 @@ class _FamilyMemberForm {
     phoneController.dispose();
   }
 }
-

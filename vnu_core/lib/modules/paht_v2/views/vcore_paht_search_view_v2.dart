@@ -11,6 +11,7 @@ import 'package:vnu_core/modules/paht_v2/widgets/paht_v2_empty_state.dart';
 import 'package:vnu_core/widgets/vcore_module_scaffold.dart';
 import 'package:vnu_core/widgets/progress_hub_widget.dart';
 import 'package:vnu_core/widgets/refresher_footer_widget.dart';
+import 'package:vnu_core/widgets/field/vnu_text_field.dart';
 
 class VcorePahtSearchViewV2 extends GetView<VcorePahtSearchControllerV2> {
   const VcorePahtSearchViewV2({super.key});
@@ -40,7 +41,7 @@ class VcorePahtSearchViewV2 extends GetView<VcorePahtSearchControllerV2> {
                   child: Row(
                     children: [
                       Expanded(
-                        child: TextField(
+                        child: VnuFloatingTextFieldAdapter(
                           controller: controller.textEditingController,
                           decoration: const InputDecoration(
                             hintText: 'Nhập nội dung tìm kiếm',

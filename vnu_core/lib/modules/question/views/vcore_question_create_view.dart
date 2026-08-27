@@ -14,6 +14,7 @@ import 'package:vnu_core/widgets/navi_widget.dart';
 import 'package:vnu_core/widgets/progress_hub_widget.dart';
 
 import '../../exam_schedule/views/vcore_dropdown_select_widget.dart';
+import 'package:vnu_core/widgets/field/vnu_text_field.dart';
 
 class VcoreQuestionCreateView extends GetView<VcoreQuestionCreateController> {
   const VcoreQuestionCreateView({super.key});
@@ -101,7 +102,7 @@ class VcoreQuestionCreateView extends GetView<VcoreQuestionCreateController> {
                                 Padding(
                                   padding:
                                       const EdgeInsets.only(top: 8, bottom: 24),
-                                  child: TextField(
+                                  child: VnuFloatingTextFieldAdapter(
                                     controller:
                                         controller.textEditingController,
                                     style: TextStyles.regular,

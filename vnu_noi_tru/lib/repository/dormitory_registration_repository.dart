@@ -14,6 +14,32 @@ import 'package:vnu_core/services/services_url.dart';
 import 'package:vnu_noi_tru/models/model.dart';
 
 class DormitoryRegistrationRepository {
+static const Set<String> supportedStudentUpdateFields = <String>{
+'full_name',
+'gender',
+'dob',
+'phone_number',
+'email',
+'identity_type',
+'identity_name',
+'identity_no',
+'identity_issue_date',
+'country',
+'country_code',
+'national',
+'permanent_address',
+'vneid_permanent_address',
+'permanent_province_code',
+'permanent_ward_code',
+'temporary_address',
+'vneid_temporary_address',
+'temporary_province_code',
+'temporary_ward_code',
+'reason_stay',
+'student_type',
+'family_members',
+};
+
 DormitoryRegistrationRepository._internal();
 
 static final DormitoryRegistrationRepository _singleton =
@@ -80,6 +106,33 @@ final response = await _dormitoryClient.get<Map<String, dynamic>>(
 options: _jsonOptions(),
 );
 return PriorityObjectListResponse.fromJson(response.data ?? {});
+}
+
+Future<List<DormitoryAccommodationStatusModel>> getAccommodationStatuses() async {
+await _loadTokenIfNeeded();
+final Response<Map<String, dynamic>> response = await _dormitoryClient
+    .get<Map<String, dynamic>>(
+  'registrations/statuses',
+  options: _jsonOptions(),
+);
+
+final dynamic rawData = response.data?['data'];
+if (rawData is! List) {
+  return <DormitoryAccommodationStatusModel>[];
+}
+
+return rawData
+    .whereType<Map>()
+    .map(
+      (Map<dynamic, dynamic> item) => DormitoryAccommodationStatusModel.fromJson(
+        Map<String, dynamic>.from(item),
+      ),
+    )
+    .where(
+      (DormitoryAccommodationStatusModel item) =>
+          item.code.isNotEmpty || item.slug.isNotEmpty,
+    )
+    .toList();
 }
 
 /// Lấy toàn bộ hồ sơ sinh viên để hiển thị lịch sử nội trú.
@@ -174,7 +227,7 @@ final String effectiveType = normalizedType.isEmpty
 
 formData.fields.add(MapEntry<String, String>('type', effectiveType));
 
-final Map<String, dynamic> studentJson = student.toJson();
+final Map<String, dynamic> studentJson = student.toUploadJson();
 final dynamic familyMembers = studentJson.remove('family_members');
 
 studentJson.forEach((String key, dynamic value) {
@@ -325,7 +378,7 @@ for (final Object id in payload.attachmentFileIds) {
 _addFormField(formData, 'attachment_file_ids[]', id);
 }
 
-final Map<String, dynamic> studentJson = payload.student.toJson();
+final Map<String, dynamic> studentJson = payload.student.toRegistrationJson();
 final dynamic familyMembers = studentJson.remove('family_members');
 
 studentJson.forEach((String key, dynamic value) {
@@ -346,9 +399,14 @@ value,
 });
 }
 }
+final List<String> registrationStudentFields = formData.fields
+    .where((MapEntry<String, String> entry) => entry.key.startsWith('student['))
+    .map((MapEntry<String, String> entry) => entry.key)
+    .toList();
 logInfo(
 '[DORMITORY_REGISTER] request prepared '
-'fieldCount=${formData.fields.length} fileCount=${formData.files.length}',
+'fieldCount=${formData.fields.length} fileCount=${formData.files.length} '
+'studentFields=$registrationStudentFields',
 );
 
 final response = await _dormitoryClient.post<Map<String, dynamic>>(
@@ -375,9 +433,22 @@ if (normalizedIdentityNo.isEmpty) {
 throw ArgumentError('Không tìm thấy CCCD hoặc mã sinh viên');
 }
 
+final List<String> unsupportedKeys = data.keys
+    .where((String key) => !supportedStudentUpdateFields.contains(key))
+    .toList();
+if (unsupportedKeys.isNotEmpty) {
+throw ArgumentError(
+'KTX UpdateStudentRequest chưa hỗ trợ: ${unsupportedKeys.join(', ')}',
+);
+}
+
 await _loadTokenIfNeeded();
 
 final String encodedIdentityNo = Uri.encodeComponent(normalizedIdentityNo);
+logInfo(
+'[DORMITORY_STUDENT_UPDATE] identityPresent=true '
+'keys=${data.keys.toList()}',
+);
 
 final response = await _studentClient.patch<Map<String, dynamic>>(
 'students/$encodedIdentityNo',
@@ -621,5 +692,3 @@ result.add(file);
 return result;
 }
 }
-
-

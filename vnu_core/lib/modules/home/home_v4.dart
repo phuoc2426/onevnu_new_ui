@@ -41,6 +41,7 @@ import 'package:table_calendar/table_calendar.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:vnu_core/common/app_text_styles.dart';
 import 'package:vnu_core/modules/question/views/vcore_question_view.dart';
+import 'package:vnu_core/widgets/field/vnu_text_field.dart';
 /* -------------------------------------------------------------------------- */
 /*                       LOCAL NOTIFICATION SERVICE                           */
 /* -------------------------------------------------------------------------- */
@@ -635,7 +636,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
 
                     const SizedBox(height: 12),
 
-                    TextField(
+                    VnuFloatingTextFieldAdapter(
                       controller: noteController,
                       maxLines: 2,
                       textInputAction: TextInputAction.done,

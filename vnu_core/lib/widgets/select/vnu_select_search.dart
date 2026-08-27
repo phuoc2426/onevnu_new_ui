@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:vnu_core/common/app_colors.dart';
 import 'package:vnu_core/common/app_text_styles.dart';
 import 'package:vnu_core/widgets/field/vnu_field_metrics.dart';
+import 'package:vnu_core/widgets/field/vnu_text_field.dart';
 
 class VnuSelectSearch extends StatelessWidget {
   const VnuSelectSearch({
@@ -19,7 +20,7 @@ class VnuSelectSearch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
+    return VnuFloatingTextFieldAdapter(
       controller: controller,
       autofocus: autofocus,
       onChanged: onChanged,

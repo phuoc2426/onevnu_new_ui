@@ -45,6 +45,8 @@ import 'package:vnu_core/widgets/zalo_chat_bubble.dart';
 import 'package:vnu_core/modules/question/views/vcore_question_view.dart';
 
 import 'package:vnu_core/common/guide/guide.dart';
+import 'package:vnu_core/common/guide/configs/home_guide_config.dart';
+import 'package:vnu_core/widgets/field/vnu_text_field.dart';
 /* -------------------------------------------------------------------------- */
 /*                       LOCAL NOTIFICATION SERVICE                           */
 /* -------------------------------------------------------------------------- */
@@ -140,7 +142,9 @@ class _LocalNotificationService {
 }
 
 class VcoreHomeViewV3 extends StatelessWidget {
-  const VcoreHomeViewV3({super.key});
+  const VcoreHomeViewV3({super.key, this.isActive = true});
+
+  final bool isActive;
 
   @override
   Widget build(BuildContext context) {
@@ -154,7 +158,10 @@ class VcoreHomeViewV3 extends StatelessWidget {
           contextComplete: (hubContext) {
             controller.context = hubContext;
           },
-          child: _HomeWireframeBody(controller: controller),
+          child: _HomeWireframeBody(
+            controller: controller,
+            isActive: isActive,
+          ),
         );
       },
     );
@@ -163,8 +170,12 @@ class VcoreHomeViewV3 extends StatelessWidget {
 
 class _HomeWireframeBody extends StatefulWidget {
   final VcoreHomeController controller;
+  final bool isActive;
 
-  const _HomeWireframeBody({required this.controller});
+  const _HomeWireframeBody({
+    required this.controller,
+    required this.isActive,
+  });
 
   @override
   State<_HomeWireframeBody> createState() => _HomeWireframeBodyState();
@@ -296,6 +307,22 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
   }
 
   @override
+  void didUpdateWidget(covariant _HomeWireframeBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.isActive && !widget.isActive) {
+      unawaited(AppGuideFlowController.instance.cancel(context: context));
+      return;
+    }
+
+    if (!oldWidget.isActive && widget.isActive && !_startedFirstGuide) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _runHomeInitialGuide();
+      });
+    }
+  }
+
+  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     _registerGuideActionsIfNeeded();
@@ -311,6 +338,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
     registry.registerAction(
       id: 'home.show_study_tab',
       action: () async {
+        await registry.runAction(HomeGuideConfig.actionOpenHomeTab);
         if (!mounted) return;
 
         if (scheduleTabIndex != 0) {
@@ -324,6 +352,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
     registry.registerAction(
       id: 'home.show_exam_tab',
       action: () async {
+        await registry.runAction(HomeGuideConfig.actionOpenHomeTab);
         if (!mounted) return;
 
         if (scheduleTabIndex != 1) {
@@ -337,6 +366,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
     registry.registerAction(
       id: 'home.show_school_news_tab',
       action: () async {
+        await registry.runAction(HomeGuideConfig.actionOpenHomeTab);
         if (!mounted) return;
 
         if (newsTabIndex != 0) {
@@ -354,22 +384,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
     registry.registerAction(
       id: 'home.show_vnu_news_tab',
       action: () async {
-        if (!mounted) return;
-
-        if (newsTabIndex != 1) {
-          setState(() => newsTabIndex = 1);
-        }
-
-        if (newsPageController.hasClients) {
-          newsPageController.jumpToPage(1000);
-        }
-
-        await _waitGuideUiReady();
-      },
-    );
-    registry.registerAction(
-      id: '',
-      action: () async {
+        await registry.runAction(HomeGuideConfig.actionOpenHomeTab);
         if (!mounted) return;
 
         if (newsTabIndex != 1) {
@@ -387,38 +402,63 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
 
   Future<void> _waitGuideUiReady() async {
     await WidgetsBinding.instance.endOfFrame;
-    await Future<void>.delayed(const Duration(milliseconds: 220));
+    await Future<void>.delayed(const Duration(milliseconds: 100));
     await WidgetsBinding.instance.endOfFrame;
   }
 
   Future<void> _runHomeInitialGuide() async {
-    if (_startedFirstGuide) return;
-    _startedFirstGuide = true;
+    if (_startedFirstGuide || !widget.isActive) return;
 
-    await Future<void>.delayed(const Duration(milliseconds: 900));
+    await Future<void>.delayed(const Duration(milliseconds: 300));
 
-    if (!mounted) return;
+    if (!mounted || !widget.isActive || _startedFirstGuide) return;
 
-    final cache = const AppGuideCacheService();
-    final hasSeen = await cache.hasSeenGroup('home.intro');
+    final startup = const AppGuideStartupService();
+    final flow = await startup.resolveFirstOpenHomeFlow();
 
-    if (hasSeen) {
-      debugPrint('[GUIDE_STARTUP] home.intro already seen');
+    // P5 regression guard must be checked again AFTER remote/cache resolution.
+    // A network delay must never allow the Home spotlight to appear over a
+    // different IndexedStack tab selected by the user in the meantime.
+    if (!mounted || !widget.isActive || _startedFirstGuide) return;
+
+    if (flow == null) {
+      _startedFirstGuide = true;
+      debugPrint('[GUIDE_STARTUP] HOME_FIRST_OPEN disabled by manifest');
       return;
     }
 
-    final registry = AppGuideRegistryScope.of(context);
+    final hasSeen = await startup.hasSeenFirstOpenHome(flow);
+    if (!mounted || !widget.isActive || _startedFirstGuide) return;
 
-    final ok = await const AppGuideNavigationService().openGroup(
+    if (hasSeen) {
+      _startedFirstGuide = true;
+      debugPrint('[GUIDE_STARTUP] ${flow.seenCacheKey} already seen');
+      return;
+    }
+
+    _startedFirstGuide = true;
+
+    final started = await AppGuideFlowController.instance.start(
       context: context,
-      registry: registry,
-      groupId: 'home.intro',
+      flow: flow,
     );
 
-    debugPrint('[GUIDE_STARTUP] home.intro started = $ok');
+    if (!mounted || !widget.isActive) {
+      if (mounted) {
+        await AppGuideFlowController.instance.cancel(context: context);
+      }
+      _startedFirstGuide = false;
+      return;
+    }
 
-    if (ok) {
-      await cache.markGroupSeen('home.intro');
+    debugPrint(
+      '[GUIDE_STARTUP] flow=${flow.id} revision=${flow.revision} started=$started',
+    );
+
+    if (!started) {
+      // Target may not have rendered yet. Allow another attempt when Home is
+      // active again; run-once state is only written by FlowController.finish.
+      _startedFirstGuide = false;
     }
   }
 
@@ -554,7 +594,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
           onOpenGuide: (result) async {
             Navigator.of(sheetContext, rootNavigator: true).pop();
 
-            await Future<void>.delayed(const Duration(milliseconds: 260));
+            await Future<void>.delayed(const Duration(milliseconds: 120));
 
             if (!mounted || !pageContext.mounted) return;
 
@@ -1038,7 +1078,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
 
                     const SizedBox(height: 12),
 
-                    TextField(
+                    VnuFloatingTextFieldAdapter(
                       controller: noteController,
                       maxLines: 2,
                       textInputAction: TextInputAction.done,
@@ -1789,7 +1829,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
 
                       return _timelineItem(
                         time:
-                            '${DateFormat('dd/MM').format(event.date)} • ${event.startTime}',
+                            '${DateFormat('dd/MM').format(event.date)} • ${event.displayStartTime}',
                         title: event.title,
                         room: event.location,
                         color: index == 0
@@ -1839,7 +1879,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
 
                       return _timelineItem(
                         time:
-                            '${DateFormat('dd/MM').format(event.date)} • ${event.startTime}',
+                            '${DateFormat('dd/MM').format(event.date)} • ${event.displayStartTime}',
                         title: event.title,
                         room: event.location,
                         color: index == 0

@@ -11,6 +11,7 @@ import 'package:vnu_core/models/model.dart';
 import 'package:vnu_core/modules/sync/vneid_deep_link_service.dart';
 import 'package:vnu_core/repository/app_repository.dart';
 import 'package:vnu_core/widgets/vcore_module_scaffold.dart';
+import 'package:vnu_core/widgets/field/vnu_text_field.dart';
 
 // LƯU Ý: ApiRepository.setToken(rawToken) phải gắn header
 // Authorization: Bearer <rawToken> cho Dio dùng trong repository.
@@ -966,7 +967,7 @@ class _VcoreSyncViewState extends State<VcoreSyncView> {
             ),
           ),
           const SizedBox(height: 12),
-          TextField(
+          VnuFloatingTextFieldAdapter(
             controller: _configNameController,
             enabled: !_isBusy,
             textInputAction: TextInputAction.done,

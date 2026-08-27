@@ -4,6 +4,7 @@ import '../widgets/buttons_widget.dart';
 import '../common/utils.dart';
 import '../themes/app_theme.dart';
 import 'container_dissmis.dart';
+import 'package:vnu_core/widgets/field/vnu_text_field.dart';
 
 class InputTextPopupWidget extends StatefulWidget {
   final String? title;
@@ -61,7 +62,7 @@ class _InputTextPopupWidgetState extends State<InputTextPopupWidget> {
                 //Content
                 Padding(
                   padding: const EdgeInsets.all(20),
-                  child: TextField(
+                  child: VnuFloatingTextFieldAdapter(
                     controller: _textEditingController,
                     style: AppTheme.body2,
                     autofocus: true,

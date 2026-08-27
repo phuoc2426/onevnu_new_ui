@@ -29,7 +29,7 @@ class VnuSearchField extends StatelessWidget {
   Widget build(BuildContext context) {
     return VnuTextField(
       controller: controller,
-      hintText: hintText,
+      label: hintText,
       maxLines: 1,
       compact: true,
       autofocus: autofocus,

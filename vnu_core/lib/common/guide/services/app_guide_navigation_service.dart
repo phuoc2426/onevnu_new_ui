@@ -1,31 +1,58 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:showcaseview/showcaseview.dart';
 
 import '../core/app_showcase_scope.dart';
 import '../models/app_guide_item.dart';
+import '../models/app_guide_item_type.dart';
 import '../registry/app_guide_registry.dart';
 import 'app_guide_pending_service.dart';
 
 class AppGuideNavigationService {
   const AppGuideNavigationService();
 
+  /// User-driven navigation (for example bottom navigation) must cancel the
+  /// current guide session. This prevents a delayed Home guide from painting
+  /// its spotlight over another IndexedStack tab.
+  void cancelActiveGuide({required BuildContext context}) {
+    AppGuidePendingService.clear();
+    AppGuideOverlayVisibility.hide();
+
+    try {
+      ShowCaseWidget.of(context).dismiss();
+    } catch (_) {
+      // No active ShowCaseWidget for this context.
+    }
+  }
+
   Future<bool> openItem({
     required BuildContext context,
     required AppGuideRegistry registry,
     required AppGuideItem item,
+    bool preferHighlight = false,
+    FutureOr<void> Function()? onPendingExpired,
   }) async {
-    // Quan trọng: chạy action của item gốc trước khi resolve fallback.
-    // Ví dụ profile.password -> app.open_profile_tab.
-    // Ví dụ home.schedule.next_exam -> home.show_exam_tab.
     await _runBeforeHighlight(
       registry: registry,
       item: item,
     );
 
+    // A function item represents a navigation/action capability. When it has
+    // an openAction, selecting it from search must perform the function rather
+    // than silently falling back to a Home tile and highlighting the wrong UI.
+    if (!preferHighlight &&
+        item.type == AppGuideItemType.function &&
+        item.openAction != null) {
+      AppGuidePendingService.clear();
+      AppGuideOverlayVisibility.hide();
+      await item.openAction!.call();
+      return true;
+    }
+
     var resolved = await _resolveRenderableItem(
       registry: registry,
       item: item,
-      allowOpenAction: true,
     );
 
     var targetItem = resolved.item;
@@ -33,22 +60,28 @@ class AppGuideNavigationService {
     var anchorContext = anchor == null ? null : _resolveAnchorContext(anchor);
 
     if (anchor == null || anchorContext == null) {
-      AppGuidePendingService.setPendingTarget(item.id);
-
-      if (item.openAction != null) {
-        await item.openAction!.call();
+      if (item.openAction == null) {
+        AppGuidePendingService.clear();
+        return false;
       }
 
+      AppGuidePendingService.setPendingTarget(
+        item.id,
+        itemOverride: item,
+        preferHighlight: preferHighlight,
+        onExpired: onPendingExpired,
+      );
+      await item.openAction!.call();
       return false;
     }
 
     await _scrollToContext(anchorContext);
 
-    // Sau khi scroll, resolve lại lần cuối vì widget có thể rebuild/unmount.
+    // After scrolling, resolve one last time because the widget may have been
+    // rebuilt or moved between tabs.
     resolved = await _resolveRenderableItem(
       registry: registry,
       item: targetItem,
-      allowOpenAction: false,
       runBeforeHighlight: false,
     );
 
@@ -59,6 +92,7 @@ class AppGuideNavigationService {
     if (anchor == null || anchorContext == null) return false;
     if (!anchorContext.mounted) return false;
 
+    AppGuidePendingService.clear();
     AppGuideOverlayVisibility.show();
     try {
       ShowCaseWidget.of(anchorContext).startShowCase([anchor.key]);
@@ -87,7 +121,6 @@ class AppGuideNavigationService {
     final firstResolved = await _resolveRenderableItem(
       registry: registry,
       item: firstItem,
-      allowOpenAction: true,
       runBeforeHighlight: false,
     );
 
@@ -112,12 +145,11 @@ class AppGuideNavigationService {
     final seenKeys = <GlobalKey>{};
 
     for (final item in items) {
-      // Group mặc định chỉ resolve những anchor đang có ở màn hiện tại.
-      // Không chạy action từng step ở đây, vì ShowCaseWidget.next() không hỗ trợ async action.
+      // A static group only includes anchors that are currently visible on the
+      // active screen. Cross-screen async sequences belong to FlowController.
       final resolved = await _resolveRenderableItem(
         registry: registry,
         item: item,
-        allowOpenAction: false,
         runBeforeHighlight: false,
       );
 
@@ -125,20 +157,26 @@ class AppGuideNavigationService {
       final anchorContext =
           anchor == null ? null : _resolveAnchorContext(anchor);
 
-      if (anchor != null && anchorContext != null && !seenKeys.contains(anchor.key)) {
+      if (anchor != null &&
+          anchorContext != null &&
+          !seenKeys.contains(anchor.key)) {
         seenKeys.add(anchor.key);
         keys.add(anchor.key);
         ids.add(resolved.item.id);
       }
     }
 
-    if (keys.isEmpty) return false;
+    if (keys.isEmpty) {
+      AppGuidePendingService.clear();
+      return false;
+    }
     if (!firstContext.mounted) return false;
 
     debugPrint(
       '[GUIDE_GROUP_START] group=$groupId keys=${keys.length} ids=${ids.join(', ')}',
     );
 
+    AppGuidePendingService.clear();
     AppGuideOverlayVisibility.show();
     try {
       ShowCaseWidget.of(firstContext).startShowCase(keys);
@@ -152,7 +190,6 @@ class AppGuideNavigationService {
   Future<_ResolvedGuideItem> _resolveRenderableItem({
     required AppGuideRegistry registry,
     required AppGuideItem item,
-    bool allowOpenAction = true,
     bool runBeforeHighlight = true,
   }) async {
     if (runBeforeHighlight) {
@@ -181,16 +218,12 @@ class AppGuideNavigationService {
       }
     }
 
-    return _ResolvedGuideItem(item: item, anchor: anchor);
+    return _ResolvedGuideItem(item: item, anchor: null);
   }
 
   BuildContext? _resolveAnchorContext(AppGuideRuntimeAnchor anchor) {
-    final keyContext = anchor.key.currentContext;
-    if (keyContext != null) return keyContext;
-
-    if (anchor.context.mounted) return anchor.context;
-
-    return null;
+    if (!anchor.isVisible) return null;
+    return anchor.mountedContext;
   }
 
   Future<void> _runBeforeHighlight({
@@ -216,13 +249,13 @@ class AppGuideNavigationService {
 
     await Scrollable.ensureVisible(
       targetContext,
-      duration: const Duration(milliseconds: 650),
+      duration: const Duration(milliseconds: 280),
       curve: Curves.easeInOutCubic,
       alignment: alignment,
       alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
     );
 
-    await Future<void>.delayed(const Duration(milliseconds: 220));
+    await Future<void>.delayed(const Duration(milliseconds: 100));
     await _waitForLayout(frames: 2);
   }
 
@@ -242,3 +275,4 @@ class _ResolvedGuideItem {
   final AppGuideItem item;
   final AppGuideRuntimeAnchor? anchor;
 }
+

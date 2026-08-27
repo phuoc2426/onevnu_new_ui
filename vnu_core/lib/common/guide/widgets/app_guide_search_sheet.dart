@@ -1,19 +1,25 @@
 import 'package:flutter/material.dart';
 
+import '../flow/app_guide_flow.dart';
 import '../models/app_guide_item_type.dart';
 import '../models/app_guide_search_result.dart';
 import '../services/app_guide_search_service.dart';
+import 'package:vnu_core/widgets/field/vnu_text_field.dart';
 
 class AppGuideSearchSheet extends StatefulWidget {
   const AppGuideSearchSheet({
     super.key,
     required this.searchService,
     required this.onOpenGuide,
+    this.manualFlows = const <AppGuideFlow>[],
+    this.onOpenFlow,
     this.moduleId,
   });
 
   final AppGuideSearchService searchService;
   final Future<void> Function(AppGuideSearchResult result) onOpenGuide;
+  final List<AppGuideFlow> manualFlows;
+  final Future<void> Function(AppGuideFlow flow)? onOpenFlow;
   final String? moduleId;
 
   @override
@@ -63,6 +69,17 @@ class _AppGuideSearchSheetState extends State<AppGuideSearchSheet> {
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.of(context).viewInsets.bottom;
+
+    final normalizedFlowQuery = _controller.text.trim().toLowerCase();
+    final manualFlows = widget.manualFlows.where((flow) {
+      if (normalizedFlowQuery.isEmpty) return true;
+      final haystack = [
+        flow.id,
+        flow.title,
+        flow.description ?? '',
+      ].join(' ').toLowerCase();
+      return haystack.contains(normalizedFlowQuery);
+    }).toList();
 
     final navigationResults = _results.where((result) {
       return result.item.type == AppGuideItemType.page ||
@@ -130,7 +147,7 @@ class _AppGuideSearchSheetState extends State<AppGuideSearchSheet> {
                   ],
                 ),
                 const SizedBox(height: 8),
-                TextField(
+                VnuFloatingTextFieldAdapter(
                   controller: _controller,
                   focusNode: _focusNode,
                   textInputAction: TextInputAction.search,
@@ -183,7 +200,7 @@ class _AppGuideSearchSheetState extends State<AppGuideSearchSheet> {
                     color: Color(0xFF047747),
                     backgroundColor: Color(0xFFE5E7EB),
                   ),
-                if (!_loading && _results.isEmpty)
+                if (!_loading && _results.isEmpty && manualFlows.isEmpty)
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 20),
                     child: Text(
@@ -201,6 +218,11 @@ class _AppGuideSearchSheetState extends State<AppGuideSearchSheet> {
                   child: ListView(
                     shrinkWrap: true,
                     children: [
+                      if (manualFlows.isNotEmpty && widget.onOpenFlow != null)
+                        _FlowSection(
+                          flows: manualFlows,
+                          onOpenFlow: widget.onOpenFlow!,
+                        ),
                       if (navigationResults.isNotEmpty)
                         _ResultSection(
                           title: 'Đi tới chức năng',
@@ -229,6 +251,113 @@ class _AppGuideSearchSheetState extends State<AppGuideSearchSheet> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _FlowSection extends StatelessWidget {
+  const _FlowSection({
+    required this.flows,
+    required this.onOpenFlow,
+  });
+
+  final List<AppGuideFlow> flows;
+  final Future<void> Function(AppGuideFlow flow) onOpenFlow;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(
+                Icons.route_rounded,
+                size: 17,
+                color: Color(0xFF047747),
+              ),
+              SizedBox(width: 6),
+              Text(
+                'Kịch bản hướng dẫn',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF047747),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ...flows.map(
+            (flow) => InkWell(
+              borderRadius: BorderRadius.circular(14),
+              onTap: () => onOpenFlow(flow),
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(11),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0FDF4),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFBBF7D0)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF047747).withOpacity(0.11),
+                        borderRadius: BorderRadius.circular(13),
+                      ),
+                      child: const Icon(
+                        Icons.play_circle_outline_rounded,
+                        color: Color(0xFF047747),
+                        size: 21,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            flow.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Color(0xFF111827),
+                              fontWeight: FontWeight.w900,
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            flow.description ??
+                                '${flow.steps.length} bước · ${flow.id}',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Color(0xFF6B7280),
+                              fontSize: 12,
+                              height: 1.25,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(
+                      Icons.play_arrow_rounded,
+                      color: Color(0xFF047747),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -371,3 +500,4 @@ class _ResultTile extends StatelessWidget {
     );
   }
 }
+

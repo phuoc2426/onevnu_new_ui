@@ -11,7 +11,7 @@ import 'package:vnu_core/constants/config.dart';
 import 'package:vnu_core/globals.dart';
 import 'package:vnu_core/models/model.dart';
 import 'package:vnu_core/modules/news/controllers/vcore_jobs_controller_v2.dart';
-import 'package:vnu_core/modules/news/views/vcore_news_detail_view.dart';
+import 'package:vnu_core/modules/news/views/vcore_job_detail_view_v2.dart';
 import 'package:vnu_core/services/services_url.dart';
 import 'package:vnu_core/widgets/container_dissmis.dart';
 import 'package:vnu_core/widgets/progress_hub_widget.dart';
@@ -40,62 +40,73 @@ class VcoreJobsViewV2 extends GetView<VcoreJobsControllerV2> {
             body: ContainerAutoDissmis(
               child: Column(
                 children: [
-                  // Premium Search Bar
+                  // Responsive search field. Avoid a fixed-height Row around
+                  // the input: large system text / iOS font metrics could overflow.
                   Container(
-                    height: 64,
                     color: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 10),
-                    child: Center(
-                      child: Container(
-                        width: double.infinity,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF3F4F6),
-                          borderRadius: BorderRadius.circular(22),
-                          border: Border.all(color: Colors.grey.shade200),
-                        ),
-                        child: Row(
-                          children: [
-                            const SizedBox(width: 14),
-                            Icon(Icons.search_rounded,
-                                color: Colors.grey.shade500, size: 20),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: TextField(
-                                controller: controller.textEditingController,
-                                style: TextStyles.regular.copyWith(
-                                  fontSize: AppFontSizes.medium,
-                                  color: Colors.black87,
-                                ),
-                                decoration: InputDecoration(
-                                  border: InputBorder.none,
-                                  isDense: true,
-                                  contentPadding: EdgeInsets.zero,
-                                  hintText:
-                                      'Tìm kiếm tin tuyển dụng, việc làm...',
-                                  hintStyle: TextStyles.regular.copyWith(
-                                    color: Colors.grey.shade400,
-                                    fontSize: AppFontSizes.mediumSmall,
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+                    child: ValueListenableBuilder<TextEditingValue>(
+                      valueListenable: controller.textEditingController,
+                      builder: (context, searchValue, _) {
+                        return TextField(
+                          controller: controller.textEditingController,
+                          textInputAction: TextInputAction.search,
+                          maxLines: 1,
+                          style: TextStyles.regular.copyWith(
+                            fontSize: AppFontSizes.medium,
+                            color: const Color(0xFF202622),
+                          ),
+                          decoration: InputDecoration(
+                            hintText: 'Tìm kiếm tin tuyển dụng, việc làm...',
+                            hintStyle: TextStyles.regular.copyWith(
+                              color: const Color(0xFF929B96),
+                              fontSize: AppFontSizes.mediumSmall,
+                            ),
+                            prefixIcon: const Icon(
+                              Icons.search_rounded,
+                              color: Color(0xFF7B8580),
+                              size: 21,
+                            ),
+                            suffixIcon: searchValue.text.isEmpty
+                                ? null
+                                : IconButton(
+                                    tooltip: 'Xóa tìm kiếm',
+                                    icon: const Icon(
+                                      Icons.close_rounded,
+                                      size: 19,
+                                      color: Color(0xFF6F7973),
+                                    ),
+                                    onPressed: () {
+                                      controller.textEditingController.clear();
+                                      controller.refreshData();
+                                    },
                                   ),
-                                ),
-                                onSubmitted: (value) {
-                                  controller.refreshData();
-                                },
+                            filled: true,
+                            fillColor: const Color(0xFFF6F8F7),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 14,
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: const BorderSide(
+                                color: Color(0xFFE1E7E3),
                               ),
                             ),
-                            if (controller
-                                .textEditingController.text.isNotEmpty)
-                              IconButton(
-                                icon: const Icon(Icons.clear_rounded, size: 18),
-                                onPressed: () {
-                                  controller.textEditingController.clear();
-                                  controller.refreshData();
-                                },
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: const BorderSide(
+                                color: Color(0xFF0A9B57),
+                                width: 1.5,
                               ),
-                          ],
-                        ),
-                      ),
+                            ),
+                          ),
+                          onSubmitted: (_) {
+                            Utils.hideKeyboard();
+                            controller.refreshData();
+                          },
+                        );
+                      },
                     ),
                   ),
 
@@ -147,11 +158,7 @@ class VcoreJobsViewV2 extends GetView<VcoreJobsControllerV2> {
       onTap: () {
         Utils.hideKeyboard();
         Get.to(
-          () => VcoreNewsDetailView(
-            tinTucModel: item,
-            screenTitle: 'Chi tiết việc làm',
-            relatedTitle: 'VIỆC LÀM LIÊN QUAN',
-          ),
+          () => VcoreJobDetailViewV2(initialJob: item),
         );
       },
       borderRadius: BorderRadius.circular(16),

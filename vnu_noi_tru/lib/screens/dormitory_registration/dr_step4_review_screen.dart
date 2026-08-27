@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:vnu_core/globals.dart';
 import 'package:vnu_noi_tru/cubit/dormitory_registration_cubit.dart';
+import 'package:vnu_noi_tru/domain/registration/dormitory_student_draft.dart';
 import 'package:vnu_noi_tru/models/model.dart';
 import 'package:path/path.dart' as p;
 import 'package:vnu_core/common/app_text_styles.dart';
 import 'dart:io';
-import 'package:vnu_core/models/student_info_model.dart';
-import 'package:shared_preferences/shared_preferences.dart'; // thêm dòng này
 import 'package:intl/intl.dart';
 class DRStep4ReviewScreen extends StatefulWidget {
   const DRStep4ReviewScreen({super.key});
@@ -22,71 +20,37 @@ class DRStep4ReviewScreenState extends State<DRStep4ReviewScreen> {
   bool _isCommitted = true;
   bool get isCommitted => _isCommitted;
   @override
-  void initState() {
-    super.initState();
-    _loadApplicantCacheIfNeeded(); // ← gọi khi khởi tạo
-  }
-
-  // ========== THÊM TOÀN BỘ HÀM NÀY ==========
-  Future<void> _loadApplicantCacheIfNeeded() async {
-    // Chỉ áp dụng khi chưa có sinh viên chính thống (thí sinh)
-    if (Globals().thongTinSinhVienModel.value != null) return;
-
-    final prefs = await SharedPreferences.getInstance();
-    final cccd = prefs.getString('applicant_cccd');
-    if (cccd == null || cccd.isEmpty) return;
-
-    final fullName = prefs.getString('applicant_fullname') ?? '';
-    final email = prefs.getString('applicant_email') ?? '';
-
-    final cubit = context.read<DormitoryRegistrationCubit>();
-    final dob = prefs.getString('applicant_dob');
-    if (cubit.tempDOB == null || cubit.tempDOB!.isEmpty) {
-      cubit.tempDOB = dob;
-    }
-    // Đồng bộ vào cubit (phòng trường hợp chưa qua step 3)
-    if (cubit.tempFullName == null || cubit.tempFullName!.isEmpty) {
-      cubit.tempFullName = fullName;
-    }
-    if (cubit.tempCccd == null || cubit.tempCccd!.isEmpty) {
-      cubit.tempCccd = cccd;
-    }
-    if (cubit.tempEmail == null || cubit.tempEmail!.isEmpty) {
-      cubit.tempEmail = email;
-    }
-
-    // Tạo StudentInfoModel giả để Globals không null
-    final fakeStudent = StudentInfoModel(
-      hoVaTen: fullName,
-      soCmtCccd: cccd,
-      email: email,
-      // Các trường khác có thể null hoặc để mặc định
-    );
-
-    Globals().thongTinSinhVienModel.value = fakeStudent;
-
-    if (mounted) setState(() {});
-  }
-  // =============================================
-
-  @override
   Widget build(BuildContext context) {
-    final cubit = context.watch<DormitoryRegistrationCubit>();
-    final student = Globals().thongTinSinhVienModel.value;
+    final DormitoryRegistrationCubit cubit =
+        context.watch<DormitoryRegistrationCubit>();
+    final DormitoryStudentDraft? draft = cubit.studentDraft;
 
-    final periodName = cubit.selectedPeriod?.name ?? '-';
-    final dormName = cubit.selectedDormitory?.name ?? '-';
-    final String priorityName = cubit.selectedPriorityObjectNames.isEmpty
-        ? 'Không có'
-        : cubit.selectedPriorityObjectNames;
+    if (draft == null) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Text(
+            'Chưa có dữ liệu Bước 3 để xác nhận. Vui lòng quay lại và kiểm tra hồ sơ.',
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+    }
+
+    final bool isApplicant = draft.studentCode.trim().isEmpty;
+    final String periodName = cubit.selectedPeriod?.name ?? '-';
+    final String dormName = cubit.selectedDormitory?.name ?? '-';
+    final String draftPriorityName = draft.priorityObjectName?.trim() ?? '';
+    final String priorityName = draftPriorityName.isNotEmpty
+        ? draftPriorityName
+        : cubit.selectedPriorityObjectNames.isEmpty
+            ? 'Không có'
+            : cubit.selectedPriorityObjectNames;
     String dobDisplay = '-';
-    final rawDob = cubit.tempDOB ??
-        (student?.ngaySinh != null
-            ? DateFormat('yyyy-MM-dd').format(student!.ngaySinh!)
-            : null);
-    if (rawDob != null && rawDob.isNotEmpty) {
+    final String rawDob = draft.dob.trim();
+    if (rawDob.isNotEmpty) {
       try {
-        final parsed = DateTime.parse(rawDob);
+        final DateTime parsed = DateTime.parse(rawDob);
         dobDisplay = DateFormat('dd/MM/yyyy').format(parsed);
       } catch (_) {
         dobDisplay = rawDob;
@@ -140,6 +104,21 @@ class DRStep4ReviewScreenState extends State<DRStep4ReviewScreen> {
                   const SizedBox(height: 12),
                   _buildSummaryRow('Đợt đăng ký', periodName),
                   _buildSummaryRow('Ký túc xá', dormName),
+                  _buildSummaryRow('Kỳ ở', cubit.selectedTermTypeLabel),
+                  if (cubit.selectedTermType == 5) ...<Widget>[
+                    _buildSummaryRow(
+                      'Từ ngày',
+                      cubit.customStartDate == null
+                          ? '-'
+                          : DateFormat('dd/MM/yyyy').format(cubit.customStartDate!),
+                    ),
+                    _buildSummaryRow(
+                      'Đến ngày',
+                      cubit.customEndDate == null
+                          ? '-'
+                          : DateFormat('dd/MM/yyyy').format(cubit.customEndDate!),
+                    ),
+                  ],
                   _buildSummaryRow('Đối tượng ưu tiên', priorityName),
                 ],
               ),
@@ -178,13 +157,80 @@ class DRStep4ReviewScreenState extends State<DRStep4ReviewScreen> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  _buildSummaryRow('Mã SV', student?.maSinhVien ?? '-'),
-                  _buildSummaryRow('Họ tên', student?.hoVaTen ?? '-'),
+                  if (!isApplicant)
+                    _buildSummaryRow('Mã SV', draft.studentCode),
+                  _buildSummaryRow('Họ tên', draft.fullName),
                   _buildSummaryRow('Ngày sinh', dobDisplay),
-                  _buildSummaryRow('Lớp', Globals().lopDaoTaoModel.value?.ten ?? '-'),
-                  _buildSummaryRow('Ngành', Globals().lopDaoTaoModel.value?.ten ?? '-'),
-                  _buildSummaryRow('SĐT', cubit.tempPhone ?? '-'),
-                  _buildSummaryRow('Email', cubit.tempEmail ?? '-'),
+                  _buildSummaryRow(
+                    'Giới tính',
+                    draft.gender == 'female'
+                        ? 'Nữ'
+                        : draft.gender == 'male'
+                            ? 'Nam'
+                            : '-',
+                  ),
+                  _buildSummaryRow('CCCD/CMND', draft.identityNo),
+                  if ((draft.identityType ?? '').trim().isNotEmpty)
+                    _buildSummaryRow('Loại giấy tờ', draft.identityType!),
+                  if ((draft.identityName ?? '').trim().isNotEmpty)
+                    _buildSummaryRow('Tên giấy tờ', draft.identityName!),
+                  if (draft.identityIssueDate.trim().isNotEmpty)
+                    _buildSummaryRow('Ngày cấp', draft.identityIssueDate),
+                  if ((draft.identityIssuePlace ?? '').trim().isNotEmpty)
+                    _buildSummaryRow('Nơi cấp', draft.identityIssuePlace!),
+                  if ((draft.countryCode ?? '').trim().isNotEmpty)
+                    _buildSummaryRow('Mã quốc gia', draft.countryCode!),
+                  if ((draft.national ?? '').trim().isNotEmpty)
+                    _buildSummaryRow('Quốc tịch', draft.national!),
+                  if ((draft.ethnicity ?? '').trim().isNotEmpty)
+                    _buildSummaryRow('Dân tộc', draft.ethnicity!),
+                  if ((draft.religion ?? '').trim().isNotEmpty)
+                    _buildSummaryRow('Tôn giáo', draft.religion!),
+                  _buildSummaryRow(
+                    'Lớp',
+                    draft.className.trim().isEmpty ? '-' : draft.className,
+                  ),
+                  if ((draft.faculty ?? '').trim().isNotEmpty)
+                    _buildSummaryRow('Khoa/đơn vị', draft.faculty!),
+                  _buildSummaryRow(
+                    'Ngành',
+                    draft.major.trim().isEmpty ? '-' : draft.major,
+                  ),
+                  if (draft.academicYear.trim().isNotEmpty)
+                    _buildSummaryRow('Năm học', draft.academicYear),
+                  if (draft.system.trim().isNotEmpty)
+                    _buildSummaryRow('Hệ đào tạo', draft.system),
+                  if (draft.level.trim().isNotEmpty)
+                    _buildSummaryRow('Bậc đào tạo', draft.level),
+                  if (draft.universityName.trim().isNotEmpty)
+                    _buildSummaryRow('Trường', draft.universityName),
+                  if (draft.univId != null)
+                    _buildSummaryRow('ID trường', '${draft.univId}'),
+                  if (draft.studentType != null)
+                    _buildSummaryRow(
+                      'Loại người học',
+                      draft.studentType == 0 ? 'Học sinh' : 'Sinh viên',
+                    ),
+                  _buildSummaryRow('SĐT', draft.phone),
+                  _buildSummaryRow('Email', draft.email),
+                  if (draft.permanentAddress.trim().isNotEmpty)
+                    _buildSummaryRow(
+                      'Thường trú',
+                      draft.permanentAddress,
+                    ),
+                  if ((draft.vneidPermanentAddress ?? '').trim().isNotEmpty)
+                    _buildSummaryRow('Thường trú VNeID', draft.vneidPermanentAddress!),
+                  if ((draft.contactAddress ?? '').trim().isNotEmpty)
+                    _buildSummaryRow('Địa chỉ liên hệ', draft.contactAddress!),
+                  if (draft.temporaryAddress.trim().isNotEmpty)
+                    _buildSummaryRow(
+                      'Tạm trú',
+                      draft.temporaryAddress,
+                    ),
+                  if ((draft.vneidTemporaryAddress ?? '').trim().isNotEmpty)
+                    _buildSummaryRow('Tạm trú VNeID', draft.vneidTemporaryAddress!),
+                  if ((draft.reasonStay ?? '').trim().isNotEmpty)
+                    _buildSummaryRow('Lý do lưu trú', draft.reasonStay!),
                 ],
               ),
             ),
@@ -221,7 +267,7 @@ class DRStep4ReviewScreenState extends State<DRStep4ReviewScreen> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  if (cubit.familyMembers.isEmpty)
+                  if (draft.familyMembers.isEmpty)
                     const Text(
                       'Không khai báo người thân.',
                       style: TextStyle(
@@ -230,7 +276,7 @@ class DRStep4ReviewScreenState extends State<DRStep4ReviewScreen> {
                       ),
                     )
                   else
-                    ...cubit.familyMembers.asMap().entries.map(
+                    ...draft.familyMembers.asMap().entries.map(
                       (MapEntry<int, FamilyMemberPayload> entry) {
                         final FamilyMemberPayload member = entry.value;
                         final List<String> details = <String>[
@@ -314,9 +360,9 @@ class DRStep4ReviewScreenState extends State<DRStep4ReviewScreen> {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    cubit.tempReason == null || cubit.tempReason!.isEmpty
+                    (draft.reasonStay ?? '').trim().isEmpty
                         ? 'Chưa nhập lý do.'
-                        : cubit.tempReason!,
+                        : draft.reasonStay!,
                     style: const TextStyle(
                       fontSize: AppFontSizes.small,
                       color: Color(0xFF1F2329),

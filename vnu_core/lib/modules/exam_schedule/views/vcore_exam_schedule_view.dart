@@ -4,7 +4,10 @@ import 'package:intl/intl.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:vnu_core/common/app_colors.dart';
+import 'package:vnu_core/common/academic_period_config.dart';
+import 'package:vnu_core/common/log.dart';
 import 'package:vnu_core/common/app_text_styles.dart';
+import 'package:vnu_core/common/guide/guide.dart';
 import 'package:vnu_core/extensions/extension_string.dart';
 import 'package:vnu_core/widgets/vcore_module_scaffold.dart';
 import 'package:vnu_core/widgets/progress_hub_widget.dart';
@@ -13,6 +16,8 @@ import 'package:vnu_core/widgets/responsive/responsive.dart';
 import '../controllers/vcore_exam_schedule_controller.dart';
 import '../widgets/academic_period_select.dart';
 import '../../../models/model.dart';
+
+enum _TermDateField { start, end }
 
 class VcoreExamScheduleView extends StatelessWidget {
   static const Color _classColor = AppColors.greenAccent;
@@ -53,7 +58,9 @@ class VcoreExamScheduleView extends StatelessWidget {
               controller.getDanhSachKieuTruong();
             }
           },
-          child: VcoreModuleScaffold(
+          child: AppGuideAnchor(
+            id: 'exam_schedule.page',
+            child: VcoreModuleScaffold(
             title: 'Lịch học & lịch thi',
             pageWidth: VnuPageWidth.content,
             body: Container(
@@ -92,14 +99,22 @@ class VcoreExamScheduleView extends StatelessWidget {
 
                       const SizedBox(height: 12),
 
-                      if (controller.showExtraTermCourses.value) ...[
-                        _buildExtraTermCoursesList(context, controller),
-                      ] else if (controller.showIncompleteExams.value) ...[
-                        _buildIncompleteExamsList(controller),
-                      ] else ...[
-                        _buildEventsHeader(context, controller),
-                        _buildEventsList(context, controller),
-                      ],
+                      AppGuideAnchor(
+                        id: 'exam_schedule.list',
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            if (controller.showExtraTermCourses.value)
+                              _buildExtraTermCoursesList(context, controller)
+                            else if (controller.showIncompleteExams.value)
+                              _buildIncompleteExamsList(controller)
+                            else ...[
+                              _buildEventsHeader(context, controller),
+                              _buildEventsList(context, controller),
+                            ],
+                          ],
+                        ),
+                      ),
 
                       const SizedBox(height: 40),
                     ],
@@ -107,6 +122,7 @@ class VcoreExamScheduleView extends StatelessWidget {
                 );
               }),
             ),
+          ),
           ),
         );
       },
@@ -271,9 +287,38 @@ class VcoreExamScheduleView extends StatelessWidget {
       currentEnd.day,
     );
     DateTime focusedDay = startDate;
+    _TermDateField? activeDateField;
+
+    AcademicPeriodConfig draftPeriodConfig = controller.academicPeriodConfig;
+    int selectedPeriod = 1;
+    bool hasPersonalDateOverride =
+        controller.hasPersonalTermDateOverride.value;
+    bool hasPersonalPeriodOverride =
+        controller.hasPersonalAcademicPeriodOverride.value;
+    bool isSaving = false;
+    bool isRestoring = false;
+    final List<String> actionLogs = <String>[];
+
+    void addActionLog(String message) {
+      actionLogs.insert(
+        0,
+        '${DateFormat('HH:mm:ss').format(DateTime.now())} • $message',
+      );
+      if (actionLogs.length > 6) {
+        actionLogs.removeRange(6, actionLogs.length);
+      }
+    }
 
     final firstDay = DateTime(startDate.year - 1, 1, 1);
     final lastDay = DateTime(endDate.year + 1, 12, 31);
+
+    logInfo(
+      '[SCHEDULE_ADJUST_UI] action=open '
+      'start=${DateFormat('yyyy-MM-dd').format(startDate)} '
+      'end=${DateFormat('yyyy-MM-dd').format(endDate)} '
+      'personalDate=$hasPersonalDateOverride '
+      'personalPeriod=$hasPersonalPeriodOverride',
+    );
 
     Get.bottomSheet(
       StatefulBuilder(
@@ -281,10 +326,17 @@ class VcoreExamScheduleView extends StatelessWidget {
           final rangeText =
               '${DateFormat('dd/MM/yyyy').format(startDate)}  →  ${DateFormat('dd/MM/yyyy').format(endDate)}';
           final totalDays = endDate.difference(startDate).inDays + 1;
-          final isPersonal = controller.hasPersonalTermDateOverride.value;
+          final resolvedPeriods = draftPeriodConfig.resolveAll();
+          final selectedRange = resolvedPeriods[selectedPeriod];
+          final selectedRule =
+              _effectivePeriodRule(draftPeriodConfig, selectedPeriod);
+          final selectedAutoStart =
+              selectedPeriod > 1 && selectedRule.autoStart;
+          final isPersonal =
+              hasPersonalDateOverride || hasPersonalPeriodOverride;
 
           return Container(
-            height: MediaQuery.of(sheetContext).size.height * 0.88,
+            height: MediaQuery.of(sheetContext).size.height * 0.92,
             decoration: const BoxDecoration(
               color: Color(0xFFF7F8FA),
               borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
@@ -315,7 +367,7 @@ class VcoreExamScheduleView extends StatelessWidget {
                             borderRadius: BorderRadius.circular(14),
                           ),
                           child: const Icon(
-                            Icons.calendar_month_rounded,
+                            Icons.tune_rounded,
                             color: AppColors.greenAccent,
                             size: 24,
                           ),
@@ -334,7 +386,7 @@ class VcoreExamScheduleView extends StatelessWidget {
                               ),
                               const SizedBox(height: 3),
                               Text(
-                                'Chọn ngày bắt đầu và ngày kết thúc phù hợp với lịch thực tế của bạn.',
+                                'Chỉnh khoảng ngày và giờ từng tiết ngay trên ứng dụng.',
                                 style: TextStyles.regular.copyWith(
                                   fontSize: AppFontSizes.small,
                                   color: Colors.grey.shade600,
@@ -358,9 +410,16 @@ class VcoreExamScheduleView extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          _buildSectionTitle(
+                            icon: Icons.date_range_rounded,
+                            title: 'Khoảng ngày lịch học',
+                            subtitle:
+                                'Bấm đúng ô bắt đầu/kết thúc rồi mới chọn ngày.',
+                          ),
+                          const SizedBox(height: 8),
                           Container(
                             width: double.infinity,
-                            padding: const EdgeInsets.all(14),
+                            padding: const EdgeInsets.all(6),
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(18),
@@ -374,14 +433,26 @@ class VcoreExamScheduleView extends StatelessWidget {
                                     label: 'Ngày bắt đầu',
                                     value: DateFormat('dd/MM/yyyy')
                                         .format(startDate),
+                                    selected:
+                                        activeDateField == _TermDateField.start,
+                                    accentColor: AppColors.greenAccent,
+                                    onTap: () {
+                                      logInfo(
+                                        '[SCHEDULE_ADJUST_UI] action=select_date_field field=start',
+                                      );
+                                      setModalState(() {
+                                        activeDateField = _TermDateField.start;
+                                        focusedDay = startDate;
+                                      });
+                                    },
                                   ),
                                 ),
                                 Padding(
                                   padding:
-                                      const EdgeInsets.symmetric(horizontal: 8),
+                                      const EdgeInsets.symmetric(horizontal: 4),
                                   child: Icon(
                                     Icons.arrow_forward_rounded,
-                                    size: 20,
+                                    size: 18,
                                     color: Colors.grey.shade400,
                                   ),
                                 ),
@@ -389,14 +460,64 @@ class VcoreExamScheduleView extends StatelessWidget {
                                   child: _buildDateRangeSummaryItem(
                                     icon: Icons.flag_outlined,
                                     label: 'Ngày kết thúc',
-                                    value: DateFormat('dd/MM/yyyy')
-                                        .format(endDate),
+                                    value:
+                                        DateFormat('dd/MM/yyyy').format(endDate),
+                                    selected:
+                                        activeDateField == _TermDateField.end,
+                                    accentColor: const Color(0xFF1976D2),
+                                    onTap: () {
+                                      logInfo(
+                                        '[SCHEDULE_ADJUST_UI] action=select_date_field field=end',
+                                      );
+                                      setModalState(() {
+                                        activeDateField = _TermDateField.end;
+                                        focusedDay = endDate;
+                                      });
+                                    },
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 8),
+                          AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 180),
+                            child: Row(
+                              key: ValueKey(activeDateField),
+                              children: [
+                                Icon(
+                                  activeDateField == null
+                                      ? Icons.touch_app_outlined
+                                      : Icons.touch_app_rounded,
+                                  size: 16,
+                                  color: activeDateField == _TermDateField.end
+                                      ? const Color(0xFF1976D2)
+                                      : activeDateField == _TermDateField.start
+                                          ? AppColors.greenAccent
+                                          : Colors.grey.shade600,
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    activeDateField == _TermDateField.start
+                                        ? 'ĐANG CHỌN NGÀY BẮT ĐẦU • Chạm một ngày trên lịch.'
+                                        : activeDateField == _TermDateField.end
+                                            ? 'ĐANG CHỌN NGÀY KẾT THÚC • Chạm một ngày từ ngày bắt đầu trở đi.'
+                                            : 'Chạm vào ô Ngày bắt đầu hoặc Ngày kết thúc trước khi chọn trên lịch.',
+                                    style: TextStyles.semiBold.copyWith(
+                                      fontSize: AppFontSizes.font11,
+                                      color: activeDateField == _TermDateField.end
+                                          ? const Color(0xFF1976D2)
+                                          : activeDateField == _TermDateField.start
+                                              ? AppColors.greenAccent
+                                              : Colors.grey.shade600,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 10),
                           Container(
                             decoration: BoxDecoration(
                               color: Colors.white,
@@ -414,7 +535,17 @@ class VcoreExamScheduleView extends StatelessWidget {
                               rangeStartDay: startDate,
                               rangeEndDay: endDate,
                               rangeSelectionMode: RangeSelectionMode.toggledOn,
-                              availableGestures: AvailableGestures.horizontalSwipe,
+                              availableGestures:
+                                  AvailableGestures.horizontalSwipe,
+                              enabledDayPredicate: (day) {
+                                if (activeDateField == null) return false;
+                                if (activeDateField == _TermDateField.end) {
+                                  final normalized =
+                                      DateTime(day.year, day.month, day.day);
+                                  return !normalized.isBefore(startDate);
+                                }
+                                return true;
+                              },
                               rowHeight: 44,
                               daysOfWeekHeight: 30,
                               headerStyle: HeaderStyle(
@@ -447,7 +578,8 @@ class VcoreExamScheduleView extends StatelessWidget {
                                 outsideDaysVisible: false,
                                 isTodayHighlighted: true,
                                 todayDecoration: BoxDecoration(
-                                  color: AppColors.greenAccent.withOpacity(0.10),
+                                  color:
+                                      AppColors.greenAccent.withOpacity(0.10),
                                   shape: BoxShape.circle,
                                 ),
                                 todayTextStyle: const TextStyle(
@@ -461,7 +593,7 @@ class VcoreExamScheduleView extends StatelessWidget {
                                   shape: BoxShape.circle,
                                 ),
                                 rangeEndDecoration: const BoxDecoration(
-                                  color: AppColors.greenAccent,
+                                  color: Color(0xFF1976D2),
                                   shape: BoxShape.circle,
                                 ),
                                 rangeStartTextStyle: const TextStyle(
@@ -476,6 +608,10 @@ class VcoreExamScheduleView extends StatelessWidget {
                                   color: AppColors.greenAccent,
                                   fontWeight: FontWeight.w700,
                                 ),
+                                disabledTextStyle: TextStyle(
+                                  color: Colors.grey.shade300,
+                                  fontWeight: FontWeight.w500,
+                                ),
                                 defaultTextStyle: const TextStyle(
                                   color: Colors.black87,
                                   fontWeight: FontWeight.w600,
@@ -488,28 +624,501 @@ class VcoreExamScheduleView extends StatelessWidget {
                               onPageChanged: (day) {
                                 focusedDay = day;
                               },
-                              onRangeSelected: (start, end, focused) {
+                              onRangeSelected: (_, __, focused) {
+                                if (activeDateField == null) return;
+
+                                final picked = DateTime(
+                                  focused.year,
+                                  focused.month,
+                                  focused.day,
+                                );
+                                final field = activeDateField!;
+                                logInfo(
+                                  '[SCHEDULE_ADJUST_UI] action=pick_date '
+                                  'field=${field.name} '
+                                  'value=${DateFormat('yyyy-MM-dd').format(picked)}',
+                                );
+
                                 setModalState(() {
-                                  focusedDay = focused;
-                                  if (start != null) {
-                                    startDate = DateTime(
-                                      start.year,
-                                      start.month,
-                                      start.day,
-                                    );
-                                  }
-                                  if (end != null) {
-                                    endDate = DateTime(
-                                      end.year,
-                                      end.month,
-                                      end.day,
-                                    );
+                                  focusedDay = picked;
+                                  if (field == _TermDateField.start) {
+                                    startDate = picked;
+                                    if (endDate.isBefore(startDate)) {
+                                      endDate = startDate;
+                                    }
+                                    activeDateField = _TermDateField.end;
                                   } else {
-                                    // Sau lần chạm đầu tiên, tạm coi là khoảng 1 ngày.
-                                    endDate = startDate;
+                                    endDate = picked;
                                   }
                                 });
                               },
+                            ),
+                          ),
+                          const SizedBox(height: 18),
+                          _buildSectionTitle(
+                            icon: Icons.schedule_rounded,
+                            title: 'Giờ tiết học',
+                            subtitle:
+                                'Chọn tiết, sau đó quyết định tự tính hoặc nhập giờ riêng.',
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: Colors.grey.shade200),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: _buildMinuteStepper(
+                                        label: 'Thời lượng 1 tiết',
+                                        value: draftPeriodConfig
+                                            .lessonDurationMinutes,
+                                        min: 5,
+                                        max: 180,
+                                        step: 5,
+                                        onChanged: (value) {
+                                          logInfo(
+                                            '[SCHEDULE_ADJUST_UI] action=change_duration value=$value',
+                                          );
+                                          setModalState(() {
+                                            draftPeriodConfig =
+                                                draftPeriodConfig.copyWith(
+                                              configured: true,
+                                              lessonDurationMinutes: value,
+                                              updatedAt: DateTime.now(),
+                                            );
+                                          });
+                                        },
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: _buildMinuteStepper(
+                                        label: 'Nghỉ mặc định',
+                                        value:
+                                            draftPeriodConfig.defaultBreakMinutes,
+                                        min: 0,
+                                        max: 120,
+                                        step: 5,
+                                        onChanged: (value) {
+                                          logInfo(
+                                            '[SCHEDULE_ADJUST_UI] action=change_default_break value=$value',
+                                          );
+                                          setModalState(() {
+                                            draftPeriodConfig =
+                                                draftPeriodConfig.copyWith(
+                                              configured: true,
+                                              defaultBreakMinutes: value,
+                                              updatedAt: DateTime.now(),
+                                            );
+                                          });
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 14),
+                                DropdownButtonFormField<int>(
+                                  value: selectedPeriod,
+                                  isExpanded: true,
+                                  decoration: InputDecoration(
+                                    labelText: 'Chọn tiết',
+                                    prefixIcon: const Icon(
+                                      Icons.view_timeline_outlined,
+                                      color: AppColors.greenAccent,
+                                    ),
+                                    filled: true,
+                                    fillColor: const Color(0xFFF8FAF9),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 12,
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                      borderSide: BorderSide(
+                                        color: Colors.grey.shade200,
+                                      ),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                      borderSide: const BorderSide(
+                                        color: AppColors.greenAccent,
+                                        width: 1.6,
+                                      ),
+                                    ),
+                                  ),
+                                  items: [
+                                    for (var period = 1;
+                                        period <= draftPeriodConfig.maxPeriods;
+                                        period++)
+                                      DropdownMenuItem<int>(
+                                        value: period,
+                                        child: Text('Tiết $period'),
+                                      ),
+                                  ],
+                                  onChanged: (value) {
+                                    if (value == null) return;
+                                    logInfo(
+                                      '[SCHEDULE_ADJUST_UI] action=select_period period=$value',
+                                    );
+                                    setModalState(() {
+                                      selectedPeriod = value;
+                                    });
+                                  },
+                                ),
+                                const SizedBox(height: 12),
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF8FAF9),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: AppColors.greenAccent
+                                          .withOpacity(0.16),
+                                    ),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              'Tiết $selectedPeriod',
+                                              style: TextStyles.bold.copyWith(
+                                                fontSize: AppFontSizes.medium,
+                                                color: Colors.black87,
+                                              ),
+                                            ),
+                                          ),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 9,
+                                              vertical: 5,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: selectedAutoStart
+                                                  ? AppColors.greenAccent
+                                                      .withOpacity(0.10)
+                                                  : Colors.orange
+                                                      .withOpacity(0.10),
+                                              borderRadius:
+                                                  BorderRadius.circular(99),
+                                            ),
+                                            child: Text(
+                                              selectedPeriod == 1
+                                                  ? 'MỐC GỐC'
+                                                  : selectedAutoStart
+                                                      ? 'TỰ TÍNH'
+                                                      : 'NHẬP TAY',
+                                              style: TextStyles.bold.copyWith(
+                                                fontSize:
+                                                    AppFontSizes.font10_5,
+                                                color: selectedAutoStart
+                                                    ? AppColors.greenAccent
+                                                    : Colors.orange.shade700,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      if (selectedPeriod > 1) ...[
+                                        const SizedBox(height: 8),
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    'Tự tính giờ vào từ tiết trước',
+                                                    style: TextStyles.semiBold
+                                                        .copyWith(
+                                                      fontSize: AppFontSizes
+                                                          .font12_5,
+                                                      color: Colors.black87,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 2),
+                                                  Text(
+                                                    'Giờ ra tiết ${selectedPeriod - 1} + thời gian nghỉ.',
+                                                    style: TextStyles.regular
+                                                        .copyWith(
+                                                      fontSize:
+                                                          AppFontSizes.font11,
+                                                      color: Colors
+                                                          .grey.shade600,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            Switch.adaptive(
+                                              value: selectedAutoStart,
+                                              activeColor:
+                                                  AppColors.greenAccent,
+                                              onChanged: (value) {
+                                                final currentResolved =
+                                                    draftPeriodConfig
+                                                        .resolveAll()[selectedPeriod];
+                                                final rule =
+                                                    _effectivePeriodRule(
+                                                  draftPeriodConfig,
+                                                  selectedPeriod,
+                                                );
+                                                logInfo(
+                                                  '[SCHEDULE_ADJUST_UI] action=toggle_auto_start '
+                                                  'period=$selectedPeriod value=$value',
+                                                );
+                                                setModalState(() {
+                                                  draftPeriodConfig =
+                                                      draftPeriodConfig
+                                                          .withPeriodRule(
+                                                    AcademicPeriodRule(
+                                                      periodNumber:
+                                                          selectedPeriod,
+                                                      startTime: value
+                                                          ? rule.startTime
+                                                          : currentResolved
+                                                              ?.startTime,
+                                                      endTime: rule.endTime,
+                                                      autoStart: value,
+                                                      // Bật/tắt auto không tự biến nghỉ mặc định
+                                                      // thành override riêng của tiết này.
+                                                      breakBeforeMinutes:
+                                                          rule.breakBeforeMinutes,
+                                                      manualOverride:
+                                                          rule.manualOverride,
+                                                    ),
+                                                  );
+                                                });
+                                              },
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 8),
+                                        _buildMinuteStepper(
+                                          label: 'Nghỉ trước Tiết $selectedPeriod',
+                                          value: selectedRule
+                                                  .breakBeforeMinutes ??
+                                              draftPeriodConfig
+                                                  .defaultBreakMinutes,
+                                          min: 0,
+                                          max: 180,
+                                          step: 5,
+                                          onChanged: (value) {
+                                            final rule =
+                                                _effectivePeriodRule(
+                                              draftPeriodConfig,
+                                              selectedPeriod,
+                                            );
+                                            logInfo(
+                                              '[SCHEDULE_ADJUST_UI] action=change_period_break '
+                                              'period=$selectedPeriod value=$value',
+                                            );
+                                            setModalState(() {
+                                              draftPeriodConfig =
+                                                  draftPeriodConfig
+                                                      .withPeriodRule(
+                                                AcademicPeriodRule(
+                                                  periodNumber:
+                                                      selectedPeriod,
+                                                  startTime: rule.startTime,
+                                                  endTime: rule.endTime,
+                                                  autoStart: rule.autoStart,
+                                                  breakBeforeMinutes: value,
+                                                  manualOverride:
+                                                      rule.manualOverride,
+                                                ),
+                                              );
+                                            });
+                                          },
+                                        ),
+                                      ],
+                                      const SizedBox(height: 12),
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: _buildClockField(
+                                              label: 'Giờ vào',
+                                              value:
+                                                  selectedRange?.startTime ?? '--:--',
+                                              enabled: selectedPeriod == 1 ||
+                                                  !selectedAutoStart,
+                                              helper: selectedAutoStart
+                                                  ? 'Tự tính'
+                                                  : 'Chạm để chọn',
+                                              onTap: () async {
+                                                final current = selectedRange
+                                                        ?.startTime ??
+                                                    selectedRule.startTime ??
+                                                    '07:00';
+                                                final picked =
+                                                    await _pickClock(
+                                                  sheetContext,
+                                                  current,
+                                                  'Chọn giờ vào Tiết $selectedPeriod',
+                                                );
+                                                if (picked == null) return;
+                                                final rule =
+                                                    _effectivePeriodRule(
+                                                  draftPeriodConfig,
+                                                  selectedPeriod,
+                                                );
+                                                logInfo(
+                                                  '[SCHEDULE_ADJUST_UI] action=change_start_time '
+                                                  'period=$selectedPeriod value=$picked',
+                                                );
+                                                setModalState(() {
+                                                  draftPeriodConfig =
+                                                      draftPeriodConfig
+                                                          .withPeriodRule(
+                                                    AcademicPeriodRule(
+                                                      periodNumber:
+                                                          selectedPeriod,
+                                                      startTime: picked,
+                                                      endTime: rule.endTime,
+                                                      autoStart: false,
+                                                      breakBeforeMinutes: rule
+                                                          .breakBeforeMinutes,
+                                                      manualOverride:
+                                                          rule.manualOverride,
+                                                    ),
+                                                  );
+                                                });
+                                              },
+                                            ),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          Expanded(
+                                            child: _buildClockField(
+                                              label: 'Giờ ra',
+                                              value:
+                                                  selectedRange?.endTime ?? '--:--',
+                                              enabled: true,
+                                              helper: selectedRule.manualOverride
+                                                  ? 'Đã nhập riêng'
+                                                  : 'Theo thời lượng chung',
+                                              onTap: () async {
+                                                final current = selectedRange
+                                                        ?.endTime ??
+                                                    selectedRule.endTime ??
+                                                    '07:50';
+                                                final picked =
+                                                    await _pickClock(
+                                                  sheetContext,
+                                                  current,
+                                                  'Chọn giờ ra Tiết $selectedPeriod',
+                                                );
+                                                if (picked == null) return;
+                                                final rule =
+                                                    _effectivePeriodRule(
+                                                  draftPeriodConfig,
+                                                  selectedPeriod,
+                                                );
+                                                logInfo(
+                                                  '[SCHEDULE_ADJUST_UI] action=change_end_time '
+                                                  'period=$selectedPeriod value=$picked',
+                                                );
+                                                setModalState(() {
+                                                  draftPeriodConfig =
+                                                      draftPeriodConfig
+                                                          .withPeriodRule(
+                                                    AcademicPeriodRule(
+                                                      periodNumber:
+                                                          selectedPeriod,
+                                                      startTime: rule.startTime,
+                                                      endTime: picked,
+                                                      autoStart: rule.autoStart,
+                                                      breakBeforeMinutes: rule
+                                                          .breakBeforeMinutes,
+                                                      manualOverride: true,
+                                                    ),
+                                                  );
+                                                });
+                                              },
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      if (selectedRule.manualOverride) ...[
+                                        const SizedBox(height: 6),
+                                        Align(
+                                          alignment: Alignment.centerRight,
+                                          child: TextButton.icon(
+                                            onPressed: () {
+                                              final rule =
+                                                  _effectivePeriodRule(
+                                                draftPeriodConfig,
+                                                selectedPeriod,
+                                              );
+                                              logInfo(
+                                                '[SCHEDULE_ADJUST_UI] action=clear_end_override period=$selectedPeriod',
+                                              );
+                                              setModalState(() {
+                                                draftPeriodConfig =
+                                                    draftPeriodConfig
+                                                        .withPeriodRule(
+                                                  AcademicPeriodRule(
+                                                    periodNumber:
+                                                        selectedPeriod,
+                                                    startTime: rule.startTime,
+                                                    endTime: rule.endTime,
+                                                    autoStart: rule.autoStart,
+                                                    breakBeforeMinutes: rule
+                                                        .breakBeforeMinutes,
+                                                    manualOverride: false,
+                                                  ),
+                                                );
+                                              });
+                                            },
+                                            icon: const Icon(
+                                              Icons.auto_fix_high_rounded,
+                                              size: 16,
+                                            ),
+                                            label: const Text(
+                                              'Giờ ra theo thời lượng chung',
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                      const SizedBox(height: 8),
+                                      Container(
+                                        width: double.infinity,
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 10,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.greenAccent
+                                              .withOpacity(0.07),
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                        child: Text(
+                                          selectedRange == null
+                                              ? 'Chưa thể tính được giờ Tiết $selectedPeriod.'
+                                              : 'Kết quả Tiết $selectedPeriod: ${selectedRange.startTime} → ${selectedRange.endTime}',
+                                          style: TextStyles.semiBold.copyWith(
+                                            fontSize: AppFontSizes.font12,
+                                            color: AppColors.greenAccent,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                           const SizedBox(height: 12),
@@ -533,7 +1142,7 @@ class VcoreExamScheduleView extends StatelessWidget {
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Text(
-                                    '$rangeText • $totalDays ngày. Thiết lập này chỉ thay đổi lịch hiển thị trên ứng dụng của bạn.',
+                                    '$rangeText • $totalDays ngày. Giờ tiết được dùng trực tiếp để dựng lại lịch học trên app.',
                                     style: TextStyles.medium.copyWith(
                                       fontSize: AppFontSizes.font11_5,
                                       color: Colors.black87,
@@ -543,10 +1152,56 @@ class VcoreExamScheduleView extends StatelessWidget {
                               ],
                             ),
                           ),
+                          const SizedBox(height: 10),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: Colors.grey.shade200),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(
+                                  Icons.history_rounded,
+                                  color: Colors.grey.shade600,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Nhật ký thao tác',
+                                        style: TextStyles.semiBold.copyWith(
+                                          fontSize: AppFontSizes.font12,
+                                          color: Colors.black87,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 3),
+                                      Text(
+                                        actionLogs.isEmpty
+                                            ? 'Chưa có thao tác trong lần mở này.'
+                                            : actionLogs.take(4).join('\n'),
+                                        style: TextStyles.regular.copyWith(
+                                          fontSize: AppFontSizes.font11,
+                                          color: Colors.grey.shade600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                           if (isPersonal) ...[
                             const SizedBox(height: 8),
                             Text(
-                              'Bạn đang dùng khoảng ngày cá nhân. Có thể khôi phục để dùng lại thời gian do hệ thống cung cấp.',
+                              'Đang có điều chỉnh cá nhân. Khôi phục mặc định sẽ xóa cả khoảng ngày và giờ tiết cá nhân.',
                               style: TextStyles.regular.copyWith(
                                 fontSize: AppFontSizes.font11,
                                 color: Colors.grey.shade600,
@@ -570,45 +1225,181 @@ class VcoreExamScheduleView extends StatelessWidget {
                         top: BorderSide(color: Colors.grey.shade200),
                       ),
                     ),
-                    child: Row(
+                    child: Column(
                       children: [
-                        if (isPersonal) ...[
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: () async {
-                                await controller.clearPersonalTermDateRange();
-                                Get.back();
-                              },
-                              icon: const Icon(Icons.restart_alt_rounded),
-                              label: const Text('Khôi phục mặc định'),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: Colors.grey.shade800,
-                                side: BorderSide(color: Colors.grey.shade300),
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 14),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: isRestoring || isSaving
+                                ? null
+                                : () async {
+                                    logInfo(
+                                      '[SCHEDULE_ADJUST_UI] action=restore_pressed',
+                                    );
+                                    setModalState(() {
+                                      isRestoring = true;
+                                      addActionLog('Bắt đầu khôi phục mặc định...');
+                                    });
+                                    try {
+                                      final restored = await controller
+                                          .restorePersonalScheduleDefaults();
+                                      if (!sheetContext.mounted) return;
+
+                                      final restoredStart =
+                                          controller.currentTermStartDate;
+                                      final restoredEnd =
+                                          controller.currentTermEndDate;
+                                      setModalState(() {
+                                        isRestoring = false;
+                                        if (restored &&
+                                            restoredStart != null &&
+                                            restoredEnd != null) {
+                                          startDate = DateTime(
+                                            restoredStart.year,
+                                            restoredStart.month,
+                                            restoredStart.day,
+                                          );
+                                          endDate = DateTime(
+                                            restoredEnd.year,
+                                            restoredEnd.month,
+                                            restoredEnd.day,
+                                          );
+                                          focusedDay = startDate;
+                                          activeDateField = null;
+                                          draftPeriodConfig =
+                                              controller.academicPeriodConfig;
+                                          if (selectedPeriod >
+                                              draftPeriodConfig.maxPeriods) {
+                                            selectedPeriod =
+                                                draftPeriodConfig.maxPeriods;
+                                          }
+                                          hasPersonalDateOverride = false;
+                                          hasPersonalPeriodOverride = false;
+                                          addActionLog(
+                                            'Đã khôi phục mặc định và cập nhật lịch ngay.',
+                                          );
+                                        } else {
+                                          addActionLog(
+                                            'Khôi phục không thành công.',
+                                          );
+                                        }
+                                      });
+                                    } catch (error) {
+                                      logError(
+                                        '[SCHEDULE_ADJUST_UI] action=restore_failed '
+                                        'error=${error.runtimeType}',
+                                      );
+                                      if (!sheetContext.mounted) return;
+                                      setModalState(() {
+                                        isRestoring = false;
+                                        addActionLog(
+                                          'Khôi phục lỗi: ${error.runtimeType}.',
+                                        );
+                                      });
+                                    }
+                                  },
+                            icon: isRestoring
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(
+                                    Icons.restart_alt_rounded,
+                                    size: 19,
+                                  ),
+                            label: const Text('Khôi phục mặc định'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.grey.shade800,
+                              side: BorderSide(color: Colors.grey.shade300),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              minimumSize: const Size.fromHeight(50),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
                               ),
                             ),
                           ),
-                          const SizedBox(width: 10),
-                        ],
-                        Expanded(
-                          flex: isPersonal ? 1 : 2,
+                        ),
+                        const SizedBox(height: 10),
+                        SizedBox(
+                          width: double.infinity,
                           child: ElevatedButton.icon(
-                            onPressed: () async {
-                              final saved = await controller
-                                  .savePersonalTermDateRange(startDate, endDate);
-                              if (saved) Get.back();
-                            },
-                            icon: const Icon(Icons.check_rounded),
-                            label: const Text('Lưu khoảng ngày'),
+                            onPressed: isSaving || isRestoring
+                                ? null
+                                : () async {
+                                    logInfo(
+                                      '[SCHEDULE_ADJUST_UI] action=save_pressed '
+                                      'selectedPeriod=$selectedPeriod',
+                                    );
+                                    setModalState(() {
+                                      isSaving = true;
+                                      addActionLog(
+                                        'Bắt đầu lưu điều chỉnh (Tiết $selectedPeriod đang được chọn)...',
+                                      );
+                                    });
+                                    try {
+                                      final saved = await controller
+                                          .savePersonalScheduleAdjustments(
+                                        startDate: startDate,
+                                        endDate: endDate,
+                                        periodConfig: draftPeriodConfig,
+                                      );
+                                      if (!sheetContext.mounted) return;
+                                      setModalState(() {
+                                        isSaving = false;
+                                        if (saved) {
+                                          hasPersonalDateOverride = true;
+                                          hasPersonalPeriodOverride = true;
+                                          draftPeriodConfig =
+                                              controller.academicPeriodConfig;
+                                          activeDateField = null;
+                                          addActionLog(
+                                            'Đã lưu và cập nhật lịch ngay, không cần thoát ra vào lại.',
+                                          );
+                                        } else {
+                                          addActionLog(
+                                            'Lưu không thành công.',
+                                          );
+                                        }
+                                      });
+                                    } catch (error) {
+                                      logError(
+                                        '[SCHEDULE_ADJUST_UI] action=save_failed '
+                                        'error=${error.runtimeType}',
+                                      );
+                                      if (!sheetContext.mounted) return;
+                                      setModalState(() {
+                                        isSaving = false;
+                                        addActionLog(
+                                          'Lưu lỗi: ${error.runtimeType}.',
+                                        );
+                                      });
+                                    }
+                                  },
+                            icon: isSaving
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor:
+                                          AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
+                                      ),
+                                    ),
+                                  )
+                                : const Icon(Icons.check_rounded, size: 19),
+                            label: const Text('Lưu điều chỉnh'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.greenAccent,
                               foregroundColor: Colors.white,
+                              disabledBackgroundColor:
+                                  AppColors.greenAccent.withOpacity(0.45),
                               elevation: 0,
                               padding: const EdgeInsets.symmetric(vertical: 14),
+                              minimumSize: const Size.fromHeight(50),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(14),
                               ),
@@ -629,48 +1420,348 @@ class VcoreExamScheduleView extends StatelessWidget {
     );
   }
 
-  Widget _buildDateRangeSummaryItem({
+  Widget _buildSectionTitle({
     required IconData icon,
-    required String label,
-    required String value,
+    required String title,
+    required String subtitle,
   }) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          width: 36,
-          height: 36,
+          width: 34,
+          height: 34,
           decoration: BoxDecoration(
             color: AppColors.greenAccent.withOpacity(0.10),
-            borderRadius: BorderRadius.circular(11),
+            borderRadius: BorderRadius.circular(10),
           ),
           child: Icon(icon, color: AppColors.greenAccent, size: 19),
         ),
-        const SizedBox(width: 9),
+        const SizedBox(width: 10),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                label,
-                style: TextStyles.regular.copyWith(
-                  fontSize: AppFontSizes.font11,
-                  color: Colors.grey.shade600,
+                title,
+                style: TextStyles.bold.copyWith(
+                  fontSize: AppFontSizes.medium,
+                  color: Colors.black87,
                 ),
               ),
               const SizedBox(height: 2),
               Text(
-                value,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyles.bold.copyWith(
-                  fontSize: AppFontSizes.small,
-                  color: Colors.black87,
+                subtitle,
+                style: TextStyles.regular.copyWith(
+                  fontSize: AppFontSizes.font11,
+                  color: Colors.grey.shade600,
                 ),
               ),
             ],
           ),
         ),
       ],
+    );
+  }
+
+  AcademicPeriodRule _effectivePeriodRule(
+    AcademicPeriodConfig config,
+    int period,
+  ) {
+    final existing = config.ruleFor(period);
+    if (existing != null) return existing;
+    final resolved = config.resolveAll()[period];
+    return AcademicPeriodRule(
+      periodNumber: period,
+      startTime: resolved?.startTime,
+      endTime: resolved?.endTime,
+      autoStart: period > 1,
+      // null = dùng defaultBreakMinutes; chỉ ghi số khi người dùng tạo override riêng.
+      breakBeforeMinutes: null,
+      manualOverride: false,
+    );
+  }
+
+  Widget _buildMinuteStepper({
+    required String label,
+    required int value,
+    required int min,
+    required int max,
+    required int step,
+    required ValueChanged<int> onChanged,
+  }) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAF9),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyles.semiBold.copyWith(
+              fontSize: AppFontSizes.font11,
+              color: Colors.grey.shade700,
+            ),
+          ),
+          const SizedBox(height: 5),
+          Row(
+            children: [
+              _minuteButton(
+                icon: Icons.remove_rounded,
+                enabled: value > min,
+                onTap: () => onChanged(
+                  (value - step).clamp(min, max).toInt(),
+                ),
+              ),
+              Expanded(
+                child: Text(
+                  '$value phút',
+                  textAlign: TextAlign.center,
+                  style: TextStyles.bold.copyWith(
+                    fontSize: AppFontSizes.font12,
+                    color: Colors.black87,
+                  ),
+                ),
+              ),
+              _minuteButton(
+                icon: Icons.add_rounded,
+                enabled: value < max,
+                onTap: () => onChanged(
+                  (value + step).clamp(min, max).toInt(),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _minuteButton({
+    required IconData icon,
+    required bool enabled,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(9),
+      onTap: enabled ? onTap : null,
+      child: Container(
+        width: 30,
+        height: 30,
+        decoration: BoxDecoration(
+          color: enabled
+              ? AppColors.greenAccent.withOpacity(0.10)
+              : Colors.grey.withOpacity(0.06),
+          borderRadius: BorderRadius.circular(9),
+        ),
+        child: Icon(
+          icon,
+          size: 17,
+          color: enabled ? AppColors.greenAccent : Colors.grey.shade400,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildClockField({
+    required String label,
+    required String value,
+    required bool enabled,
+    required String helper,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: enabled ? onTap : null,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: enabled ? Colors.white : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: enabled
+                ? AppColors.greenAccent.withOpacity(0.25)
+                : Colors.grey.shade200,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: TextStyles.semiBold.copyWith(
+                fontSize: AppFontSizes.font11,
+                color: Colors.grey.shade600,
+              ),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              value,
+              style: TextStyles.bold.copyWith(
+                fontSize: AppFontSizes.large,
+                color: enabled ? Colors.black87 : Colors.grey.shade600,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              helper,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyles.regular.copyWith(
+                fontSize: AppFontSizes.font10_5,
+                color: enabled
+                    ? AppColors.greenAccent
+                    : Colors.grey.shade500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<String?> _pickClock(
+    BuildContext context,
+    String current,
+    String title,
+  ) async {
+    final parts = current.split(':');
+    final initial = TimeOfDay(
+      hour: int.tryParse(parts.isNotEmpty ? parts[0] : '') ?? 7,
+      minute: int.tryParse(parts.length > 1 ? parts[1] : '') ?? 0,
+    );
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: initial,
+      helpText: title,
+      cancelText: 'Hủy',
+      confirmText: 'Chọn',
+      builder: (pickerContext, child) {
+        final base = Theme.of(pickerContext);
+        return Theme(
+          data: base.copyWith(
+            colorScheme: base.colorScheme.copyWith(
+              primary: AppColors.greenAccent,
+              secondary: AppColors.greenAccent,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked == null) return null;
+    return '${picked.hour.toString().padLeft(2, '0')}:'
+        '${picked.minute.toString().padLeft(2, '0')}';
+  }
+
+  Widget _buildDateRangeSummaryItem({
+    required IconData icon,
+    required String label,
+    required String value,
+    bool selected = false,
+    Color accentColor = AppColors.greenAccent,
+    VoidCallback? onTap,
+  }) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 10),
+        decoration: BoxDecoration(
+          color: selected
+              ? accentColor.withOpacity(0.10)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: selected ? accentColor : Colors.transparent,
+            width: selected ? 2 : 1,
+          ),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: accentColor.withOpacity(0.12),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: selected
+                    ? accentColor.withOpacity(0.16)
+                    : Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                icon,
+                color: selected ? accentColor : Colors.grey.shade500,
+                size: 18,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyles.regular.copyWith(
+                      fontSize: AppFontSizes.font11,
+                      color: selected ? accentColor : Colors.grey.shade600,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyles.bold.copyWith(
+                      fontSize: AppFontSizes.small,
+                      color: selected ? accentColor : Colors.black87,
+                    ),
+                  ),
+                  if (selected) ...[
+                    const SizedBox(height: 3),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: accentColor.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                      child: Text(
+                        'ĐANG CHỌN',
+                        style: TextStyles.bold.copyWith(
+                          fontSize: 9,
+                          color: accentColor,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -733,7 +1824,9 @@ class VcoreExamScheduleView extends StatelessWidget {
       controller.focusedDay.value,
     );
 
-    return Container(
+    return AppGuideAnchor(
+      id: 'exam_schedule.calendar',
+      child: Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -872,6 +1965,7 @@ class VcoreExamScheduleView extends StatelessWidget {
           _buildCalendarLegend(),
           _buildModeSelector(context, controller),
         ],
+      ),
       ),
     );
   }
@@ -1781,17 +2875,14 @@ class VcoreExamScheduleView extends StatelessWidget {
   }
 
   String _displayTimeRange(ScheduleEvent event) {
-    final actualStart = event.actualStartTime?.trim() ?? '';
-    final actualEnd = event.actualEndTime?.trim() ?? '';
-
-    if (actualStart.isNotEmpty && actualEnd.isNotEmpty) {
-      return '$actualStart - $actualEnd';
+    // Class times are already resolved once in VcoreExamScheduleController.
+    // This guarantees Home and Calendar display the same ScheduleEvent clock.
+    if (event.type == ScheduleType.classSession) {
+      return event.displayTimeRange;
     }
 
-    if (actualStart.isNotEmpty) {
-      return actualStart;
-    }
-
+    // Exam payload may contain an HH:mm value or a duration; keep existing
+    // exam formatting behavior unchanged.
     return _mapTietToTime(event.startTime, event.endTime);
   }
   Widget _buildModeButton({
@@ -2193,3 +3284,4 @@ class VcoreExamScheduleView extends StatelessWidget {
     );
   }
 }
+
