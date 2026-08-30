@@ -323,6 +323,63 @@ class DormitoryHistoryResolvedData {
     return '';
   }
 
+  String buildingNameFor(int? id) {
+    if (id == null) return '';
+
+    for (final Map<String, dynamic> room in roomsById.values) {
+      final int? roomBuildingId = _toInt(
+        room['buildingId'] ?? room['building_id'],
+      );
+      if (roomBuildingId != id) continue;
+
+      final dynamic rawBuilding = room['building'];
+      if (rawBuilding is String && rawBuilding.trim().isNotEmpty) {
+        return _normalizeBuildingName(rawBuilding);
+      }
+      if (rawBuilding is Map) {
+        final Map<String, dynamic> building =
+            Map<String, dynamic>.from(rawBuilding);
+        final String name = _firstText(<dynamic>[
+          building['name'],
+          building['buildingName'],
+          building['building_name'],
+          building['code'],
+        ]);
+        if (name.isNotEmpty) return _normalizeBuildingName(name);
+      }
+
+      final String directName = _firstText(<dynamic>[
+        room['buildingName'],
+        room['building_name'],
+        room['buildingCode'],
+        room['building_code'],
+      ]);
+      if (directName.isNotEmpty) return _normalizeBuildingName(directName);
+    }
+
+    return 'Tòa nhà chưa cập nhật tên';
+  }
+
+  String buildingNameForRoom(int? roomId) {
+    if (roomId == null) return '';
+    final Map<String, dynamic>? room = roomsById[roomId];
+    if (room == null) return '';
+    return buildingNameFor(_toInt(room['buildingId'] ?? room['building_id']));
+  }
+
+  static String _normalizeBuildingName(String value) {
+    final String text = value.trim();
+    if (text.isEmpty) return '';
+    final String lower = text.toLowerCase();
+    if (lower.startsWith('tòa') ||
+        lower.startsWith('toa') ||
+        lower.startsWith('block') ||
+        lower.startsWith('building')) {
+      return text;
+    }
+    return 'Tòa $text';
+  }
+
   String roomDescriptionFor(int? id) {
     if (id == null) return '';
     final Map<String, dynamic>? room = roomsById[id];

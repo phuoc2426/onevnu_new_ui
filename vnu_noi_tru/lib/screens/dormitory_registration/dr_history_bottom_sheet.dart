@@ -749,6 +749,13 @@ class _DRHistoryBottomSheetState extends State<DRHistoryBottomSheet> {
       case 'registration_period_id':
       case 'registrationperiodid':
         return _resolvedId('Đợt đăng ký', lookup.periodNameFor(id), id);
+      case 'building_id':
+      case 'buildingid':
+        return _resolvedId(
+          'Tòa nhà',
+          lookup.buildingNameFor(id),
+          id,
+        );
       case 'room_type_id':
       case 'roomtypeid':
         return _resolvedId('Loại phòng', lookup.roomTypeNameFor(id), id);
@@ -767,7 +774,7 @@ class _DRHistoryBottomSheetState extends State<DRHistoryBottomSheet> {
         return _resolvedId('Sinh viên', lookup.studentNameFor(id), id);
       case 'accommodation_id':
       case 'accommodationid':
-        return const _ResolvedValue('', '');
+        return const _ResolvedValue('Hồ sơ nội trú', 'Hồ sơ lưu trú liên quan');
       case 'performed_by':
       case 'performedby':
         return _ResolvedValue(
@@ -841,13 +848,13 @@ class _DRHistoryBottomSheetState extends State<DRHistoryBottomSheet> {
     int? id, {
     String? subtitle,
   }) {
-    if (resolvedName.trim().isEmpty) {
-      return const _ResolvedValue('', '');
-    }
+    final String displayName = resolvedName.trim().isEmpty
+        ? '$label chưa cập nhật thông tin'
+        : resolvedName.trim();
 
     return _ResolvedValue(
       label,
-      resolvedName,
+      displayName,
       subtitle: _hasText(subtitle) ? subtitle!.trim() : null,
     );
   }
@@ -1261,4 +1268,3 @@ class _ResolvedValue {
     this.subtitle,
   });
 }
-

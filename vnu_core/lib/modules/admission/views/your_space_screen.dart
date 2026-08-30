@@ -5,6 +5,8 @@ import 'package:vnu_core/common/app_text_styles.dart';
 import 'package:vnu_core/common/log.dart';
 import 'package:vnu_core/globals.dart';
 import 'package:vnu_core/modules/notify/views/vcore_notify_view_v3.dart';
+import 'package:vnu_core/modules/motel/vcore_motel_webview.dart';
+import 'package:vnu_core/modules/shapeshifter/views/shapeshifter_my_features.dart';
 import 'package:vnu_core/repository/app_repository.dart';
 import 'package:vnu_core/repository/applicant_session_repository.dart';
 import 'package:vnu_core/screens/vcore_admission_view.dart';
@@ -32,6 +34,7 @@ class _YourSpaceScreenState extends State<YourSpaceScreen>
   bool _isLoggingOut = false;
 
   int _buildCount = 0;
+  int _shapeRefreshVersion = 0;
   DateTime? _screenOpenedAt;
   String? _currentRouteName;
 
@@ -198,6 +201,12 @@ class _YourSpaceScreenState extends State<YourSpaceScreen>
     );
 
     await _loadSystemUnreadCount();
+
+    if (mounted) {
+      setState(() {
+        _shapeRefreshVersion++;
+      });
+    }
 
     _log(
       'Hoàn thành làm mới màn hình',
@@ -802,6 +811,16 @@ class _YourSpaceScreenState extends State<YourSpaceScreen>
     );
   }
 
+  void _reloadDynamicMyFeatures() {
+    if (!mounted) return;
+    setState(() {
+      _shapeRefreshVersion++;
+    });
+    _log(
+      'Reload chức năng MY từ API | version=$_shapeRefreshVersion',
+    );
+  }
+
   Widget _buildServicesSection() {
     const List<_ServiceItem> services = [
       _ServiceItem(
@@ -812,10 +831,15 @@ class _YourSpaceScreenState extends State<YourSpaceScreen>
       ),
       _ServiceItem(
         label: 'Thông báo',
-        icon: Icons
-            .notifications_active_outlined,
+        icon: Icons.notifications_active_outlined,
         color: Color(0xFF34C759),
         type: _ServiceType.notification,
+      ),
+      _ServiceItem(
+        label: 'Phòng trọ',
+        icon: Icons.apartment_rounded,
+        color: Color(0xFF00A6A6),
+        type: _ServiceType.motel,
       ),
     ];
 
@@ -823,41 +847,40 @@ class _YourSpaceScreenState extends State<YourSpaceScreen>
       crossAxisAlignment:
       CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.only(left: 4),
-          child: Text(
-            'DỊCH VỤ CỦA BẠN',
-            style: TextStyle(
-              color: AppColors.brandGreen,
-              fontSize:
-              AppFontSizes.mediumSmall,
-              fontWeight:
-              FontWeight.w900,
+        Row(
+          children: <Widget>[
+            const Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(left: 4),
+                child: Text(
+                  'DỊCH VỤ CỦA BẠN',
+                  style: TextStyle(
+                    color: AppColors.brandGreen,
+                    fontSize: AppFontSizes.mediumSmall,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
             ),
-          ),
+            Tooltip(
+              message: 'Tải lại chức năng mới nhất',
+              child: IconButton(
+                onPressed: _reloadDynamicMyFeatures,
+                icon: const Icon(Icons.refresh_rounded),
+                color: AppColors.brandGreen,
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 14),
-        GridView.builder(
-          shrinkWrap: true,
-          physics:
-          const NeverScrollableScrollPhysics(),
-          gridDelegate:
-          const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 3,
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-            childAspectRatio: 0.85,
-          ),
-          itemCount: services.length,
-          itemBuilder: (
-              context,
-              index,
-              ) {
-            return _buildServiceCard(
-              context,
-              services[index],
-            );
-          },
+        ShapeshifterMyFeatures(
+          key: ValueKey('shape-my-$_shapeRefreshVersion'),
+          layout: ShapeshifterMyLayout.admittedGrid,
+          showSectionTitle: false,
+          admittedLeadingItems: services
+              .map((item) => _buildServiceCard(context, item))
+              .toList(growable: false),
         ),
       ],
     );
@@ -888,6 +911,10 @@ class _YourSpaceScreenState extends State<YourSpaceScreen>
 
             case _ServiceType.notification:
               _openSystemNotifications();
+              break;
+
+            case _ServiceType.motel:
+              openMotelWebView();
               break;
           }
         },
@@ -1098,6 +1125,7 @@ class _HeaderIconContainer
 enum _ServiceType {
   dormitory,
   notification,
+  motel,
 }
 
 class _ServiceItem {

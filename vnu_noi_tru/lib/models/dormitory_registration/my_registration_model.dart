@@ -53,8 +53,11 @@ class MyRegistrationModel {
   final Object? id;
   final int? registrationPeriodId;
   final int? priorityObjectId;
+  final List<int> priorityObjectIds;
+  final String? priorityObjectName;
   final int? dormitoryId;
   final int? roomTypeId;
+  final int? roomId;
   final String? status;
   final String? statusLabel;
   final String? registrationPeriodName;
@@ -78,8 +81,11 @@ class MyRegistrationModel {
     this.id,
     this.registrationPeriodId,
     this.priorityObjectId,
+    this.priorityObjectIds = const <int>[],
+    this.priorityObjectName,
     this.dormitoryId,
     this.roomTypeId,
+    this.roomId,
     this.status,
     this.statusLabel,
     this.registrationPeriodName,
@@ -101,23 +107,118 @@ class MyRegistrationModel {
   });
 
   factory MyRegistrationModel.fromJson(Map<String, dynamic> json) {
-    int? _parseInt(dynamic v) {
-      if (v == null) return null;
-      if (v is int) return v;
-      if (v is String) return int.tryParse(v);
-      return null;
+    int? _parseInt(dynamic value) {
+      if (value == null) return null;
+      if (value is int) return value;
+      if (value is num) return value.toInt();
+      return int.tryParse(value.toString().trim());
     }
+
+    Map<String, dynamic>? _map(dynamic value) {
+      return value is Map ? Map<String, dynamic>.from(value) : null;
+    }
+
+    final List<int> priorityIds = <int>[];
+    void collectPriorityIds(dynamic raw) {
+      if (raw == null) return;
+      if (raw is Iterable && raw is! String) {
+        for (final dynamic item in raw) {
+          collectPriorityIds(item);
+        }
+        return;
+      }
+      if (raw is Map) {
+        final int? id = _parseInt(
+          raw['id'] ?? raw['priority_object_id'] ?? raw['priorityObjectId'],
+        );
+        if (id != null && !priorityIds.contains(id)) priorityIds.add(id);
+        collectPriorityIds(
+          raw['priority_objects'] ??
+              raw['priorityObjects'] ??
+              raw['priority_object_ids'] ??
+              raw['priorityObjectIds'],
+        );
+        return;
+      }
+      final String text = raw.toString().trim();
+      final int? direct = _parseInt(text);
+      if (direct != null) {
+        if (!priorityIds.contains(direct)) priorityIds.add(direct);
+        return;
+      }
+      for (final String part in text.split(RegExp(r'[,;|]'))) {
+        final int? id = _parseInt(part);
+        if (id != null && !priorityIds.contains(id)) priorityIds.add(id);
+      }
+    }
+
+    collectPriorityIds(
+      json['priority_object_ids'] ??
+          json['priorityObjectIds'] ??
+          json['priority_objects'] ??
+          json['priorityObjects'],
+    );
+    final int? singlePriorityId = _parseInt(
+      json['priority_object_id'] ?? json['priorityObjectId'],
+    );
+    if (singlePriorityId != null && !priorityIds.contains(singlePriorityId)) {
+      priorityIds.add(singlePriorityId);
+    }
+
+    final Map<String, dynamic>? room = _map(
+      json['room'] ?? json['assigned_room'] ?? json['assignedRoom'],
+    );
+    final int? roomId = _parseInt(
+      json['room_id'] ?? json['roomId'] ?? room?['id'],
+    );
+
+    String? assignedRoomText(dynamic raw) {
+      if (raw == null) return null;
+      if (raw is Map) {
+        return (raw['room_number'] ??
+                raw['roomNumber'] ??
+                raw['name'] ??
+                raw['code'])
+            ?.toString();
+      }
+      return raw.toString();
+    }
+
+    final dynamic rawDocuments =
+        json['documents'] ??
+        json['attachments'] ??
+        json['attachment_files'] ??
+        json['attachmentFiles'];
+    final List<UploadedAttachmentModel>? documents = rawDocuments is Iterable
+        ? rawDocuments
+            .whereType<Map>()
+            .map(
+              (Map e) => UploadedAttachmentModel.fromJson(
+                Map<String, dynamic>.from(e),
+              ),
+            )
+            .toList()
+        : null;
 
     return MyRegistrationModel(
       id: _normalizeRegistrationId(json['id']),
       registrationPeriodId: _parseInt(
         json['registration_period_id'] ?? json['registrationPeriodId'],
       ),
-      priorityObjectId: _parseInt(
-        json['priority_object_id'] ?? json['priorityObjectId'],
+      priorityObjectId: singlePriorityId,
+      priorityObjectIds: priorityIds,
+      priorityObjectName: (json['priority_object_name'] ??
+              json['priorityObjectName'] ??
+              json['priorityObject'])
+          ?.toString(),
+      dormitoryId: _parseInt(
+        json['dormitory_id'] ??
+            json['dormitoryId'] ??
+            room?['dormitory_id'] ??
+            room?['dormitoryId'],
       ),
-      dormitoryId: _parseInt(json['dormitory_id'] ?? json['dormitoryId']),
       roomTypeId: _parseInt(json['room_type_id'] ?? json['roomTypeId']),
+      roomId: roomId,
       status: json['status'] as String?,
       statusLabel: (json['status_label'] ?? json['statusLabel']) as String?,
       registrationPeriodName:
@@ -125,7 +226,9 @@ class MyRegistrationModel {
               as String?,
       studentCode: (json['student_code'] ?? json['studentCode']) as String?,
       studentName: (json['student_name'] ?? json['studentName']) as String?,
-      assignedRoom: (json['assigned_room'] ?? json['assignedRoom']) as String?,
+      assignedRoom: assignedRoomText(
+        json['assigned_room'] ?? json['assignedRoom'] ?? json['room'],
+      ),
       isDraft: json['is_draft'] as bool? ?? json['isDraft'] as bool?,
       startDate: (json['start_date'] ?? json['startDate']) as String?,
       endDate: (json['end_date'] ?? json['endDate']) as String?,
@@ -149,15 +252,7 @@ class MyRegistrationModel {
               json['student'] as Map<String, dynamic>,
             )
           : null,
-      documents: json['documents'] != null
-          ? (json['documents'] as List)
-                .map(
-                  (e) => UploadedAttachmentModel.fromJson(
-                    e as Map<String, dynamic>,
-                  ),
-                )
-                .toList()
-          : null,
+      documents: documents,
     );
   }
 
@@ -165,8 +260,11 @@ class MyRegistrationModel {
     'id': id,
     'registration_period_id': registrationPeriodId,
     'priority_object_id': priorityObjectId,
+    'priority_object_ids': priorityObjectIds,
+    'priority_object_name': priorityObjectName,
     'dormitory_id': dormitoryId,
     'room_type_id': roomTypeId,
+    'room_id': roomId,
     'status': status,
     'status_label': statusLabel,
     'registration_period_name': registrationPeriodName,

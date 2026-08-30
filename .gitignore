@@ -1,166 +1,154 @@
-# Miscellaneous
-*.class
-*.log
-*.pyc
-*.swp
+# =========================================================
+# ONEVNU monorepo .gitignore
+# Keep source/configuration files in Git; ignore only generated,
+# local-machine, build-cache and secret/signing artifacts.
+# =========================================================
+
+# OS / editors
 .DS_Store
+*.swp
+*.swo
+*~
 .atom/
 .buildlog/
-.history
+.history/
 .svn/
-
-# IntelliJ / Android Studio
+.vscode/
+.idea/
 *.iml
 *.ipr
 *.iws
-.idea/
-.gradle/
 
-# VS Code
-.vscode/
+# Logs / temporary files
+*.log
+logs/
+*.tmp
+tmp/
+*.class
+*.pyc
 
-# Flutter / Dart / Pub
+# Dart / Flutter / Pub generated state
 .dart_tool/
+**/.dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
 .packages
 .pub-cache/
 .pub/
-build/
+**/doc/api/
 
-
-
-# Flutter generated
-.flutter-plugins
-.flutter-plugins-dependencies
+# FVM SDK cache. Keep .fvmrc in Git so the Flutter version is reproducible.
 .fvm/
-.fvmrc
-
-# Dart
-.dart_tool/
-.packages
-.pub/
-.pub-cache/
 
 # Build outputs
 build/
+**/build/
 dist/
 out/
+coverage/
 
-# Android
-android/captures/
-android/**/build/
-*.apk
-*.aab
-*.ap_
-*.dex
-
-# iOS
-ios/Flutter/App.framework
-ios/Flutter/Flutter.framework
-ios/Flutter/engine/
-DerivedData/
-
-# Xcode
-xcuserdata/
-*.xcuserstate
-
-# Crash / temp
-*.lock
-*.tmp
-tmp/
-
-# Archive / binaries
-*.zip
-*.rar
-*.7z
-*.tar
-*.gz
-
-# Logs
-logs/
-*.log
-# Generated files
+# Generated Dart sources
 *.g.dart
 *.freezed.dart
 *.mocks.dart
 *.config.dart
 
-# Coverage
-coverage/
-
-# Android
-android/.gradle/
-android/app/build/
-android/build/
+# Android generated/local/signing files
+.gradle/
+**/.gradle/
+**/.kotlin/
+android/captures/
 android/local.properties
 android/key.properties
 android/app/*.jks
 android/app/*.keystore
+*.apk
+*.aab
+*.ap_
+*.dex
 
-# iOS
-ios/Pods/
-ios/.symlinks/
-ios/Flutter/Flutter.framework
-ios/Flutter/Flutter.podspec
-ios/Flutter/Generated.xcconfig
-ios/Flutter/ephemeral/
-ios/build/
-ios/Runner.xcworkspace/
-ios/Podfile.lock
+# iOS / Xcode generated files
+**/DerivedData/
+**/xcuserdata/
+*.xcuserstate
+**/ios/Pods/
+**/ios/.symlinks/
+**/ios/Flutter/App.framework
+**/ios/Flutter/Flutter.framework
+**/ios/Flutter/engine/
+**/ios/Flutter/Flutter.podspec
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/flutter_export_environment.sh
+**/ios/Flutter/ephemeral/
+**/ios/Flutter/.last_build_id
+**/ios/Flutter/flutter_assets/
+**/ios/build/
+**/ios/Runner.xcworkspace/
 
-# macOS
-macos/Pods/
-macos/.symlinks/
-macos/Flutter/ephemeral/
-macos/build/
-macos/Runner.xcworkspace/
-macos/Podfile.lock
+# IMPORTANT: iOS source/configuration files below must stay in Git.
+# They contain deployment target, permissions, capabilities and build settings.
+!one_vnu_appstore/ios/Podfile
+!one_vnu_appstore/ios/Podfile.lock
+!one_vnu_appstore/ios/Flutter/AppFrameworkInfo.plist
+!one_vnu_appstore/ios/Flutter/Debug.xcconfig
+!one_vnu_appstore/ios/Flutter/Release.xcconfig
+!one_vnu_appstore/ios/Runner/Info.plist
+!one_vnu_appstore/ios/Runner/AppDelegate.swift
+!one_vnu_appstore/ios/Runner/*.entitlements
+!one_vnu_appstore/ios/Runner.xcodeproj/project.pbxproj
+!one_vnu_appstore/ios/Runner.xcodeproj/xcshareddata/**
 
-# Web
+# Also keep the same files when one_vnu_appstore itself is used as repo root.
+!ios/Podfile
+!ios/Podfile.lock
+!ios/Flutter/AppFrameworkInfo.plist
+!ios/Flutter/Debug.xcconfig
+!ios/Flutter/Release.xcconfig
+!ios/Runner/Info.plist
+!ios/Runner/AppDelegate.swift
+!ios/Runner/*.entitlements
+!ios/Runner.xcodeproj/project.pbxproj
+!ios/Runner.xcodeproj/xcshareddata/**
+
+# macOS generated files
+**/macos/Pods/
+**/macos/.symlinks/
+**/macos/Flutter/ephemeral/
+**/macos/build/
+**/macos/Runner.xcworkspace/
+
+# Web / Windows / Linux generated files
 web/.dart_tool/
-
-# Windows
 windows/flutter/ephemeral/
 windows/build/
-
-# Linux
 linux/flutter/ephemeral/
 linux/build/
 
-# Firebase / secrets
-firebase_options.dart
+# Secrets / certificates / provisioning profiles
 .env
 .env.*
 *.pem
 *.p12
 *.key
 *.mobileprovision
+android/key.properties
+android/app/*.jks
+android/app/*.keystore
 
+# Firebase generated Dart config (project policy: generated locally/CI)
+firebase_options.dart
 
+# Archives / binary build artifacts
+*.zip
+*.rar
+*.7z
+*.tar
+*.gz
+*.aar
 
-# indoor sdk cache
+# Indoor SDK / temporary caches
 **/cache.tar.gz
+*.xcframework/**/cache.tar.gz
 temp_aar_check/
 inmapz_backup/
 CODE_BUNDLE.txt
-
-# xcframework cache
-*.xcframework/**/cache.tar.gz
-
-# build cache
-DerivedData/
-
-# aar temp
-*.aar
-
-
-inmapz_backup/
-temp_aar_check/
-
-
-**/.kotlin/
-build/
-.dart_tool/
-.txt
-.md

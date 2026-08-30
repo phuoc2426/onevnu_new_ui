@@ -3,15 +3,22 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:vnu_core/common/log.dart';
-import 'package:vnu_core/services/dio_options.dart';
 import 'package:vnu_core/services/services_url.dart';
 
 import 'app_update_policy.dart';
+import '../modules/auth_mode/login_runtime_config.dart';
 
 /// Loads /api/config from the fixed ONEVNU mobile API.
 ///
-/// Concurrent callers share one request. A successful result is reused only
-/// for the current app process; every new app launch fetches fresh config.
+/// Important P4.2 invariants:
+/// - Login mode is read from the server at runtime; Flutter has no IDP URL
+///   fallback compiled into the app.
+/// - /api/config is bootstrap/public configuration and is fetched with a clean
+///   Dio instance, without the normal authenticated API interceptor.
+/// - A KTX/VNeID/Zalo configuration problem must never silently turn IDP off.
+/// - If the bootstrap request itself fails, callers can inspect [lastLoadError]
+///   and show an explicit password-fallback notice instead of pretending that
+///   the server configured password mode.
 class AppConfigService {
   static const Duration _failureRetryDelay = Duration(minutes: 1);
 
@@ -27,11 +34,19 @@ class AppConfigService {
   Future<void>? _inFlight;
   DateTime? _lastRemoteAttemptAt;
   bool _loadedSuccessfully = false;
+  String? _lastLoadError;
   AppUpdatePolicy? _appUpdatePolicy;
+  LoginRuntimeConfig _loginRuntimeConfig = LoginRuntimeConfig.defaults;
 
   bool get isLoadedSuccessfully => _loadedSuccessfully;
 
+  String? get lastLoadError => _lastLoadError;
+
+  bool get hasLoadError => (_lastLoadError ?? '').trim().isNotEmpty;
+
   AppUpdatePolicy? get appUpdatePolicy => _appUpdatePolicy;
+
+  LoginRuntimeConfig get loginRuntimeConfig => _loginRuntimeConfig;
 
   bool get hasEnabledAppUpdatePolicy =>
       _appUpdatePolicy?.android.isConfigured == true ||
@@ -43,6 +58,31 @@ class AppConfigService {
       return current;
     }
     return ServicesUrl().effectiveZaloGroupUrl;
+  }
+
+  /// Fetch only the login-method section from /api/config.
+  ///
+  /// This is intentionally independent from the full app-config hydration.
+  /// The login button uses it as a last-second source of truth so an unrelated
+  /// KTX/VNeID/update config parsing problem can never leave the UI on a stale
+  /// authentication method. This call never falls back to the cached method: if
+  /// the network/config request fails, the caller must stop the login attempt.
+  Future<LoginRuntimeConfig> fetchLatestLoginRuntimeConfig() async {
+    await ServicesUrl().init();
+    final Map<String, dynamic> config = await _fetchRemoteConfig();
+    final LoginRuntimeConfig latest = LoginRuntimeConfig.fromAppConfig(config);
+
+    // Keep the singleton's login snapshot aligned with the value that was
+    // explicitly verified, without marking the entire app config as loaded.
+    _loginRuntimeConfig = latest;
+    _lastLoadError = null;
+
+    logInfo(
+      '[LOGIN_CONFIG_DIRECT] idpLogin=${latest.idpLogin} '
+      'qrEnabled=${latest.qrEnabled} '
+      'idpStartUrl=${latest.idpStartUrl.isEmpty ? "<empty>" : latest.idpStartUrl}',
+    );
+    return latest;
   }
 
   Future<void> ensureLoaded({bool forceRefresh = false}) async {
@@ -67,10 +107,10 @@ class AppConfigService {
 
     _lastRemoteAttemptAt = DateTime.now();
 
-    // Do not allow an obsolete persisted endpoint to survive a failed refresh.
-    ServicesUrl().clearRemoteConfig();
-    _publishZaloUrl(ServicesUrl.defaultZaloGroupUrl);
-
+    // Do not clear the last known-good config before a refresh. A refresh may
+    // run while the login screen is visible; clearing first would temporarily
+    // switch KTX/IDP/CCCD endpoints to defaults and could affect concurrent
+    // requests. New values replace the old values atomically after success.
     final Future<void> request = _loadRemoteConfig();
     _inFlight = request;
 
@@ -84,21 +124,36 @@ class AppConfigService {
   }
 
   Future<void> _loadRemoteConfig() async {
+    final bool hadUsableConfig = _loadedSuccessfully;
+    final LoginRuntimeConfig previousLoginConfig = _loginRuntimeConfig;
+    final AppUpdatePolicy? previousUpdatePolicy = _appUpdatePolicy;
+
     try {
       final Map<String, dynamic> config = await _fetchRemoteConfig();
 
-      final String downloadDomain = _readOptionalHttpUrl(
+      // LOGIN IS PARSED FIRST AND INDEPENDENTLY.
+      // This is the critical P4.2 fix: an unrelated integration URL can no
+      // longer force LoginRuntimeConfig.defaults.
+      final LoginRuntimeConfig parsedLogin =
+          LoginRuntimeConfig.fromAppConfig(config);
+      _loginRuntimeConfig = parsedLogin;
+
+      _appUpdatePolicy = _readAppUpdatePolicy(config);
+
+      final String downloadDomain = _readOptionalHttpUrlSafely(
         config,
         'domainDownload',
       );
-      final String ktxUrl = _readRequiredHttpUrl(config, 'ktxApiUrl');
-      final String vneidUrl = _readRequiredHttpUrl(config, 'vneidApiUrl');
-      final String cccdConfigUrl = _readOptionalHttpUrl(
+      final String ktxUrl = _readOptionalHttpUrlSafely(config, 'ktxApiUrl');
+      final String vneidUrl = _readOptionalHttpUrlSafely(
+        config,
+        'vneidApiUrl',
+      );
+      final String cccdConfigUrl = _readOptionalHttpUrlSafely(
         config,
         'cccdConfigApiUrl',
       );
       final String zaloUrl = _readString(config, 'zaloGroupUrl');
-      _appUpdatePolicy = _readAppUpdatePolicy(config);
 
       ServicesUrl().baseUrlFileDownload = downloadDomain;
       ServicesUrl().ktxApiUrl = ktxUrl;
@@ -107,19 +162,29 @@ class AppConfigService {
       ServicesUrl().zaloGroupUrl = zaloUrl;
 
       _loadedSuccessfully = true;
+      _lastLoadError = null;
       _publishZaloUrl(ServicesUrl().effectiveZaloGroupUrl);
 
-      final updatePolicy = _appUpdatePolicy;
-      final androidUpdate = updatePolicy == null
+      final AppUpdatePolicy? updatePolicy = _appUpdatePolicy;
+      final String androidUpdate = updatePolicy == null
           ? '<none>'
           : 'enabled=${updatePolicy.android.enabled},'
               'min=${updatePolicy.android.minimumVersion},'
               'latest=${updatePolicy.android.latestVersion}';
-      final iosUpdate = updatePolicy == null
+      final String iosUpdate = updatePolicy == null
           ? '<none>'
           : 'enabled=${updatePolicy.ios.enabled},'
               'min=${updatePolicy.ios.minimumVersion},'
               'latest=${updatePolicy.ios.latestVersion}';
+
+      logInfo(
+        '[LOGIN_CONFIG] loaded=true '
+        'idpLogin=${parsedLogin.idpLogin}, '
+        'idpStartUrl=${parsedLogin.idpStartUrl.isEmpty ? "<empty>" : parsedLogin.idpStartUrl}, '
+        'idpWebUrl=${parsedLogin.idpWebUrl.isEmpty ? "<empty>" : parsedLogin.idpWebUrl}, '
+        'qrEnabled=${parsedLogin.qrEnabled}, '
+        'passwordFallback=${parsedLogin.passwordFallbackEnabled}',
+      );
 
       logInfo(
         'App config loaded from ${ServicesUrl.defaultBaseUrl}/api/config: '
@@ -127,19 +192,58 @@ class AppConfigService {
         'vneidApiUrl=${ServicesUrl().effectiveVneidApiUrl}, '
         'cccdConfigApiUrl=${cccdConfigUrl.isEmpty ? "<not-configured>" : cccdConfigUrl}, '
         'domainDownload=${downloadDomain.isEmpty ? "<mobile-api>" : downloadDomain}, '
-        'androidUpdate=$androidUpdate, iosUpdate=$iosUpdate',
+        'androidUpdate=$androidUpdate, iosUpdate=$iosUpdate, '
+        'idpLogin=${parsedLogin.idpLogin}, '
+        'qrEnabled=${parsedLogin.qrEnabled}, '
+        'passwordFallback=${parsedLogin.passwordFallbackEnabled}',
       );
     } catch (error, stackTrace) {
-      _loadedSuccessfully = false;
-      _appUpdatePolicy = null;
-      ServicesUrl().clearRemoteConfig();
-      _publishZaloUrl(ServicesUrl.defaultZaloGroupUrl);
-      logError('Load app config error: $error\n$stackTrace');
+      _lastLoadError = _friendlyLoadError(error);
+
+      if (hadUsableConfig) {
+        // A transient network error during a forced refresh must not destroy the
+        // config that was already working. Keep login/integration values and
+        // let the next explicit refresh try again.
+        _loadedSuccessfully = true;
+        _appUpdatePolicy = previousUpdatePolicy;
+        _loginRuntimeConfig = previousLoginConfig;
+        _publishZaloUrl(ServicesUrl().effectiveZaloGroupUrl);
+
+        logError(
+          '[LOGIN_CONFIG] refresh_failed=true keep_last_good=true '
+          'error=$_lastLoadError\n$stackTrace',
+        );
+      } else {
+        _loadedSuccessfully = false;
+        _appUpdatePolicy = null;
+        _loginRuntimeConfig = LoginRuntimeConfig.defaults;
+        ServicesUrl().clearRemoteConfig();
+        _publishZaloUrl(ServicesUrl.defaultZaloGroupUrl);
+
+        logError(
+          '[LOGIN_CONFIG] loaded=false error=$_lastLoadError\n$stackTrace',
+        );
+      }
     }
   }
 
   Future<Map<String, dynamic>> _fetchRemoteConfig() async {
-    final Dio dio = DioOptions().createDio(ServicesUrl().baseUrl);
+    // Do not use the authenticated Dio factory here. The app config endpoint is a
+    // public bootstrap endpoint and must not inherit Authorization headers,
+    // token-expired redirect behavior, or other authenticated interceptors.
+    final Dio dio = Dio(
+      BaseOptions(
+        baseUrl: ServicesUrl.defaultBaseUrl,
+        connectTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 15),
+        sendTimeout: const Duration(seconds: 15),
+        headers: const <String, dynamic>{
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+        },
+      ),
+    );
 
     try {
       final Response<dynamic> response = await dio.get<dynamic>(
@@ -147,33 +251,63 @@ class AppConfigService {
         queryParameters: <String, dynamic>{
           '_ts': DateTime.now().millisecondsSinceEpoch,
         },
-        options: Options(
-          headers: const <String, dynamic>{
-            'Accept': 'application/json',
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-          },
-        ),
       );
 
-      final dynamic raw = response.data;
-      if (raw is Map) {
-        return Map<String, dynamic>.from(raw);
-      }
-
-      if (raw is String && raw.trim().isNotEmpty) {
-        final dynamic decoded = jsonDecode(raw);
-        if (decoded is Map) {
-          return Map<String, dynamic>.from(decoded);
-        }
-      }
-
-      throw const FormatException('/api/config must return a JSON object');
+      final Map<String, dynamic> decoded = _decodeConfigObject(response.data);
+      return _unwrapConfigEnvelope(decoded);
     } finally {
       dio.close(force: true);
     }
   }
 
+  Map<String, dynamic> _decodeConfigObject(dynamic raw) {
+    if (raw is Map) {
+      return Map<String, dynamic>.from(raw);
+    }
+
+    if (raw is String && raw.trim().isNotEmpty) {
+      final dynamic decoded = jsonDecode(raw);
+      if (decoded is Map) {
+        return Map<String, dynamic>.from(decoded);
+      }
+    }
+
+    throw const FormatException('/api/config must return a JSON object');
+  }
+
+  Map<String, dynamic> _unwrapConfigEnvelope(Map<String, dynamic> input) {
+    Map<String, dynamic> current = Map<String, dynamic>.from(input);
+
+    // Current API returns the config directly. These two passes keep Flutter
+    // compatible if the API is later standardized as {data:{...}} or
+    // {result:{...}} without changing the mobile release.
+    for (int i = 0; i < 2; i++) {
+      final dynamic nested = current['data'] ?? current['result'];
+      if (nested is! Map) break;
+
+      final Map<String, dynamic> candidate =
+          Map<String, dynamic>.from(nested);
+      if (!_looksLikeAppConfig(candidate)) break;
+      current = candidate;
+    }
+
+    if (!_looksLikeAppConfig(current)) {
+      throw const FormatException(
+        '/api/config JSON object does not contain ONEVNU config fields',
+      );
+    }
+
+    return current;
+  }
+
+  bool _looksLikeAppConfig(Map<String, dynamic> map) {
+    return map.containsKey('login') ||
+        map.containsKey('ktxApiUrl') ||
+        map.containsKey('vneidApiUrl') ||
+        map.containsKey('appUpdate') ||
+        map.containsKey('domainDownload') ||
+        map.containsKey('zaloGroupUrl');
+  }
 
   AppUpdatePolicy? _readAppUpdatePolicy(Map<String, dynamic> config) {
     final dynamic raw = config['appUpdate'];
@@ -191,22 +325,10 @@ class AppConfigService {
     return config[key]?.toString().trim() ?? '';
   }
 
-  String _readRequiredHttpUrl(Map<String, dynamic> config, String key) {
-    final String value = _readString(config, key);
-    final Uri? uri = Uri.tryParse(value);
-
-    if (value.isEmpty ||
-        uri == null ||
-        !uri.hasScheme ||
-        (uri.scheme != 'http' && uri.scheme != 'https') ||
-        uri.host.isEmpty) {
-      throw StateError('Invalid or missing $key in /api/config');
-    }
-
-    return value;
-  }
-
-  String _readOptionalHttpUrl(Map<String, dynamic> config, String key) {
+  String _readOptionalHttpUrlSafely(
+    Map<String, dynamic> config,
+    String key,
+  ) {
     final String value = _readString(config, key);
     if (value.isEmpty) return '';
 
@@ -215,10 +337,27 @@ class AppConfigService {
         !uri.hasScheme ||
         (uri.scheme != 'http' && uri.scheme != 'https') ||
         uri.host.isEmpty) {
-      throw StateError('Invalid $key in /api/config');
+      logError(
+        '[APP_CONFIG] Ignore invalid $key from /api/config: $value',
+      );
+      return '';
     }
 
     return value;
+  }
+
+  String _friendlyLoadError(Object error) {
+    if (error is DioException) {
+      final int? status = error.response?.statusCode;
+      if (status != null) {
+        return 'Không tải được cấu hình đăng nhập (HTTP $status).';
+      }
+      return 'Không kết nối được máy chủ cấu hình đăng nhập.';
+    }
+    if (error is FormatException) {
+      return 'Dữ liệu /api/config không đúng định dạng.';
+    }
+    return 'Không tải được cấu hình đăng nhập.';
   }
 
   void _publishZaloUrl(String value) {

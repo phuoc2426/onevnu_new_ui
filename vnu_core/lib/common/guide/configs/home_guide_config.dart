@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:vnu_hoc_bong/vnu_hoc_bong.dart';
 import 'package:vnu_noi_tru/vnu_noi_tru.dart';
+import '../../../common/utils.dart';
+import '../../../modules/auth_mode/auth_entry_mode_service.dart';
+import '../../../modules/qr/views/vcore_qr_scanner_view.dart';
 
 import '../../../modules/cam_nang/views/vcore_cam_nang_view.dart';
 import '../../../modules/course_points/views/vcore_course_points_view.dart';
@@ -51,6 +54,7 @@ class HomeGuideConfig implements AppGuideModuleConfig {
         'home.header',
         'home.search',
         'home.notification',
+        'home.qr',
         'home.overview',
         'home.schedule',
         'home.quick_access',
@@ -161,12 +165,23 @@ class HomeGuideConfig implements AppGuideModuleConfig {
     _homeWidget(
       id: 'home.qr',
       groupId: 'home.intro',
-      title: 'Mã QR và tiện ích nhanh',
-      description: 'Khu vực dành cho mã QR hoặc tiện ích nhanh trên trang chủ.',
+      title: 'Quét QR xác minh',
+      description:
+          'QR xác minh chỉ khả dụng khi phiên hiện tại đăng nhập bằng VNU IDP. '
+          'Nếu đăng nhập thông thường hoặc đăng nhập dự phòng, ứng dụng sẽ thông báo và không mở máy quét.',
       icon: Icons.qr_code_2_rounded,
-      keywords: ['qr', 'mã qr', 'tiện ích'],
+      keywords: ['qr', 'mã qr', 'idp', 'xác minh', 'đăng nhập'],
       fallbackId: 'home.header',
-      priority: 700,
+      priority: 905,
+      openAction: () async {
+        final QrAccessDecision decision =
+            await AuthEntryModeService().qrAccessDecision();
+        if (!decision.allowed) {
+          snackBarWarning(decision.message);
+          return;
+        }
+        Get.to(() => const VcoreQrScannerView());
+      },
     ),
     _homeSection(
       id: 'home.overview',

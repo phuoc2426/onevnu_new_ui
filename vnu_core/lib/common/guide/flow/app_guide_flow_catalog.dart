@@ -25,6 +25,7 @@ class AppGuideFlowCatalog {
           id: 'home_notification',
           itemId: 'home.notification',
         ),
+        AppGuideFlowStep(id: 'home_qr', itemId: 'home.qr'),
         AppGuideFlowStep(id: 'home_overview', itemId: 'home.overview'),
         AppGuideFlowStep(id: 'home_schedule', itemId: 'home.schedule'),
         AppGuideFlowStep(

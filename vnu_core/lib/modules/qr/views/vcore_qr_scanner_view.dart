@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:vnu_core/common/utils.dart';
 import 'package:vnu_core/modules/idp_auth/services/idp_auth_flow.dart';
+import 'package:vnu_core/modules/auth_mode/auth_entry_mode_service.dart';
 import 'package:vnu_core/modules/qr/models/qr_action_model.dart';
 import 'package:vnu_core/modules/qr/repository/qr_repository.dart';
 
@@ -76,7 +77,7 @@ class _VcoreQrScannerViewState extends State<VcoreQrScannerView>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    unawaited(_startScanner());
+    unawaited(_guardAndStartScanner());
   }
 
   @override
@@ -119,6 +120,20 @@ class _VcoreQrScannerViewState extends State<VcoreQrScannerView>
         unawaited(_scannerController.stop());
         break;
     }
+  }
+
+  Future<void> _guardAndStartScanner() async {
+    final QrAccessDecision decision =
+        await AuthEntryModeService().qrAccessDecision();
+    if (!mounted || _disposed) return;
+
+    if (!decision.allowed) {
+      snackBarWarning(decision.message);
+      Navigator.of(context).maybePop();
+      return;
+    }
+
+    await _startScanner();
   }
 
   Future<void> _startScanner() async {
@@ -231,7 +246,7 @@ class _VcoreQrScannerViewState extends State<VcoreQrScannerView>
     } catch (error) {
       if (!mounted || _disposed) return;
 
-      if (action.isIdp && _looksLikeMissingIdpSession(error)) {
+      if (action.isIdp && _requiresIdpReauth(error)) {
         final bool reLogin = await _askIdpLogin();
 
         if (!reLogin || !mounted || _disposed) {
@@ -333,13 +348,9 @@ class _VcoreQrScannerViewState extends State<VcoreQrScannerView>
     }
   }
 
-  bool _looksLikeMissingIdpSession(Object error) {
-    final String text = error.toString().toLowerCase();
-    return text.contains('idp') &&
-        (text.contains('credential') ||
-            text.contains('re-login') ||
-            text.contains('đăng nhập') ||
-            text.contains('refresh token'));
+  bool _requiresIdpReauth(Object error) {
+    return error is QrApiException &&
+        error.code == kQrErrorIdpReauthRequired;
   }
 
   Future<void> _safeToggleTorch() async {

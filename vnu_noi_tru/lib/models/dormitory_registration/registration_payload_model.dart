@@ -325,7 +325,6 @@ class RegistrationStudentPayload {
       'country_code': countryCode,
       'national': national,
       'permanent_address': permanentAddress,
-      'vneid_permanent_address': vneidPermanentAddress,
       'permanent_province_code': permanentProvinceCode,
       'permanent_ward_code': permanentWardCode,
       'contact_address': contactAddress,
@@ -340,7 +339,6 @@ class RegistrationStudentPayload {
       'student_type': studentType,
       'priority_object_name': priorityObjectName,
       'temporary_address': temporaryAddress,
-      'vneid_temporary_address': vneidTemporaryAddress,
       'temporary_province_code': temporaryProvinceCode,
       'temporary_ward_code': temporaryWardCode,
       'reason_stay': reasonStay,
@@ -416,8 +414,6 @@ class RegistrationStudentPayload {
       'country': country,
       'country_code': countryCode,
       'national': national,
-      'vneid_permanent_address': vneidPermanentAddress,
-      'vneid_temporary_address': vneidTemporaryAddress,
       'reason_stay': reasonStay,
     };
 

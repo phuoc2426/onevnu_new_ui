@@ -204,8 +204,6 @@ class DRStep4ReviewScreenState extends State<DRStep4ReviewScreen> {
                     _buildSummaryRow('Bậc đào tạo', draft.level),
                   if (draft.universityName.trim().isNotEmpty)
                     _buildSummaryRow('Trường', draft.universityName),
-                  if (draft.univId != null)
-                    _buildSummaryRow('ID trường', '${draft.univId}'),
                   if (draft.studentType != null)
                     _buildSummaryRow(
                       'Loại người học',
@@ -218,8 +216,6 @@ class DRStep4ReviewScreenState extends State<DRStep4ReviewScreen> {
                       'Thường trú',
                       draft.permanentAddress,
                     ),
-                  if ((draft.vneidPermanentAddress ?? '').trim().isNotEmpty)
-                    _buildSummaryRow('Thường trú VNeID', draft.vneidPermanentAddress!),
                   if ((draft.contactAddress ?? '').trim().isNotEmpty)
                     _buildSummaryRow('Địa chỉ liên hệ', draft.contactAddress!),
                   if (draft.temporaryAddress.trim().isNotEmpty)
@@ -227,8 +223,6 @@ class DRStep4ReviewScreenState extends State<DRStep4ReviewScreen> {
                       'Tạm trú',
                       draft.temporaryAddress,
                     ),
-                  if ((draft.vneidTemporaryAddress ?? '').trim().isNotEmpty)
-                    _buildSummaryRow('Tạm trú VNeID', draft.vneidTemporaryAddress!),
                   if ((draft.reasonStay ?? '').trim().isNotEmpty)
                     _buildSummaryRow('Lý do lưu trú', draft.reasonStay!),
                 ],
@@ -257,7 +251,7 @@ class DRStep4ReviewScreenState extends State<DRStep4ReviewScreen> {
                       ),
                       SizedBox(width: 8),
                       Text(
-                        'Thông tin gia đình',
+                        'Thông tin gia đình *',
                         style: TextStyle(
                           fontSize: AppFontSizes.font11,
                           fontWeight: FontWeight.bold,
@@ -269,7 +263,7 @@ class DRStep4ReviewScreenState extends State<DRStep4ReviewScreen> {
                   const SizedBox(height: 12),
                   if (draft.familyMembers.isEmpty)
                     const Text(
-                      'Không khai báo người thân.',
+                      'Thiếu thông tin gia đình. Vui lòng quay lại bổ sung ít nhất 1 người thân.',
                       style: TextStyle(
                         fontSize: AppFontSizes.small,
                         color: Color(0xFF666B75),

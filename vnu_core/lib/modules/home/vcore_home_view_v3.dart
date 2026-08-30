@@ -43,6 +43,10 @@ import 'package:flutter/cupertino.dart';
 import 'package:vnu_core/common/app_text_styles.dart';
 import 'package:vnu_core/widgets/zalo_chat_bubble.dart';
 import 'package:vnu_core/modules/question/views/vcore_question_view.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:vnu_core/modules/shapeshifter/models/shapeshifter_feature.dart';
+import 'package:vnu_core/modules/shapeshifter/repository/shapeshifter_repository.dart';
+import 'package:vnu_core/modules/shapeshifter/services/shapeshifter_launcher.dart';
 
 import 'package:vnu_core/common/guide/guide.dart';
 import 'package:vnu_core/common/guide/configs/home_guide_config.dart';
@@ -202,33 +206,40 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
 
   static const String _temporaryAddressFunctionLabel = 'Cập nhật tạm trú';
 
-  // Migration một lần: sau bản cập nhật này, Truy cập nhanh mặc định hiển thị
-  // toàn bộ icon. Sau khi migration chạy, sinh viên vẫn có thể tự Ghim/Bỏ ghim.
+  // P4.4-A: pin bằng stable key thay vì label để admin có thể đổi tên
+  // Shapeshifter feature mà không làm mất cấu hình người dùng.
   static const String _allFunctionsPinnedMigrationKey =
       'kPinnedFunctions_v3_all_default_v1';
+  static const String _stablePinMigrationKey =
+      'kPinnedFunctions_v3_stable_key_v1';
+  static const String _seenShapeFeaturesKey =
+      'kShapeshifterSeenFeatures_v1';
 
-  List<String> _pinnedFunctionLabels = [
-    'Lịch học & thi',
-    'Điểm',
-    'Đăng ký môn',
-    'Việc làm',
-    'Đồng bộ',
-    'Học phí',
-    'Tài liệu',
-    'Điểm danh',
-    'Học bổng',
-    'Phản ánh',
-    'Nội trú',
-    _temporaryAddressFunctionLabel,
-    'Phòng trọ',
-    'Thủ tục',
-    'Thư viện',
-    'Bản đồ',
-    'Hỏi đáp',
-    'Cẩm nang',
+  List<String> _pinnedFunctionKeys = [
+    'native:Lịch học & thi',
+    'native:Điểm',
+    'native:Đăng ký môn',
+    'native:Việc làm',
+    'native:Đồng bộ',
+    'native:Học phí',
+    'native:Tài liệu',
+    'native:Điểm danh',
+    'native:Học bổng',
+    'native:Phản ánh',
+    'native:Nội trú',
+    'native:$_temporaryAddressFunctionLabel',
+    'native:Phòng trọ',
+    'native:Thủ tục',
+    'native:Thư viện',
+    'native:Bản đồ',
+    'native:Hỏi đáp',
+    'native:Cẩm nang',
   ];
 
-  static final List<_FunctionItem> _allAvailableFunctions = [
+  List<ShapeshifterFeature> _dynamicFeatures = const <ShapeshifterFeature>[];
+  bool _reloadingFunctionRegistry = false;
+
+  static final List<_FunctionItem> _nativeFunctions = [
     _FunctionItem(
       'Lịch học & thi',
       Color.fromRGBO(0, 122, 255, 1),
@@ -255,49 +266,64 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
     _FunctionItem('Cẩm nang', Color.fromRGBO(142, 142, 147, 1)), // Gray
   ];
 
-  static final Map<String, List<_FunctionItem>> _groupedFunctions = {
-    'Học tập': _allAvailableFunctions
-        .where(
-          (e) => [
-            'Lịch học & thi',
-            'Điểm',
-            'Đăng ký môn',
-            'Điểm danh',
-          ].contains(e.label),
-        )
-        .toList(),
-    'Dịch vụ': _allAvailableFunctions
-        .where(
-          (e) => [
-            'Học phí',
-            'Học bổng',
-            'Thủ tục',
-            'Nội trú',
-            _temporaryAddressFunctionLabel,
-            'Phản ánh',
-            'Đồng bộ',
-            'Hỏi đáp',
-          ].contains(e.label),
-        )
-        .toList(),
-    'Tiện ích': _allAvailableFunctions
-        .where(
-          (e) => [
-            'Tài liệu',
-            'Thư viện',
-            'Bản đồ',
-            'Việc làm',
-            'Phòng trọ',
-            'Cẩm nang',
-          ].contains(e.label),
-        )
-        .toList(),
-  };
+  List<_FunctionItem> get _allAvailableFunctions => <_FunctionItem>[
+        ..._nativeFunctions,
+        ..._dynamicFeatures.map(_FunctionItem.fromShapeshifter),
+      ];
+
+  Map<String, List<_FunctionItem>> get _groupedFunctions {
+    final result = <String, List<_FunctionItem>>{
+      'Học tập': <_FunctionItem>[],
+      'Dịch vụ': <_FunctionItem>[],
+      'Tiện ích': <_FunctionItem>[],
+    };
+
+    for (final item in _allAvailableFunctions) {
+      String group;
+      final shape = item.shapeshifterFeature;
+      if (shape != null) {
+        switch (shape.groupCode.toUpperCase()) {
+          case 'HOC_TAP':
+            group = 'Học tập';
+            break;
+          case 'TIEN_ICH':
+            group = 'Tiện ích';
+            break;
+          case 'DICH_VU':
+          default:
+            group = 'Dịch vụ';
+            break;
+        }
+      } else if (<String>{
+        'Lịch học & thi',
+        'Điểm',
+        'Đăng ký môn',
+        'Điểm danh',
+      }.contains(item.label)) {
+        group = 'Học tập';
+      } else if (<String>{
+        'Học phí',
+        'Học bổng',
+        'Thủ tục',
+        'Nội trú',
+        _temporaryAddressFunctionLabel,
+        'Phản ánh',
+        'Đồng bộ',
+        'Hỏi đáp',
+      }.contains(item.label)) {
+        group = 'Dịch vụ';
+      } else {
+        group = 'Tiện ích';
+      }
+      result[group]!.add(item);
+    }
+    return result;
+  }
 
   @override
   void initState() {
     super.initState();
-    _loadPinnedFunctions();
+    unawaited(_initializeFunctionRegistry());
     _startNewsAutoScroll();
     _LocalNotificationService.init();
 
@@ -685,64 +711,152 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
     });
   }
 
+  Future<void> _initializeFunctionRegistry() async {
+    try {
+      final features = await ShapeshifterRepository().getFeatures(
+        placement: ShapeshifterPlacement.home,
+      );
+      if (mounted) {
+        setState(() => _dynamicFeatures = features);
+      } else {
+        _dynamicFeatures = features;
+      }
+    } catch (_) {
+      // Fail-safe: Home native vẫn hoạt động nếu registry API tạm lỗi.
+      // Stable shape:* pin keys được giữ lại trong local prefs để tự hồi phục
+      // khi API hoạt động trở lại.
+    }
+
+    await _loadPinnedFunctions();
+  }
+
+  Future<void> _reloadFunctionRegistry() async {
+    if (_reloadingFunctionRegistry) return;
+
+    if (mounted) {
+      setState(() => _reloadingFunctionRegistry = true);
+    }
+
+    try {
+      final features = await ShapeshifterRepository().getFeatures(
+        placement: ShapeshifterPlacement.home,
+      );
+      if (!mounted) return;
+
+      setState(() => _dynamicFeatures = features);
+
+      // Re-run pin normalization after fetching the newest registry. Existing
+      // user pin choices are preserved; a brand-new dynamic feature with
+      // defaultPinned=true is pinned exactly once by the seen-feature logic.
+      await _loadPinnedFunctions();
+      if (!mounted) return;
+
+      snackBarSuccess('Đã tải lại danh sách chức năng mới nhất.');
+    } catch (error) {
+      debugPrint('[SHAPE-HOME-RELOAD] $error');
+      if (mounted) {
+        snackBarWarning('Không tải lại được chức năng. Vui lòng thử lại.');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _reloadingFunctionRegistry = false);
+      }
+    }
+  }
+
   Future<void> _loadPinnedFunctions() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final saved = prefs.getStringList('kPinnedFunctions_v3');
       final bool allFunctionsDefaultApplied =
           prefs.getBool(_allFunctionsPinnedMigrationKey) ?? false;
+      final bool stableMigrationApplied =
+          prefs.getBool(_stablePinMigrationKey) ?? false;
 
       List<String> loaded;
-
-      if (!allFunctionsDefaultApplied) {
-        // Áp dụng một lần cho cả người dùng cũ để bản cập nhật mới nhìn thấy
-        // đầy đủ icon ngay. Từ lần sau vẫn tôn trọng lựa chọn Ghim của người dùng.
-        loaded = _allAvailableFunctions
-            .map((_FunctionItem item) => item.label)
-            .toList();
-      } else if (saved != null && saved.isNotEmpty) {
-        loaded = List<String>.from(saved);
+      if (!allFunctionsDefaultApplied || saved == null) {
+        loaded = _nativeFunctions.map((item) => item.key).toList();
       } else {
-        // Người dùng mới / cache rỗng: mặc định hiển thị toàn bộ icon.
-        loaded = _allAvailableFunctions
-            .map((_FunctionItem item) => item.label)
-            .toList();
+        loaded = List<String>.from(saved);
       }
 
-      final List<String> normalized = <String>[];
-      for (final String label in loaded) {
-        final bool exists = _allAvailableFunctions.any(
-          (_FunctionItem item) => item.label == label,
-        );
-        if (exists && !normalized.contains(label)) {
-          normalized.add(label);
+      // Migrate legacy label values such as "Điểm" -> "native:Điểm".
+      // Also accepts a dynamic label once, but from now on shape:<code> is used.
+      final List<String> migrated = <String>[];
+      for (final raw in loaded) {
+        final value = raw.trim();
+        if (value.isEmpty) continue;
+        String? key;
+        if (value.startsWith('native:') || value.startsWith('shape:')) {
+          key = value;
+        } else {
+          final native = _nativeFunctions.where((item) => item.label == value);
+          if (native.isNotEmpty) {
+            key = native.first.key;
+          } else {
+            final dynamic = _dynamicFeatures.where((item) => item.label == value);
+            if (dynamic.isNotEmpty) key = dynamic.first.stableKey;
+          }
         }
+        if (key != null && !migrated.contains(key)) migrated.add(key);
+      }
+
+      // Feature động có defaultPinned=true chỉ được tự ghim đúng lần đầu nó
+      // xuất hiện trong registry của tài khoản. Sau đó tôn trọng thao tác bỏ ghim.
+      final seenCodes = (prefs.getStringList(_seenShapeFeaturesKey) ?? const <String>[])
+          .toSet();
+      bool seenChanged = false;
+      for (final feature in _dynamicFeatures) {
+        if (!seenCodes.contains(feature.code)) {
+          if (feature.defaultPinned && !migrated.contains(feature.stableKey)) {
+            migrated.add(feature.stableKey);
+          }
+          seenCodes.add(feature.code);
+          seenChanged = true;
+        }
+      }
+
+      // Chỉ loại native key không tồn tại. shape:* key chưa tải được từ server
+      // vẫn được giữ để tránh mất pin khi mạng lỗi / feature tạm disable.
+      final validNativeKeys = _nativeFunctions.map((item) => item.key).toSet();
+      final List<String> normalized = <String>[];
+      for (final key in migrated) {
+        final keep = key.startsWith('shape:') || validNativeKeys.contains(key);
+        if (keep && !normalized.contains(key)) normalized.add(key);
       }
 
       await prefs.setStringList('kPinnedFunctions_v3', normalized);
       if (!allFunctionsDefaultApplied) {
         await prefs.setBool(_allFunctionsPinnedMigrationKey, true);
       }
+      if (!stableMigrationApplied) {
+        await prefs.setBool(_stablePinMigrationKey, true);
+      }
+      if (seenChanged) {
+        await prefs.setStringList(_seenShapeFeaturesKey, seenCodes.toList()..sort());
+      }
 
       if (!mounted) return;
-      setState(() {
-        _pinnedFunctionLabels = normalized;
-      });
-    } catch (e) {
-      // Giữ danh sách mặc định (toàn bộ icon) nếu không đọc được local prefs.
+      setState(() => _pinnedFunctionKeys = normalized);
+    } catch (_) {
+      // Giữ native defaults nếu local prefs lỗi.
     }
   }
 
-  Future<void> _savePinnedFunctions(List<String> labels) async {
+  Future<void> _savePinnedFunctions(List<String> keys) async {
     try {
+      final normalized = <String>[];
+      for (final key in keys) {
+        if (key.trim().isNotEmpty && !normalized.contains(key)) {
+          normalized.add(key);
+        }
+      }
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setStringList('kPinnedFunctions_v3', labels);
+      await prefs.setStringList('kPinnedFunctions_v3', normalized);
 
       if (!mounted) return;
-      setState(() {
-        _pinnedFunctionLabels = labels;
-      });
-    } catch (e) {
+      setState(() => _pinnedFunctionKeys = normalized);
+    } catch (_) {
       // ignore
     }
   }
@@ -756,7 +870,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
       transitionDuration: const Duration(milliseconds: 300),
       pageBuilder: (context, animation, secondaryAnimation) {
         return _RadialPinOverlay(
-          initialPinned: _pinnedFunctionLabels,
+          initialPinned: _pinnedFunctionKeys,
           onSave: _savePinnedFunctions,
           groupedFunctions: _groupedFunctions,
           getIconForLabel: _getIconForLabel,
@@ -765,7 +879,14 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
     );
   }
 
-  void _handleFunctionTap(String label) {
+  void _handleFunctionTap(_FunctionItem item) {
+    final shape = item.shapeshifterFeature;
+    if (shape != null) {
+      unawaited(ShapeshifterLauncher().open(context, shape));
+      return;
+    }
+
+    final label = item.label;
     switch (label) {
       case 'Lịch học & thi':
         Get.to(() => const VcoreExamScheduleView())?.then((_) {
@@ -1899,13 +2020,13 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
 
   Widget _buildQuickAccess() {
     final pinnedItems = _allAvailableFunctions
-        .where((item) => _pinnedFunctionLabels.contains(item.label))
+        .where((item) => _pinnedFunctionKeys.contains(item.key))
         .toList();
 
     final orderedPinned = <_FunctionItem>[];
 
-    for (final label in _pinnedFunctionLabels) {
-      final matches = pinnedItems.where((item) => item.label == label);
+    for (final key in _pinnedFunctionKeys) {
+      final matches = pinnedItems.where((item) => item.key == key);
       if (matches.isNotEmpty) {
         orderedPinned.add(matches.first);
       }
@@ -1920,10 +2041,75 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
         children: [
           AppGuideAnchor(
             id: 'home.quick_access.pin',
-            child: _sectionHeader(
-              'Truy cập nhanh',
-              'Ghim',
-              onTap: _showPinDialog,
+            child: Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'TRUY CẬP NHANH',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: AppColors.brandGreen,
+                      fontSize: AppFontSizes.mediumSmall,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                Tooltip(
+                  message: 'Tải lại chức năng mới nhất',
+                  child: SizedBox(
+                    width: 34,
+                    height: 34,
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      splashRadius: 18,
+                      onPressed: _reloadingFunctionRegistry
+                          ? null
+                          : () => unawaited(_reloadFunctionRegistry()),
+                      icon: _reloadingFunctionRegistry
+                          ? const SizedBox(
+                              width: 15,
+                              height: 15,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppColors.brandGreen,
+                              ),
+                            )
+                          : const Icon(
+                              Icons.refresh_rounded,
+                              size: 20,
+                              color: AppColors.brandGreen,
+                            ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                GestureDetector(
+                  onTap: _showPinDialog,
+                  behavior: HitTestBehavior.opaque,
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 6),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Ghim',
+                          style: TextStyle(
+                            color: AppColors.brandGreen,
+                            fontSize: AppFontSizes.font11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Icon(
+                          Icons.chevron_right,
+                          size: 16,
+                          color: AppColors.brandGreen,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 14),
@@ -2455,11 +2641,13 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
 
   Widget _functionItem(_FunctionItem item) {
     return AppGuideAnchor(
-      id: _homeFunctionGuideId(item.label),
+      id: item.shapeshifterFeature == null
+          ? _homeFunctionGuideId(item.label)
+          : 'home.shapeshifter.${item.shapeshifterFeature!.code}',
       child: SizedBox(
         width: double.infinity,
         child: GestureDetector(
-          onTap: () => _handleFunctionTap(item.label),
+          onTap: () => _handleFunctionTap(item),
           behavior: HitTestBehavior.opaque,
           child: Column(
             children: [
@@ -2490,11 +2678,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                   ],
                 ),
                 child: Center(
-                  child: Icon(
-                    _getIconForLabel(item.label),
-                    size: 26,
-                    color: item.color,
-                  ),
+                  child: _functionIcon(item, size: 26),
                 ),
               ),
               const SizedBox(height: 8),
@@ -2513,6 +2697,45 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _functionIcon(_FunctionItem item, {double size = 26}) {
+    final iconUrl = item.shapeshifterFeature?.iconUrl?.trim() ?? '';
+    if (iconUrl.isEmpty) {
+      return Icon(
+        item.shapeshifterFeature == null
+            ? _getIconForLabel(item.label)
+            : Icons.language_rounded,
+        size: size,
+        color: item.color,
+      );
+    }
+
+    if (iconUrl.toLowerCase().split('?').first.endsWith('.svg')) {
+      return SvgPicture.network(
+        iconUrl,
+        width: size,
+        height: size,
+        colorFilter: ColorFilter.mode(item.color, BlendMode.srcIn),
+        placeholderBuilder: (_) => Icon(
+          Icons.language_rounded,
+          size: size,
+          color: item.color,
+        ),
+      );
+    }
+
+    return CachedNetworkImage(
+      imageUrl: iconUrl,
+      width: size,
+      height: size,
+      fit: BoxFit.contain,
+      errorWidget: (_, __, ___) => Icon(
+        Icons.language_rounded,
+        size: size,
+        color: item.color,
       ),
     );
   }
@@ -2989,8 +3212,24 @@ class _OverviewItem {
 class _FunctionItem {
   final String label;
   final Color color;
+  final String key;
+  final ShapeshifterFeature? shapeshifterFeature;
 
-  _FunctionItem(this.label, this.color);
+  _FunctionItem(
+    this.label,
+    this.color, {
+    String? key,
+    this.shapeshifterFeature,
+  }) : key = key ?? 'native:$label';
+
+  factory _FunctionItem.fromShapeshifter(ShapeshifterFeature feature) {
+    return _FunctionItem(
+      feature.label,
+      feature.primaryColor,
+      key: feature.stableKey,
+      shapeshifterFeature: feature,
+    );
+  }
 }
 
 class _RadialPinOverlay extends StatefulWidget {
@@ -3125,7 +3364,7 @@ class _RadialPinOverlayState extends State<_RadialPinOverlay>
                         children: [
                           ...List.generate(items.length, (index) {
                             final item = items[index];
-                            final isPinned = tempPinned.contains(item.label);
+                            final isPinned = tempPinned.contains(item.key);
 
                             final double start = index * 0.08;
                             final double end = (start + 0.6).clamp(0.0, 1.0);
@@ -3156,9 +3395,9 @@ class _RadialPinOverlayState extends State<_RadialPinOverlay>
                                     onTap: () {
                                       setState(() {
                                         if (isPinned) {
-                                          tempPinned.remove(item.label);
+                                          tempPinned.remove(item.key);
                                         } else {
-                                          tempPinned.add(item.label);
+                                          tempPinned.add(item.key);
                                         }
                                         widget.onSave(tempPinned);
                                       });

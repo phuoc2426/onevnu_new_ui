@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vnu_core/globals.dart';
 import 'package:vnu_core/models/model.dart';
+import 'package:vnu_core/modules/auth_mode/auth_entry_mode_service.dart';
 import 'package:vnu_core/repository/app_repository.dart';
 import 'package:vnu_core/repository/data_repository.dart';
 
@@ -65,6 +66,8 @@ class IdpOneVnuSessionService {
         'Đăng nhập IdP thành công nhưng không tải được thông tin sinh viên.',
       );
     }
+
+    await AuthEntryModeService().markIdp();
   }
 
   Future<void> _clearApplicantLocalData() async {

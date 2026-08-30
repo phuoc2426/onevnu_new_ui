@@ -1,3 +1,4 @@
+# Xcode user/local state
 **/dgph
 *.mode1v3
 *.mode2v3
@@ -10,26 +11,45 @@
 **/.vagrant/
 **/DerivedData/
 Icon?
+xcuserdata/
+**/.generated/
+
+# CocoaPods / Flutter generated output
 **/Pods/
 **/.symlinks/
 **/BuildRelease/build/
 BuildRelease/build/
-profile
-xcuserdata
-**/.generated/
+profile/
 Flutter/App.framework
 Flutter/Flutter.framework
 Flutter/Flutter.podspec
 Flutter/Generated.xcconfig
 Flutter/ephemeral/
+Flutter/.last_build_id
 Flutter/app.flx
 Flutter/app.zip
 Flutter/flutter_assets/
 Flutter/flutter_export_environment.sh
 ServiceDefinitions.json
 Runner/GeneratedPluginRegistrant.*
+Runner.xcworkspace/
+build/
 
-# Exceptions to above rules.
+# Keep reproducible iOS source/configuration in Git.
+# These files define deployment target, permissions, APNs, associated domains,
+# URL schemes and native build behavior.
+!Podfile
+!Podfile.lock
+!Flutter/AppFrameworkInfo.plist
+!Flutter/Debug.xcconfig
+!Flutter/Release.xcconfig
+!Runner/Info.plist
+!Runner/AppDelegate.swift
+!Runner/*.entitlements
+!Runner.xcodeproj/project.pbxproj
+!Runner.xcodeproj/xcshareddata/**
+
+# Standard Xcode shared defaults
 !default.mode1v3
 !default.mode2v3
 !default.pbxuser

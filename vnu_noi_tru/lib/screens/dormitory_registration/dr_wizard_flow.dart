@@ -83,7 +83,19 @@ class _DRWizardFlowState extends State<DRWizardFlow> {
         await _step3Key.currentState?.saveDataToCubit();
       } catch (error) {
         if (!mounted) return;
-        _showSnackbarError('Không lưu được dữ liệu hồ sơ ở Bước 3');
+        final String message = error
+            .toString()
+            .replaceFirst('Invalid argument(s): ', '')
+            .replaceFirst('Invalid argument: ', '');
+        _showSnackbarError(message);
+        return;
+      }
+
+      final studentDraft = _cubit.studentDraft;
+      if (studentDraft == null || studentDraft.familyMembers.isEmpty) {
+        _showSnackbarError(
+          'Vui lòng nhập ít nhất 1 người thân trong thông tin gia đình',
+        );
         return;
       }
 
@@ -404,6 +416,24 @@ class _DRWizardFlowState extends State<DRWizardFlow> {
     if (_cubit.selectedPeriod?.id == null ||
         _cubit.selectedDormitory?.id == null) {
       _showSnackbarError('Thiếu thông tin đăng ký');
+      return;
+    }
+
+    final studentDraft = _cubit.studentDraft;
+    if (studentDraft == null || studentDraft.familyMembers.isEmpty) {
+      _showSnackbarError(
+        'Vui lòng nhập ít nhất 1 người thân trong thông tin gia đình',
+      );
+      return;
+    }
+
+    if (_cubit.cccdFrontFile == null && _cubit.cccdFrontAttachment == null) {
+      _showSnackbarError('Vui lòng tải lên CCCD mặt trước');
+      return;
+    }
+
+    if (_cubit.cccdBackFile == null && _cubit.cccdBackAttachment == null) {
+      _showSnackbarError('Vui lòng tải lên CCCD mặt sau');
       return;
     }
 

@@ -345,6 +345,65 @@ class DRStudentHistorySheet extends StatelessWidget {
     );
   }
 
+  Map<String, dynamic> _enrichAccommodationDisplayMap(dynamic rawValue) {
+    final Map<String, dynamic> value = Map<String, dynamic>.from(_asMap(rawValue));
+    if (value.isEmpty) return value;
+
+    bool missing(String key) {
+      final dynamic current = value[key];
+      return current == null || (current is String && current.trim().isEmpty);
+    }
+
+    final Map<String, dynamic> room = _asMap(value['room']);
+    final Map<String, dynamic> dormitory = _asMap(value['dormitory']);
+    final Map<String, dynamic> roomType = _asMap(
+      value['room_type'] ?? value['roomType'],
+    );
+    final Map<String, dynamic> period = _asMap(
+      value['registration_period'] ?? value['registrationPeriod'],
+    );
+
+    // Production contract added room.building_name. This is the source of
+    // truth for the building shown to the student.
+    if (missing('buildingName')) {
+      final dynamic buildingName = room['building_name'] ?? room['buildingName'];
+      if (buildingName != null && buildingName.toString().trim().isNotEmpty) {
+        value['buildingName'] = buildingName.toString().trim();
+      }
+    }
+
+    if (missing('assignedRoom')) {
+      final dynamic roomNumber =
+          room['room_number'] ?? room['roomNumber'] ?? room['room_no'];
+      if (roomNumber != null && roomNumber.toString().trim().isNotEmpty) {
+        value['assignedRoom'] = roomNumber.toString().trim();
+      }
+    }
+
+    if (missing('dormitoryName')) {
+      final dynamic name = dormitory['name'];
+      if (name != null && name.toString().trim().isNotEmpty) {
+        value['dormitoryName'] = name.toString().trim();
+      }
+    }
+
+    if (missing('roomTypeName')) {
+      final dynamic name = roomType['name'];
+      if (name != null && name.toString().trim().isNotEmpty) {
+        value['roomTypeName'] = name.toString().trim();
+      }
+    }
+
+    if (missing('registrationPeriodName')) {
+      final dynamic name = period['name'];
+      if (name != null && name.toString().trim().isNotEmpty) {
+        value['registrationPeriodName'] = name.toString().trim();
+      }
+    }
+
+    return value;
+  }
+
   Widget _buildAccommodationSection(List<dynamic> values) {
     return _sectionCard(
       icon: Icons.apartment_rounded,
@@ -354,7 +413,8 @@ class DRStudentHistorySheet extends StatelessWidget {
       children: values.isEmpty
           ? <Widget>[_emptyText('Chưa có hồ sơ nội trú')]
           : values.asMap().entries.map((MapEntry<int, dynamic> item) {
-              final Map<String, dynamic> value = _asMap(item.value);
+              final Map<String, dynamic> value =
+                  _enrichAccommodationDisplayMap(item.value);
               final String periodName = _text(
                 value,
                 const <String>[
@@ -790,8 +850,26 @@ class DRStudentHistorySheet extends StatelessWidget {
     );
   }
 
+  Map<String, dynamic> _normalizeHistoryData(dynamic rawData) {
+    final Map<String, dynamic> direct = _asMap(rawData);
+    if (direct.isNotEmpty) return direct;
+
+    // OpenAPI allows StudentHistory.data to be array|null, while production
+    // also returns an object. Merge map items so KTX/building/room metadata is
+    // still visible in the history sheet.
+    if (rawData is Iterable && rawData is! String) {
+      final Map<String, dynamic> merged = <String, dynamic>{};
+      for (final dynamic item in rawData) {
+        merged.addAll(_asMap(item));
+      }
+      return merged;
+    }
+
+    return <String, dynamic>{};
+  }
+
   List<_DisplayEntry> _eventDetailEntries(dynamic rawData) {
-    final Map<String, dynamic> value = _asMap(rawData);
+    final Map<String, dynamic> value = _normalizeHistoryData(rawData);
     if (value.isEmpty) {
       return <_DisplayEntry>[];
     }
@@ -822,6 +900,20 @@ class DRStudentHistorySheet extends StatelessWidget {
           'dormitoryName',
           'dormitory_name',
           'dormitory',
+        ],
+      ),
+      _entry(
+        'Tòa nhà',
+        value,
+        const <String>[
+          'buildingName',
+          'building_name',
+          'building',
+          'buildingCode',
+          'building_code',
+          'blockName',
+          'block_name',
+          'toa',
         ],
       ),
       _entry(

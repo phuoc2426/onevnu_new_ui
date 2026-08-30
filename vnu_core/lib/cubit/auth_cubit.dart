@@ -7,6 +7,7 @@ import 'package:vnu_core/common/utils.dart';
 import 'package:vnu_core/constants/constant.dart';
 import 'package:vnu_core/globals.dart';
 import 'package:vnu_core/models/login_reponse_model.dart';
+import 'package:vnu_core/modules/auth_mode/auth_entry_mode_service.dart';
 import 'package:vnu_core/repository/app_repository.dart';
 import 'package:vnu_core/repository/data_repository.dart';
 import 'package:vnu_core/services/services_url.dart';
@@ -129,6 +130,8 @@ class AuthCubit extends Cubit<AuthState> {
           return;
         }
 
+        await AuthEntryModeService().markPassword();
+
         emit(AuthDismissHub());
 
         logSuccess(
@@ -188,4 +191,3 @@ class AuthCubit extends Cubit<AuthState> {
     // }
   }
 }
-

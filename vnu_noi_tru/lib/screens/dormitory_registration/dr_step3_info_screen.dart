@@ -11,6 +11,7 @@ import 'package:vnu_noi_tru/domain/registration/dormitory_date_codec.dart';
 import 'package:vnu_noi_tru/domain/registration/dormitory_student_draft.dart';
 import 'package:vnu_noi_tru/services/registration/dormitory_local_file_store.dart';
 import 'package:vnu_noi_tru/models/model.dart';
+import 'package:vnu_noi_tru/repository/dormitory_registration_repository.dart';
 import 'package:path/path.dart' as p;
 import 'package:vnu_core/common/app_text_styles.dart';
 import 'package:vnu_core/widgets/field/vnu_text_field.dart';
@@ -30,6 +31,19 @@ class DRStep3InfoScreen extends StatefulWidget {
 
 class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
   final _picker = ImagePicker();
+  final DormitoryRegistrationRepository _repository =
+      DormitoryRegistrationRepository();
+
+  List<DormitoryCountryOption> _countries = <DormitoryCountryOption>[];
+  List<DormitoryProvinceOption> _provinces = <DormitoryProvinceOption>[];
+  List<DormitoryWardOption> _permanentWards = <DormitoryWardOption>[];
+  List<DormitoryWardOption> _temporaryWards = <DormitoryWardOption>[];
+  DormitoryCountryOption? _selectedCountry;
+  DormitoryProvinceOption? _selectedPermanentProvince;
+  DormitoryWardOption? _selectedPermanentWard;
+  DormitoryProvinceOption? _selectedTemporaryProvince;
+  DormitoryWardOption? _selectedTemporaryWard;
+  bool _loadingAddressOptions = false;
   bool _isImagePickerActive = false;
   static const int _maxUploadMb = 5;
   static const int _maxUploadBytes = _maxUploadMb * 1024 * 1024;
@@ -184,7 +198,12 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
       _familyForms
         ..clear()
         ..addAll(draft.familyMembers.map(_FamilyMemberForm.fromPayload));
+      if (_familyForms.isEmpty) {
+        _familyForms.add(_FamilyMemberForm.empty());
+      }
 
+      await _loadAddressOptions();
+      if (!mounted) return;
       setState(() {});
     } catch (error) {
       if (!mounted) return;
@@ -198,6 +217,186 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
           ),
         );
     }
+  }
+
+  Future<void> _loadAddressOptions() async {
+    if (_loadingAddressOptions) return;
+    _loadingAddressOptions = true;
+    try {
+      final List<Object> results = await Future.wait<Object>(<Future<Object>>[
+        _repository.getCountries(),
+        _repository.getProvinces(),
+      ]);
+      if (!mounted) return;
+
+      _countries = results[0] as List<DormitoryCountryOption>;
+      _provinces = results[1] as List<DormitoryProvinceOption>;
+
+      final String countryCode = _countryCodeController.text.trim();
+      _selectedCountry = _findCountryByCode(countryCode);
+      if (_selectedCountry == null && _countries.isNotEmpty) {
+        _selectedCountry = _countries.firstWhere(
+          (DormitoryCountryOption item) => item.code.toLowerCase() == 'vn',
+          orElse: () => _countries.first,
+        );
+      }
+      if (_selectedCountry != null) {
+        _applyCountry(_selectedCountry!);
+      }
+
+      _selectedPermanentProvince = _findProvinceByCode(
+        _permanentProvinceCodeController.text,
+      );
+      _selectedTemporaryProvince = _findProvinceByCode(
+        _temporaryProvinceCodeController.text,
+      );
+
+      if (_selectedPermanentProvince != null) {
+        _permanentWards = await _repository.getWardsByProvince(
+          _selectedPermanentProvince!.id,
+        );
+        _selectedPermanentWard = _findWardByCode(
+          _permanentWards,
+          _permanentWardCodeController.text,
+        );
+        _syncPermanentAddress();
+      }
+
+      if (_selectedTemporaryProvince != null) {
+        _temporaryWards = await _repository.getWardsByProvince(
+          _selectedTemporaryProvince!.id,
+        );
+        _selectedTemporaryWard = _findWardByCode(
+          _temporaryWards,
+          _temporaryWardCodeController.text,
+        );
+        _syncTemporaryAddress();
+      }
+    } catch (error) {
+      debugPrint('[DORMITORY-ADDRESS-LOOKUP] $error');
+    } finally {
+      _loadingAddressOptions = false;
+      if (mounted) setState(() {});
+    }
+  }
+
+  DormitoryCountryOption? _findCountryByCode(String rawCode) {
+    final String code = rawCode.trim().toLowerCase();
+    if (code.isEmpty) return null;
+    for (final DormitoryCountryOption item in _countries) {
+      if (item.code.toLowerCase() == code) return item;
+    }
+    return null;
+  }
+
+  DormitoryProvinceOption? _findProvinceByCode(String rawCode) {
+    final String code = rawCode.trim().toLowerCase();
+    if (code.isEmpty) return null;
+    for (final DormitoryProvinceOption item in _provinces) {
+      if (item.code.toLowerCase() == code) return item;
+    }
+    return null;
+  }
+
+  DormitoryWardOption? _findWardByCode(
+    List<DormitoryWardOption> items,
+    String rawCode,
+  ) {
+    final String code = rawCode.trim().toLowerCase();
+    if (code.isEmpty) return null;
+    for (final DormitoryWardOption item in items) {
+      if (item.code.toLowerCase() == code) return item;
+    }
+    return null;
+  }
+
+  void _applyCountry(DormitoryCountryOption value) {
+    _selectedCountry = value;
+    _countryCodeController.text = value.code;
+    _countryController.text = value.code;
+    _nationalController.text = value.name;
+  }
+
+  Future<void> _selectPermanentProvince(
+    DormitoryProvinceOption? value,
+  ) async {
+    if (value == null) return;
+    setState(() {
+      _selectedPermanentProvince = value;
+      _selectedPermanentWard = null;
+      _permanentWards = <DormitoryWardOption>[];
+      _permanentProvinceCodeController.text = value.code;
+      _permanentWardCodeController.clear();
+    });
+    try {
+      final List<DormitoryWardOption> wards =
+          await _repository.getWardsByProvince(value.id);
+      if (!mounted || _selectedPermanentProvince?.id != value.id) return;
+      setState(() => _permanentWards = wards);
+      _syncPermanentAddress();
+    } catch (error) {
+      debugPrint('[DORMITORY-PERMANENT-WARDS] $error');
+    }
+  }
+
+  void _selectPermanentWard(DormitoryWardOption? value) {
+    if (value == null) return;
+    setState(() {
+      _selectedPermanentWard = value;
+      _permanentWardCodeController.text = value.code;
+      _syncPermanentAddress();
+    });
+  }
+
+  Future<void> _selectTemporaryProvince(
+    DormitoryProvinceOption? value,
+  ) async {
+    if (value == null) return;
+    setState(() {
+      _selectedTemporaryProvince = value;
+      _selectedTemporaryWard = null;
+      _temporaryWards = <DormitoryWardOption>[];
+      _temporaryProvinceCodeController.text = value.code;
+      _temporaryWardCodeController.clear();
+    });
+    try {
+      final List<DormitoryWardOption> wards =
+          await _repository.getWardsByProvince(value.id);
+      if (!mounted || _selectedTemporaryProvince?.id != value.id) return;
+      setState(() => _temporaryWards = wards);
+      _syncTemporaryAddress();
+    } catch (error) {
+      debugPrint('[DORMITORY-TEMPORARY-WARDS] $error');
+    }
+  }
+
+  void _selectTemporaryWard(DormitoryWardOption? value) {
+    if (value == null) return;
+    setState(() {
+      _selectedTemporaryWard = value;
+      _temporaryWardCodeController.text = value.code;
+      _syncTemporaryAddress();
+    });
+  }
+
+  void _syncPermanentAddress() {
+    final List<String> parts = <String>[
+      if (_selectedPermanentWard?.name.trim().isNotEmpty == true)
+        _selectedPermanentWard!.name.trim(),
+      if (_selectedPermanentProvince?.name.trim().isNotEmpty == true)
+        _selectedPermanentProvince!.name.trim(),
+    ];
+    if (parts.isNotEmpty) _permanentAddressController.text = parts.join(', ');
+  }
+
+  void _syncTemporaryAddress() {
+    final List<String> parts = <String>[
+      if (_selectedTemporaryWard?.name.trim().isNotEmpty == true)
+        _selectedTemporaryWard!.name.trim(),
+      if (_selectedTemporaryProvince?.name.trim().isNotEmpty == true)
+        _selectedTemporaryProvince!.name.trim(),
+    ];
+    if (parts.isNotEmpty) _temporaryAddressController.text = parts.join(', ');
   }
 
   @override
@@ -343,6 +542,11 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
         .map((_FamilyMemberForm item) => item.toPayload())
         .where((FamilyMemberPayload item) => item.fullName.trim().isNotEmpty)
         .toList();
+    if (members.isEmpty) {
+      throw ArgumentError(
+        'Vui lòng nhập ít nhất 1 người thân trong thông tin gia đình.',
+      );
+    }
 
     final DormitoryStudentDraft draft = current.copyWith(
       studentCode: _studentCodeController.text.trim(),
@@ -360,7 +564,7 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
       countryCode: _countryCodeController.text.trim(),
       national: _nationalController.text.trim(),
       permanentAddress: _permanentAddressController.text.trim(),
-      vneidPermanentAddress: _vneidPermanentAddressController.text.trim(),
+      vneidPermanentAddress: '',
       permanentProvinceCode: _permanentProvinceCodeController.text.trim(),
       permanentWardCode: _permanentWardCodeController.text.trim(),
       contactAddress: _contactAddressController.text.trim(),
@@ -377,7 +581,7 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
       clearStudentType: _studentType == null,
       priorityObjectName: _priorityObjectNameController.text.trim(),
       temporaryAddress: _temporaryAddressController.text.trim(),
-      vneidTemporaryAddress: _vneidTemporaryAddressController.text.trim(),
+      vneidTemporaryAddress: '',
       temporaryProvinceCode: _temporaryProvinceCodeController.text.trim(),
       temporaryWardCode: _temporaryWardCodeController.text.trim(),
       ethnicity: _ethnicityController.text.trim(),
@@ -695,7 +899,7 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: _buildField(
-                              'Ngày cấp CCCD *',
+                              'Ngày cấp CCCD',
                               _cccdIssueDateController,
                               readOnly: true,
                               icon: Icons.calendar_today_outlined,
@@ -704,10 +908,6 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
                                   _cccdIssueDateController,
                                   title: 'Ngày cấp CCCD',
                                 ),
-                              validator: (v) =>
-                              v == null || v.isEmpty
-                                  ? 'Chọn ngày cấp'
-                                  : null,
                             ),
                           ),
                         ],
@@ -748,47 +948,55 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
                         _identityIssuePlaceController,
                       ),
                       const SizedBox(height: 8),
-                      Row(
-                        children: <Widget>[
-                          Expanded(child: _buildField('Mã quốc gia', _countryCodeController)),
-                          const SizedBox(width: 8),
-                          Expanded(child: _buildField('Quốc gia', _countryController)),
-                        ],
+                      NtCustomDropdown<DormitoryCountryOption>(
+                        label: 'Quốc gia / quốc tịch',
+                        hintText: _loadingAddressOptions
+                            ? 'Đang tải danh mục...'
+                            : 'Chọn quốc gia',
+                        value: _selectedCountry,
+                        items: _countries,
+                        itemAsString: (DormitoryCountryOption item) => item.name,
+                        onChanged: (DormitoryCountryOption? value) {
+                          if (value == null) return;
+                          setState(() => _applyCountry(value));
+                        },
                       ),
                       const SizedBox(height: 8),
                       Row(
                         children: <Widget>[
-                          Expanded(child: _buildField('Quốc tịch', _nationalController)),
-                          const SizedBox(width: 8),
                           Expanded(child: _buildField('Dân tộc', _ethnicityController)),
                           const SizedBox(width: 8),
                           Expanded(child: _buildField('Tôn giáo', _religionController)),
                         ],
                       ),
                       const SizedBox(height: 8),
+                      NtCustomDropdown<DormitoryProvinceOption>(
+                        label: 'Tỉnh/Thành phố thường trú',
+                        hintText: 'Chọn tỉnh/thành phố',
+                        value: _selectedPermanentProvince,
+                        items: _provinces,
+                        itemAsString: (DormitoryProvinceOption item) => item.name,
+                        onChanged: _selectPermanentProvince,
+                      ),
+                      const SizedBox(height: 8),
+                      NtCustomDropdown<DormitoryWardOption>(
+                        label: 'Xã/Phường thường trú',
+                        hintText: _selectedPermanentProvince == null
+                            ? 'Chọn tỉnh/thành phố trước'
+                            : 'Chọn xã/phường',
+                        value: _selectedPermanentWard,
+                        items: _permanentWards,
+                        itemAsString: (DormitoryWardOption item) => item.name,
+                        onChanged: _selectedPermanentProvince == null
+                            ? (DormitoryWardOption? _) {}
+                            : _selectPermanentWard,
+                      ),
+                      const SizedBox(height: 8),
                       _buildField(
-                        'Địa chỉ thường trú *',
+                        'Địa chỉ thường trú',
                         _permanentAddressController,
-                        validator: (v) =>
-                        v == null || v.isEmpty
-                            ? 'Nhập địa chỉ thường trú'
-                            : null,
+                        readOnly: true,
                       ),
-                      const SizedBox(height: 8),
-                      _buildField(
-                        'Thường trú theo VNeID',
-                        _vneidPermanentAddressController,
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: <Widget>[
-                          Expanded(child: _buildField('Mã tỉnh thường trú', _permanentProvinceCodeController)),
-                          const SizedBox(width: 8),
-                          Expanded(child: _buildField('Mã xã/phường thường trú', _permanentWardCodeController)),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      _buildField('Địa chỉ liên hệ', _contactAddressController),
                     ],
                   ),
                 ),
@@ -861,19 +1069,7 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
                           ],
                         ),
                         const SizedBox(height: 8),
-                        Row(
-                          children: <Widget>[
-                            Expanded(child: _buildField('Trường', _universityNameController)),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: _buildField(
-                                'ID trường',
-                                _univIdController,
-                                keyboardType: TextInputType.number,
-                              ),
-                            ),
-                          ],
-                        ),
+                        _buildField('Trường', _universityNameController),
                       ],
                     ),
                   ),
@@ -906,23 +1102,37 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
                         ],
                       ),
                       const SizedBox(height: 12),
-                      _buildField(
-                        'Địa chỉ tạm trú *',
-                        _temporaryAddressController,
-                        validator: (v) =>
-                        v == null || v.isEmpty
-                            ? 'Nhập địa chỉ tạm trú'
-                            : null,
+                      NtCustomDropdown<DormitoryProvinceOption>(
+                        label: 'Tỉnh/Thành phố tạm trú',
+                        hintText: 'Chọn tỉnh/thành phố',
+                        value: _selectedTemporaryProvince,
+                        items: _provinces,
+                        itemAsString: (DormitoryProvinceOption item) => item.name,
+                        onChanged: _selectTemporaryProvince,
                       ),
                       const SizedBox(height: 8),
-                      _buildField('Tạm trú theo VNeID', _vneidTemporaryAddressController),
+                      NtCustomDropdown<DormitoryWardOption>(
+                        label: 'Xã/Phường tạm trú',
+                        hintText: _selectedTemporaryProvince == null
+                            ? 'Chọn tỉnh/thành phố trước'
+                            : 'Chọn xã/phường',
+                        value: _selectedTemporaryWard,
+                        items: _temporaryWards,
+                        itemAsString: (DormitoryWardOption item) => item.name,
+                        onChanged: _selectedTemporaryProvince == null
+                            ? (DormitoryWardOption? _) {}
+                            : _selectTemporaryWard,
+                      ),
                       const SizedBox(height: 8),
-                      Row(
-                        children: <Widget>[
-                          Expanded(child: _buildField('Mã tỉnh tạm trú', _temporaryProvinceCodeController)),
-                          const SizedBox(width: 8),
-                          Expanded(child: _buildField('Mã xã/phường tạm trú', _temporaryWardCodeController)),
-                        ],
+                      _buildField(
+                        'Địa chỉ tạm trú',
+                        _temporaryAddressController,
+                        readOnly: true,
+                      ),
+                      const SizedBox(height: 8),
+                      _buildField(
+                        'Địa chỉ liên hệ',
+                        _contactAddressController,
                       ),
                       const SizedBox(height: 8),
                       Row(
@@ -1150,7 +1360,7 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   const Text(
-                    'Ảnh thẻ sinh viên *',
+                    'Ảnh thẻ sinh viên',
                     style: TextStyle(
                       fontSize: AppFontSizes.small,
                       fontWeight: FontWeight.bold,
@@ -1230,7 +1440,7 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
                 const SizedBox(width: 8),
                 const Expanded(
                   child: Text(
-                    'Thông tin gia đình',
+                    'Thông tin gia đình *',
                     style: TextStyle(
                       fontSize: AppFontSizes.font11,
                       fontWeight: FontWeight.bold,
@@ -1247,7 +1457,7 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
             ),
             const SizedBox(height: 5),
             const Text(
-              'Có thể khai báo bố, mẹ hoặc người giám hộ. Các trường nghề nghiệp và số điện thoại không bắt buộc.',
+              'Bắt buộc khai báo ít nhất 1 người thân (bố, mẹ hoặc người giám hộ). Nghề nghiệp và số điện thoại là tùy chọn.',
               style: TextStyle(
                 fontSize: AppFontSizes.extraSmall,
                 color: Color(0xFF666B75),

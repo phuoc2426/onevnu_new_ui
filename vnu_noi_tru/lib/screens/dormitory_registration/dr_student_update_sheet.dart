@@ -117,6 +117,17 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
   int? _studentType;
   bool _submitting = false;
 
+  List<DormitoryCountryOption> _countries = <DormitoryCountryOption>[];
+  List<DormitoryProvinceOption> _provinces = <DormitoryProvinceOption>[];
+  List<DormitoryWardOption> _permanentWards = <DormitoryWardOption>[];
+  List<DormitoryWardOption> _temporaryWards = <DormitoryWardOption>[];
+  DormitoryCountryOption? _selectedCountry;
+  DormitoryProvinceOption? _selectedPermanentProvince;
+  DormitoryProvinceOption? _selectedTemporaryProvince;
+  DormitoryWardOption? _selectedPermanentWard;
+  DormitoryWardOption? _selectedTemporaryWard;
+  bool _loadingAddressOptions = false;
+
   final List<_StudentFamilyMemberForm> _familyForms =
       <_StudentFamilyMemberForm>[];
   late String _initialFamilySnapshot;
@@ -405,8 +416,129 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
     }
 
     _familyForms.addAll(_readFamilyMembers(widget.student));
+    if (_familyForms.isEmpty) {
+      _familyForms.add(_StudentFamilyMemberForm.empty());
+    }
     _initialFamilySnapshot = _familyMembersSnapshot();
     _unsupportedInitialValues = _unsupportedFieldValues();
+    _loadAddressOptions();
+  }
+
+  Future<void> _loadAddressOptions() async {
+    if (_loadingAddressOptions) return;
+    _loadingAddressOptions = true;
+    try {
+      final List<Object> result = await Future.wait<Object>(<Future<Object>>[
+        _repository.getCountries(),
+        _repository.getProvinces(),
+      ]);
+      if (!mounted) return;
+      _countries = result[0] as List<DormitoryCountryOption>;
+      _provinces = result[1] as List<DormitoryProvinceOption>;
+
+      final String currentCountry = _countryCodeController.text.trim().toLowerCase();
+      for (final DormitoryCountryOption item in _countries) {
+        if (item.code.toLowerCase() == currentCountry) {
+          _selectedCountry = item;
+          break;
+        }
+      }
+      if (_selectedCountry == null && _countries.isNotEmpty) {
+        _selectedCountry = _countries.firstWhere(
+          (DormitoryCountryOption item) => item.code.toLowerCase() == 'vn',
+          orElse: () => _countries.first,
+        );
+      }
+      if (_selectedCountry != null) _applyCountry(_selectedCountry!);
+
+      _selectedPermanentProvince = _provinceByCode(_permanentProvinceCodeController.text);
+      _selectedTemporaryProvince = _provinceByCode(_temporaryProvinceCodeController.text);
+      if (_selectedPermanentProvince != null) {
+        _permanentWards = await _repository.getWardsByProvince(_selectedPermanentProvince!.id);
+        _selectedPermanentWard = _wardByCode(_permanentWards, _permanentWardCodeController.text);
+      }
+      if (_selectedTemporaryProvince != null) {
+        _temporaryWards = await _repository.getWardsByProvince(_selectedTemporaryProvince!.id);
+        _selectedTemporaryWard = _wardByCode(_temporaryWards, _temporaryWardCodeController.text);
+      }
+      if (mounted) setState(() {});
+    } catch (error) {
+      debugPrint('[DORMITORY-UPDATE-ADDRESS] $error');
+    } finally {
+      _loadingAddressOptions = false;
+      if (mounted) setState(() {});
+    }
+  }
+
+  DormitoryProvinceOption? _provinceByCode(String raw) {
+    final String code = raw.trim().toLowerCase();
+    for (final DormitoryProvinceOption item in _provinces) {
+      if (item.code.toLowerCase() == code) return item;
+    }
+    return null;
+  }
+
+  DormitoryWardOption? _wardByCode(List<DormitoryWardOption> items, String raw) {
+    final String code = raw.trim().toLowerCase();
+    for (final DormitoryWardOption item in items) {
+      if (item.code.toLowerCase() == code) return item;
+    }
+    return null;
+  }
+
+  void _applyCountry(DormitoryCountryOption item) {
+    _selectedCountry = item;
+    _countryCodeController.text = item.code;
+    _countryController.text = item.code;
+    _nationalController.text = item.name;
+  }
+
+  Future<void> _changePermanentProvince(DormitoryProvinceOption? item) async {
+    if (item == null) return;
+    setState(() {
+      _selectedPermanentProvince = item;
+      _selectedPermanentWard = null;
+      _permanentWards = <DormitoryWardOption>[];
+      _permanentProvinceCodeController.text = item.code;
+      _permanentWardCodeController.clear();
+      _permanentAddressController.clear();
+    });
+    final List<DormitoryWardOption> wards = await _repository.getWardsByProvince(item.id);
+    if (!mounted || _selectedPermanentProvince?.id != item.id) return;
+    setState(() => _permanentWards = wards);
+  }
+
+  void _changePermanentWard(DormitoryWardOption? item) {
+    if (item == null) return;
+    setState(() {
+      _selectedPermanentWard = item;
+      _permanentWardCodeController.text = item.code;
+      _permanentAddressController.text = '${item.name}, ${_selectedPermanentProvince?.name ?? ''}';
+    });
+  }
+
+  Future<void> _changeTemporaryProvince(DormitoryProvinceOption? item) async {
+    if (item == null) return;
+    setState(() {
+      _selectedTemporaryProvince = item;
+      _selectedTemporaryWard = null;
+      _temporaryWards = <DormitoryWardOption>[];
+      _temporaryProvinceCodeController.text = item.code;
+      _temporaryWardCodeController.clear();
+      _temporaryAddressController.clear();
+    });
+    final List<DormitoryWardOption> wards = await _repository.getWardsByProvince(item.id);
+    if (!mounted || _selectedTemporaryProvince?.id != item.id) return;
+    setState(() => _temporaryWards = wards);
+  }
+
+  void _changeTemporaryWard(DormitoryWardOption? item) {
+    if (item == null) return;
+    setState(() {
+      _selectedTemporaryWard = item;
+      _temporaryWardCodeController.text = item.code;
+      _temporaryAddressController.text = '${item.name}, ${_selectedTemporaryProvince?.name ?? ''}';
+    });
   }
 
   @override
@@ -493,8 +625,6 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
                           _buildContactPriorityCard(),
                           const SizedBox(height: 12),
                           _buildFamilyCard(),
-                          const SizedBox(height: 12),
-                          _buildPriorityDocumentsCard(),
                         ],
                       ),
                     ),
@@ -817,60 +947,21 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
       icon: Icons.person_outline_rounded,
       title: 'Thông tin sinh viên',
       children: <Widget>[
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Expanded(
-              child: _field(
-                controller: _studentCodeController,
-                label: 'Mã sinh viên',
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _field(
-                controller: _fullNameController,
-                label: 'Họ và tên *',
-                maxLength: 255,
-                validator: _requiredValidator,
-              ),
-            ),
-          ],
-        ),
+        _field(controller: _fullNameController, label: 'Họ và tên *', maxLength: 255, validator: _requiredValidator),
         const SizedBox(height: 10),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Expanded(
-              child: _dateField(
-                controller: _dobController,
-                label: 'Ngày sinh *',
-                validator: _requiredValidator,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: VnuSingleSelect<String>(
-                label: 'Giới tính',
-                requiredField: true,
-                value: _gender,
-                hintText: 'Chọn giới tính',
-                sheetTitle: 'Chọn giới tính',
-                enabled: !_submitting,
-                items: const <VnuSelectItem<String>>[
-                  VnuSelectItem<String>(value: 'male', label: 'Nam'),
-                  VnuSelectItem<String>(value: 'female', label: 'Nữ'),
-                ],
-                validator: (String? value) => value == null
-                    ? 'Vui lòng chọn giới tính'
-                    : null,
-                onChanged: (String? value) {
-                  setState(() => _gender = value);
-                },
-              ),
-            ),
-          ],
-        ),
+        Row(children: <Widget>[
+          Expanded(child: _dateField(controller: _dobController, label: 'Ngày sinh *', validator: _requiredValidator)),
+          const SizedBox(width: 10),
+          Expanded(child: VnuSingleSelect<String>(
+            label: 'Giới tính', requiredField: true, value: _gender, hintText: 'Chọn giới tính',
+            sheetTitle: 'Chọn giới tính', enabled: !_submitting,
+            items: const <VnuSelectItem<String>>[
+              VnuSelectItem<String>(value: 'male', label: 'Nam'),
+              VnuSelectItem<String>(value: 'female', label: 'Nữ'),
+            ], validator: (String? value) => value == null ? 'Vui lòng chọn giới tính' : null,
+            onChanged: (String? value) => setState(() => _gender = value),
+          )),
+        ]),
       ],
     );
   }
@@ -878,146 +969,64 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
   Widget _buildIdentityCard() {
     return _sectionCard(
       icon: Icons.badge_outlined,
-      title: 'Giấy tờ tùy thân',
+      title: 'Giấy tờ & địa chỉ',
       children: <Widget>[
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Expanded(
-              child: VnuSingleSelect<String>(
-                label: 'Loại giấy tờ',
-                value: _identityType,
-                hintText: 'Chọn loại giấy tờ',
-                sheetTitle: 'Chọn loại giấy tờ',
-                enabled: !_submitting,
-                items: const <VnuSelectItem<String>>[
-                  VnuSelectItem<String>(value: 'CCCD', label: 'CCCD'),
-                  VnuSelectItem<String>(value: 'CMND', label: 'CMND'),
-                  VnuSelectItem<String>(value: 'HC', label: 'Hộ chiếu'),
-                  VnuSelectItem<String>(value: 'GTK', label: 'Giấy tờ khác'),
-                ],
-                onChanged: (String? value) {
-                  if (value != null) {
-                    setState(() => _identityType = value);
-                  }
-                },
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _field(
-                controller: _identityNameController,
-                label: 'Tên giấy tờ',
-                maxLength: 100,
-              ),
-            ),
-          ],
+        Row(children: <Widget>[
+          Expanded(child: VnuSingleSelect<String>(
+            label: 'Loại giấy tờ', value: _identityType, hintText: 'Chọn loại giấy tờ',
+            sheetTitle: 'Chọn loại giấy tờ', enabled: !_submitting,
+            items: const <VnuSelectItem<String>>[
+              VnuSelectItem<String>(value: 'CCCD', label: 'CCCD'),
+              VnuSelectItem<String>(value: 'CMND', label: 'CMND'),
+              VnuSelectItem<String>(value: 'HC', label: 'Hộ chiếu'),
+              VnuSelectItem<String>(value: 'GTK', label: 'Giấy tờ khác'),
+            ], onChanged: (String? v) { if (v != null) setState(() => _identityType = v); },
+          )),
+          const SizedBox(width: 10),
+          Expanded(child: _field(controller: _identityNameController, label: 'Tên giấy tờ', maxLength: 100)),
+        ]),
+        const SizedBox(height: 10),
+        Row(children: <Widget>[
+          Expanded(child: _field(controller: _identityNoController, label: 'Số CCCD/giấy tờ *', maxLength: 50, validator: _requiredValidator)),
+          const SizedBox(width: 10),
+          Expanded(child: _dateField(controller: _identityIssueDateController, label: 'Ngày cấp')),
+        ]),
+        const SizedBox(height: 10),
+        VnuSingleSelect<DormitoryCountryOption>(
+          label: 'Quốc gia / quốc tịch', value: _selectedCountry,
+          hintText: _loadingAddressOptions ? 'Đang tải...' : 'Chọn quốc gia',
+          sheetTitle: 'Chọn quốc gia', enabled: !_submitting && !_loadingAddressOptions,
+          items: _countries.map((DormitoryCountryOption e) => VnuSelectItem<DormitoryCountryOption>(value: e, label: e.name)).toList(),
+          onChanged: (DormitoryCountryOption? v) { if (v != null) setState(() => _applyCountry(v)); },
         ),
         const SizedBox(height: 10),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Expanded(
-              child: _field(
-                controller: _identityNoController,
-                label: 'Số CCCD/giấy tờ *',
-                maxLength: 50,
-                validator: _requiredValidator,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _dateField(
-                controller: _identityIssueDateController,
-                label: 'Ngày cấp',
-              ),
-            ),
-          ],
+        VnuSingleSelect<DormitoryProvinceOption>(
+          label: 'Tỉnh/Thành phố thường trú', value: _selectedPermanentProvince, hintText: 'Chọn tỉnh/thành phố',
+          sheetTitle: 'Chọn tỉnh/thành phố thường trú', enabled: !_submitting,
+          items: _provinces.map((DormitoryProvinceOption e) => VnuSelectItem<DormitoryProvinceOption>(value: e, label: e.name)).toList(),
+          onChanged: _changePermanentProvince,
         ),
         const SizedBox(height: 10),
-        _field(
-          controller: _identityIssuePlaceController,
-          label: 'Nơi cấp giấy tờ',
-          maxLength: 255,
+        VnuSingleSelect<DormitoryWardOption>(
+          label: 'Xã/Phường thường trú', value: _selectedPermanentWard, hintText: 'Chọn xã/phường',
+          sheetTitle: 'Chọn xã/phường thường trú', enabled: !_submitting && _selectedPermanentProvince != null,
+          items: _permanentWards.map((DormitoryWardOption e) => VnuSelectItem<DormitoryWardOption>(value: e, label: e.name)).toList(),
+          onChanged: _changePermanentWard,
         ),
         const SizedBox(height: 10),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Expanded(child: _field(controller: _ethnicityController, label: 'Dân tộc', maxLength: 50)),
-            const SizedBox(width: 10),
-            Expanded(child: _field(controller: _religionController, label: 'Tôn giáo', maxLength: 50)),
-          ],
-        ),
-        const SizedBox(height: 10),
-        _field(
-          controller: _permanentAddressController,
-          label: 'Địa chỉ thường trú',
-          maxLines: 2,
-        ),
-        const SizedBox(height: 10),
-        _field(
-          controller: _vneidPermanentAddressController,
-          label: 'Địa chỉ thường trú theo VNeID',
-          maxLines: 2,
-        ),
-        const SizedBox(height: 10),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Expanded(child: _field(controller: _permanentProvinceCodeController, label: 'Mã tỉnh thường trú', maxLength: 50)),
-            const SizedBox(width: 10),
-            Expanded(child: _field(controller: _permanentWardCodeController, label: 'Mã xã/phường thường trú', maxLength: 50)),
-          ],
-        ),
-        const SizedBox(height: 10),
-        _field(
-          controller: _contactAddressController,
-          label: 'Địa chỉ liên hệ',
-          maxLines: 2,
-        ),
-        const SizedBox(height: 10),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Expanded(
-              child: _field(
-                controller: _countryController,
-                label: 'Quốc gia',
-                maxLength: 10,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _field(
-                controller: _countryCodeController,
-                label: 'Mã quốc gia',
-                maxLength: 10,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        _field(
-          controller: _nationalController,
-          label: 'Quốc tịch',
-          maxLength: 50,
-        ),
+        _field(controller: _permanentAddressController, label: 'Địa chỉ thường trú', maxLines: 2, readOnly: true),
       ],
     );
   }
 
   Widget _buildAcademicCard() {
     return _sectionCard(
-      icon: Icons.school_outlined,
-      title: 'Thông tin học tập',
+      icon: Icons.home_work_outlined,
+      title: 'Thông tin lưu trú',
       children: <Widget>[
         VnuSingleSelect<int>(
-          label: 'Loại người học',
-          value: _studentType,
-          hintText: 'Chọn loại người học',
-          sheetTitle: 'Chọn loại người học',
-          enabled: !_submitting,
+          label: 'Loại người học', value: _studentType, hintText: 'Chọn loại người học',
+          sheetTitle: 'Chọn loại người học', enabled: !_submitting,
           items: const <VnuSelectItem<int>>[
             VnuSelectItem<int>(value: 0, label: 'Học sinh'),
             VnuSelectItem<int>(value: 1, label: 'Sinh viên'),
@@ -1025,89 +1034,7 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
           onChanged: (int? value) => setState(() => _studentType = value),
         ),
         const SizedBox(height: 10),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Expanded(
-              child: _field(
-                controller: _classNameController,
-                label: 'Lớp',
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _field(
-                controller: _majorController,
-                label: 'Ngành',
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _field(
-                controller: _academicYearController,
-                label: 'Năm học',
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Expanded(
-              child: _field(
-                controller: _facultyController,
-                label: 'Khoa/đơn vị',
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _field(
-                controller: _systemController,
-                label: 'Hệ đào tạo',
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Expanded(
-              child: _field(
-                controller: _levelController,
-                label: 'Bậc đào tạo',
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _field(
-                controller: _universityController,
-                label: 'Trường',
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Expanded(
-              child: _field(
-                controller: _universityIdController,
-                label: 'ID trường',
-                keyboardType: TextInputType.number,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _field(
-                controller: _priorityObjectNameController,
-                label: 'Tên đối tượng ưu tiên',
-              ),
-            ),
-          ],
-        ),
+        _field(controller: _reasonStayController, label: 'Lý do lưu trú', maxLength: 100),
       ],
     );
   }
@@ -1115,53 +1042,29 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
   Widget _buildContactPriorityCard() {
     return _sectionCard(
       icon: Icons.phone_outlined,
-      title: 'Liên hệ & lưu trú',
+      title: 'Liên hệ & tạm trú',
       children: <Widget>[
-        _field(
-          controller: _temporaryAddressController,
-          label: 'Địa chỉ tạm trú',
-          maxLines: 2,
+        VnuSingleSelect<DormitoryProvinceOption>(
+          label: 'Tỉnh/Thành phố tạm trú', value: _selectedTemporaryProvince, hintText: 'Chọn tỉnh/thành phố',
+          sheetTitle: 'Chọn tỉnh/thành phố tạm trú', enabled: !_submitting,
+          items: _provinces.map((DormitoryProvinceOption e) => VnuSelectItem<DormitoryProvinceOption>(value: e, label: e.name)).toList(),
+          onChanged: _changeTemporaryProvince,
         ),
         const SizedBox(height: 10),
-        _field(
-          controller: _vneidTemporaryAddressController,
-          label: 'Địa chỉ tạm trú theo VNeID',
-          maxLines: 2,
+        VnuSingleSelect<DormitoryWardOption>(
+          label: 'Xã/Phường tạm trú', value: _selectedTemporaryWard, hintText: 'Chọn xã/phường',
+          sheetTitle: 'Chọn xã/phường tạm trú', enabled: !_submitting && _selectedTemporaryProvince != null,
+          items: _temporaryWards.map((DormitoryWardOption e) => VnuSelectItem<DormitoryWardOption>(value: e, label: e.name)).toList(),
+          onChanged: _changeTemporaryWard,
         ),
         const SizedBox(height: 10),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Expanded(child: _field(controller: _temporaryProvinceCodeController, label: 'Mã tỉnh tạm trú', maxLength: 50)),
-            const SizedBox(width: 10),
-            Expanded(child: _field(controller: _temporaryWardCodeController, label: 'Mã xã/phường tạm trú', maxLength: 50)),
-          ],
-        ),
+        _field(controller: _temporaryAddressController, label: 'Địa chỉ tạm trú', maxLines: 2, readOnly: true),
         const SizedBox(height: 10),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Expanded(
-              child: _field(
-                controller: _phoneController,
-                label: 'Số điện thoại *',
-                keyboardType: TextInputType.phone,
-                maxLength: 20,
-                validator: _requiredValidator,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _field(
-                controller: _emailController,
-                label: 'Email *',
-                keyboardType: TextInputType.emailAddress,
-                maxLength: 255,
-                validator: _emailValidator,
-              ),
-            ),
-          ],
-        ),
+        Row(children: <Widget>[
+          Expanded(child: _field(controller: _phoneController, label: 'Số điện thoại *', keyboardType: TextInputType.phone, maxLength: 20, validator: _requiredValidator)),
+          const SizedBox(width: 10),
+          Expanded(child: _field(controller: _emailController, label: 'Email *', keyboardType: TextInputType.emailAddress, maxLength: 255, validator: _emailValidator)),
+        ]),
       ],
     );
   }
@@ -1829,7 +1732,7 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
   Widget _buildFamilyCard() {
     return _sectionCard(
       icon: Icons.family_restroom_rounded,
-      title: 'Thông tin gia đình',
+      title: 'Thông tin gia đình *',
       trailing: TextButton.icon(
         onPressed: _submitting ? null : _addFamilyMember,
         icon: const Icon(Icons.add_rounded, size: 18),
@@ -1837,7 +1740,7 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
       ),
       children: <Widget>[
         const Text(
-          'Khi lưu, danh sách dưới đây sẽ thay thế toàn bộ danh sách người thân hiện có.',
+          'Bắt buộc có ít nhất 1 người thân. Khi danh sách được chỉnh sửa và lưu, danh sách dưới đây sẽ thay thế toàn bộ danh sách người thân hiện có.',
           style: TextStyle(
             fontSize: AppFontSizes.extraSmall,
             color: Color(0xFF666B75),
@@ -1908,7 +1811,7 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
               ),
               IconButton(
                 tooltip: 'Xóa người thân',
-                onPressed: _submitting
+                onPressed: _submitting || _familyForms.length <= 1
                     ? null
                     : () => _removeFamilyMember(index),
                 icon: const Icon(
@@ -2137,18 +2040,23 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
   Future<void> _submit() async {
     if (_formKey.currentState?.validate() != true) return;
 
+    final List<FamilyMemberPayload> familyMembers = _familyForms
+        .map((_StudentFamilyMemberForm item) => item.toPayload())
+        .where((FamilyMemberPayload item) => item.fullName.trim().isNotEmpty)
+        .toList();
+    if (familyMembers.isEmpty) {
+      _showError(
+        'Vui lòng nhập ít nhất 1 người thân trong thông tin gia đình.',
+      );
+      return;
+    }
+
     final String originalIdentityNo = widget.identityNo.trim();
     final String updatedIdentityNo = _identityNoController.text.trim();
 
     if (originalIdentityNo.isEmpty) {
       _showError('Không tìm thấy CCCD hoặc mã sinh viên để cập nhật');
       return;
-    }
-
-    final List<String> unsupportedChanges = _unsupportedChanges();
-    if (unsupportedChanges.isNotEmpty) {
-      final bool continueSaving = await _confirmUnsupportedChanges(unsupportedChanges);
-      if (!continueSaving || !mounted) return;
     }
 
     setState(() => _submitting = true);
@@ -2170,17 +2078,11 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
         'country_code': _textOrNull(_countryCodeController),
         'national': _textOrNull(_nationalController),
         'permanent_address': _textOrNull(_permanentAddressController),
-        'vneid_permanent_address': _textOrNull(
-          _vneidPermanentAddressController,
-        ),
         'permanent_province_code': _textOrNull(
           _permanentProvinceCodeController,
         ),
         'permanent_ward_code': _textOrNull(_permanentWardCodeController),
         'temporary_address': _textOrNull(_temporaryAddressController),
-        'vneid_temporary_address': _textOrNull(
-          _vneidTemporaryAddressController,
-        ),
         'temporary_province_code': _textOrNull(
           _temporaryProvinceCodeController,
         ),
@@ -2193,8 +2095,8 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
       if (currentFamilySnapshot != _initialFamilySnapshot) {
         // PATCH contract: when this key is present the server replaces the
         // entire family list. Omit it when the user did not edit the list.
-        data['family_members'] = _familyForms
-            .map((_StudentFamilyMemberForm item) => item.toPayload().toJson())
+        data['family_members'] = familyMembers
+            .map((FamilyMemberPayload item) => item.toJson())
             .toList();
       }
 
@@ -2218,18 +2120,6 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
         }
       }
 
-      if (_priorityDocumentFiles.isNotEmpty && uploadStudent != null) {
-        final UploadedAttachmentListResponse documentResponse = await _repository
-            .uploadPriorityDocuments(
-              student: uploadStudent,
-              files: List<File>.unmodifiable(_priorityDocumentFiles),
-            );
-        if (documentResponse.success != true &&
-            (documentResponse.data == null || documentResponse.data!.isEmpty)) {
-          throw Exception('Không tải được giấy tờ ưu tiên');
-        }
-      }
-
       final Map<String, dynamic> response = await _repository.updateStudent(
         identityNo: originalIdentityNo,
         data: data,
@@ -2241,10 +2131,7 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
           response['message']?.toString().trim().isNotEmpty == true
           ? response['message'].toString()
           : 'Cập nhật thông tin sinh viên thành công.';
-      final String message = unsupportedChanges.isEmpty
-          ? baseMessage
-          : '$baseMessage Các trường chưa được API KTX hỗ trợ cập nhật nên '
-              'chưa được lưu: ${unsupportedChanges.join(', ')}.';
+      final String message = baseMessage;
 
       Navigator.pop(
         context,
@@ -2286,7 +2173,7 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
       countryCode: _textOrNull(_countryCodeController),
       national: _textOrNull(_nationalController),
       permanentAddress: _permanentAddressController.text.trim(),
-      vneidPermanentAddress: _textOrNull(_vneidPermanentAddressController),
+      vneidPermanentAddress: null,
       permanentProvinceCode: _textOrNull(_permanentProvinceCodeController),
       permanentWardCode: _textOrNull(_permanentWardCodeController),
       contactAddress: _textOrNull(_contactAddressController),
@@ -2299,7 +2186,7 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
       universityName: _universityController.text.trim(),
       priorityObjectName: null,
       temporaryAddress: _temporaryAddressController.text.trim(),
-      vneidTemporaryAddress: _textOrNull(_vneidTemporaryAddressController),
+      vneidTemporaryAddress: null,
       temporaryProvinceCode: _textOrNull(_temporaryProvinceCodeController),
       temporaryWardCode: _textOrNull(_temporaryWardCodeController),
       reasonStay: _textOrNull(_reasonStayController),

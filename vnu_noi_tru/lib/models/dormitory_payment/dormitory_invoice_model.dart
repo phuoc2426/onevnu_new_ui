@@ -77,6 +77,15 @@ class DormitoryInvoiceModel {
   final DateTime? paidAt;
   final DateTime? createdAt;
 
+  // Snapshot thông tin xếp phòng mà Receipt API trả trực tiếp. Các field này
+  // dùng để resolve ID kỹ thuật thành text có nghĩa trên màn Nội trú.
+  final Object? accommodationId;
+  final int? dormitoryId;
+  final int? roomTypeId;
+  final String? roomTypeName;
+  final String? roomNumber;
+  final String? buildingName;
+
   /// Ngày bắt đầu/kết thúc kỳ thu nếu API biên lai có trả về.
   /// Khi API chưa có hai trường này, màn hình hóa đơn dùng ngày của hồ sơ
   /// nội trú được truyền từ card lịch sử làm dữ liệu dự phòng.
@@ -103,6 +112,12 @@ class DormitoryInvoiceModel {
     this.dueDate,
     this.paidAt,
     this.createdAt,
+    this.accommodationId,
+    this.dormitoryId,
+    this.roomTypeId,
+    this.roomTypeName,
+    this.roomNumber,
+    this.buildingName,
     this.periodStartDate,
     this.periodEndDate,
     this.paymentCode,
@@ -163,6 +178,18 @@ class DormitoryInvoiceModel {
       dueDate: _toDateTime(json['due_date'] ?? json['dueDate']),
       paidAt: _toDateTime(json['paid_at'] ?? json['paidAt']),
       createdAt: _toDateTime(json['created_at'] ?? json['createdAt']),
+      accommodationId: json['accommodation_id'] ?? json['accommodationId'],
+      dormitoryId: _toInt(json['dormitory_id'] ?? json['dormitoryId']),
+      roomTypeId: _toInt(json['room_type_id'] ?? json['roomTypeId']),
+      roomTypeName:
+          json['room_type_name']?.toString() ??
+          json['roomTypeName']?.toString(),
+      roomNumber:
+          json['room_number']?.toString() ??
+          json['roomNumber']?.toString(),
+      buildingName:
+          json['building_name']?.toString() ??
+          json['buildingName']?.toString(),
       periodStartDate: _toDateTime(
         json['period_start_date'] ??
             json['periodStartDate'] ??
@@ -349,6 +376,13 @@ class DormitoryInvoiceModel {
     return normalized == 'paid' ||
         normalized == 'completed' ||
         normalized == 'success';
+  }
+
+  static int? _toInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value.toString());
   }
 
   static double _toDouble(dynamic value) {

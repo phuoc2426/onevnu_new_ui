@@ -45,6 +45,7 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
   List<DormitoryInvoiceModel> _dashboardReceipts = <DormitoryInvoiceModel>[];
   List<DormitoryAccommodationStatusModel> _statusCatalog =
       <DormitoryAccommodationStatusModel>[];
+  Map<String, dynamic>? _fullStudentProfile;
 
   late BuildContext _hubContext;
 
@@ -94,6 +95,7 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
     }
 
     await _cubit.getMyRegistrations();
+    await _loadFullStudentProfileFromCurrentState();
     await _loadLatestPendingApprovalDaysFromCurrentState();
     await _loadLatestReceiptFromCurrentState();
   }
@@ -119,8 +121,53 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
     }
 
     await _cubit.getMyRegistrations();
+    await _loadFullStudentProfileFromCurrentState();
     await _loadLatestPendingApprovalDaysFromCurrentState();
     await _loadLatestReceiptFromCurrentState();
+  }
+
+  Future<void> _loadFullStudentProfileFromCurrentState() async {
+    final dynamic data = _readDataFromState(_cubit.state);
+    dynamic student;
+    if (data is Map) {
+      student = data['student'];
+    } else {
+      try {
+        student = data?.student;
+      } catch (_) {
+        student = null;
+      }
+    }
+
+    final String studentCode = _studentCodeText(student).trim();
+    String identityNo = _studentIdentityNo(student).trim();
+    if (identityNo.isEmpty) {
+      final SharedPreferences preferences = await SharedPreferences.getInstance();
+      identityNo = preferences.getString('applicant_cccd')?.trim() ?? '';
+    }
+
+    if (studentCode.isEmpty && identityNo.isEmpty) {
+      if (mounted && _fullStudentProfile != null) {
+        setState(() => _fullStudentProfile = null);
+      } else {
+        _fullStudentProfile = null;
+      }
+      return;
+    }
+
+    try {
+      final Map<String, dynamic>? profile = await _repository.getStudentProfile(
+        studentCode: studentCode,
+        identityNo: identityNo,
+      );
+      if (!mounted) {
+        _fullStudentProfile = profile;
+        return;
+      }
+      setState(() => _fullStudentProfile = profile);
+    } catch (_) {
+      // /dormitory/me vẫn là nguồn chính; profile đầy đủ chỉ bổ sung familyMembers.
+    }
   }
 
   Future<void> _loadStatusCatalog() async {
@@ -375,17 +422,28 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
   }
 
   dynamic _readStudent(dynamic data) {
-    if (data == null) return null;
+    if (data == null) return _fullStudentProfile;
 
+    dynamic baseStudent;
     if (data is Map) {
-      return data['student'];
+      baseStudent = data['student'];
+    } else {
+      try {
+        baseStudent = data.student;
+      } catch (_) {
+        baseStudent = null;
+      }
     }
 
-    try {
-      return data.student;
-    } catch (_) {
-      return null;
+    final Map<String, dynamic>? profile = _fullStudentProfile;
+    if (profile == null) return baseStudent;
+    if (baseStudent is Map) {
+      return <String, dynamic>{
+        ...Map<String, dynamic>.from(baseStudent),
+        ...profile,
+      };
     }
+    return profile;
   }
 
   List<dynamic> _readTopLevelList(
@@ -533,28 +591,341 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
     return normalized.trim();
   }
 
+  bool _hasMeaningfulApiValue(dynamic value) {
+    if (value == null) return false;
+    if (value is String) {
+      final String text = value.trim();
+      return text.isNotEmpty && text.toLowerCase() != 'null';
+    }
+    if (value is Map) return value.isNotEmpty;
+    if (value is Iterable) return value.isNotEmpty;
+    return true;
+  }
+
+  Map<String, dynamic> _asStringMap(dynamic value) {
+    if (value is! Map) return <String, dynamic>{};
+    return value.map<String, dynamic>(
+      (dynamic key, dynamic item) => MapEntry<String, dynamic>(
+        key.toString(),
+        item,
+      ),
+    );
+  }
+
+  Map<String, dynamic> _historyDataAsMap(dynamic rawData) {
+    if (rawData is Map) return _asStringMap(rawData);
+
+    // OpenAPI currently declares StudentHistory.data as array|null, while
+    // production history payloads can also be JSON objects. Support both.
+    if (rawData is Iterable && rawData is! String) {
+      final Map<String, dynamic> merged = <String, dynamic>{};
+      for (final dynamic item in rawData) {
+        if (item is Map) {
+          merged.addAll(_asStringMap(item));
+        }
+      }
+      return merged;
+    }
+
+    return <String, dynamic>{};
+  }
+
+  List<Map<String, dynamic>> _historySourceMaps(
+    Map<String, dynamic> history,
+  ) {
+    final List<Map<String, dynamic>> sources = <Map<String, dynamic>>[];
+    final Map<String, dynamic> dataMap = _historyDataAsMap(history['data']);
+    if (dataMap.isNotEmpty) sources.add(dataMap);
+
+    final Map<String, dynamic> accommodationSnapshot = _asStringMap(
+      history['accommodation'],
+    );
+    if (accommodationSnapshot.isNotEmpty) {
+      sources.add(accommodationSnapshot);
+    }
+
+    sources.add(history);
+
+    // Some backends put room/building fields inside a room snapshot.
+    for (final Map<String, dynamic> source in List<Map<String, dynamic>>.from(
+      sources,
+    )) {
+      final Map<String, dynamic> room = _asStringMap(source['room']);
+      if (room.isNotEmpty) sources.add(room);
+
+      final Map<String, dynamic> building = _asStringMap(source['building']);
+      if (building.isNotEmpty) sources.add(building);
+    }
+
+    return sources;
+  }
+
+  dynamic _firstMeaningfulHistoryValue(
+    List<Map<String, dynamic>> sources,
+    List<String> keys,
+  ) {
+    for (final Map<String, dynamic> source in sources) {
+      for (final String key in keys) {
+        final dynamic value = source[key];
+        if (_hasMeaningfulApiValue(value)) return value;
+      }
+    }
+    return null;
+  }
+
+  String _historyComparableId(dynamic value) {
+    if (value == null) return '';
+    final String text = value.toString().trim();
+    if (text.isEmpty || text.toLowerCase() == 'null') return '';
+    return text;
+  }
+
+  bool _historyMatchesAccommodation({
+    required Map<String, dynamic> history,
+    required dynamic accommodation,
+    required int accommodationCount,
+  }) {
+    final Map<String, dynamic> dataMap = _historyDataAsMap(history['data']);
+    final Map<String, dynamic> snapshot = _asStringMap(
+      history['accommodation'],
+    );
+
+    final String accommodationId = _historyComparableId(
+      _accommodationId(accommodation),
+    );
+    final String historyAccommodationId = _historyComparableId(
+      history['accommodation_id'] ??
+          history['accommodationId'] ??
+          dataMap['accommodation_id'] ??
+          dataMap['accommodationId'] ??
+          snapshot['id'] ??
+          snapshot['accommodation_id'] ??
+          snapshot['accommodationId'],
+    );
+
+    if (accommodationId.isNotEmpty && historyAccommodationId.isNotEmpty) {
+      return accommodationId == historyAccommodationId;
+    }
+
+    // Some history rows do not expose accommodation_id but do expose the
+    // registration period. Use that as a safe second-level match.
+    final String periodId = _historyComparableId(
+      _registrationPeriodId(accommodation),
+    );
+    final String historyPeriodId = _historyComparableId(
+      dataMap['registration_period_id'] ??
+          dataMap['registrationPeriodId'] ??
+          dataMap['period_id'] ??
+          dataMap['periodId'] ??
+          snapshot['registration_period_id'] ??
+          snapshot['registrationPeriodId'] ??
+          history['registration_period_id'] ??
+          history['registrationPeriodId'],
+    );
+
+    if (periodId.isNotEmpty && historyPeriodId.isNotEmpty) {
+      return periodId == historyPeriodId;
+    }
+
+    // Only use an unscoped history row when there is exactly one
+    // accommodation; this avoids copying an old KTX/building into a newer
+    // registration when the student has multiple historical stays.
+    return accommodationCount == 1 &&
+        historyAccommodationId.isEmpty &&
+        historyPeriodId.isEmpty;
+  }
+
+  DateTime _historySortTime(Map<String, dynamic> history) {
+    final Map<String, dynamic> dataMap = _historyDataAsMap(history['data']);
+    return _parseDate(
+          history['created_at'] ??
+              history['createdAt'] ??
+              dataMap['created_at'] ??
+              dataMap['createdAt'] ??
+              history['updated_at'] ??
+              history['updatedAt'],
+        ) ??
+        DateTime.fromMillisecondsSinceEpoch(0);
+  }
+
+  void _fillAccommodationFieldFromHistory({
+    required Map<String, dynamic> target,
+    required String targetKey,
+    required List<String> existingKeys,
+    required List<Map<String, dynamic>> sources,
+    required List<String> sourceKeys,
+  }) {
+    if (_hasMeaningfulApiValue(target[targetKey])) return;
+
+    // Canonicalize an already-present alias first. This matters because the
+    // generic reader treats an existing empty primary key as authoritative and
+    // therefore would not fall through to a non-empty alias.
+    for (final String key in existingKeys) {
+      if (key == targetKey) continue;
+      final dynamic existingValue = target[key];
+      if (_hasMeaningfulApiValue(existingValue)) {
+        target[targetKey] = existingValue;
+        return;
+      }
+    }
+
+    final dynamic value = _firstMeaningfulHistoryValue(sources, sourceKeys);
+    if (_hasMeaningfulApiValue(value)) {
+      target[targetKey] = value;
+    }
+  }
+
+  Map<String, dynamic> _enrichAccommodationFromHistory({
+    required Map<String, dynamic> accommodation,
+    required List<dynamic> histories,
+    required int accommodationCount,
+  }) {
+    final Map<String, dynamic> result = Map<String, dynamic>.from(accommodation);
+
+    final List<Map<String, dynamic>> candidates = histories
+        .whereType<Map>()
+        .map(_asStringMap)
+        .where(
+          (Map<String, dynamic> history) => _historyMatchesAccommodation(
+            history: history,
+            accommodation: result,
+            accommodationCount: accommodationCount,
+          ),
+        )
+        .toList()
+      ..sort(
+        (Map<String, dynamic> first, Map<String, dynamic> second) =>
+            _historySortTime(second).compareTo(_historySortTime(first)),
+      );
+
+    for (final Map<String, dynamic> history in candidates) {
+      final List<Map<String, dynamic>> sources = _historySourceMaps(history);
+
+      _fillAccommodationFieldFromHistory(
+        target: result,
+        targetKey: 'dormitory',
+        existingKeys: const <String>[
+          'dormitory',
+          'dormitoryName',
+          'dormitory_name',
+        ],
+        sources: sources,
+        sourceKeys: const <String>[
+          'dormitory',
+          'dormitoryName',
+          'dormitory_name',
+          'dormitoryLabel',
+          'dormitory_label',
+        ],
+      );
+      _fillAccommodationFieldFromHistory(
+        target: result,
+        targetKey: 'building',
+        existingKeys: const <String>[
+          'building',
+          'buildingName',
+          'building_name',
+          'buildingCode',
+          'building_code',
+        ],
+        sources: sources,
+        sourceKeys: const <String>[
+          'building',
+          'buildingName',
+          'building_name',
+          'buildingCode',
+          'building_code',
+          'blockName',
+          'block_name',
+          'toa',
+        ],
+      );
+      _fillAccommodationFieldFromHistory(
+        target: result,
+        targetKey: 'roomTypeName',
+        existingKeys: const <String>['roomTypeName', 'room_type_name'],
+        sources: sources,
+        sourceKeys: const <String>['roomTypeName', 'room_type_name'],
+      );
+      _fillAccommodationFieldFromHistory(
+        target: result,
+        targetKey: 'roomType',
+        existingKeys: const <String>['roomType', 'room_type'],
+        sources: sources,
+        sourceKeys: const <String>['roomType', 'room_type'],
+      );
+      _fillAccommodationFieldFromHistory(
+        target: result,
+        targetKey: 'assignedRoom',
+        existingKeys: const <String>[
+          'assignedRoom',
+          'assigned_room',
+          'roomNumber',
+          'room_number',
+        ],
+        sources: sources,
+        sourceKeys: const <String>[
+          'assignedRoom',
+          'assigned_room',
+          'roomNumber',
+          'room_number',
+        ],
+      );
+      _fillAccommodationFieldFromHistory(
+        target: result,
+        targetKey: 'dormitory_id',
+        existingKeys: const <String>['dormitory_id', 'dormitoryId'],
+        sources: sources,
+        sourceKeys: const <String>['dormitory_id', 'dormitoryId'],
+      );
+      _fillAccommodationFieldFromHistory(
+        target: result,
+        targetKey: 'room_type_id',
+        existingKeys: const <String>['room_type_id', 'roomTypeId'],
+        sources: sources,
+        sourceKeys: const <String>['room_type_id', 'roomTypeId'],
+      );
+      _fillAccommodationFieldFromHistory(
+        target: result,
+        targetKey: 'room_id',
+        existingKeys: const <String>['room_id', 'roomId'],
+        sources: sources,
+        sourceKeys: const <String>['room_id', 'roomId'],
+      );
+      _fillAccommodationFieldFromHistory(
+        target: result,
+        targetKey: 'startDate',
+        existingKeys: const <String>['startDate', 'start_date'],
+        sources: sources,
+        sourceKeys: const <String>['startDate', 'start_date'],
+      );
+      _fillAccommodationFieldFromHistory(
+        target: result,
+        targetKey: 'endDate',
+        existingKeys: const <String>['endDate', 'end_date'],
+        sources: sources,
+        sourceKeys: const <String>['endDate', 'end_date'],
+      );
+    }
+
+    return result;
+  }
+
   List<dynamic> _readAccommodations(dynamic data) {
     if (data == null) return <dynamic>[];
 
-    // API /dormitory/me đang trả hai danh sách:
-    // 1. data.accommodations: bản tóm tắt, có status/statusLabel.
-    // 2. data.student.accommodations: bản đầy đủ, có dormitory,
-    //    registration_period, room_type, room, ngày ở và ghi chú.
-    // Phải ghép hai danh sách theo id, nếu chỉ dùng danh sách tóm tắt
-    // thì UI sẽ hiện "Chưa có thông tin" dù API đã trả dữ liệu đầy đủ.
-    List<dynamic> summaryItems = <dynamic>[];
-    dynamic student;
+    // /dormitory/me only guarantees a compact accommodations[] response
+    // (roomTypeName + assignedRoom) plus histories[]. student.show returns a
+    // richer accommodations[] response containing dormitory/building as well.
+    // Merge every available source and finally recover missing room metadata
+    // from the matching StudentHistory row by accommodation_id/period_id.
+    final List<dynamic> summaryItems = _readTopLevelList(data, 'accommodations');
+    final List<dynamic> histories = _readTopLevelList(data, 'histories');
 
+    dynamic student;
     if (data is Map) {
-      summaryItems = _asList(data['accommodations']);
       student = data['student'];
     } else {
-      try {
-        summaryItems = _asList(data.accommodations);
-      } catch (_) {
-        summaryItems = <dynamic>[];
-      }
-
       try {
         student = data.student;
       } catch (_) {
@@ -573,61 +944,63 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
       }
     }
 
-    if (summaryItems.isEmpty) {
-      return detailItems;
-    }
-
-    if (detailItems.isEmpty) {
-      return summaryItems;
-    }
-
     final Map<String, dynamic> detailById = <String, dynamic>{};
-
     for (final dynamic detail in detailItems) {
       final Object? id = _accommodationId(detail);
-      if (id != null) {
-        detailById[id.toString()] = detail;
-      }
+      if (id != null) detailById[id.toString()] = detail;
     }
 
-    final List<dynamic> result = <dynamic>[];
-    final Set<String> usedIds = <String>{};
+    final List<dynamic> mergedItems = <dynamic>[];
+    final Set<String> usedDetailIds = <String>{};
 
     for (final dynamic summary in summaryItems) {
       final Object? id = _accommodationId(summary);
       final String? key = id?.toString();
       final dynamic detail = key == null ? null : detailById[key];
-
-      if (key != null) {
-        usedIds.add(key);
-      }
+      if (key != null) usedDetailIds.add(key);
 
       if (summary is Map && detail is Map) {
-        final Map<String, dynamic> merged = Map<String, dynamic>.from(detail);
-
-        // Ưu tiên giá trị tóm tắt khi khác null vì status ở đây
-        // đã được backend chuẩn hóa thành PENDING/APPROVED/ASSIGNED...
-        summary.forEach((dynamic rawKey, dynamic value) {
-          if (value != null) {
-            merged[rawKey.toString()] = value;
+        final Map<String, dynamic> merged = _asStringMap(detail);
+        _asStringMap(summary).forEach((String field, dynamic value) {
+          // Do not let an empty string from the compact response erase richer
+          // dormitory/building/room metadata from another source.
+          if (_hasMeaningfulApiValue(value) || !merged.containsKey(field)) {
+            merged[field] = value;
           }
         });
-
-        result.add(merged);
+        mergedItems.add(merged);
+      } else if (summary is Map) {
+        mergedItems.add(_asStringMap(summary));
       } else {
-        result.add(detail ?? summary);
+        mergedItems.add(detail ?? summary);
       }
     }
 
-    // Giữ cả bản ghi chi tiết mà danh sách tóm tắt chưa trả về.
     for (final dynamic detail in detailItems) {
       final Object? id = _accommodationId(detail);
-      if (id == null || !usedIds.contains(id.toString())) {
-        result.add(detail);
+      if (id == null || !usedDetailIds.contains(id.toString())) {
+        mergedItems.add(detail is Map ? _asStringMap(detail) : detail);
       }
     }
 
-    return result;
+    // In case an unusual response contains only student.accommodations.
+    if (mergedItems.isEmpty && detailItems.isNotEmpty) {
+      mergedItems.addAll(
+        detailItems.map<dynamic>(
+          (dynamic value) => value is Map ? _asStringMap(value) : value,
+        ),
+      );
+    }
+
+    final int accommodationCount = mergedItems.length;
+    return mergedItems.map<dynamic>((dynamic item) {
+      if (item is! Map) return item;
+      return _enrichAccommodationFromHistory(
+        accommodation: _asStringMap(item),
+        histories: histories,
+        accommodationCount: accommodationCount,
+      );
+    }).toList();
   }
 
   List<dynamic> _asList(dynamic value) {
@@ -880,11 +1253,7 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
       student,
       'permanent_address',
       (dynamic object) => object.permanentAddress,
-      aliases: const <String>[
-        'permanentAddress',
-        'vneid_permanent_address',
-        'vneidPermanentAddress',
-      ],
+      aliases: const <String>['permanentAddress'],
     );
   }
 
@@ -893,11 +1262,7 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
       student,
       'temporary_address',
       (dynamic object) => object.temporaryAddress,
-      aliases: const <String>[
-        'temporaryAddress',
-        'vneid_temporary_address',
-        'vneidTemporaryAddress',
-      ],
+      aliases: const <String>['temporaryAddress'],
     );
   }
 
@@ -1052,6 +1417,24 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
       return;
     }
 
+    dynamic editableStudent = student;
+    try {
+      final Map<String, dynamic>? fullProfile =
+          await _repository.getStudentProfile(
+        studentCode: _studentCodeText(student),
+        identityNo: identityNo,
+      );
+      if (fullProfile != null) {
+        editableStudent = fullProfile;
+        final String profileIdentityNo = _studentIdentityNo(fullProfile).trim();
+        if (profileIdentityNo.isNotEmpty) {
+          identityNo = profileIdentityNo;
+        }
+      }
+    } catch (_) {
+      // Giữ dữ liệu /me làm fallback; không chặn người dùng mở màn cập nhật.
+    }
+
     if (!mounted) return;
 
     final DRStudentUpdateResult? result =
@@ -1062,7 +1445,7 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
           backgroundColor: Colors.transparent,
           builder: (BuildContext context) {
             return DRStudentUpdateSheet(
-              student: student,
+              student: editableStudent,
               accommodation: latestAccommodation,
               identityNo: identityNo,
               // Nút cập nhật hiện đang tạm ẩn. Không truyền tham số
@@ -1627,7 +2010,14 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
   }
 
   String _dormitoryName(dynamic item) {
-    final dynamic dormitory = _dormitory(item);
+    // OpenAPI hiện tại trả accommodations[].dormitory trực tiếp.
+    // Vẫn hỗ trợ object/alias cũ để không phá response legacy.
+    final dynamic dormitory = _readNested(
+      item,
+      'dormitory',
+      (dynamic object) => object.dormitory,
+      aliases: const <String>['dormitoryName', 'dormitory_name'],
+    );
 
     if (dormitory is String && dormitory.trim().isNotEmpty) {
       return dormitory.trim();
@@ -1637,7 +2027,8 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
       dormitory,
       'name',
       (dynamic object) => object.name,
-    );
+      aliases: const <String>['dormitoryName', 'dormitory_name', 'title'],
+    ).trim();
     if (nestedName.isNotEmpty) return nestedName;
 
     final int? dormitoryId = _dormitoryId(item);
@@ -1713,55 +2104,29 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
   }
 
   String _assignedBuildingName(dynamic item) {
-    // API history đang trả buildingName ở NGAY object accommodation.
-    // Đây cũng là nguồn mà DRStudentHistorySheet dùng để hiển thị "Tòa C1".
-    // Vì vậy dashboard phải ưu tiên cùng nguồn trước khi đi xuống room.
-    final String accommodationBuildingName = _readString(
-      item,
-      'buildingName',
+    // Production API: student.accommodations[].room.building_name is the
+    // canonical display name of the assigned building. Prefer it before every
+    // legacy/top-level fallback so the UI shows exactly what KTX returns.
+    final dynamic room = _room(item);
+    final String roomBuildingName = _readString(
+      room,
+      'building_name',
       (dynamic object) => object.buildingName ?? '',
       aliases: const <String>[
-        'building_name',
-        'buildingCode',
+        'buildingName',
         'building_code',
-        'blockName',
+        'buildingCode',
         'block_name',
+        'blockName',
         'toa',
       ],
-    );
-    if (accommodationBuildingName.trim().isNotEmpty) {
-      return _normalizeBuildingName(accommodationBuildingName);
+    ).trim();
+    if (roomBuildingName.isNotEmpty) {
+      return _normalizeBuildingName(roomBuildingName);
     }
 
-    // Một số response có building là string hoặc object ngay trên accommodation.
-    final dynamic accommodationBuilding = _readNested(
-      item,
-      'building',
-      (dynamic object) => object.building,
-    );
-    if (accommodationBuilding is String &&
-        accommodationBuilding.trim().isNotEmpty) {
-      return _normalizeBuildingName(accommodationBuilding);
-    }
-    final String accommodationNestedBuildingName = _readString(
-      accommodationBuilding,
-      'name',
-      (dynamic object) => object.name,
-      aliases: const <String>[
-        'buildingName',
-        'building_name',
-        'code',
-        'buildingCode',
-        'building_code',
-        'title',
-      ],
-    );
-    if (accommodationNestedBuildingName.trim().isNotEmpty) {
-      return _normalizeBuildingName(accommodationNestedBuildingName);
-    }
-
-    // Fallback cho response chi tiết đặt building bên trong room.
-    final dynamic room = _room(item);
+    // Backward compatibility for responses that expose room.building as an
+    // object/string instead of room.building_name.
     final dynamic roomBuilding = _readNested(
       room,
       'building',
@@ -1784,29 +2149,51 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
         'building_code',
         'title',
       ],
-    );
+    ).trim();
     if (nestedRoomBuildingName.isNotEmpty) {
       return _normalizeBuildingName(nestedRoomBuildingName);
     }
 
-    final String roomLevelBuildingName = _readString(
-      room,
-      'building_name',
-      (dynamic object) => object.buildingName ?? '',
+    // Older/alternate API responses may still expose building on the
+    // accommodation itself. Keep this only as fallback after room.*.
+    final dynamic contractBuilding = _readNested(
+      item,
+      'building',
+      (dynamic object) => object.building,
       aliases: const <String>[
         'buildingName',
-        'building_code',
+        'building_name',
         'buildingCode',
-        'block_name',
+        'building_code',
         'blockName',
+        'block_name',
         'toa',
       ],
     );
-    if (roomLevelBuildingName.isNotEmpty) {
-      return _normalizeBuildingName(roomLevelBuildingName);
+
+    if (contractBuilding is String && contractBuilding.trim().isNotEmpty) {
+      return _normalizeBuildingName(contractBuilding);
     }
 
-    // Cuối cùng mới suy từ mã phòng kiểu CT1-206 / C1-206 / A206.
+    final String contractBuildingName = _readString(
+      contractBuilding,
+      'name',
+      (dynamic object) => object.name,
+      aliases: const <String>[
+        'buildingName',
+        'building_name',
+        'code',
+        'buildingCode',
+        'building_code',
+        'title',
+      ],
+    ).trim();
+    if (contractBuildingName.isNotEmpty) {
+      return _normalizeBuildingName(contractBuildingName);
+    }
+
+    // Last-resort compatibility only. New production responses should never
+    // need to infer a building name from the room number.
     final String hint = _assignedBuildingHintFromRoomNumber(_roomNumber(item));
     if (hint.isNotEmpty) {
       return _normalizeBuildingName(hint);
@@ -1831,17 +2218,57 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
   }
 
   String _roomTypeName(dynamic item) {
-    final dynamic roomType = _roomType(item);
+    // OpenAPI có đồng thời roomTypeName và roomType.
+    // roomTypeName là tên hiển thị; roomType có thể là mã/kiểu phòng.
+    final String directName = _readString(
+      item,
+      'roomTypeName',
+      (dynamic object) => object.roomTypeName ?? '',
+      aliases: const <String>['room_type_name'],
+    ).trim();
 
-    if (roomType is String && roomType.trim().isNotEmpty) {
-      return roomType.trim();
+    final dynamic rawRoomType = _readNested(
+      item,
+      'roomType',
+      (dynamic object) => object.roomType,
+      aliases: const <String>['room_type'],
+    );
+
+    String directType = '';
+    if (rawRoomType is String) {
+      directType = rawRoomType.trim();
+    } else {
+      directType = _readString(
+        rawRoomType,
+        'name',
+        (dynamic object) => object.name,
+        aliases: const <String>[
+          'roomTypeName',
+          'room_type_name',
+          'code',
+          'roomTypeCode',
+          'room_type_code',
+        ],
+      ).trim();
     }
 
+    if (directName.isNotEmpty && directType.isNotEmpty) {
+      if (directName.toLowerCase() == directType.toLowerCase()) {
+        return directName;
+      }
+      return '$directName · $directType';
+    }
+    if (directName.isNotEmpty) return directName;
+    if (directType.isNotEmpty) return directType;
+
+    // Legacy fallback: room_type object + room_type_id.
+    final dynamic legacyRoomType = _roomType(item);
     final String nestedName = _readString(
-      roomType,
+      legacyRoomType,
       'name',
       (dynamic object) => object.name,
-    );
+      aliases: const <String>['room_type_name', 'roomTypeName', 'code'],
+    ).trim();
     if (nestedName.isNotEmpty) return nestedName;
 
     final int? roomTypeId = _readInt(
@@ -1897,25 +2324,22 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
   }
 
   String _roomNumber(dynamic item) {
-    final dynamic room = _room(item);
-
-    final String roomNumber = _readString(
-      room,
-      'room_number',
-      (dynamic object) => object.roomNumber,
-      aliases: const <String>['roomNumber'],
-    );
-
-    if (roomNumber.isNotEmpty) {
-      return roomNumber;
-    }
-
-    return _readString(
+    // OpenAPI trả accommodations[].assignedRoom trực tiếp.
+    final String assignedRoom = _readString(
       item,
       'assignedRoom',
       (dynamic object) => object.assignedRoom ?? '',
-      aliases: const <String>['assigned_room'],
-    );
+      aliases: const <String>['assigned_room', 'roomNumber', 'room_number'],
+    ).trim();
+    if (assignedRoom.isNotEmpty) return assignedRoom;
+
+    final dynamic room = _room(item);
+    return _readString(
+      room,
+      'room_number',
+      (dynamic object) => object.roomNumber,
+      aliases: const <String>['roomNumber', 'name', 'code'],
+    ).trim();
   }
 
   String _roomCapacity(dynamic item) {
@@ -2556,16 +2980,16 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
             ],
           ),
           const SizedBox(height: 14),
+          // KTX và loại phòng thường dài: để full-width để hiển thị đủ.
+          _buildRoomInfoTile(
+            icon: Icons.apartment_rounded,
+            label: 'Ký túc xá',
+            value: dormitory,
+          ),
+          const SizedBox(height: 10),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Expanded(
-                child: _buildRoomInfoTile(
-                  icon: Icons.apartment_rounded,
-                  label: 'Ký túc xá',
-                  value: dormitory,
-                ),
-              ),
-              const SizedBox(width: 10),
               Expanded(
                 child: _buildRoomInfoTile(
                   icon: Icons.location_city_rounded,
@@ -2573,11 +2997,7 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
                   value: buildingName.isEmpty ? 'Chưa cập nhật' : buildingName,
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: <Widget>[
+              const SizedBox(width: 10),
               Expanded(
                 child: _buildRoomInfoTile(
                   icon: Icons.meeting_room_rounded,
@@ -2585,15 +3005,13 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
                   value: roomNumber.isEmpty ? 'Đang bố trí' : roomNumber,
                 ),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _buildRoomInfoTile(
-                  icon: Icons.groups_rounded,
-                  label: 'Loại phòng',
-                  value: roomType.isEmpty ? 'Chưa cập nhật' : roomType,
-                ),
-              ),
             ],
+          ),
+          const SizedBox(height: 10),
+          _buildRoomInfoTile(
+            icon: Icons.groups_rounded,
+            label: 'Loại phòng',
+            value: roomType.isEmpty ? 'Chưa cập nhật' : roomType,
           ),
           const SizedBox(height: 10),
           _buildRoomInfoTile(
@@ -2669,8 +3087,7 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
                 const SizedBox(height: 3),
                 Text(
                   value,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+                  softWrap: true,
                   style: const TextStyle(
                     fontSize: AppFontSizes.font11,
                     color: Color(0xFF252B27),
@@ -3316,12 +3733,7 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
     final String level = _studentLevel(student);
     final String permanentAddress = _studentPermanentAddress(student);
     final String temporaryAddress = _studentTemporaryAddress(student);
-    // student.show đặt lựa chọn ưu tiên trong accommodation.priorityObject,
-    // không nằm trong object student. Vẫn fallback về dữ liệu student cũ.
-    final String priorityObject = _priorityObjectName(
-      latestAccommodation,
-      student,
-    );
+    final String priorityObject = _studentPriorityObjectName(student);
     final String avatarUrl = _studentAvatarUrl(student);
     final List<dynamic> familyMembers = _studentFamilyMembers(student);
     // Tạm ẩn trạng thái khóa trên giao diện.
@@ -3430,7 +3842,7 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
               const SizedBox(height: 14),
             ],
             _buildInfoRow('Họ và tên:', _studentFullName(student)),
-            _buildInfoRow('Mã SV:', _studentCodeText(student)),
+            _buildInfoRow('Mã sinh viên:', _studentCodeText(student)),
             if (identityNo.isNotEmpty)
               _buildInfoRow(
                 identityType.isNotEmpty ? '$identityType:' : 'CCCD:',
@@ -3447,8 +3859,8 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
             if (_studentMajor(student).isNotEmpty)
               _buildInfoRow('Ngành:', _studentMajor(student)),
             if (academicYear.isNotEmpty)
-              _buildInfoRow('Năm nhập học:', academicYear),
-            if (level.isNotEmpty) _buildInfoRow('Trình độ:', level),
+              _buildInfoRow('Năm học:', academicYear),
+            if (level.isNotEmpty) _buildInfoRow('Bậc đào tạo:', level),
             if (_studentPhone(student).isNotEmpty)
               _buildInfoRow('SĐT:', _studentPhone(student)),
             if (_studentEmail(student).isNotEmpty)
@@ -3566,9 +3978,6 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
       data,
       'accommodations',
     ).length;
-    final int roommateCount = _readTopLevelList(data, 'roommates').length;
-    final int receiptCount = _readTopLevelList(data, 'receipts').length;
-    final int issueCount = _readTopLevelList(data, 'issues').length;
     final int historyCount = _readTopLevelList(data, 'histories').length;
 
     return Card(
@@ -3614,18 +4023,8 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
                     ),
                     const SizedBox(height: 5),
                     Text(
-                      '$accommodationCount hồ sơ · '
-                      '$roommateCount bạn cùng phòng · '
-                      '$receiptCount biên lai',
-                      style: const TextStyle(
-                        fontSize: AppFontSizes.extraSmall,
-                        color: Color(0xFF626A65),
-                        height: 1.35,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '$issueCount sự cố · $historyCount sự kiện lịch sử',
+                      '$accommodationCount hồ sơ nội trú · '
+                      '$historyCount sự kiện lịch sử',
                       style: const TextStyle(
                         fontSize: AppFontSizes.extraSmall,
                         color: Color(0xFF626A65),
@@ -3650,37 +4049,44 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
     required bool isLatest,
   }) {
     final String status = _accommodationStatus(item);
-    final String periodName = _periodName(item);
-    final String periodDescription = _periodDescription(item);
-    final DateTime? periodStart = _periodStartTime(item);
-    final DateTime? periodEnd = _periodEndTime(item);
-
-    final String dormitoryName = _dormitoryName(item);
-    final String dormitoryAddress = _dormitoryAddress(item);
-    final String buildingName = _assignedBuildingName(item);
-    final String priorityObjectName = _priorityObjectName(item, student);
-
-    final String roomTypeName = _roomTypeName(item);
-    final String latestReceiptPrice = isLatest
-        ? _latestReceiptPriceText(item)
-        : '';
-    final String roomNumber = _roomNumber(item);
-    final String roomCapacity = _roomCapacity(item);
-    final String roomCurrentOccupancy = _roomCurrentOccupancy(item);
-
+    final String statusLabel = _readString(
+      item, 'statusLabel', (dynamic object) => object.statusLabel,
+      aliases: const <String>['status_label'],
+    );
+    final String periodName = _readString(
+      item, 'registrationPeriodName',
+      (dynamic object) => object.registrationPeriodName,
+      aliases: const <String>['registration_period_name'],
+    );
+    final String studentCode = _readString(
+      item, 'studentCode', (dynamic object) => object.studentCode,
+      aliases: const <String>['student_code'],
+    );
+    final String studentName = _readString(
+      item, 'studentName', (dynamic object) => object.studentName,
+      aliases: const <String>['student_name'],
+    );
+    final String rejectReason = _readString(
+      item, 'rejectReason', (dynamic object) => object.rejectReason,
+      aliases: const <String>['reject_reason'],
+    );
+    final String roomTypeName = _readString(
+      item, 'roomTypeName', (dynamic object) => object.roomTypeName,
+      aliases: const <String>['room_type_name'],
+    );
+    final String assignedRoom = _readString(
+      item, 'assignedRoom', (dynamic object) => object.assignedRoom,
+      aliases: const <String>['assigned_room'],
+    );
+    bool? isDraft;
+    if (item is Map) {
+      final dynamic raw = item['isDraft'] ?? item['is_draft'];
+      if (raw is bool) isDraft = raw;
+    } else {
+      try { isDraft = item.isDraft as bool?; } catch (_) {}
+    }
     final DateTime? createdAt = _accommodationCreatedAt(item);
     final DateTime? updatedAt = _accommodationUpdatedAt(item);
-    final DateTime? approvedAt = _accommodationApprovedAt(item);
-    final DateTime? assignedAt = _accommodationAssignedAt(item);
-    final DateTime? checkinAt = _accommodationCheckinAt(item);
-    final DateTime? checkoutAt = _accommodationCheckoutAt(item);
-    final DateTime? startDate = _accommodationStartDate(item);
-    final DateTime? endDate = _accommodationEndDate(item);
-
-    final String reasonStay = _accommodationReasonStay(item);
-    final String requestStatus = _requestStatusText(item);
-    final bool? isRoomLeader = _accommodationIsRoomLeader(item);
-    final String note = _accommodationNote(item);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -3696,170 +4102,35 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: Icon(
-                      _getStatusIcon(status),
-                      size: 20,
-                      color: _getStatusColor(status),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      periodName,
-                      style: const TextStyle(
-                        fontSize: AppFontSizes.mediumSmall,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF111318),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  _buildStatusBadge(status),
-                ],
-              ),
+              Row(children: <Widget>[
+                Icon(_getStatusIcon(status), size: 20, color: _getStatusColor(status)),
+                const SizedBox(width: 8),
+                Expanded(child: Text(
+                  periodName.isEmpty ? 'Hồ sơ nội trú' : periodName,
+                  style: const TextStyle(fontSize: AppFontSizes.mediumSmall, fontWeight: FontWeight.bold, color: Color(0xFF111318)),
+                )),
+                const SizedBox(width: 8),
+                _buildStatusBadge(status),
+              ]),
               const Divider(height: 22),
-
-              _buildSectionTitle(
-                icon: Icons.apartment_rounded,
-                title: 'Thông tin ký túc xá',
-              ),
-              _buildInfoRow('Khu nội trú:', dormitoryName),
-              if (dormitoryAddress.isNotEmpty)
-                _buildInfoRow('Địa chỉ:', dormitoryAddress),
-
-              const SizedBox(height: 10),
-              _buildSectionTitle(
-                icon: Icons.description_outlined,
-                title: 'Thông tin hồ sơ',
-              ),
-              _buildInfoRow('Đợt đăng ký:', periodName),
-              if (periodDescription.isNotEmpty)
-                _buildInfoRow('Mô tả đợt:', periodDescription),
-              if (periodStart != null)
-                _buildInfoRow(
-                  'Mở đăng ký:',
-                  DateFormat('dd/MM/yyyy HH:mm').format(periodStart.toLocal()),
-                ),
-              if (periodEnd != null)
-                _buildInfoRow(
-                  'Đóng đăng ký:',
-                  DateFormat('dd/MM/yyyy HH:mm').format(periodEnd.toLocal()),
-                ),
-              if (priorityObjectName.isNotEmpty)
-                _buildInfoRow('Đối tượng ưu tiên:', priorityObjectName),
-              if (reasonStay.isNotEmpty)
-                _buildInfoRow('Lý do lưu trú:', reasonStay),
-              if (_accommodationRequestType(item).isNotEmpty &&
-                  requestStatus.isNotEmpty)
-                _buildInfoRow('Trạng thái yêu cầu:', requestStatus),
-              if (isRoomLeader != null)
-                _buildInfoRow('Trưởng phòng:', isRoomLeader ? 'Có' : 'Không'),
-              if (startDate != null)
-                _buildInfoRow(
-                  'Thời gian ở từ:',
-                  DateFormat('dd/MM/yyyy').format(startDate.toLocal()),
-                ),
-              if (endDate != null)
-                _buildInfoRow(
-                  'Thời gian ở đến:',
-                  DateFormat('dd/MM/yyyy').format(endDate.toLocal()),
-                ),
-              if (createdAt != null)
-                _buildInfoRow(
-                  'Ngày đăng ký:',
-                  DateFormat('dd/MM/yyyy HH:mm').format(createdAt.toLocal()),
-                ),
-              if (updatedAt != null &&
-                  (createdAt == null || updatedAt != createdAt))
-                _buildInfoRow(
-                  'Cập nhật gần nhất:',
-                  DateFormat('dd/MM/yyyy HH:mm').format(updatedAt.toLocal()),
-                ),
-              if (note.isNotEmpty) _buildInfoRow('Ghi chú:', note),
-
-              if (roomTypeName.isNotEmpty ||
-                  roomNumber.isNotEmpty ||
-                  buildingName.isNotEmpty ||
-                  latestReceiptPrice.isNotEmpty) ...<Widget>[
-                const SizedBox(height: 10),
-                _buildSectionTitle(
-                  icon: Icons.meeting_room_outlined,
-                  title: 'Thông tin xếp phòng',
-                ),
-                if (buildingName.isNotEmpty)
-                  _buildInfoRow('Tòa:', buildingName),
-                if (roomTypeName.isNotEmpty)
-                  _buildInfoRow('Loại phòng:', roomTypeName),
-                if (latestReceiptPrice.isNotEmpty)
-                  _buildInfoRow('Giá phòng:', latestReceiptPrice),
-                if (roomNumber.isNotEmpty) _buildInfoRow('Phòng:', roomNumber),
-                if (roomCapacity.isNotEmpty)
-                  _buildInfoRow(
-                    'Sức chứa:',
-                    roomCurrentOccupancy.isNotEmpty
-                        ? '$roomCurrentOccupancy/$roomCapacity người'
-                        : '$roomCapacity người',
-                  ),
-              ],
-
-              if (approvedAt != null ||
-                  assignedAt != null ||
-                  checkinAt != null ||
-                  checkoutAt != null) ...<Widget>[
-                const SizedBox(height: 10),
-                _buildSectionTitle(
-                  icon: Icons.timeline_rounded,
-                  title: 'Mốc xử lý',
-                ),
-                if (approvedAt != null)
-                  _buildInfoRow(
-                    'Ngày duyệt:',
-                    DateFormat('dd/MM/yyyy HH:mm').format(approvedAt.toLocal()),
-                  ),
-                if (assignedAt != null)
-                  _buildInfoRow(
-                    'Ngày xếp phòng:',
-                    DateFormat('dd/MM/yyyy HH:mm').format(assignedAt.toLocal()),
-                  ),
-                if (checkinAt != null)
-                  _buildInfoRow(
-                    'Ngày nhận phòng:',
-                    DateFormat('dd/MM/yyyy HH:mm').format(checkinAt.toLocal()),
-                  ),
-                if (checkoutAt != null)
-                  _buildInfoRow(
-                    'Ngày trả phòng:',
-                    DateFormat('dd/MM/yyyy HH:mm').format(checkoutAt.toLocal()),
-                  ),
-              ],
-
+              if (statusLabel.isNotEmpty) _buildInfoRow('Trạng thái:', statusLabel),
+              if (studentName.isNotEmpty) _buildInfoRow('Sinh viên:', studentName),
+              if (studentCode.isNotEmpty) _buildInfoRow('Mã sinh viên:', studentCode),
+              if (periodName.isNotEmpty) _buildInfoRow('Đợt đăng ký:', periodName),
+              if (roomTypeName.isNotEmpty) _buildInfoRow('Loại phòng:', roomTypeName),
+              if (assignedRoom.isNotEmpty) _buildInfoRow('Phòng được xếp:', assignedRoom),
+              if (isDraft != null) _buildInfoRow('Hồ sơ nháp:', isDraft ? 'Có' : 'Không'),
+              if (rejectReason.isNotEmpty) _buildInfoRow('Lý do từ chối:', rejectReason),
+              if (createdAt != null) _buildInfoRow('Ngày tạo:', DateFormat('dd/MM/yyyy HH:mm').format(createdAt.toLocal())),
+              if (updatedAt != null) _buildInfoRow('Cập nhật:', DateFormat('dd/MM/yyyy HH:mm').format(updatedAt.toLocal())),
               const SizedBox(height: 14),
               _buildActionArea(item, student),
               const SizedBox(height: 10),
-              const Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: <Widget>[
-                  Text(
-                    'Xem lịch sử xử lý',
-                    style: TextStyle(
-                      fontSize: AppFontSizes.font11,
-                      color: Color(0xFF078B3E),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  SizedBox(width: 4),
-                  Icon(
-                    Icons.arrow_forward_ios,
-                    size: 10,
-                    color: Color(0xFF078B3E),
-                  ),
-                ],
-              ),
+              const Row(mainAxisAlignment: MainAxisAlignment.end, children: <Widget>[
+                Text('Xem lịch sử xử lý', style: TextStyle(fontSize: AppFontSizes.font11, color: Color(0xFF078B3E), fontWeight: FontWeight.bold)),
+                SizedBox(width: 4),
+                Icon(Icons.arrow_forward_ios, size: 10, color: Color(0xFF078B3E)),
+              ]),
             ],
           ),
         ),

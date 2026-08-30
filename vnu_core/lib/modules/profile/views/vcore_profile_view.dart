@@ -14,6 +14,7 @@ import 'package:vnu_core/modules/profile/views/vcore_profile_change_pass_view_v2
 import 'package:vnu_core/modules/profile/views/vcore_profile_family_info_view.dart';
 import 'package:vnu_core/modules/profile/views/vcore_profile_person_info_view.dart';
 import 'package:vnu_core/modules/profile/views/vcore_profile_setup_bio_view.dart';
+import 'package:vnu_core/modules/shapeshifter/views/shapeshifter_my_features.dart';
 
 import '../controllers/vcore_profile_controller.dart';
 import 'vcore_profile_change_pass_view.dart';
@@ -289,6 +290,12 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
                   ),
                   const SizedBox(height: 12),
 
+                  // Dynamic services configured from ONEVNU Admin. The API already
+                  // filters STUDENT vs admitted-student audiences and MY placement.
+                  const ShapeshifterMyFeatures(
+                    layout: ShapeshifterMyLayout.studentList,
+                  ),
+
                   // VcoreProfileItemWidget(
                   //   title: "Quản lý ảnh cá nhân",
                   //   guideId: 'profile.photo_manager',
@@ -496,4 +503,3 @@ class VcoreProfileItemWidget extends StatelessWidget {
     return AppGuideAnchor(id: guideId!, child: content);
   }
 }
-

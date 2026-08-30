@@ -90,10 +90,13 @@ options: _jsonOptions(),
 return DormitoryListResponse.fromJson(response.data ?? {});
 }
 
-Future<RoomTypeListResponse> getRoomTypes() async {
+Future<RoomTypeListResponse> getRoomTypes({int? dormitoryId}) async {
 await _loadTokenIfNeeded();
 final response = await _dormitoryClient.get<Map<String, dynamic>>(
 'room-types',
+queryParameters: dormitoryId != null && dormitoryId > 0
+    ? <String, dynamic>{'dormitory_id': dormitoryId}
+    : null,
 options: _jsonOptions(),
 );
 return RoomTypeListResponse.fromJson(response.data ?? {});
@@ -106,6 +109,61 @@ final response = await _dormitoryClient.get<Map<String, dynamic>>(
 options: _jsonOptions(),
 );
 return PriorityObjectListResponse.fromJson(response.data ?? {});
+}
+
+Future<List<DormitoryCountryOption>> getCountries() async {
+await _loadTokenIfNeeded();
+final Response<Map<String, dynamic>> response = await _studentClient
+    .get<Map<String, dynamic>>(
+  'countries',
+  options: _jsonOptions(),
+);
+final dynamic raw = response.data?['data'];
+if (raw is! List) return <DormitoryCountryOption>[];
+return raw
+    .whereType<Map>()
+    .map((Map<dynamic, dynamic> item) => DormitoryCountryOption.fromJson(
+          Map<String, dynamic>.from(item),
+        ))
+    .where((DormitoryCountryOption item) => item.code.isNotEmpty)
+    .toList();
+}
+
+Future<List<DormitoryProvinceOption>> getProvinces() async {
+await _loadTokenIfNeeded();
+final Response<Map<String, dynamic>> response = await _studentClient
+    .get<Map<String, dynamic>>(
+  'provinces',
+  options: _jsonOptions(),
+);
+final dynamic raw = response.data?['data'];
+if (raw is! List) return <DormitoryProvinceOption>[];
+return raw
+    .whereType<Map>()
+    .map((Map<dynamic, dynamic> item) => DormitoryProvinceOption.fromJson(
+          Map<String, dynamic>.from(item),
+        ))
+    .where((DormitoryProvinceOption item) => item.id > 0)
+    .toList();
+}
+
+Future<List<DormitoryWardOption>> getWardsByProvince(int provinceId) async {
+if (provinceId <= 0) return <DormitoryWardOption>[];
+await _loadTokenIfNeeded();
+final Response<Map<String, dynamic>> response = await _studentClient
+    .get<Map<String, dynamic>>(
+  'provinces/$provinceId/wards',
+  options: _jsonOptions(),
+);
+final dynamic raw = response.data?['data'];
+if (raw is! List) return <DormitoryWardOption>[];
+return raw
+    .whereType<Map>()
+    .map((Map<dynamic, dynamic> item) => DormitoryWardOption.fromJson(
+          Map<String, dynamic>.from(item),
+        ))
+    .where((DormitoryWardOption item) => item.id > 0)
+    .toList();
 }
 
 Future<List<DormitoryAccommodationStatusModel>> getAccommodationStatuses() async {
@@ -137,12 +195,9 @@ return rawData
 
 /// Lấy toàn bộ hồ sơ sinh viên để hiển thị lịch sử nội trú.
 ///
-/// - Sinh viên chính quy có mã sinh viên: ưu tiên student.show vì API này
-///   trả đầy đủ student, accommodations, roommates, receipts, issues và
-///   histories.
-/// - Thí sinh hoặc tài khoản chưa có mã sinh viên: giữ API dormitory/me để
-///   tra cứu theo identity_no.
-/// - Nếu student.show chưa có dữ liệu, tự động fallback về dormitory/me.
+/// Nguồn chính là GET /dormitory/me đúng contract mobile KTX.
+/// Tra lần lượt theo student_code và identity_no; student.show chỉ là fallback
+/// tương thích nếu backend /me chưa nhận diện được tài khoản hiện tại.
 Future<MyRegistrationResponse> getMyRegistrations({
 String? studentCode,
 String? identityNo,
@@ -152,42 +207,67 @@ await _loadTokenIfNeeded();
 final String normalizedStudentCode = studentCode?.trim() ?? '';
 final String normalizedIdentityNo = identityNo?.trim() ?? '';
 
+final List<Map<String, dynamic>> queries = <Map<String, dynamic>>[];
 if (normalizedStudentCode.isNotEmpty) {
-try {
-final String encodedStudentCode = Uri.encodeComponent(
-normalizedStudentCode,
-);
-final Response<Map<String, dynamic>> response = await _studentClient
-    .get<Map<String, dynamic>>(
-'students/$encodedStudentCode',
-options: _jsonOptions(),
-);
-
-return MyRegistrationResponse.fromJson(response.data ?? {});
-} on DioException catch (error) {
-final int? statusCode = error.response?.statusCode;
-if (statusCode != 404 && statusCode != 422) {
-rethrow;
-}
-}
-}
-
-final Map<String, dynamic> queryParams = <String, dynamic>{};
-if (normalizedStudentCode.isNotEmpty) {
-queryParams['student_code'] = normalizedStudentCode;
+  queries.add(<String, dynamic>{'student_code': normalizedStudentCode});
 }
 if (normalizedIdentityNo.isNotEmpty) {
-queryParams['identity_no'] = normalizedIdentityNo;
+  queries.add(<String, dynamic>{'identity_no': normalizedIdentityNo});
+}
+if (normalizedStudentCode.isNotEmpty && normalizedIdentityNo.isNotEmpty) {
+  queries.add(<String, dynamic>{
+    'student_code': normalizedStudentCode,
+    'identity_no': normalizedIdentityNo,
+  });
+}
+if (queries.isEmpty) queries.add(<String, dynamic>{});
+
+DioException? lastLookupError;
+for (final Map<String, dynamic> query in queries) {
+  try {
+    final Response<Map<String, dynamic>> response = await _studentClient
+        .get<Map<String, dynamic>>(
+      'dormitory/me',
+      queryParameters: query.isEmpty ? null : query,
+      options: _jsonOptions(),
+    );
+    return MyRegistrationResponse.fromJson(response.data ?? {});
+  } on DioException catch (error) {
+    lastLookupError = error;
+    final int? statusCode = error.response?.statusCode;
+    if (statusCode != 404 && statusCode != 422) rethrow;
+  }
 }
 
-final Response<Map<String, dynamic>> response = await _studentClient
-    .get<Map<String, dynamic>>(
-'dormitory/me',
-queryParameters: queryParams.isNotEmpty ? queryParams : null,
-options: _jsonOptions(),
-);
+// Compatibility fallback only. Main KTX screen is intentionally grounded in
+// /dormitory/me because that is the documented mobile accommodation contract.
+if (normalizedStudentCode.isNotEmpty) {
+  try {
+    final String encodedStudentCode = Uri.encodeComponent(normalizedStudentCode);
+    final Response<Map<String, dynamic>> response = await _studentClient
+        .get<Map<String, dynamic>>(
+      'students/$encodedStudentCode',
+      options: _jsonOptions(),
+    );
+    return MyRegistrationResponse.fromJson(response.data ?? {});
+  } on DioException catch (error) {
+    final int? statusCode = error.response?.statusCode;
+    if (statusCode != 404 && statusCode != 422) rethrow;
+    lastLookupError ??= error;
+  }
+}
 
-return MyRegistrationResponse.fromJson(response.data ?? {});
+if (lastLookupError != null) throw lastLookupError;
+return MyRegistrationResponse.fromJson(<String, dynamic>{
+  'success': true,
+  'code': 200,
+  'message': 'Success',
+  'data': <String, dynamic>{
+    'student': null,
+    'accommodations': <dynamic>[],
+    'histories': <dynamic>[],
+  },
+});
 }
 
 Future<SingleRegistrationResponse> getRegistrationDetail(Object id) async {
@@ -421,6 +501,48 @@ logInfo(
 );
 
 return SingleRegistrationResponse.fromJson(response.data ?? {});
+}
+
+/// Lấy profile sinh viên đầy đủ để hydrate màn cập nhật.
+/// /dormitory/me không trả family_members; /students/{key} trả familyMembers.
+Future<Map<String, dynamic>?> getStudentProfile({
+  String? studentCode,
+  String? identityNo,
+}) async {
+  await _loadTokenIfNeeded();
+
+  final List<String> lookupKeys = <String>[];
+  for (final String value in <String>[
+    studentCode?.trim() ?? '',
+    identityNo?.trim() ?? '',
+  ]) {
+    if (value.isNotEmpty && !lookupKeys.contains(value)) {
+      lookupKeys.add(value);
+    }
+  }
+
+  for (final String key in lookupKeys) {
+    try {
+      final String encodedKey = Uri.encodeComponent(key);
+      final Response<Map<String, dynamic>> response =
+          await _studentClient.get<Map<String, dynamic>>(
+        'students/$encodedKey',
+        options: _jsonOptions(),
+      );
+      final dynamic data = response.data?['data'];
+      if (data is Map) {
+        final dynamic student = data['student'];
+        if (student is Map) {
+          return Map<String, dynamic>.from(student);
+        }
+      }
+    } on DioException catch (error) {
+      final int? statusCode = error.response?.statusCode;
+      if (statusCode != 404 && statusCode != 422) rethrow;
+    }
+  }
+
+  return null;
 }
 
 /// SV tự cập nhật thông tin cá nhân khi hồ sơ chưa được duyệt/xếp phòng/lưu trú.

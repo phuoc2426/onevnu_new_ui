@@ -18,6 +18,8 @@ import 'package:vnu_core/globals.dart';
 import 'package:vnu_core/modules/admission/controllers/applicant_auth_controller.dart';
 import 'package:vnu_core/modules/inmapz/vcore_immap_view.dart';
 import 'package:vnu_core/modules/idp_auth/services/idp_auth_flow.dart';
+import 'package:vnu_core/modules/auth_mode/login_runtime_config.dart';
+import 'package:vnu_core/services/app_config_service.dart';
 import 'package:vnu_core/modules/motel/vcore_motel_webview.dart';
 import 'package:vnu_core/modules/profile/views/vcore_profile_domain_dialog.dart';
 import 'package:vnu_core/modules/profile/views/vcore_profile_forgot_pass_view_v2.dart';
@@ -69,6 +71,10 @@ class _VCoreLoginScreenV4State extends State<VCoreLoginScreenV4> {
   bool isEnableLoginBio = false;
   bool _obscurePassword = true;
   bool _idpLoading = false;
+  bool _loginConfigLoading = true;
+  LoginRuntimeConfig _loginRuntimeConfig = LoginRuntimeConfig.defaults;
+  String? _loginConfigError;
+  bool _loginConfigRefreshRunning = false;
 
   String userNameLocal = '';
   String passwordLocal = '';
@@ -106,6 +112,57 @@ class _VCoreLoginScreenV4State extends State<VCoreLoginScreenV4> {
     }
 
     _checkBio();
+    _loadLoginRuntimeConfig(showLoading: true, reason: 'initial');
+  }
+
+  Future<void> _loadLoginRuntimeConfig({
+    required bool showLoading,
+    required String reason,
+  }) async {
+    if (_loginConfigRefreshRunning) return;
+
+    _loginConfigRefreshRunning = true;
+
+    if (showLoading && mounted) {
+      setState(() {
+        _loginConfigLoading = true;
+        _loginConfigError = null;
+      });
+    }
+
+    try {
+      final AppConfigService configService = AppConfigService();
+      await configService.ensureLoaded(forceRefresh: true);
+      if (!mounted) return;
+
+      setState(() {
+        _loginRuntimeConfig = configService.loginRuntimeConfig;
+        _loginConfigLoading = false;
+        _loginConfigError = configService.isLoadedSuccessfully
+            ? null
+            : (configService.lastLoadError ??
+                'Không tải được cấu hình đăng nhập từ máy chủ.');
+      });
+
+      logInfo(
+        '[LOGIN_CONFIG_RUNTIME] reason=$reason '
+        'loaded=${configService.isLoadedSuccessfully} '
+        'idpLogin=${_loginRuntimeConfig.idpLogin} '
+        'qrEnabled=${_loginRuntimeConfig.qrEnabled}',
+      );
+    } catch (error, stackTrace) {
+      if (showLoading && mounted) {
+        setState(() {
+          _loginConfigLoading = false;
+          _loginConfigError = error.toString();
+        });
+      }
+      logError(
+        '[LOGIN_CONFIG_RUNTIME] reason=$reason error=$error\n$stackTrace',
+      );
+    } finally {
+      _loginConfigRefreshRunning = false;
+    }
   }
 
   @override
@@ -192,8 +249,90 @@ class _VCoreLoginScreenV4State extends State<VCoreLoginScreenV4> {
     });
   }
 
-  void _loginStudent() {
+  Future<bool> _verifyLoginMethodBeforeSubmit({
+    required bool expectedIdpLogin,
+  }) async {
+    if (_loginConfigRefreshRunning) {
+      snackBarWarning(
+        'Đang kiểm tra phương thức đăng nhập. Vui lòng thử lại.',
+      );
+      return false;
+    }
+
+    _loginConfigRefreshRunning = true;
+    try {
+      final bool methodShownBeforeCheck = _loginRuntimeConfig.idpLogin;
+      final LoginRuntimeConfig latest =
+          await AppConfigService().fetchLatestLoginRuntimeConfig();
+      if (!mounted) return false;
+
+      final bool methodChanged =
+          latest.idpLogin != methodShownBeforeCheck;
+      final bool clickedFlowIsStillValid =
+          latest.idpLogin == expectedIdpLogin;
+
+      setState(() {
+        _loginRuntimeConfig = latest;
+        _loginConfigError = null;
+        _loginConfigLoading = false;
+      });
+
+      if (methodChanged || !clickedFlowIsStillValid) {
+        // The server is the source of truth. Never continue the old flow after
+        // /api/config says the active authentication method has changed.
+        _studentCodeController.clear();
+        _passwordController.clear();
+        userNameLocal = '';
+        passwordLocal = '';
+
+        snackBarWarning(
+          latest.idpLogin
+              ? 'Phương thức đăng nhập đã chuyển sang tài khoản VNU. '
+                  'Màn hình đã được cập nhật, vui lòng đăng nhập lại.'
+              : 'Phương thức đăng nhập đã chuyển sang mã sinh viên và mật khẩu. '
+                  'Màn hình đã được cập nhật, vui lòng nhập lại thông tin.',
+        );
+
+        logInfo(
+          '[LOGIN_METHOD_CHECK] changed=true '
+          'shownIdp=$methodShownBeforeCheck '
+          'clickedIdp=$expectedIdpLogin '
+          'actualIdp=${latest.idpLogin}',
+        );
+        return false;
+      }
+
+      logInfo(
+        '[LOGIN_METHOD_CHECK] changed=false actualIdp=${latest.idpLogin}',
+      );
+      return true;
+    } catch (error, stackTrace) {
+      logError(
+        '[LOGIN_METHOD_CHECK] direct_check_failed=true error=$error\n$stackTrace',
+      );
+
+      // Do not continue with a stale cached method. Otherwise an IDP screen can
+      // remain visible after the server has switched to password login and the
+      // user only sees a downstream IdpAuthFlow error.
+      if (mounted) {
+        snackBarWarning(
+          'Không kiểm tra được phương thức đăng nhập hiện tại. '
+          'Vui lòng kiểm tra kết nối và thử lại.',
+        );
+      }
+      return false;
+    } finally {
+      _loginConfigRefreshRunning = false;
+    }
+  }
+
+  Future<void> _loginStudent() async {
     FocusManager.instance.primaryFocus?.unfocus();
+
+    final bool canContinue = await _verifyLoginMethodBeforeSubmit(
+      expectedIdpLogin: false,
+    );
+    if (!canContinue || !mounted) return;
 
     _authCubit.loginMobile(
       _studentCodeController.text.trim(),
@@ -205,27 +344,46 @@ class _VCoreLoginScreenV4State extends State<VCoreLoginScreenV4> {
 
   Future<void> _loginWithIdp() async {
     FocusManager.instance.primaryFocus?.unfocus();
+
     if (_idpLoading) return;
+
+    final bool canContinue = await _verifyLoginMethodBeforeSubmit(
+      expectedIdpLogin: true,
+    );
+    if (!canContinue || !mounted) return;
 
     setState(() => _idpLoading = true);
 
     try {
       final bool success = await IdpAuthFlow().login(context);
-      if (!success) return;
+
+      if (!success) {
+        return;
+      }
 
       if (VnuCore().loginSucces != null) {
         VnuCore().loginSucces!(Globals().token);
       }
     } catch (error, stackTrace) {
-      logError('Đăng nhập VNU IDP lỗi: $error\n$stackTrace');
+      logError(
+        'Đăng nhập tài khoản VNU lỗi: '
+            '$error\n$stackTrace',
+      );
+
       AppFeedback.showError(error);
     } finally {
-      if (mounted) setState(() => _idpLoading = false);
+      if (mounted) {
+        setState(() => _idpLoading = false);
+      }
     }
   }
-
   Future<void> _loginWithBio() async {
     FocusManager.instance.primaryFocus?.unfocus();
+
+    final bool canContinue = await _verifyLoginMethodBeforeSubmit(
+      expectedIdpLogin: false,
+    );
+    if (!canContinue || !mounted) return;
 
     if (userNameLocal.isEmpty || passwordLocal.isEmpty) {
       snackBarWarning(
@@ -462,6 +620,9 @@ class _VCoreLoginScreenV4State extends State<VCoreLoginScreenV4> {
                                     onBioLogin: _loginWithBio,
                                     idpLoading: _idpLoading,
                                     onIdpLogin: _loginWithIdp,
+                                    loginRuntimeConfig: _loginRuntimeConfig,
+                                    loginConfigLoading: _loginConfigLoading,
+                                    loginConfigError: _loginConfigError,
                                     onTogglePassword: () {
                                       setState(() {
                                         _obscurePassword = !_obscurePassword;
@@ -517,6 +678,9 @@ class _LoginCard extends StatelessWidget {
     required this.onBioLogin,
     required this.idpLoading,
     required this.onIdpLogin,
+    required this.loginRuntimeConfig,
+    required this.loginConfigLoading,
+    required this.loginConfigError,
     required this.onTogglePassword,
   });
 
@@ -539,6 +703,9 @@ class _LoginCard extends StatelessWidget {
   final VoidCallback onBioLogin;
   final bool idpLoading;
   final VoidCallback onIdpLogin;
+  final LoginRuntimeConfig loginRuntimeConfig;
+  final bool loginConfigLoading;
+  final String? loginConfigError;
   final VoidCallback onTogglePassword;
 
   bool get _isStudent => loginMode == _LoginMode.student;
@@ -582,29 +749,8 @@ class _LoginCard extends StatelessWidget {
                 ),
               );
             },
-            child: _isStudent ? _buildStudentForm() : _buildApplicantForm(),
+            child: _isStudent ? _buildStudentEntry() : _buildApplicantForm(),
           ),
-          if (_isStudent) ...<Widget>[
-            const SizedBox(height: 22),
-            const _IdpDividerText(),
-            const SizedBox(height: 14),
-            _IdpLoginButton(
-              isLoading: idpLoading,
-              onTap: idpLoading ? null : onIdpLogin,
-            ),
-            const SizedBox(height: 9),
-            const Text(
-              'Mở cổng idp-test.vnu.edu.vn trong WebView. '
-              'App chỉ giữ token ONEVNU; token IdP được backend quản lý.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: _VCoreLoginScreenV4State.textMuted,
-                fontSize: AppFontSizes.small,
-                height: 1.4,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
           const SizedBox(height: 24),
           const _DividerText(),
           const SizedBox(height: 16),
@@ -614,6 +760,121 @@ class _LoginCard extends StatelessWidget {
     );
   }
 
+  Widget _buildStudentEntry() {
+    if (loginConfigLoading) {
+      return const Padding(
+        key: ValueKey<String>('login-config-loading'),
+        padding: EdgeInsets.symmetric(vertical: 28),
+        child: Column(
+          children: <Widget>[
+            CircularProgressIndicator(),
+            SizedBox(height: 12),
+            Text(
+              'Đang chuẩn bị đăng nhập...',
+              style: TextStyle(
+                color: _VCoreLoginScreenV4State.textMuted,
+                fontSize: AppFontSizes.small,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final String configError = loginConfigError?.trim() ?? '';
+
+    if (configError.isNotEmpty) {
+      return Column(
+        key: const ValueKey<String>('student-config-error'),
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF6E8),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: const Color(0xFFFFD99C),
+              ),
+            ),
+            child: const Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Icon(
+                  Icons.cloud_off_rounded,
+                  color: Color(0xFF9A6515),
+                ),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Không thể kết nối đến hệ thống đăng nhập. '
+                        'Vui lòng kiểm tra kết nối mạng và thử lại.',
+                    style: TextStyle(
+                      color: Color(0xFF805313),
+                      fontSize: AppFontSizes.small,
+                      height: 1.4,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+        ],
+      );
+    }
+
+    if (!loginRuntimeConfig.idpLogin) {
+      return _buildStudentForm();
+    }
+
+    return Column(
+      key: const ValueKey<String>('student-login-idp'),
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: _VCoreLoginScreenV4State.green.withOpacity(0.07),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: _VCoreLoginScreenV4State.green.withOpacity(0.14),
+            ),
+          ),
+          child: const Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Icon(
+                Icons.account_circle_outlined,
+                color: _VCoreLoginScreenV4State.green,
+                size: 22,
+              ),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Sử dụng tài khoản VNU để truy cập OneVNU.',
+                  style: TextStyle(
+                    color: _VCoreLoginScreenV4State.textDark,
+                    fontSize: AppFontSizes.small,
+                    height: 1.4,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 18),
+        _IdpLoginButton(
+          isLoading: idpLoading,
+          onTap: idpLoading ? null : onIdpLogin,
+        ),
+      ],
+    );
+  }
   Widget _buildStudentForm() {
     return Column(
       key: const ValueKey<String>('student-login-form'),
@@ -1210,7 +1471,7 @@ class _IdpLoginButton extends StatelessWidget {
                 ),
               const SizedBox(width: 10),
               const Text(
-                'Đăng nhập bằng VNU IDP',
+                'Đăng nhập',
                 style: TextStyle(
                   color: _VCoreLoginScreenV4State.textDark,
                   fontSize: AppFontSizes.mediumLarge,
@@ -1346,5 +1607,3 @@ class _UtilityButton extends StatelessWidget {
     );
   }
 }
-
-
