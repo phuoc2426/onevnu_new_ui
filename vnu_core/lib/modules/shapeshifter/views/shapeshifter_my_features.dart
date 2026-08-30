@@ -43,14 +43,58 @@ class _ShapeshifterMyFeaturesState extends State<ShapeshifterMyFeatures> {
   }
 
   Future<List<ShapeshifterFeature>> _load() async {
-    debugPrint('[SHAPE_MY] GET features placement=MY');
+    final bool admitted = widget.layout == ShapeshifterMyLayout.admittedGrid;
+
     try {
-      final List<ShapeshifterFeature> features =
-          await ShapeshifterRepository().getFeatures(
-        placement: ShapeshifterPlacement.my,
+      if (!admitted) {
+        debugPrint('[SHAPE_MY] GET features placement=MY layout=student');
+        final List<ShapeshifterFeature> features =
+            await ShapeshifterRepository().getFeatures(
+          placement: ShapeshifterPlacement.my,
+        );
+        debugPrint(
+          '[SHAPE_MY] student MY loaded=${features.length} ' +
+              features.map((feature) => feature.code).join(','),
+        );
+        return features;
+      }
+
+      // Admitted Student has only one service hub (YourSpace/My), while the
+      // registry can place a feature in HOME, MY, or both. Query both
+      // placements with the APPLICANT token and merge by feature code so a
+      // feature enabled for admitted students is not lost only because it was
+      // configured as HOME in Admin. The Mobile API remains the authority for
+      // enabled/time-window/audience filtering.
+      debugPrint('[SHAPE_MY] GET features placement=MY+HOME layout=admitted');
+      final List<List<ShapeshifterFeature>> result = await Future.wait(
+        <Future<List<ShapeshifterFeature>>>[
+          ShapeshifterRepository().getFeatures(
+            placement: ShapeshifterPlacement.my,
+          ),
+          ShapeshifterRepository().getFeatures(
+            placement: ShapeshifterPlacement.home,
+          ),
+        ],
       );
+
+      final List<ShapeshifterFeature> myFeatures = result[0];
+      final List<ShapeshifterFeature> homeFeatures = result[1];
+      final Map<String, ShapeshifterFeature> merged =
+          <String, ShapeshifterFeature>{};
+
+      // Keep MY order first; append HOME-only features afterwards. Dart maps
+      // preserve insertion order, so Admin ordering remains predictable.
+      for (final ShapeshifterFeature feature in myFeatures) {
+        merged[feature.code] = feature;
+      }
+      for (final ShapeshifterFeature feature in homeFeatures) {
+        merged.putIfAbsent(feature.code, () => feature);
+      }
+
+      final List<ShapeshifterFeature> features = merged.values.toList();
       debugPrint(
-        '[SHAPE_MY] loaded=${features.length} ' +
+        '[SHAPE_MY] admitted MY=${myFeatures.length} HOME=${homeFeatures.length} ' +
+            'merged=${features.length} ' +
             features.map((feature) => feature.code).join(','),
       );
       return features;
@@ -232,22 +276,49 @@ class _ShapeshifterMyFeaturesState extends State<ShapeshifterMyFeatures> {
                 ((availableWidth - (gap * 2)) / 3).clamp(82.0, 180.0).toDouble();
             final double cardHeight = cardWidth / 0.85;
 
-            return SizedBox(
-              height: cardHeight,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: EdgeInsets.zero,
-                physics: cards.length > 3
-                    ? const BouncingScrollPhysics()
-                    : const NeverScrollableScrollPhysics(),
-                itemCount: cards.length,
-                separatorBuilder: (_, __) => const SizedBox(width: gap),
-                itemBuilder: (context, index) => SizedBox(
-                  width: cardWidth,
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: <Widget>[
+                SizedBox(
                   height: cardHeight,
-                  child: cards[index],
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    padding: EdgeInsets.zero,
+                    physics: cards.length > 3
+                        ? const BouncingScrollPhysics()
+                        : const NeverScrollableScrollPhysics(),
+                    itemCount: cards.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: gap),
+                    itemBuilder: (context, index) => SizedBox(
+                      width: cardWidth,
+                      height: cardHeight,
+                      child: cards[index],
+                    ),
+                  ),
                 ),
-              ),
+                if (cards.length > 3) ...[
+                  const SizedBox(height: 7),
+                  const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Icon(
+                        Icons.swipe_left_rounded,
+                        size: 15,
+                        color: Color(0xFF667085),
+                      ),
+                      SizedBox(width: 5),
+                      Text(
+                        'K\u00e9o ngang \u0111\u1ec3 xem th\u00eam',
+                        style: TextStyle(
+                          color: Color(0xFF667085),
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
             );
           },
         ),
