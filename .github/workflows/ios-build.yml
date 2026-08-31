@@ -1,0 +1,53 @@
+name: iOS Build Test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-ios:
+    name: Build Flutter iOS
+    runs-on: macos-26
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Show Mac information
+        run: |
+          echo "===== CPU ARCH ====="
+          uname -m
+
+          echo "===== MACOS ====="
+          sw_vers
+
+          echo "===== XCODE ====="
+          xcodebuild -version
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Show Flutter information
+        run: |
+          flutter --version
+          flutter doctor -v
+
+      - name: Install Flutter packages
+        run: flutter pub get
+
+      - name: Build iOS without signing
+        run: flutter build ios --release --no-codesign
+
+      - name: Upload build result
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build-no-sign
+          path: build/ios/iphoneos/
+          retention-days: 7
