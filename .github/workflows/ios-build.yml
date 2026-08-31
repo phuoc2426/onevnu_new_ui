@@ -12,6 +12,10 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 45
 
+    defaults:
+      run:
+        working-directory: one_vnu_appstore
+
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
@@ -26,6 +30,13 @@ jobs:
 
           echo "===== XCODE ====="
           xcodebuild -version
+
+          echo "===== CURRENT DIRECTORY ====="
+          pwd
+
+          echo "===== FLUTTER PROJECT ====="
+          ls -la
+          test -f pubspec.yaml && echo "pubspec.yaml FOUND"
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -49,5 +60,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ios-build-no-sign
-          path: build/ios/iphoneos/
+          path: one_vnu_appstore/build/ios/iphoneos/
           retention-days: 7
