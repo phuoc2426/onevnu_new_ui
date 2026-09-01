@@ -48,10 +48,10 @@ out/
 coverage/
 
 # Generated Dart sources
-*.g.dart
-*.freezed.dart
-*.mocks.dart
-*.config.dart
+# *.g.dart
+# *.freezed.dart
+# *.mocks.dart
+# *.config.dart
 
 # Android generated/local/signing files
 .gradle/
@@ -136,7 +136,7 @@ android/app/*.jks
 android/app/*.keystore
 
 # Firebase generated Dart config (project policy: generated locally/CI)
-firebase_options.dart
+# firebase_options.dart
 
 # Archives / binary build artifacts
 *.zip
