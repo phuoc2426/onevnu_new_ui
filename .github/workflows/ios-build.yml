@@ -268,7 +268,43 @@ jobs:
           test -s "$KEY_PATH"
 
           echo "App Store Connect API key installed"
+      - name: Verify App Store Connect credentials
+        env:
+          APPSTORE_API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+          APPSTORE_API_ISSUER_ID: ${{ secrets.APPSTORE_API_ISSUER_ID }}
+        run: |
+          set -euo pipefail
 
+          KEY_PATH="$HOME/.appstoreconnect/private_keys/AuthKey_${APPSTORE_API_KEY_ID}.p8"
+
+          echo "===== API CONFIG CHECK ====="
+          echo "Key ID length: ${#APPSTORE_API_KEY_ID}"
+          echo "Issuer ID length: ${#APPSTORE_API_ISSUER_ID}"
+
+          test -s "$KEY_PATH"
+
+          echo "Private key file exists: OK"
+          echo "Private key bytes: $(wc -c < "$KEY_PATH")"
+
+          openssl pkey \
+            -in "$KEY_PATH" \
+            -check \
+            -noout
+
+          echo "Private key parse: OK"
+
+          if [ "${#APPSTORE_API_KEY_ID}" -ne 10 ]; then
+            echo "ERROR: Key ID should be 10 characters"
+            exit 1
+          fi
+
+          if [ "${#APPSTORE_API_ISSUER_ID}" -ne 36 ]; then
+            echo "ERROR: Issuer ID should be 36 characters"
+            exit 1
+          fi
+
+          echo "API credential structure: OK"
+          
       - name: Validate IPA with App Store Connect
         env:
           APPSTORE_API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
