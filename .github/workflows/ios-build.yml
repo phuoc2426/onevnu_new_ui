@@ -1,0 +1,97 @@
+name: iOS Build Test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-ios:
+    name: Build Flutter iOS
+    runs-on: macos-26
+    timeout-minutes: 60
+
+    defaults:
+      run:
+        working-directory: one_vnu_appstore
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v5
+
+      - name: Show Mac and Xcode information
+        run: |
+          echo "===== CPU ====="
+          uname -m
+
+          echo "===== MACOS ====="
+          sw_vers
+
+          echo "===== XCODE ====="
+          xcodebuild -version
+
+      - name: Setup Flutter 3.27.3
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.27.3'
+          channel: stable
+          cache: true
+
+      - name: Show Flutter version
+        run: |
+          flutter --version
+          dart --version
+
+      - name: Verify required source files
+        run: |
+          echo "========================================"
+          echo "CHECK FIREBASE"
+          echo "========================================"
+
+          test -f lib/firebase_options.dart
+          echo "OK: lib/firebase_options.dart"
+
+          echo "========================================"
+          echo "CHECK VNU CORE GENERATED CODE"
+          echo "========================================"
+
+          test -f ../vnu_core/lib/models/cam_nang_model.g.dart
+          echo "OK: cam_nang_model.g.dart"
+
+          test -f ../vnu_core/lib/data/app_api.g.dart
+          echo "OK: app_api.g.dart"
+
+          test -f ../vnu_core/lib/data/api_response.g.dart
+          echo "OK: api_response.g.dart"
+
+          test -f ../vnu_core/lib/data/api_response.freezed.dart
+          echo "OK: api_response.freezed.dart"
+
+          echo "========================================"
+          echo "CHECK NOI TRU GENERATED CODE"
+          echo "========================================"
+
+          test -f ../vnu_noi_tru/lib/data/noitru_api.g.dart
+          echo "OK: noitru_api.g.dart"
+
+          test -f ../vnu_noi_tru/lib/data/noitru_response.g.dart
+          echo "OK: noitru_response.g.dart"
+
+          echo "========================================"
+          echo "ALL REQUIRED FILES FOUND"
+          echo "========================================"
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Build iOS without signing
+        run: flutter build ios --release --no-codesign
+
+      - name: Upload iOS build result
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build-no-sign
+          path: one_vnu_appstore/build/ios/iphoneos/
+          retention-days: 7
