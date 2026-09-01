@@ -1,14 +1,19 @@
-name: iOS Build Test
+name: iOS Signed Build
 
 on:
   workflow_dispatch:
+    inputs:
+      build_number:
+        description: 'Build number'
+        required: true
+        default: '1059'
 
 permissions:
   contents: read
 
 jobs:
   build-ios:
-    name: Build Flutter iOS
+    name: Build Signed iOS IPA
     runs-on: macos-26
     timeout-minutes: 60
 
@@ -22,19 +27,14 @@ jobs:
 
       - name: Show Mac and Xcode information
         run: |
-          echo "===== CPU ====="
           uname -m
-
-          echo "===== MACOS ====="
           sw_vers
-
-          echo "===== XCODE ====="
           xcodebuild -version
 
-      - name: Setup Flutter 3.27.3
+      - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.27.3'
+          flutter-version: '3.47.2'
           channel: stable
           cache: true
 
@@ -45,53 +45,211 @@ jobs:
 
       - name: Verify required source files
         run: |
-          echo "========================================"
-          echo "CHECK FIREBASE"
-          echo "========================================"
-
           test -f lib/firebase_options.dart
-          echo "OK: lib/firebase_options.dart"
-
-          echo "========================================"
-          echo "CHECK VNU CORE GENERATED CODE"
-          echo "========================================"
-
           test -f ../vnu_core/lib/models/cam_nang_model.g.dart
-          echo "OK: cam_nang_model.g.dart"
-
           test -f ../vnu_core/lib/data/app_api.g.dart
-          echo "OK: app_api.g.dart"
-
-          test -f ../vnu_core/lib/data/api_response.g.dart
-          echo "OK: api_response.g.dart"
-
           test -f ../vnu_core/lib/data/api_response.freezed.dart
-          echo "OK: api_response.freezed.dart"
-
-          echo "========================================"
-          echo "CHECK NOI TRU GENERATED CODE"
-          echo "========================================"
-
           test -f ../vnu_noi_tru/lib/data/noitru_api.g.dart
-          echo "OK: noitru_api.g.dart"
 
-          test -f ../vnu_noi_tru/lib/data/noitru_response.g.dart
-          echo "OK: noitru_response.g.dart"
-
-          echo "========================================"
           echo "ALL REQUIRED FILES FOUND"
-          echo "========================================"
 
       - name: Flutter pub get
         run: flutter pub get
 
-      - name: Build iOS without signing
-        run: flutter build ios --release --no-codesign
+      - name: Install Apple certificate and provisioning profile
+        env:
+          IOS_CERTIFICATE_BASE64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
+          IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          set -euo pipefail
 
-      - name: Upload iOS build result
-        if: success()
+          CERTIFICATE_PATH="$RUNNER_TEMP/distribution.p12"
+          PROFILE_PATH="$RUNNER_TEMP/profile.mobileprovision"
+          PROFILE_PLIST="$RUNNER_TEMP/profile.plist"
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 24)"
+
+          echo "$IOS_CERTIFICATE_BASE64" \
+            | base64 --decode \
+            > "$CERTIFICATE_PATH"
+
+          echo "$IOS_PROVISIONING_PROFILE_BASE64" \
+            | base64 --decode \
+            > "$PROFILE_PATH"
+
+          echo "===== CREATE KEYCHAIN ====="
+
+          security create-keychain \
+            -p "$KEYCHAIN_PASSWORD" \
+            "$KEYCHAIN_PATH"
+
+          security set-keychain-settings \
+            -lut 21600 \
+            "$KEYCHAIN_PATH"
+
+          security unlock-keychain \
+            -p "$KEYCHAIN_PASSWORD" \
+            "$KEYCHAIN_PATH"
+
+          echo "===== IMPORT CERTIFICATE ====="
+
+          security import "$CERTIFICATE_PATH" \
+            -P "$IOS_CERTIFICATE_PASSWORD" \
+            -A \
+            -t cert \
+            -f pkcs12 \
+            -k "$KEYCHAIN_PATH"
+
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: \
+            -s \
+            -k "$KEYCHAIN_PASSWORD" \
+            "$KEYCHAIN_PATH"
+
+          security list-keychains \
+            -d user \
+            -s "$KEYCHAIN_PATH"
+
+          security default-keychain \
+            -s "$KEYCHAIN_PATH"
+
+          echo "===== CHECK SIGNING IDENTITY ====="
+
+          security find-identity \
+            -v \
+            -p codesigning \
+            "$KEYCHAIN_PATH"
+
+          echo "===== READ PROVISIONING PROFILE ====="
+
+          security cms \
+            -D \
+            -i "$PROFILE_PATH" \
+            > "$PROFILE_PLIST"
+
+          PROFILE_UUID=$(
+            /usr/libexec/PlistBuddy \
+              -c "Print :UUID" \
+              "$PROFILE_PLIST"
+          )
+
+          PROFILE_NAME=$(
+            /usr/libexec/PlistBuddy \
+              -c "Print :Name" \
+              "$PROFILE_PLIST"
+          )
+
+          PROFILE_TEAM=$(
+            /usr/libexec/PlistBuddy \
+              -c "Print :TeamIdentifier:0" \
+              "$PROFILE_PLIST"
+          )
+
+          PROFILE_APP_IDENTIFIER=$(
+            /usr/libexec/PlistBuddy \
+              -c "Print :Entitlements:application-identifier" \
+              "$PROFILE_PLIST"
+          )
+
+          echo "Profile name: $PROFILE_NAME"
+          echo "Profile UUID: $PROFILE_UUID"
+          echo "Team: $PROFILE_TEAM"
+          echo "App identifier: $PROFILE_APP_IDENTIFIER"
+
+          if [[ "$PROFILE_APP_IDENTIFIER" != *".com.vnu.students" ]]; then
+            echo "ERROR: Profile is not for com.vnu.students"
+            exit 1
+          fi
+
+          if [[ "$PROFILE_TEAM" != "XWZPSV443R" ]]; then
+            echo "ERROR: Wrong Apple Team"
+            exit 1
+          fi
+
+          PROFILE_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
+
+          mkdir -p "$PROFILE_DIR"
+
+          cp "$PROFILE_PATH" \
+            "$PROFILE_DIR/$PROFILE_UUID.mobileprovision"
+
+          echo "IOS_PROFILE_NAME=$PROFILE_NAME" >> "$GITHUB_ENV"
+          echo "IOS_TEAM_ID=$PROFILE_TEAM" >> "$GITHUB_ENV"
+
+      - name: Configure signing for CI
+        run: |
+          python3 <<'PY'
+          import os
+          from pathlib import Path
+
+          path = Path("ios/Runner.xcodeproj/project.pbxproj")
+          text = path.read_text()
+
+          profile = os.environ["IOS_PROFILE_NAME"]
+
+          text = text.replace(
+              '"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "VNU Students - AppStore";',
+              f'"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "{profile}";'
+          )
+
+          text = text.replace(
+              '"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution";',
+              '"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "Apple Distribution";'
+          )
+
+          path.write_text(text)
+
+          print("Using provisioning profile:", profile)
+          PY
+
+      - name: Create ExportOptions.plist
+        run: |
+          cat > ios/ExportOptions.plist <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+
+              <key>method</key>
+              <string>app-store-connect</string>
+
+              <key>signingStyle</key>
+              <string>manual</string>
+
+              <key>teamID</key>
+              <string>${IOS_TEAM_ID}</string>
+
+              <key>provisioningProfiles</key>
+              <dict>
+                  <key>com.vnu.students</key>
+                  <string>${IOS_PROFILE_NAME}</string>
+              </dict>
+
+              <key>uploadSymbols</key>
+              <true/>
+
+          </dict>
+          </plist>
+          EOF
+
+          plutil -lint ios/ExportOptions.plist
+
+      - name: Build signed IPA
+        run: |
+          flutter build ipa \
+            --release \
+            --build-number="${{ inputs.build_number }}" \
+            --export-options-plist=ios/ExportOptions.plist
+
+      - name: Show IPA
+        run: |
+          echo "===== IPA FILE ====="
+          ls -lh build/ios/ipa/
+
+      - name: Upload signed IPA
         uses: actions/upload-artifact@v4
         with:
-          name: ios-build-no-sign
-          path: one_vnu_appstore/build/ios/iphoneos/
+          name: onevnu-ios-signed-ipa
+          path: one_vnu_appstore/build/ios/ipa/*.ipa
           retention-days: 7
