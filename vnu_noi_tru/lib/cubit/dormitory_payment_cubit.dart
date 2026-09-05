@@ -92,7 +92,7 @@ class DormitoryPaymentCubit extends Cubit<DormitoryPaymentState> {
   Future<bool> uploadProof({
     required String identityNo,
     required Object receiptId,
-    required File proofImage,
+    required List<File> proofImages,
     int? dormitoryId,
     String? note,
   }) async {
@@ -107,7 +107,7 @@ class DormitoryPaymentCubit extends Cubit<DormitoryPaymentState> {
           await _repository.uploadPaymentProof(
         identityNo: identityNo,
         receiptId: receiptId,
-        proofImage: proofImage,
+        proofImages: proofImages,
         note: note,
         onSendProgress: (int sent, int total) {
           if (total <= 0 || isClosed) {
@@ -142,6 +142,40 @@ class DormitoryPaymentCubit extends Cubit<DormitoryPaymentState> {
     }
   }
 
+
+  Future<bool> deleteProof({
+    required String identityNo,
+    required Object receiptId,
+    required Object proofId,
+    int? dormitoryId,
+  }) async {
+    if (isClosed) return false;
+
+    try {
+      emit(DormitoryPaymentProofDeleting(proofId));
+
+      final Map<String, dynamic> response =
+          await _repository.deletePaymentProof(
+        identityNo: identityNo,
+        receiptId: receiptId,
+        proofId: proofId,
+      );
+
+      if (isClosed) return false;
+
+      final String message = _responseMessage(response) ?? 'Đã xóa minh chứng.';
+      emit(DormitoryPaymentProofDeleteSuccess(message));
+
+      await loadData(identityNo: identityNo, dormitoryId: dormitoryId);
+      return true;
+    } catch (error) {
+      if (!isClosed) {
+        emit(DormitoryPaymentError(_cleanError(error)));
+      }
+      return false;
+    }
+  }
+
   String? _responseMessage(Map<String, dynamic> response) {
     final String value = response['message']?.toString().trim() ?? '';
     return value.isEmpty ? null : value;
@@ -161,4 +195,3 @@ class DormitoryPaymentCubit extends Cubit<DormitoryPaymentState> {
     return AppErrorMapper.map(error).userMessage;
   }
 }
-

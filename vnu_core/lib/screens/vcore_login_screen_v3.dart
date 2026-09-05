@@ -1,3 +1,4 @@
+import 'package:vnu_core/common/error/app_feedback.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -16,6 +17,10 @@ import 'package:vnu_core/cubit/auth_cubit.dart';
 import 'package:vnu_core/globals.dart';
 import 'package:vnu_core/modules/admission/controllers/applicant_auth_controller.dart';
 import 'package:vnu_core/modules/inmapz/vcore_immap_view.dart';
+import 'package:vnu_core/modules/idp_auth/config/idp_auth_config.dart';
+import 'package:vnu_core/modules/idp_auth/services/idp_auth_flow.dart';
+import 'package:vnu_core/modules/auth_mode/login_runtime_config.dart';
+import 'package:vnu_core/services/app_config_service.dart';
 import 'package:vnu_core/modules/motel/vcore_motel_webview.dart';
 import 'package:vnu_core/modules/profile/views/vcore_profile_domain_dialog.dart';
 import 'package:vnu_core/modules/profile/views/vcore_profile_forgot_pass_view_v2.dart';
@@ -66,6 +71,11 @@ class _VCoreLoginScreenV3State extends State<VCoreLoginScreenV3> {
   bool isBioByFaceId = true;
   bool isEnableLoginBio = false;
   bool _obscurePassword = true;
+  bool _idpLoading = false;
+  bool _loginConfigLoading = true;
+  LoginRuntimeConfig _loginRuntimeConfig = LoginRuntimeConfig.defaults;
+  String? _loginConfigError;
+  bool _loginConfigRefreshRunning = false;
 
   String userNameLocal = '';
   String passwordLocal = '';
@@ -103,6 +113,76 @@ class _VCoreLoginScreenV3State extends State<VCoreLoginScreenV3> {
     }
 
     _checkBio();
+
+    // TEMP TEST: nếu IdpAuthConfig có test URL thì ép Student login sang IDP
+    // và KHÔNG đọc /api/config. Comment đúng dòng idp-test trong
+    // IdpAuthConfig để quay về cơ chế server-driven ban đầu.
+    final String testIdpUrl =
+        IdpAuthConfig.temporaryTestStartUrl?.trim() ?? '';
+    if (testIdpUrl.isNotEmpty) {
+      _loginRuntimeConfig = LoginRuntimeConfig(
+        idpLogin: true,
+        idpStartUrl: testIdpUrl,
+        idpWebUrl: testIdpUrl,
+        passwordFallbackEnabled: false,
+        qrEnabled: false,
+      );
+      _loginConfigLoading = false;
+      _loginConfigError = null;
+      logWarning('[LOGIN_IDP_TEST] force IDP UI: $testIdpUrl');
+    } else {
+      _loadLoginRuntimeConfig(showLoading: true, reason: 'initial');
+    }
+  }
+
+  Future<void> _loadLoginRuntimeConfig({
+    required bool showLoading,
+    required String reason,
+  }) async {
+    if (_loginConfigRefreshRunning) return;
+
+    _loginConfigRefreshRunning = true;
+
+    if (showLoading && mounted) {
+      setState(() {
+        _loginConfigLoading = true;
+        _loginConfigError = null;
+      });
+    }
+
+    try {
+      final AppConfigService configService = AppConfigService();
+      await configService.ensureLoaded(forceRefresh: true);
+      if (!mounted) return;
+
+      setState(() {
+        _loginRuntimeConfig = configService.loginRuntimeConfig;
+        _loginConfigLoading = false;
+        _loginConfigError = configService.isLoadedSuccessfully
+            ? null
+            : (configService.lastLoadError ??
+                'Không tải được cấu hình đăng nhập từ máy chủ.');
+      });
+
+      logInfo(
+        '[LOGIN_CONFIG_RUNTIME] reason=$reason '
+        'loaded=${configService.isLoadedSuccessfully} '
+        'idpLogin=${_loginRuntimeConfig.idpLogin} '
+        'qrEnabled=${_loginRuntimeConfig.qrEnabled}',
+      );
+    } catch (error, stackTrace) {
+      if (showLoading && mounted) {
+        setState(() {
+          _loginConfigLoading = false;
+          _loginConfigError = error.toString();
+        });
+      }
+      logError(
+        '[LOGIN_CONFIG_RUNTIME] reason=$reason error=$error\n$stackTrace',
+      );
+    } finally {
+      _loginConfigRefreshRunning = false;
+    }
   }
 
   @override
@@ -189,8 +269,95 @@ class _VCoreLoginScreenV3State extends State<VCoreLoginScreenV3> {
     });
   }
 
-  void _loginStudent() {
+  Future<bool> _verifyLoginMethodBeforeSubmit({
+    required bool expectedIdpLogin,
+  }) async {
+    // TEMP TEST không đọc /api/config ở màn login. Chỉ IDP flow được phép chạy.
+    if (IdpAuthConfig.temporaryTestEnabled) {
+      return expectedIdpLogin;
+    }
+
+    if (_loginConfigRefreshRunning) {
+      snackBarWarning(
+        'Đang kiểm tra phương thức đăng nhập. Vui lòng thử lại.',
+      );
+      return false;
+    }
+
+    _loginConfigRefreshRunning = true;
+    try {
+      final bool methodShownBeforeCheck = _loginRuntimeConfig.idpLogin;
+      final LoginRuntimeConfig latest =
+          await AppConfigService().fetchLatestLoginRuntimeConfig();
+      if (!mounted) return false;
+
+      final bool methodChanged =
+          latest.idpLogin != methodShownBeforeCheck;
+      final bool clickedFlowIsStillValid =
+          latest.idpLogin == expectedIdpLogin;
+
+      setState(() {
+        _loginRuntimeConfig = latest;
+        _loginConfigError = null;
+        _loginConfigLoading = false;
+      });
+
+      if (methodChanged || !clickedFlowIsStillValid) {
+        // The server is the source of truth. Never continue the old flow after
+        // /api/config says the active authentication method has changed.
+        _studentCodeController.clear();
+        _passwordController.clear();
+        userNameLocal = '';
+        passwordLocal = '';
+
+        snackBarWarning(
+          latest.idpLogin
+              ? 'Phương thức đăng nhập đã chuyển sang tài khoản VNU. '
+                  'Màn hình đã được cập nhật, vui lòng đăng nhập lại.'
+              : 'Phương thức đăng nhập đã chuyển sang mã sinh viên và mật khẩu. '
+                  'Màn hình đã được cập nhật, vui lòng nhập lại thông tin.',
+        );
+
+        logInfo(
+          '[LOGIN_METHOD_CHECK] changed=true '
+          'shownIdp=$methodShownBeforeCheck '
+          'clickedIdp=$expectedIdpLogin '
+          'actualIdp=${latest.idpLogin}',
+        );
+        return false;
+      }
+
+      logInfo(
+        '[LOGIN_METHOD_CHECK] changed=false actualIdp=${latest.idpLogin}',
+      );
+      return true;
+    } catch (error, stackTrace) {
+      logError(
+        '[LOGIN_METHOD_CHECK] direct_check_failed=true error=$error\n$stackTrace',
+      );
+
+      // Do not continue with a stale cached method. Otherwise an IDP screen can
+      // remain visible after the server has switched to password login and the
+      // user only sees a downstream IdpAuthFlow error.
+      if (mounted) {
+        snackBarWarning(
+          'Không kiểm tra được phương thức đăng nhập hiện tại. '
+          'Vui lòng kiểm tra kết nối và thử lại.',
+        );
+      }
+      return false;
+    } finally {
+      _loginConfigRefreshRunning = false;
+    }
+  }
+
+  Future<void> _loginStudent() async {
     FocusManager.instance.primaryFocus?.unfocus();
+
+    final bool canContinue = await _verifyLoginMethodBeforeSubmit(
+      expectedIdpLogin: false,
+    );
+    if (!canContinue || !mounted) return;
 
     _authCubit.loginMobile(
       _studentCodeController.text.trim(),
@@ -200,8 +367,48 @@ class _VCoreLoginScreenV3State extends State<VCoreLoginScreenV3> {
     );
   }
 
+  Future<void> _loginWithIdp() async {
+    FocusManager.instance.primaryFocus?.unfocus();
+
+    if (_idpLoading) return;
+
+    final bool canContinue = await _verifyLoginMethodBeforeSubmit(
+      expectedIdpLogin: true,
+    );
+    if (!canContinue || !mounted) return;
+
+    setState(() => _idpLoading = true);
+
+    try {
+      final bool success = await IdpAuthFlow().login(context);
+
+      if (!success) {
+        return;
+      }
+
+      if (VnuCore().loginSucces != null) {
+        VnuCore().loginSucces!(Globals().token);
+      }
+    } catch (error, stackTrace) {
+      logError(
+        'Đăng nhập tài khoản VNU lỗi: '
+            '$error\n$stackTrace',
+      );
+
+      AppFeedback.showError(error);
+    } finally {
+      if (mounted) {
+        setState(() => _idpLoading = false);
+      }
+    }
+  }
   Future<void> _loginWithBio() async {
     FocusManager.instance.primaryFocus?.unfocus();
+
+    final bool canContinue = await _verifyLoginMethodBeforeSubmit(
+      expectedIdpLogin: false,
+    );
+    if (!canContinue || !mounted) return;
 
     if (userNameLocal.isEmpty || passwordLocal.isEmpty) {
       snackBarWarning(
@@ -436,6 +643,11 @@ class _VCoreLoginScreenV3State extends State<VCoreLoginScreenV3> {
                                     onApplicantLogin:
                                         _applicantAuthController.login,
                                     onBioLogin: _loginWithBio,
+                                    idpLoading: _idpLoading,
+                                    onIdpLogin: _loginWithIdp,
+                                    loginRuntimeConfig: _loginRuntimeConfig,
+                                    loginConfigLoading: _loginConfigLoading,
+                                    loginConfigError: _loginConfigError,
                                     onTogglePassword: () {
                                       setState(() {
                                         _obscurePassword = !_obscurePassword;
@@ -489,6 +701,11 @@ class _LoginCard extends StatelessWidget {
     required this.onStudentLogin,
     required this.onApplicantLogin,
     required this.onBioLogin,
+    required this.idpLoading,
+    required this.onIdpLogin,
+    required this.loginRuntimeConfig,
+    required this.loginConfigLoading,
+    required this.loginConfigError,
     required this.onTogglePassword,
   });
 
@@ -509,6 +726,11 @@ class _LoginCard extends StatelessWidget {
   final VoidCallback onStudentLogin;
   final VoidCallback onApplicantLogin;
   final VoidCallback onBioLogin;
+  final bool idpLoading;
+  final VoidCallback onIdpLogin;
+  final LoginRuntimeConfig loginRuntimeConfig;
+  final bool loginConfigLoading;
+  final String? loginConfigError;
   final VoidCallback onTogglePassword;
 
   bool get _isStudent => loginMode == _LoginMode.student;
@@ -545,11 +767,10 @@ class _LoginCard extends StatelessWidget {
             transitionBuilder: (Widget child, Animation<double> animation) {
               return FadeTransition(
                 opacity: animation,
-                child: child, // bỏ SizeTransition tạm thời
-
+                child: child,
               );
             },
-            child: _isStudent ? _buildStudentForm() : _buildApplicantForm(),
+            child: _isStudent ? _buildStudentEntry() : _buildApplicantForm(),
           ),
           const SizedBox(height: 24),
           const _DividerText(),
@@ -560,6 +781,121 @@ class _LoginCard extends StatelessWidget {
     );
   }
 
+  Widget _buildStudentEntry() {
+    if (loginConfigLoading) {
+      return const Padding(
+        key: ValueKey<String>('login-config-loading'),
+        padding: EdgeInsets.symmetric(vertical: 28),
+        child: Column(
+          children: <Widget>[
+            CircularProgressIndicator(),
+            SizedBox(height: 12),
+            Text(
+              'Đang chuẩn bị đăng nhập...',
+              style: TextStyle(
+                color: _VCoreLoginScreenV3State.textMuted,
+                fontSize: AppFontSizes.small,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final String configError = loginConfigError?.trim() ?? '';
+
+    if (configError.isNotEmpty) {
+      return Column(
+        key: const ValueKey<String>('student-config-error'),
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF6E8),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: const Color(0xFFFFD99C),
+              ),
+            ),
+            child: const Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Icon(
+                  Icons.cloud_off_rounded,
+                  color: Color(0xFF9A6515),
+                ),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Không thể kết nối đến hệ thống đăng nhập. '
+                        'Vui lòng kiểm tra kết nối mạng và thử lại.',
+                    style: TextStyle(
+                      color: Color(0xFF805313),
+                      fontSize: AppFontSizes.small,
+                      height: 1.4,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+        ],
+      );
+    }
+
+    if (!loginRuntimeConfig.idpLogin) {
+      return _buildStudentForm();
+    }
+
+    return Column(
+      key: const ValueKey<String>('student-login-idp'),
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: _VCoreLoginScreenV3State.green.withOpacity(0.07),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: _VCoreLoginScreenV3State.green.withOpacity(0.14),
+            ),
+          ),
+          child: const Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Icon(
+                Icons.account_circle_outlined,
+                color: _VCoreLoginScreenV3State.green,
+                size: 22,
+              ),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Sử dụng tài khoản VNU để truy cập OneVNU.',
+                  style: TextStyle(
+                    color: _VCoreLoginScreenV3State.textDark,
+                    fontSize: AppFontSizes.small,
+                    height: 1.4,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 18),
+        _IdpLoginButton(
+          isLoading: idpLoading,
+          onTap: idpLoading ? null : onIdpLogin,
+        ),
+      ],
+    );
+  }
   Widget _buildStudentForm() {
     return Column(
       key: const ValueKey<String>('student-login-form'),
@@ -1080,6 +1416,103 @@ class _BioLoginButton extends StatelessWidget {
   }
 }
 
+class _IdpDividerText extends StatelessWidget {
+  const _IdpDividerText();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Row(
+      children: <Widget>[
+        Expanded(
+          child: Divider(color: _VCoreLoginScreenV3State.border, thickness: 1),
+        ),
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: 12),
+          child: Text(
+            'Hoặc đăng nhập tập trung',
+            style: TextStyle(
+              color: _VCoreLoginScreenV3State.textMuted,
+              fontSize: AppFontSizes.mediumSmall,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Divider(color: _VCoreLoginScreenV3State.border, thickness: 1),
+        ),
+      ],
+    );
+  }
+}
+
+class _IdpLoginButton extends StatelessWidget {
+  const _IdpLoginButton({
+    required this.onTap,
+    required this.isLoading,
+  });
+
+  final VoidCallback? onTap;
+  final bool isLoading;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        onTap: isLoading ? null : onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Ink(
+          height: 56,
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.72),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: _VCoreLoginScreenV3State.green.withOpacity(0.34),
+              width: 1.2,
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[
+              if (isLoading)
+                const SizedBox(
+                  width: 21,
+                  height: 21,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.2,
+                    color: _VCoreLoginScreenV3State.green,
+                  ),
+                )
+              else
+                const Icon(
+                  Icons.account_balance_rounded,
+                  color: _VCoreLoginScreenV3State.green,
+                  size: 23,
+                ),
+              const SizedBox(width: 10),
+              const Text(
+                'Đăng nhập',
+                style: TextStyle(
+                  color: _VCoreLoginScreenV3State.textDark,
+                  fontSize: AppFontSizes.mediumLarge,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(width: 6),
+              const Icon(
+                Icons.open_in_browser_rounded,
+                color: _VCoreLoginScreenV3State.textMuted,
+                size: 18,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _DividerText extends StatelessWidget {
   const _DividerText();
 
@@ -1195,4 +1628,3 @@ class _UtilityButton extends StatelessWidget {
     );
   }
 }
-

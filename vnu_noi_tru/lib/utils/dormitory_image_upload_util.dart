@@ -12,7 +12,7 @@ import 'package:path_provider/path_provider.dart';
 class DormitoryImageUploadUtil {
   DormitoryImageUploadUtil._();
 
-  static const int maxUploadMb = 5;
+  static const int maxUploadMb = 4;
   static const int maxUploadBytes = maxUploadMb * 1024 * 1024;
 
   static const int _defaultMaxImageSide = 1600;

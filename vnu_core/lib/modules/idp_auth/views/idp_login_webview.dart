@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:vnu_core/modules/idp_auth/config/idp_auth_config.dart';
+import 'package:vnu_core/widgets/vcore_floating_back_bubble.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 class IdpWebLoginResult {
@@ -20,9 +21,17 @@ class IdpWebLoginResult {
 }
 
 class IdpLoginWebView extends StatefulWidget {
-  const IdpLoginWebView({super.key, required this.startUri});
+  const IdpLoginWebView({
+    super.key,
+    required this.startUri,
+    this.forceCloseWebViewOnBack = false,
+  });
 
   final Uri startUri;
+
+  /// true: nút bubble luôn đóng hẳn màn IDP WebView, không đi history.
+  /// false: còn history thì Back; hết history thì đổi X đỏ và đóng màn.
+  final bool forceCloseWebViewOnBack;
 
   @override
   State<IdpLoginWebView> createState() => _IdpLoginWebViewState();
@@ -32,6 +41,7 @@ class _IdpLoginWebViewState extends State<IdpLoginWebView> {
   late final WebViewController _controller;
   int _progress = 0;
   bool _finished = false;
+  bool _canGoBack = false;
 
   @override
   void initState() {
@@ -44,6 +54,12 @@ class _IdpLoginWebViewState extends State<IdpLoginWebView> {
         NavigationDelegate(
           onProgress: (int progress) {
             if (mounted) setState(() => _progress = progress);
+          },
+          onPageStarted: (_) {
+            _refreshBackState();
+          },
+          onPageFinished: (_) {
+            _refreshBackState();
           },
           onNavigationRequest: (NavigationRequest request) {
             final Uri? uri = Uri.tryParse(request.url);
@@ -75,12 +91,36 @@ class _IdpLoginWebViewState extends State<IdpLoginWebView> {
     Navigator.of(context).pop(IdpWebLoginResult.failure(error));
   }
 
+  Future<void> _refreshBackState() async {
+    final bool canGoBack = await _controller.canGoBack();
+    if (!mounted || canGoBack == _canGoBack) return;
+
+    setState(() {
+      _canGoBack = canGoBack;
+    });
+  }
+
+  Future<void> _closeWebView() async {
+    if (!mounted) return;
+
+    /// Pop route IDP WebView. Sau khi route bị pop, State.dispose() giải phóng
+    /// WebView; không tiếp tục lần ngược history nội bộ nữa.
+    Navigator.of(context).pop();
+  }
+
   Future<void> _back() async {
-    if (await _controller.canGoBack()) {
-      await _controller.goBack();
+    if (widget.forceCloseWebViewOnBack) {
+      await _closeWebView();
       return;
     }
-    if (mounted) Navigator.of(context).pop();
+
+    if (await _controller.canGoBack()) {
+      await _controller.goBack();
+      await _refreshBackState();
+      return;
+    }
+
+    await _closeWebView();
   }
 
   @override
@@ -92,35 +132,32 @@ class _IdpLoginWebViewState extends State<IdpLoginWebView> {
       },
       child: Scaffold(
         backgroundColor: Colors.white,
-        appBar: AppBar(
-          backgroundColor: Colors.white,
-          foregroundColor: const Color(0xFF101936),
-          elevation: 0,
-          leading: IconButton(
-            onPressed: _back,
-            icon: const Icon(Icons.arrow_back_ios_new_rounded),
-          ),
-          titleSpacing: 0,
-          title: const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                'Đăng nhập VNU IDP',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-              ),
-              SizedBox(height: 2),
-              Text(
-                'idp-test.vnu.edu.vn',
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w400),
-              ),
-            ],
-          ),
-        ),
-        body: Column(
+        body: Stack(
           children: <Widget>[
-            if (_progress < 100)
-              LinearProgressIndicator(value: _progress / 100.0),
-            Expanded(child: WebViewWidget(controller: _controller)),
+            /// Bỏ hoàn toàn AppBar/navbar cũ. Chỉ giữ SafeArea hệ thống.
+            Positioned.fill(
+              child: SafeArea(
+                bottom: false,
+                child: Column(
+                  children: <Widget>[
+                    if (_progress < 100)
+                      LinearProgressIndicator(value: _progress / 100.0),
+                    Expanded(
+                      child: WebViewWidget(controller: _controller),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            /// Dùng đúng component bubble đã tách từ chức năng Nhà trọ.
+            Positioned.fill(
+              child: VcoreFloatingBackBubble(
+                isCloseAction:
+                    widget.forceCloseWebViewOnBack || !_canGoBack,
+                onBack: _back,
+              ),
+            ),
           ],
         ),
       ),

@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:http_parser/http_parser.dart';
+import 'package:path/path.dart' as path;
 import 'package:vnu_core/common/log.dart';
 import 'package:vnu_core/services/app_config_service.dart';
 import 'package:vnu_core/services/dio_options.dart';
@@ -15,9 +16,7 @@ class DormitoryPaymentRepository {
   static final DormitoryPaymentRepository _instance =
       DormitoryPaymentRepository._internal();
 
-  factory DormitoryPaymentRepository() {
-    return _instance;
-  }
+  factory DormitoryPaymentRepository() => _instance;
 
   Dio? _dio;
   String _dioBaseUrl = '';
@@ -43,15 +42,10 @@ class DormitoryPaymentRepository {
     return _dio!;
   }
 
-  /// Lấy toàn bộ biên lai của sinh viên.
-  ///
-  /// API mới:
-  /// GET /students/{identityNo}/receipts
   Future<DormitoryInvoiceResponse> getReceipts({
     required String identityNo,
   }) async {
     final String normalizedIdentityNo = identityNo.trim();
-
     if (normalizedIdentityNo.isEmpty) {
       throw ArgumentError('CCCD không được để trống');
     }
@@ -59,20 +53,19 @@ class DormitoryPaymentRepository {
     final Dio dio = await _getDio();
     final String encodedIdentityNo = Uri.encodeComponent(normalizedIdentityNo);
 
-    final Response<Map<String, dynamic>> response = await dio
-        .get<Map<String, dynamic>>(
-          'students/$encodedIdentityNo/receipts',
-          options: Options(
-            headers: <String, dynamic>{'Accept': 'application/json'},
-          ),
-        );
+    final Response<Map<String, dynamic>> response =
+        await dio.get<Map<String, dynamic>>(
+      'students/$encodedIdentityNo/receipts',
+      options: Options(
+        headers: <String, dynamic>{'Accept': 'application/json'},
+      ),
+    );
 
     return DormitoryInvoiceResponse.fromJson(
       response.data ?? const <String, dynamic>{},
     );
   }
 
-  /// Giữ lại tên hàm cũ để các nơi chưa cập nhật vẫn biên dịch được.
   Future<DormitoryInvoiceResponse> getInvoices({required String identityNo}) {
     return getReceipts(identityNo: identityNo);
   }
@@ -82,93 +75,106 @@ class DormitoryPaymentRepository {
   }) async {
     final Dio dio = await _getDio();
 
-    final Response<Map<String, dynamic>> response = await dio
-        .get<Map<String, dynamic>>(
-          'dormitory/$dormitoryId/payment-methods',
-          options: Options(
-            headers: <String, dynamic>{'Accept': 'application/json'},
-          ),
-        );
+    final Response<Map<String, dynamic>> response =
+        await dio.get<Map<String, dynamic>>(
+      'dormitory/$dormitoryId/payment-methods',
+      options: Options(
+        headers: <String, dynamic>{'Accept': 'application/json'},
+      ),
+    );
 
     return DormitoryPaymentMethodResponse.fromJson(
       response.data ?? const <String, dynamic>{},
     );
   }
 
-  /// Gửi ảnh minh chứng chuyển khoản cho một biên lai.
+  /// API mới cho phép gửi nhiều minh chứng trong cùng một lần và bổ sung
+  /// nhiều lần cho cùng payment đang pending.
   ///
-  /// API mới:
   /// POST /students/{identityNo}/receipts/{receipt}/payment-proof
-  /// multipart field bắt buộc: proof_image
+  /// multipart: proof_images[] + note
   Future<Map<String, dynamic>> uploadPaymentProof({
     required String identityNo,
     required Object receiptId,
-    required File proofImage,
+    required List<File> proofImages,
     String? note,
     ProgressCallback? onSendProgress,
   }) async {
     final String normalizedIdentityNo = identityNo.trim();
-
     if (normalizedIdentityNo.isEmpty) {
       throw ArgumentError('CCCD không được để trống');
     }
 
-    if (!await proofImage.exists()) {
-      throw ArgumentError('File minh chứng không tồn tại');
+    if (proofImages.isEmpty) {
+      throw ArgumentError('Vui lòng chọn ít nhất một ảnh minh chứng');
     }
 
     final String normalizedReceiptId = receiptId.toString().trim();
-
     if (normalizedReceiptId.isEmpty) {
       throw ArgumentError('Mã biên lai không hợp lệ');
     }
 
-    final String encodedIdentityNo = Uri.encodeComponent(normalizedIdentityNo);
-    final String encodedReceiptId = Uri.encodeComponent(normalizedReceiptId);
-
     final String? normalizedNote = note?.trim();
-
     if (normalizedNote != null && normalizedNote.length > 500) {
       throw ArgumentError('Ghi chú không được vượt quá 500 ký tự');
     }
 
-    final int proofSize = await proofImage.length();
-    final String uploadFileName =
-        'payment_proof_${DateTime.now().millisecondsSinceEpoch}.jpg';
+    final FormData formData = FormData();
+    int totalBytes = 0;
+
+    for (int index = 0; index < proofImages.length; index++) {
+      final File file = proofImages[index];
+      if (!await file.exists()) {
+        throw ArgumentError('Có ảnh minh chứng không còn tồn tại trên thiết bị');
+      }
+
+      totalBytes += await file.length();
+      final String extension = path.extension(file.path).toLowerCase();
+      final MediaType contentType = extension == '.png'
+          ? MediaType('image', 'png')
+          : MediaType('image', 'jpeg');
+
+      formData.files.add(
+        MapEntry<String, MultipartFile>(
+          'proof_images[]',
+          await MultipartFile.fromFile(
+            file.path,
+            filename:
+                'payment_proof_${DateTime.now().millisecondsSinceEpoch}_$index${extension.isEmpty ? '.jpg' : extension}',
+            contentType: contentType,
+          ),
+        ),
+      );
+    }
+
+    if (normalizedNote != null && normalizedNote.isNotEmpty) {
+      formData.fields.add(MapEntry<String, String>('note', normalizedNote));
+    }
 
     logInfo(
-      '[PAYMENT-PROOF-UPLOAD] '
-      'platform=${Platform.operatingSystem} bytes=$proofSize',
+      '[PAYMENT-PROOF-UPLOAD] platform=${Platform.operatingSystem} '
+      'files=${proofImages.length} bytes=$totalBytes',
     );
 
-    final FormData formData = FormData.fromMap(<String, dynamic>{
-      'proof_image': await MultipartFile.fromFile(
-        proofImage.path,
-        filename: uploadFileName,
-        contentType: MediaType('image', 'jpeg'),
-      ),
-      if (normalizedNote != null && normalizedNote.isNotEmpty)
-        'note': normalizedNote,
-    });
-
+    final String encodedIdentityNo = Uri.encodeComponent(normalizedIdentityNo);
+    final String encodedReceiptId = Uri.encodeComponent(normalizedReceiptId);
     final Dio dio = await _getDio();
 
     try {
-      final Response<Map<String, dynamic>> response = await dio
-          .post<Map<String, dynamic>>(
-            'students/$encodedIdentityNo'
-            '/receipts/$encodedReceiptId'
-            '/payment-proof',
-            data: formData,
-            onSendProgress: onSendProgress,
-            options: Options(
-              headers: <String, dynamic>{'Accept': 'application/json'},
-              contentType: Headers.multipartFormDataContentType,
-            ),
-          );
+      final Response<Map<String, dynamic>> response =
+          await dio.post<Map<String, dynamic>>(
+        'students/$encodedIdentityNo/receipts/$encodedReceiptId/payment-proof',
+        data: formData,
+        onSendProgress: onSendProgress,
+        options: Options(
+          headers: <String, dynamic>{'Accept': 'application/json'},
+          contentType: Headers.multipartFormDataContentType,
+        ),
+      );
 
       logInfo(
-        '[PAYMENT-PROOF-UPLOAD-SUCCESS] status=${response.statusCode}',
+        '[PAYMENT-PROOF-UPLOAD-SUCCESS] status=${response.statusCode} '
+        'files=${proofImages.length}',
       );
 
       return response.data ?? const <String, dynamic>{};
@@ -180,5 +186,54 @@ class DormitoryPaymentRepository {
       rethrow;
     }
   }
-}
 
+  /// Compatibility wrapper cho code cũ nếu còn nơi gọi 1 file.
+  Future<Map<String, dynamic>> uploadSinglePaymentProof({
+    required String identityNo,
+    required Object receiptId,
+    required File proofImage,
+    String? note,
+    ProgressCallback? onSendProgress,
+  }) {
+    return uploadPaymentProof(
+      identityNo: identityNo,
+      receiptId: receiptId,
+      proofImages: <File>[proofImage],
+      note: note,
+      onSendProgress: onSendProgress,
+    );
+  }
+
+  /// Xóa một proof riêng lẻ. Backend chỉ cho xóa khi payment còn pending.
+  Future<Map<String, dynamic>> deletePaymentProof({
+    required String identityNo,
+    required Object receiptId,
+    required Object proofId,
+  }) async {
+    final String normalizedIdentityNo = identityNo.trim();
+    final String normalizedReceiptId = receiptId.toString().trim();
+    final String normalizedProofId = proofId.toString().trim();
+
+    if (normalizedIdentityNo.isEmpty ||
+        normalizedReceiptId.isEmpty ||
+        normalizedProofId.isEmpty) {
+      throw ArgumentError('Thiếu thông tin minh chứng cần xóa');
+    }
+
+    final Dio dio = await _getDio();
+    final String encodedIdentityNo = Uri.encodeComponent(normalizedIdentityNo);
+    final String encodedReceiptId = Uri.encodeComponent(normalizedReceiptId);
+    final String encodedProofId = Uri.encodeComponent(normalizedProofId);
+
+    final Response<Map<String, dynamic>> response =
+        await dio.delete<Map<String, dynamic>>(
+      'students/$encodedIdentityNo/receipts/$encodedReceiptId/'
+      'payment-proof/$encodedProofId',
+      options: Options(
+        headers: <String, dynamic>{'Accept': 'application/json'},
+      ),
+    );
+
+    return response.data ?? const <String, dynamic>{};
+  }
+}

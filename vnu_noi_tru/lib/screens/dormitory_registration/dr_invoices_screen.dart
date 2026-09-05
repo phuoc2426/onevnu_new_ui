@@ -45,7 +45,7 @@ class DRInvoicesScreen extends StatefulWidget {
 }
 
 class _DRInvoicesScreenState extends State<DRInvoicesScreen> {
-  static const int _maxProofSizeMb = 5;
+  static const int _maxProofSizeMb = 4;
   static const int _maxProofSizeBytes = _maxProofSizeMb * 1024 * 1024;
 
   final DormitoryPaymentCubit _cubit = DormitoryPaymentCubit();
@@ -88,6 +88,10 @@ class _DRInvoicesScreenState extends State<DRInvoicesScreen> {
         bloc: _cubit,
         listener: (BuildContext context, DormitoryPaymentState state) {
           if (state is DormitoryPaymentUploadSuccess) {
+            _showSuccess(state.message);
+          }
+
+          if (state is DormitoryPaymentProofDeleteSuccess) {
             _showSuccess(state.message);
           }
 
@@ -440,6 +444,10 @@ class _DRInvoicesScreenState extends State<DRInvoicesScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
                           _buildInvoiceStatusBadge(invoice),
+                          if (invoice.hasRoomChange || invoice.adjustedCount > 0) ...<Widget>[
+                            const SizedBox(height: 6),
+                            _buildRoomChangeBadge(invoice),
+                          ],
                           const SizedBox(height: 8),
                           Text(
                             invoice.displayTitle,
@@ -591,6 +599,31 @@ class _DRInvoicesScreenState extends State<DRInvoicesScreen> {
             ],
           ),
         ],
+        if (invoice.proofCount > 0) ...<Widget>[
+          const SizedBox(height: 10),
+          Row(
+            children: <Widget>[
+              Icon(
+                Icons.photo_library_outlined,
+                size: 14,
+                color: accentColor,
+              ),
+              const SizedBox(width: 5),
+              Flexible(
+                child: Text(
+                  '${invoice.proofCount} minh chứng',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    color: accentColor,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
         const SizedBox(height: 10),
         InkWell(
           onTap: () => _showInvoiceDetailsSheet(invoice),
@@ -676,8 +709,10 @@ class _DRInvoicesScreenState extends State<DRInvoicesScreen> {
       icon = Icons.check_circle_rounded;
       label = 'Đã thanh\ntoán';
     } else if (invoice.hasPendingPayment) {
-      icon = Icons.upload_file_rounded;
-      label = 'Chờ xác\nnhận';
+      icon = Icons.photo_library_rounded;
+      label = invoice.proofCount > 0
+          ? '${invoice.proofCount} minh\nchứng'
+          : 'Chờ xác\nnhận';
     } else {
       icon = Icons.upload_file_rounded;
       label = 'Gửi minh\nchứng';
@@ -812,9 +847,13 @@ class _DRInvoicesScreenState extends State<DRInvoicesScreen> {
                       const SizedBox(height: 14),
                       _buildBankInformation(paymentMethod),
                     ],
+                    if (invoice.hasRoomChange || invoice.adjustedCount > 0) ...<Widget>[
+                      const SizedBox(height: 14),
+                      _buildRoomChangeSummary(invoice),
+                    ],
                     if (invoice.payments.isNotEmpty) ...<Widget>[
                       const SizedBox(height: 14),
-                      _buildLatestPaymentBox(invoice),
+                      _buildPaymentProofsSection(invoice),
                     ],
                     if (!invoice.isPaid) ...<Widget>[
                       const SizedBox(height: 14),
@@ -863,8 +902,9 @@ class _DRInvoicesScreenState extends State<DRInvoicesScreen> {
       label = 'Đã thanh toán';
       icon = Icons.check_circle_rounded;
     } else if (invoice.hasPendingPayment) {
-      label = 'Đang chờ xác nhận';
-      icon = Icons.hourglass_top_rounded;
+      label = 'Bổ sung minh chứng';
+      icon = Icons.add_photo_alternate_rounded;
+      onTap = () => _pickPaymentProof(invoice);
     } else if (qrUrl != null) {
       label = 'Thanh toán ngay';
       icon = Icons.qr_code_2_rounded;
@@ -1703,110 +1743,453 @@ class _DRInvoicesScreenState extends State<DRInvoicesScreen> {
   // Minh chứng đã gửi
   // =========================================================
 
-  Widget _buildLatestPaymentBox(DormitoryInvoiceModel invoice) {
+  Widget _buildPaymentProofsSection(DormitoryInvoiceModel invoice) {
     final DormitoryPaymentModel payment = invoice.latestPayment!;
+    final List<DormitoryPaymentProofModel> proofs = payment.allProofImages;
 
-    final String status = payment.status?.toLowerCase().trim() ?? '';
+    final Color color;
+    final IconData icon;
+    final String title;
 
-    Color color;
-    IconData icon;
-    String title;
-
-    // Receipt là trạng thái nghiệp vụ cuối cùng. Khi biên lai đã được xác nhận
-    // thanh toán, không tiếp tục hiển thị Payment cũ là pending.
-    if (invoice.isPaid) {
+    if (invoice.isPaid || payment.isConfirmed) {
       color = AppTheme.colorSuccess;
-      icon = Icons.check_circle_rounded;
+      icon = Icons.verified_rounded;
       title = 'Minh chứng đã được xác nhận';
+    } else if (payment.isRejected) {
+      color = AppTheme.colorError;
+      icon = Icons.error_rounded;
+      title = 'Minh chứng cần bổ sung';
     } else {
-      switch (status) {
-        case 'approved':
-        case 'confirmed':
-        case 'paid':
-        case 'completed':
-        case 'success':
-          color = AppTheme.colorSuccess;
-          icon = Icons.check_circle_rounded;
-          title = 'Minh chứng đã được xác nhận';
-          break;
-
-        case 'rejected':
-          color = AppTheme.colorError;
-          icon = Icons.cancel_rounded;
-          title = 'Minh chứng bị từ chối';
-          break;
-
-        default:
-          color = Colors.orange;
-          icon = Icons.hourglass_top_rounded;
-          title = 'Minh chứng đang chờ xác nhận';
-          break;
-      }
+      color = const Color(0xFFF59E0B);
+      icon = Icons.schedule_rounded;
+      title = 'Minh chứng đang chờ xác nhận';
     }
+
+    final bool allowDelete = payment.isPending && !invoice.isPaid;
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(13),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.25)),
+        color: color.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: color.withOpacity(0.22)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Row(
             children: <Widget>[
-              Icon(icon, size: 19, color: color),
-              const SizedBox(width: 8),
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, size: 21, color: color),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: AppFontSizes.font11,
+                        fontWeight: FontWeight.w800,
+                        color: color,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      proofs.isEmpty
+                          ? 'Chưa có ảnh minh chứng lưu trên hệ thống'
+                          : '${proofs.length} minh chứng đã nộp',
+                      style: const TextStyle(
+                        fontSize: AppFontSizes.extraSmall,
+                        color: Color(0xFF6B7280),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (payment.createdAt != null) ...<Widget>[
+            const SizedBox(height: 10),
+            Text(
+              'Lần cập nhật gần nhất: '
+              '${DateFormat('dd/MM/yyyy HH:mm').format(payment.createdAt!.toLocal())}',
+              style: const TextStyle(
+                fontSize: AppFontSizes.extraSmall,
+                color: Color(0xFF6B7280),
+              ),
+            ),
+          ],
+          if (_hasText(payment.note)) ...<Widget>[
+            const SizedBox(height: 5),
+            Text(
+              'Ghi chú: ${payment.note}',
+              style: const TextStyle(
+                fontSize: AppFontSizes.font11,
+                color: Color(0xFF4B5563),
+                height: 1.35,
+              ),
+            ),
+          ],
+          if (!invoice.isPaid && _hasText(payment.rejectionReason)) ...<Widget>[
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFEBEE),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                'Lý do từ chối: ${payment.rejectionReason}',
+                style: const TextStyle(
+                  fontSize: AppFontSizes.font11,
+                  color: Color(0xFFC62828),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+          if (proofs.isNotEmpty) ...<Widget>[
+            const SizedBox(height: 14),
+            LayoutBuilder(
+              builder: (BuildContext context, BoxConstraints constraints) {
+                final double itemWidth = ((constraints.maxWidth - 16) / 3)
+                    .clamp(82.0, 116.0)
+                    .toDouble();
+                return Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: proofs.asMap().entries.map((entry) {
+                    final int index = entry.key;
+                    final DormitoryPaymentProofModel proof = entry.value;
+                    return SizedBox(
+                      width: itemWidth,
+                      child: _buildProofThumbnail(
+                        invoice: invoice,
+                        proof: proof,
+                        index: index,
+                        allowDelete: allowDelete,
+                      ),
+                    );
+                  }).toList(),
+                );
+              },
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProofThumbnail({
+    required DormitoryInvoiceModel invoice,
+    required DormitoryPaymentProofModel proof,
+    required int index,
+    required bool allowDelete,
+  }) {
+    return AspectRatio(
+      aspectRatio: 0.92,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: <Widget>[
+          Positioned.fill(
+            child: Material(
+              color: const Color(0xFFF3F5F4),
+              borderRadius: BorderRadius.circular(12),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: proof.url.trim().isEmpty
+                    ? null
+                    : () => _showProofImagePreview(proof.url),
+                child: Image.network(
+                  proof.url,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const Center(
+                    child: Icon(
+                      Icons.image_not_supported_outlined,
+                      color: Color(0xFF9CA3AF),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            left: 6,
+            bottom: 6,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.62),
+                borderRadius: BorderRadius.circular(99),
+              ),
+              child: Text(
+                '${index + 1}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ),
+          if (allowDelete && proof.canDelete)
+            Positioned(
+              top: -5,
+              right: -5,
+              child: Material(
+                color: const Color(0xFFE53935),
+                shape: const CircleBorder(),
+                elevation: 2,
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: () => _confirmDeleteProof(invoice, proof),
+                  child: const Padding(
+                    padding: EdgeInsets.all(5),
+                    child: Icon(Icons.close_rounded, size: 14, color: Colors.white),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showProofImagePreview(String url) async {
+    await showDialog<void>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return Dialog(
+          insetPadding: const EdgeInsets.all(16),
+          backgroundColor: Colors.black,
+          child: Stack(
+            children: <Widget>[
+              InteractiveViewer(
+                minScale: 0.8,
+                maxScale: 4,
+                child: Image.network(
+                  url,
+                  fit: BoxFit.contain,
+                  width: double.infinity,
+                  errorBuilder: (_, __, ___) => const SizedBox(
+                    height: 260,
+                    child: Center(
+                      child: Text(
+                        'Không tải được minh chứng',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                right: 8,
+                top: 8,
+                child: IconButton.filled(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.white.withOpacity(0.18),
+                  ),
+                  icon: const Icon(Icons.close_rounded, color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _confirmDeleteProof(
+    DormitoryInvoiceModel invoice,
+    DormitoryPaymentProofModel proof,
+  ) async {
+    if (invoice.id == null || !proof.canDelete) return;
+
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('Xóa minh chứng?'),
+          content: const Text(
+            'Minh chứng đang chờ xử lý sẽ được xóa khỏi hóa đơn. '
+            'Bạn có thể tải lại ảnh khác ngay sau đó.',
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Giữ lại'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFE53935),
+              ),
+              child: const Text('Xóa'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    final bool deleted = await _cubit.deleteProof(
+      identityNo: widget.identityNo,
+      receiptId: invoice.id!,
+      proofId: proof.id!,
+      dormitoryId: widget.dormitoryId,
+    );
+
+    if (deleted && mounted && Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    }
+  }
+
+  Widget _buildRoomChangeBadge(DormitoryInvoiceModel invoice) {
+    final String label = invoice.adjustedCount > 1
+        ? 'Đã điều chỉnh ${invoice.adjustedCount} lần'
+        : 'Có điều chỉnh phòng';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF6FF),
+        borderRadius: BorderRadius.circular(99),
+        border: Border.all(color: const Color(0xFFBFDBFE)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          const Icon(Icons.swap_horiz_rounded, size: 13, color: Color(0xFF2563EB)),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF2563EB),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRoomChangeSummary(DormitoryInvoiceModel invoice) {
+    final List<Widget> details = <Widget>[];
+
+    if (_hasText(invoice.buildingName)) {
+      details.add(_buildRoomChangeInfo(Icons.apartment_rounded, 'Tòa', invoice.buildingName!));
+    }
+    if (_hasText(invoice.roomNumber)) {
+      details.add(_buildRoomChangeInfo(Icons.meeting_room_rounded, 'Phòng', invoice.roomNumber!));
+    }
+    if (_hasText(invoice.roomTypeName)) {
+      details.add(_buildRoomChangeInfo(Icons.bed_rounded, 'Loại phòng', invoice.roomTypeName!));
+    }
+    if (invoice.roomTypePrice != null && invoice.roomTypePrice! > 0) {
+      details.add(
+        _buildRoomChangeInfo(
+          Icons.payments_outlined,
+          'Mức phí phòng',
+          '${_formatMoney(invoice.roomTypePrice!)} đ',
+        ),
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: <Color>[Color(0xFFF0FDF4), Color(0xFFEFF6FF)],
+        ),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFCDE9D7)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const Row(
+            children: <Widget>[
+              Icon(Icons.swap_horiz_rounded, color: Color(0xFF078B3E), size: 22),
+              SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  title,
+                  'Hóa đơn đã gộp điều chỉnh phòng',
                   style: TextStyle(
                     fontSize: AppFontSizes.font11,
-                    fontWeight: FontWeight.bold,
-                    color: color,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF12341F),
                   ),
                 ),
               ),
             ],
           ),
+          const SizedBox(height: 6),
+          Text(
+            invoice.adjustedCount > 0
+                ? 'Hệ thống đã cập nhật ${invoice.adjustedCount} lần điều chỉnh vào cùng một hóa đơn.'
+                : 'Khoản chênh lệch do đổi phòng/loại phòng được theo dõi trên cùng hóa đơn này.',
+            style: const TextStyle(
+              fontSize: AppFontSizes.extraSmall,
+              color: Color(0xFF526057),
+              height: 1.35,
+            ),
+          ),
+          if (details.isNotEmpty) ...<Widget>[
+            const SizedBox(height: 12),
+            ...details,
+          ],
+        ],
+      ),
+    );
+  }
 
-          if (payment.createdAt != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              'Ngày gửi: '
-              '${DateFormat('dd/MM/yyyy HH:mm').format(payment.createdAt!)}',
+  Widget _buildRoomChangeInfo(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 7),
+      child: Row(
+        children: <Widget>[
+          Icon(icon, size: 16, color: const Color(0xFF078B3E)),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 86,
+            child: Text(
+              label,
               style: const TextStyle(
-                fontSize: AppFontSizes.font11,
-                color: Color(0xFF666B75),
+                fontSize: AppFontSizes.extraSmall,
+                color: Color(0xFF667169),
               ),
             ),
-          ],
-
-          if (_hasText(payment.note)) ...[
-            const SizedBox(height: 6),
-            Text(
-              'Ghi chú: ${payment.note}',
+          ),
+          Expanded(
+            child: Text(
+              value,
               style: const TextStyle(
                 fontSize: AppFontSizes.font11,
-                color: Color(0xFF666B75),
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1F2937),
               ),
             ),
-          ],
-
-          if (!invoice.isPaid && _hasText(payment.rejectionReason)) ...[
-            const SizedBox(height: 6),
-            Text(
-              'Lý do từ chối: '
-              '${payment.rejectionReason}',
-              style: const TextStyle(
-                fontSize: AppFontSizes.font11,
-                color: Colors.red,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
+          ),
         ],
       ),
     );
@@ -1828,16 +2211,8 @@ class _DRInvoicesScreenState extends State<DRInvoicesScreen> {
       );
     }
 
-    if (invoice.hasPendingPayment) {
-      return SizedBox(
-        width: double.infinity,
-        child: OutlinedButton.icon(
-          onPressed: null,
-          icon: const Icon(Icons.hourglass_top_rounded),
-          label: const Text('Đang chờ xác nhận thanh toán'),
-        ),
-      );
-    }
+    final bool hasProofs = invoice.proofCount > 0;
+    final bool pending = invoice.hasPendingPayment;
 
     return SizedBox(
       width: double.infinity,
@@ -1851,11 +2226,15 @@ class _DRInvoicesScreenState extends State<DRInvoicesScreen> {
             borderRadius: BorderRadius.circular(12),
           ),
         ),
-        icon: const Icon(Icons.upload_file_rounded),
+        icon: Icon(
+          hasProofs ? Icons.add_photo_alternate_rounded : Icons.upload_file_rounded,
+        ),
         label: Text(
-          invoice.hasRejectedPayment
-              ? 'Gửi lại minh chứng thanh toán'
-              : 'Gửi minh chứng thanh toán',
+          hasProofs || pending
+              ? 'Bổ sung minh chứng thanh toán'
+              : invoice.hasRejectedPayment
+                  ? 'Gửi lại minh chứng thanh toán'
+                  : 'Gửi minh chứng thanh toán',
         ),
       ),
     );
@@ -1867,56 +2246,47 @@ class _DRInvoicesScreenState extends State<DRInvoicesScreen> {
       return;
     }
 
-    if (_isPickingPaymentProof) {
-      return;
-    }
+    if (_isPickingPaymentProof) return;
 
     _isPickingPaymentProof = true;
-    File? originalFile;
-    File? normalizedProofFile;
+    final List<File> originalFiles = <File>[];
+    final List<File> normalizedFiles = <File>[];
 
     try {
-      final XFile? selectedImage = await _imagePicker.pickImage(
-        source: ImageSource.gallery,
-        // Chỉ giảm sơ bộ khi chọn ảnh. Bước chuẩn hóa JPEG phía dưới mới là
-        // bước bắt buộc cho cả Android và iOS, đặc biệt với HEIC/HEIF trên iOS.
+      final List<XFile> selectedImages = await _imagePicker.pickMultiImage(
         imageQuality: 100,
       );
 
-      if (selectedImage == null) {
-        return;
+      if (selectedImages.isEmpty) return;
+
+      for (final XFile selectedImage in selectedImages) {
+        final File selectedFile = File(selectedImage.path);
+        originalFiles.add(selectedFile);
+
+        final File preparedProofFile =
+            await DormitoryImageUploadUtil.normalizeToJpeg(selectedFile);
+        normalizedFiles.add(preparedProofFile);
+
+        final int fileSize = await preparedProofFile.length();
+        if (fileSize > _maxProofSizeBytes) {
+          _showError(
+            'Mỗi ảnh minh chứng không được vượt quá $_maxProofSizeMb MB',
+          );
+          return;
+        }
       }
 
-      final File selectedFile = File(selectedImage.path);
-      originalFile = selectedFile;
-      final File preparedProofFile =
-          await DormitoryImageUploadUtil.normalizeToJpeg(selectedFile);
-      normalizedProofFile = preparedProofFile;
-
-      final int fileSize = await preparedProofFile.length();
-      if (fileSize > _maxProofSizeBytes) {
-        _showError(
-          'Ảnh minh chứng không được vượt quá '
-          '$_maxProofSizeMb MB',
-        );
-        return;
-      }
-
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
 
       final PaymentProofConfirmResult? confirmResult =
-          await _showProofConfirmDialog(preparedProofFile);
+          await _showProofConfirmDialog(normalizedFiles);
 
-      if (confirmResult == null || !confirmResult.confirmed) {
-        return;
-      }
+      if (confirmResult == null || !confirmResult.confirmed) return;
 
       await _cubit.uploadProof(
         identityNo: widget.identityNo,
         receiptId: invoice.id!,
-        proofImage: preparedProofFile,
+        proofImages: normalizedFiles,
         note: confirmResult.note,
         dormitoryId: widget.dormitoryId,
       );
@@ -1931,23 +2301,25 @@ class _DRInvoicesScreenState extends State<DRInvoicesScreen> {
       }
     } finally {
       _isPickingPaymentProof = false;
-      await DormitoryImageUploadUtil.deleteTemporaryFile(
-        normalizedFile: normalizedProofFile,
-        originalFile: originalFile,
-      );
+
+      for (int index = 0; index < normalizedFiles.length; index++) {
+        await DormitoryImageUploadUtil.deleteTemporaryFile(
+          normalizedFile: normalizedFiles[index],
+          originalFile: index < originalFiles.length ? originalFiles[index] : null,
+        );
+      }
     }
   }
 
-  Future<PaymentProofConfirmResult?>
-      _showProofConfirmDialog(
-    File proofFile,
+  Future<PaymentProofConfirmResult?> _showProofConfirmDialog(
+    List<File> proofFiles,
   ) {
     return showDialog<PaymentProofConfirmResult>(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext dialogContext) {
         return _PaymentProofConfirmDialog(
-          proofFile: proofFile,
+          proofFiles: proofFiles,
         );
       },
     );
@@ -2059,12 +2431,11 @@ class _DRInvoicesScreenState extends State<DRInvoicesScreen> {
 }
 
 
-class _PaymentProofConfirmDialog
-    extends StatefulWidget {
-  final File proofFile;
+class _PaymentProofConfirmDialog extends StatefulWidget {
+  final List<File> proofFiles;
 
   const _PaymentProofConfirmDialog({
-    required this.proofFile,
+    required this.proofFiles,
   });
 
   @override
@@ -2074,8 +2445,7 @@ class _PaymentProofConfirmDialog
 
 class _PaymentProofConfirmDialogState
     extends State<_PaymentProofConfirmDialog> {
-  late final TextEditingController
-      _noteController;
+  late final TextEditingController _noteController;
 
   @override
   void initState() {
@@ -2095,9 +2465,7 @@ class _PaymentProofConfirmDialogState
   }
 
   void _submit() {
-    final String note =
-        _noteController.text.trim();
-
+    final String note = _noteController.text.trim();
     FocusScope.of(context).unfocus();
 
     Navigator.of(context).pop(
@@ -2110,91 +2478,127 @@ class _PaymentProofConfirmDialogState
 
   @override
   Widget build(BuildContext context) {
-    final double maxHeight =
-        MediaQuery.of(context).size.height * 0.86;
+    final double maxHeight = MediaQuery.of(context).size.height * 0.88;
 
     return Dialog(
-      insetPadding: const EdgeInsets.symmetric(
-        horizontal: 16,
-        vertical: 24,
-      ),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 20),
       backgroundColor: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
       child: SafeArea(
         child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: maxHeight,
-          ),
+          constraints: BoxConstraints(maxHeight: maxHeight),
           child: SingleChildScrollView(
             padding: EdgeInsets.fromLTRB(
               16,
               12,
               16,
-              16 +
-                  MediaQuery.of(context)
-                      .viewInsets
-                      .bottom,
+              16 + MediaQuery.of(context).viewInsets.bottom,
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Row(
                   children: <Widget>[
-                    const Expanded(
-                      child: Text(
-                        'Xác nhận minh chứng',
-                        style: TextStyle(
-                          fontSize:
-                              AppFontSizes.medium,
-                          fontWeight:
-                              FontWeight.bold,
-                        ),
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFEAF8EF),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.receipt_long_rounded,
+                        color: Color(0xFF078B3E),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          const Text(
+                            'Xác nhận minh chứng',
+                            style: TextStyle(
+                              fontSize: AppFontSizes.medium,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF15181D),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${widget.proofFiles.length} ảnh sẽ được gửi cùng lần này',
+                            style: const TextStyle(
+                              fontSize: AppFontSizes.extraSmall,
+                              color: Color(0xFF6B7280),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     IconButton(
                       tooltip: 'Đóng',
                       onPressed: _close,
-                      icon: const Icon(
-                        Icons.close_rounded,
-                      ),
+                      icon: const Icon(Icons.close_rounded),
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
-                Container(
-                  width: double.infinity,
-                  constraints:
-                      const BoxConstraints(
-                    minHeight: 180,
-                    maxHeight: 280,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF4F5F7),
-                    borderRadius:
-                        BorderRadius.circular(14),
-                  ),
-                  child: ClipRRect(
-                    borderRadius:
-                        BorderRadius.circular(14),
-                    child: Image.file(
-                      widget.proofFile,
-                      fit: BoxFit.contain,
-                      errorBuilder: (
-                        BuildContext context,
-                        Object error,
-                        StackTrace? stackTrace,
-                      ) {
-                        return const Center(
-                          child: Text(
-                            'Không hiển thị được ảnh',
-                          ),
-                        );
-                      },
-                    ),
+                const SizedBox(height: 14),
+                SizedBox(
+                  height: widget.proofFiles.length == 1 ? 230 : 150,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: widget.proofFiles.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 10),
+                    itemBuilder: (BuildContext context, int index) {
+                      final File file = widget.proofFiles[index];
+                      return Container(
+                        width: widget.proofFiles.length == 1 ? 260 : 120,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF4F5F7),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFE2E8E4)),
+                        ),
+                        child: Stack(
+                          children: <Widget>[
+                            Positioned.fill(
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(15),
+                                child: Image.file(
+                                  file,
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (_, __, ___) => const Center(
+                                    child: Text('Không hiển thị được ảnh'),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              top: 7,
+                              left: 7,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.62),
+                                  borderRadius: BorderRadius.circular(99),
+                                ),
+                                child: Text(
+                                  '${index + 1}/${widget.proofFiles.length}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -2203,17 +2607,13 @@ class _PaymentProofConfirmDialogState
                   maxLines: 3,
                   minLines: 2,
                   maxLength: 500,
-                  textInputAction:
-                      TextInputAction.newline,
+                  textInputAction: TextInputAction.newline,
                   decoration: InputDecoration(
-                    labelText:
-                        'Ghi chú thanh toán',
-                    hintText:
-                        'Ví dụ: Đã chuyển khoản lúc 10:30',
+                    labelText: 'Ghi chú thanh toán',
+                    hintText: 'Ví dụ: Nộp bổ sung chênh lệch đổi phòng',
                     alignLabelWithHint: true,
                     border: OutlineInputBorder(
-                      borderRadius:
-                          BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
                 ),
@@ -2222,14 +2622,13 @@ class _PaymentProofConfirmDialogState
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color:
-                        const Color(0xFFFFF8E7),
-                    borderRadius:
-                        BorderRadius.circular(12),
+                    gradient: const LinearGradient(
+                      colors: <Color>[Color(0xFFFFF8E7), Color(0xFFF2FBF5)],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Row(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
                       Icon(
                         Icons.info_outline_rounded,
@@ -2239,15 +2638,12 @@ class _PaymentProofConfirmDialogState
                       SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Ảnh cần nhìn rõ số tiền, '
-                          'thời gian và nội dung '
-                          'chuyển khoản.',
+                          'Có thể chọn nhiều ảnh và tiếp tục bổ sung minh chứng '
+                          'sau lần gửi đầu tiên. Mỗi ảnh tối đa 4 MB.',
                           style: TextStyle(
-                            fontSize:
-                                AppFontSizes.font11,
+                            fontSize: AppFontSizes.font11,
                             height: 1.35,
-                            color:
-                                Color(0xFF766220),
+                            color: Color(0xFF5E552A),
                           ),
                         ),
                       ),
@@ -2256,49 +2652,32 @@ class _PaymentProofConfirmDialogState
                 ),
                 const SizedBox(height: 18),
                 LayoutBuilder(
-                  builder: (
-                    BuildContext context,
-                    BoxConstraints constraints,
-                  ) {
-                    final bool useColumn =
-                        constraints.maxWidth < 330;
+                  builder: (BuildContext context, BoxConstraints constraints) {
+                    final bool useColumn = constraints.maxWidth < 330;
 
-                    final Widget cancelButton =
-                        OutlinedButton(
+                    final Widget cancelButton = OutlinedButton(
                       onPressed: _close,
-                      child: const Text(
-                        'Chọn lại',
-                      ),
+                      child: const Text('Chọn lại'),
                     );
 
-                    final Widget submitButton =
-                        FilledButton.icon(
+                    final Widget submitButton = FilledButton.icon(
                       onPressed: _submit,
-                      style:
-                          FilledButton.styleFrom(
-                        backgroundColor:
-                            const Color(
-                          0xFF078B3E,
-                        ),
-                        foregroundColor:
-                            Colors.white,
-                        padding:
-                            const EdgeInsets.symmetric(
-                          vertical: 13,
-                        ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF078B3E),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 13),
                       ),
-                      icon: const Icon(
-                        Icons.send_rounded,
-                      ),
-                      label: const Text(
-                        'Gửi minh chứng',
+                      icon: const Icon(Icons.send_rounded),
+                      label: Text(
+                        widget.proofFiles.length > 1
+                            ? 'Gửi ${widget.proofFiles.length} minh chứng'
+                            : 'Gửi minh chứng',
                       ),
                     );
 
                     if (useColumn) {
                       return Column(
-                        crossAxisAlignment:
-                            CrossAxisAlignment.stretch,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: <Widget>[
                           submitButton,
                           const SizedBox(height: 10),
@@ -2309,13 +2688,9 @@ class _PaymentProofConfirmDialogState
 
                     return Row(
                       children: <Widget>[
-                        Expanded(
-                          child: cancelButton,
-                        ),
+                        Expanded(child: cancelButton),
                         const SizedBox(width: 12),
-                        Expanded(
-                          child: submitButton,
-                        ),
+                        Expanded(child: submitButton),
                       ],
                     );
                   },

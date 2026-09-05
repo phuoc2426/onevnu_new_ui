@@ -17,6 +17,7 @@ import 'package:vnu_core/cubit/auth_cubit.dart';
 import 'package:vnu_core/globals.dart';
 import 'package:vnu_core/modules/admission/controllers/applicant_auth_controller.dart';
 import 'package:vnu_core/modules/inmapz/vcore_immap_view.dart';
+import 'package:vnu_core/modules/idp_auth/config/idp_auth_config.dart';
 import 'package:vnu_core/modules/idp_auth/services/idp_auth_flow.dart';
 import 'package:vnu_core/modules/auth_mode/login_runtime_config.dart';
 import 'package:vnu_core/services/app_config_service.dart';
@@ -112,7 +113,26 @@ class _VCoreLoginScreenV4State extends State<VCoreLoginScreenV4> {
     }
 
     _checkBio();
-    _loadLoginRuntimeConfig(showLoading: true, reason: 'initial');
+
+    // TEMP TEST: nếu IdpAuthConfig có test URL thì ép Student login sang IDP
+    // và KHÔNG đọc /api/config. Comment đúng dòng idp-test trong
+    // IdpAuthConfig để quay về cơ chế server-driven ban đầu.
+    final String testIdpUrl =
+        IdpAuthConfig.temporaryTestStartUrl?.trim() ?? '';
+    if (testIdpUrl.isNotEmpty) {
+      _loginRuntimeConfig = LoginRuntimeConfig(
+        idpLogin: true,
+        idpStartUrl: testIdpUrl,
+        idpWebUrl: testIdpUrl,
+        passwordFallbackEnabled: false,
+        qrEnabled: false,
+      );
+      _loginConfigLoading = false;
+      _loginConfigError = null;
+      logWarning('[LOGIN_IDP_TEST] force IDP UI: $testIdpUrl');
+    } else {
+      _loadLoginRuntimeConfig(showLoading: true, reason: 'initial');
+    }
   }
 
   Future<void> _loadLoginRuntimeConfig({
@@ -252,6 +272,11 @@ class _VCoreLoginScreenV4State extends State<VCoreLoginScreenV4> {
   Future<bool> _verifyLoginMethodBeforeSubmit({
     required bool expectedIdpLogin,
   }) async {
+    // TEMP TEST không đọc /api/config ở màn login. Chỉ IDP flow được phép chạy.
+    if (IdpAuthConfig.temporaryTestEnabled) {
+      return expectedIdpLogin;
+    }
+
     if (_loginConfigRefreshRunning) {
       snackBarWarning(
         'Đang kiểm tra phương thức đăng nhập. Vui lòng thử lại.',

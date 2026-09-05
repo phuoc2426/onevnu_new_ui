@@ -41,7 +41,6 @@ class DioOptions {
       );
     }
 
-    // P0 security invariant: do not install badCertificateCallback here.
     return client;
   }
 }
@@ -100,21 +99,32 @@ class ApiInterceptor extends Interceptor {
 
 class AppDioException extends DioException {
   AppDioException({
-    required DioException original,
+    required this.original,
     required this.appError,
   }) : super(
           requestOptions: original.requestOptions,
           response: original.response,
           type: original.type,
+          // Keep AppError here for compatibility with the existing
+          // AppFeedback/AppError flow. The original DioException is retained
+          // separately so diagnostics can still inspect SocketException,
+          // HandshakeException, OSError, etc.
           error: appError,
           stackTrace: original.stackTrace,
           message: appError.userMessage,
         );
 
+  /// DioException received from Dio before AppErrorMapper wrapped it.
+  final DioException original;
+
   final AppError appError;
+
+  /// Lowest-level error exposed by Dio/HttpClient/OS when available.
+  Object? get nativeError => original.error;
 
   bool get isNetworkConnected => appError.type != AppErrorType.offline;
 
   @override
   String toString() => appError.userMessage;
 }
+

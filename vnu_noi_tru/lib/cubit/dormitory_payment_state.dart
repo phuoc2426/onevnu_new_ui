@@ -34,6 +34,18 @@ class DormitoryPaymentUploadSuccess extends DormitoryPaymentState {
   const DormitoryPaymentUploadSuccess(this.message);
 }
 
+class DormitoryPaymentProofDeleting extends DormitoryPaymentState {
+  final Object proofId;
+
+  const DormitoryPaymentProofDeleting(this.proofId);
+}
+
+class DormitoryPaymentProofDeleteSuccess extends DormitoryPaymentState {
+  final String message;
+
+  const DormitoryPaymentProofDeleteSuccess(this.message);
+}
+
 class DormitoryPaymentError extends DormitoryPaymentState {
   final String message;
 

@@ -14,9 +14,7 @@ class DormitoryInvoiceResponse {
     this.invoices = const <DormitoryInvoiceModel>[],
   });
 
-  factory DormitoryInvoiceResponse.fromJson(
-    Map<String, dynamic> json,
-  ) {
+  factory DormitoryInvoiceResponse.fromJson(Map<String, dynamic> json) {
     final dynamic rawData = json['data'];
     List<dynamic> rawReceipts = <dynamic>[];
 
@@ -41,8 +39,7 @@ class DormitoryInvoiceResponse {
       invoices: rawReceipts
           .whereType<Map>()
           .map(
-            (Map<dynamic, dynamic> item) =>
-                DormitoryInvoiceModel.fromJson(
+            (Map<dynamic, dynamic> item) => DormitoryInvoiceModel.fromJson(
               Map<String, dynamic>.from(item),
             ),
           )
@@ -51,10 +48,7 @@ class DormitoryInvoiceResponse {
   }
 
   static int? _toInt(dynamic value) {
-    if (value is num) {
-      return value.toInt();
-    }
-
+    if (value is num) return value.toInt();
     return int.tryParse(value?.toString() ?? '');
   }
 }
@@ -77,18 +71,20 @@ class DormitoryInvoiceModel {
   final DateTime? paidAt;
   final DateTime? createdAt;
 
-  // Snapshot thông tin xếp phòng mà Receipt API trả trực tiếp. Các field này
-  // dùng để resolve ID kỹ thuật thành text có nghĩa trên màn Nội trú.
   final Object? accommodationId;
   final int? dormitoryId;
   final int? roomTypeId;
   final String? roomTypeName;
+  final double? roomTypePrice;
   final String? roomNumber;
   final String? buildingName;
+  final String? studentName;
+  final String? studentIdentityNo;
 
-  /// Ngày bắt đầu/kết thúc kỳ thu nếu API biên lai có trả về.
-  /// Khi API chưa có hai trường này, màn hình hóa đơn dùng ngày của hồ sơ
-  /// nội trú được truyền từ card lịch sử làm dữ liệu dự phòng.
+  /// API mới dùng một biên lai cho cả phần điều chỉnh khi đổi phòng/loại phòng.
+  final int adjustedCount;
+  final bool hasRoomChange;
+
   final DateTime? periodStartDate;
   final DateTime? periodEndDate;
   final String? paymentCode;
@@ -116,8 +112,13 @@ class DormitoryInvoiceModel {
     this.dormitoryId,
     this.roomTypeId,
     this.roomTypeName,
+    this.roomTypePrice,
     this.roomNumber,
     this.buildingName,
+    this.studentName,
+    this.studentIdentityNo,
+    this.adjustedCount = 0,
+    this.hasRoomChange = false,
     this.periodStartDate,
     this.periodEndDate,
     this.paymentCode,
@@ -125,24 +126,37 @@ class DormitoryInvoiceModel {
     this.payments = const <DormitoryPaymentModel>[],
   });
 
-  factory DormitoryInvoiceModel.fromJson(
-    Map<String, dynamic> json,
-  ) {
+  factory DormitoryInvoiceModel.fromJson(Map<String, dynamic> json) {
     final dynamic rawPayments = json['payments'];
+    final List<DormitoryPaymentModel> payments = rawPayments is List
+        ? rawPayments
+            .whereType<Map>()
+            .map(
+              (Map<dynamic, dynamic> item) => DormitoryPaymentModel.fromJson(
+                Map<String, dynamic>.from(item),
+              ),
+            )
+            .toList()
+        : const <DormitoryPaymentModel>[];
+
     final String? status = json['status']?.toString();
     final double totalAmount = _toDouble(
       json['total_amount'] ?? json['totalAmount'] ?? json['amount'],
     );
-
     final bool paidByStatus = _isPaidStatus(status);
 
-    final dynamic rawPaidAmount =
-        json['paid_amount'] ?? json['paidAmount'];
+    final dynamic rawPaidAmount = json['paid_amount'] ?? json['paidAmount'];
+    final double confirmedPaymentAmount = payments
+        .where((DormitoryPaymentModel item) => item.isConfirmed)
+        .fold<double>(0, (double sum, DormitoryPaymentModel item) {
+          return sum + item.amount;
+        });
+
     final double paidAmount = rawPaidAmount != null
         ? _toDouble(rawPaidAmount)
         : paidByStatus
             ? totalAmount
-            : 0;
+            : confirmedPaymentAmount;
 
     final dynamic rawRemainingAmount =
         json['remaining_amount'] ?? json['remainingAmount'];
@@ -157,13 +171,15 @@ class DormitoryInvoiceModel {
 
     return DormitoryInvoiceModel(
       id: json['id'],
-      code: json['code']?.toString(),
+      code:
+          json['receipt_code']?.toString() ??
+          json['receiptCode']?.toString() ??
+          json['code']?.toString(),
       title: json['title']?.toString(),
       description: json['description']?.toString(),
       kind: json['kind']?.toString(),
       kindLabel:
-          json['kind_label']?.toString() ??
-          json['kindLabel']?.toString(),
+          json['kind_label']?.toString() ?? json['kindLabel']?.toString(),
       direction: json['direction']?.toString(),
       billingPeriodName:
           json['billing_period_name']?.toString() ??
@@ -173,8 +189,7 @@ class DormitoryInvoiceModel {
       remainingAmount: remainingAmount,
       status: status,
       statusLabel:
-          json['status_label']?.toString() ??
-          json['statusLabel']?.toString(),
+          json['status_label']?.toString() ?? json['statusLabel']?.toString(),
       dueDate: _toDateTime(json['due_date'] ?? json['dueDate']),
       paidAt: _toDateTime(json['paid_at'] ?? json['paidAt']),
       createdAt: _toDateTime(json['created_at'] ?? json['createdAt']),
@@ -182,14 +197,25 @@ class DormitoryInvoiceModel {
       dormitoryId: _toInt(json['dormitory_id'] ?? json['dormitoryId']),
       roomTypeId: _toInt(json['room_type_id'] ?? json['roomTypeId']),
       roomTypeName:
-          json['room_type_name']?.toString() ??
-          json['roomTypeName']?.toString(),
+          json['room_type_name']?.toString() ?? json['roomTypeName']?.toString(),
+      roomTypePrice: _toNullableDouble(
+        json['room_type_price'] ?? json['roomTypePrice'],
+      ),
       roomNumber:
-          json['room_number']?.toString() ??
-          json['roomNumber']?.toString(),
+          json['room_number']?.toString() ?? json['roomNumber']?.toString(),
       buildingName:
-          json['building_name']?.toString() ??
-          json['buildingName']?.toString(),
+          json['building_name']?.toString() ?? json['buildingName']?.toString(),
+      studentName:
+          json['student_name']?.toString() ?? json['studentName']?.toString(),
+      studentIdentityNo:
+          json['student_identity_no']?.toString() ??
+          json['studentIdentityNo']?.toString(),
+      adjustedCount: _toInt(json['adjusted_count'] ?? json['adjustedCount']) ?? 0,
+      hasRoomChange: _toBool(
+            json['has_room_change'] ?? json['hasRoomChange'],
+          ) ||
+          (_toInt(json['adjusted_count'] ?? json['adjustedCount']) ?? 0) > 0 ||
+          _looksLikeRoomChange(json),
       periodStartDate: _toDateTime(
         json['period_start_date'] ??
             json['periodStartDate'] ??
@@ -207,30 +233,17 @@ class DormitoryInvoiceModel {
             json['toDate'],
       ),
       paymentCode:
-          json['payment_code']?.toString() ??
-          json['paymentCode']?.toString(),
+          json['payment_code']?.toString() ?? json['paymentCode']?.toString(),
       bankTransferQrUrl:
           json['bank_transfer_qr_url']?.toString() ??
           json['bankTransferQrUrl']?.toString() ??
           json['qr_url']?.toString(),
-      payments: rawPayments is List
-          ? rawPayments
-              .whereType<Map>()
-              .map(
-                (Map<dynamic, dynamic> item) =>
-                    DormitoryPaymentModel.fromJson(
-                  Map<String, dynamic>.from(item),
-                ),
-              )
-              .toList()
-          : const <DormitoryPaymentModel>[],
+      payments: payments,
     );
   }
 
   bool get isPaid => _isPaidStatus(status);
 
-  /// Ngày áp dụng của biên lai. Ưu tiên trường ngày riêng từ API; nếu API
-  /// chỉ gói khoảng ngày trong billingPeriodName thì thử tách từ chuỗi.
   DateTime? get resolvedPeriodStartDate =>
       periodStartDate ?? _extractPeriodDates(billingPeriodName).$1;
 
@@ -238,51 +251,46 @@ class DormitoryInvoiceModel {
       periodEndDate ?? _extractPeriodDates(billingPeriodName).$2;
 
   DormitoryPaymentModel? get latestPayment {
-    if (payments.isEmpty) {
-      return null;
-    }
+    if (payments.isEmpty) return null;
 
     final List<DormitoryPaymentModel> sorted =
         List<DormitoryPaymentModel>.from(payments);
 
-    sorted.sort(
-      (DormitoryPaymentModel first, DormitoryPaymentModel second) {
-        final DateTime firstDate = first.createdAt ??
-            DateTime.fromMillisecondsSinceEpoch(0);
-        final DateTime secondDate = second.createdAt ??
-            DateTime.fromMillisecondsSinceEpoch(0);
+    sorted.sort((DormitoryPaymentModel first, DormitoryPaymentModel second) {
+      final DateTime firstDate =
+          first.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final DateTime secondDate =
+          second.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final int dateCompare = secondDate.compareTo(firstDate);
+      if (dateCompare != 0) return dateCompare;
 
-        final int dateCompare = secondDate.compareTo(firstDate);
-        if (dateCompare != 0) {
-          return dateCompare;
-        }
-
-        final int firstId = int.tryParse(first.id?.toString() ?? '') ?? 0;
-        final int secondId = int.tryParse(second.id?.toString() ?? '') ?? 0;
-
-        return secondId.compareTo(firstId);
-      },
-    );
+      final int firstId = int.tryParse(first.id?.toString() ?? '') ?? 0;
+      final int secondId = int.tryParse(second.id?.toString() ?? '') ?? 0;
+      return secondId.compareTo(firstId);
+    });
 
     return sorted.first;
   }
 
-  bool get hasPendingPayment {
-    final String normalized =
-        latestPayment?.status?.trim().toLowerCase() ?? '';
+  bool get hasPendingPayment => payments.any(
+        (DormitoryPaymentModel item) => item.isPending,
+      );
 
-    return normalized == 'pending' ||
-        normalized == 'waiting' ||
-        normalized == 'submitted';
-  }
+  bool get hasRejectedPayment => payments.any(
+        (DormitoryPaymentModel item) => item.isRejected,
+      );
 
-  bool get hasRejectedPayment {
-    return latestPayment?.status?.trim().toLowerCase() == 'rejected';
-  }
+  /// API mới cho phép bổ sung thêm proof vào cùng Payment đang pending.
+  /// Vì vậy không khóa upload chỉ vì đã có một lần gửi trước đó.
+  bool get canUploadProof => !isPaid;
 
-  bool get canUploadProof => !isPaid && !hasPendingPayment;
+  int get proofCount => latestPayment?.allProofImages.length ?? 0;
 
   String get displayTitle {
+    if (hasRoomChange || adjustedCount > 0) {
+      return 'Hóa đơn điều chỉnh nội trú';
+    }
+
     final List<String?> values = <String?>[
       kindLabel,
       title,
@@ -291,22 +299,17 @@ class DormitoryInvoiceModel {
     ];
 
     for (final String? value in values) {
-      if (value != null && value.trim().isNotEmpty) {
-        return value;
-      }
+      if (value != null && value.trim().isNotEmpty) return value;
     }
 
-    return 'Biên lai ký túc xá';
+    return 'Hóa đơn ký túc xá';
   }
 
   static (DateTime?, DateTime?) _extractPeriodDates(String? value) {
     final String source = value?.trim() ?? '';
-    if (source.isEmpty) {
-      return (null, null);
-    }
+    if (source.isEmpty) return (null, null);
 
     final List<DateTime> dates = <DateTime>[];
-
     final RegExp vietnameseDate = RegExp(
       r'\b(\d{1,2})[\/-](\d{1,2})[\/-](\d{2}|\d{4})\b',
     );
@@ -315,39 +318,21 @@ class DormitoryInvoiceModel {
       final int? day = int.tryParse(match.group(1) ?? '');
       final int? month = int.tryParse(match.group(2) ?? '');
       int? year = int.tryParse(match.group(3) ?? '');
-
-      if (day == null || month == null || year == null) {
-        continue;
-      }
-
-      if (year < 100) {
-        year += 2000;
-      }
-
+      if (day == null || month == null || year == null) continue;
+      if (year < 100) year += 2000;
       final DateTime? parsed = _safeDate(year, month, day);
-      if (parsed != null) {
-        dates.add(parsed);
-      }
+      if (parsed != null) dates.add(parsed);
     }
 
     if (dates.length < 2) {
-      final RegExp isoDate = RegExp(
-        r'\b(\d{4})-(\d{1,2})-(\d{1,2})\b',
-      );
-
+      final RegExp isoDate = RegExp(r'\b(\d{4})-(\d{1,2})-(\d{1,2})\b');
       for (final RegExpMatch match in isoDate.allMatches(source)) {
         final int? year = int.tryParse(match.group(1) ?? '');
         final int? month = int.tryParse(match.group(2) ?? '');
         final int? day = int.tryParse(match.group(3) ?? '');
-
-        if (year == null || month == null || day == null) {
-          continue;
-        }
-
+        if (year == null || month == null || day == null) continue;
         final DateTime? parsed = _safeDate(year, month, day);
-        if (parsed != null && !dates.contains(parsed)) {
-          dates.add(parsed);
-        }
+        if (parsed != null && !dates.contains(parsed)) dates.add(parsed);
       }
     }
 
@@ -361,18 +346,15 @@ class DormitoryInvoiceModel {
     if (year < 1900 || month < 1 || month > 12 || day < 1 || day > 31) {
       return null;
     }
-
     final DateTime value = DateTime(year, month, day);
     if (value.year != year || value.month != month || value.day != day) {
       return null;
     }
-
     return value;
   }
 
   static bool _isPaidStatus(String? value) {
     final String normalized = value?.trim().toLowerCase() ?? '';
-
     return normalized == 'paid' ||
         normalized == 'completed' ||
         normalized == 'success';
@@ -385,27 +367,47 @@ class DormitoryInvoiceModel {
     return int.tryParse(value.toString());
   }
 
-  static double _toDouble(dynamic value) {
-    if (value is num) {
-      return value.toDouble();
-    }
+  static bool _toBool(dynamic value) {
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    final String normalized = value?.toString().trim().toLowerCase() ?? '';
+    return normalized == '1' || normalized == 'true' || normalized == 'yes';
+  }
 
+  static bool _looksLikeRoomChange(Map<String, dynamic> json) {
+    final String source = <dynamic>[
+      json['kind'],
+      json['kind_label'],
+      json['kindLabel'],
+      json['title'],
+      json['description'],
+    ].where((dynamic value) => value != null).join(' ').toLowerCase();
+
+    return source.contains('room_change') ||
+        source.contains('change_room') ||
+        source.contains('đổi phòng') ||
+        source.contains('chuyển phòng') ||
+        source.contains('điều chỉnh phòng') ||
+        source.contains('điều chỉnh nội trú');
+  }
+
+  static double _toDouble(dynamic value) {
+    if (value is num) return value.toDouble();
     if (value is String) {
       return double.tryParse(value.replaceAll(',', '')) ?? 0;
     }
-
     return 0;
   }
 
+  static double? _toNullableDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toDouble();
+    return double.tryParse(value.toString().replaceAll(',', ''));
+  }
+
   static DateTime? _toDateTime(dynamic value) {
-    if (value == null) {
-      return null;
-    }
-
-    if (value is DateTime) {
-      return value;
-    }
-
+    if (value == null) return null;
+    if (value is DateTime) return value;
     return DateTime.tryParse(value.toString());
   }
 }
@@ -418,6 +420,7 @@ class DormitoryPaymentModel {
   final String? statusLabel;
   final double amount;
   final String? proofImageUrl;
+  final List<DormitoryPaymentProofModel> proofImages;
   final String? note;
   final String? rejectionReason;
   final DateTime? createdAt;
@@ -431,60 +434,111 @@ class DormitoryPaymentModel {
     this.statusLabel,
     this.amount = 0,
     this.proofImageUrl,
+    this.proofImages = const <DormitoryPaymentProofModel>[],
     this.note,
     this.rejectionReason,
     this.createdAt,
     this.confirmedAt,
   });
 
-  factory DormitoryPaymentModel.fromJson(
-    Map<String, dynamic> json,
-  ) {
+  factory DormitoryPaymentModel.fromJson(Map<String, dynamic> json) {
+    final dynamic rawProofImages = json['proof_images'] ?? json['proofImages'];
+
     return DormitoryPaymentModel(
       id: json['id'],
       method: json['method']?.toString(),
       methodLabel:
-          json['method_label']?.toString() ??
-          json['methodLabel']?.toString(),
+          json['method_label']?.toString() ?? json['methodLabel']?.toString(),
       status: json['status']?.toString(),
       statusLabel:
-          json['status_label']?.toString() ??
-          json['statusLabel']?.toString(),
+          json['status_label']?.toString() ?? json['statusLabel']?.toString(),
       amount: _toDouble(json['amount']),
       proofImageUrl:
-          json['proof_image_url']?.toString() ??
-          json['proofImageUrl']?.toString(),
+          json['proof_image_url']?.toString() ?? json['proofImageUrl']?.toString(),
+      proofImages: rawProofImages is List
+          ? rawProofImages
+              .whereType<Map>()
+              .map(
+                (Map<dynamic, dynamic> item) =>
+                    DormitoryPaymentProofModel.fromJson(
+                  Map<String, dynamic>.from(item),
+                ),
+              )
+              .toList()
+          : const <DormitoryPaymentProofModel>[],
       note: json['note']?.toString(),
       rejectionReason:
           json['rejection_reason']?.toString() ??
           json['rejectionReason']?.toString(),
       createdAt: _parseDate(json['created_at'] ?? json['createdAt']),
-      confirmedAt: _parseDate(
-        json['confirmed_at'] ?? json['confirmedAt'],
-      ),
+      confirmedAt: _parseDate(json['confirmed_at'] ?? json['confirmedAt']),
     );
   }
 
-  static double _toDouble(dynamic value) {
-    if (value is num) {
-      return value.toDouble();
-    }
+  bool get isPending {
+    final String normalized = status?.trim().toLowerCase() ?? '';
+    return normalized == 'pending' ||
+        normalized == 'waiting' ||
+        normalized == 'submitted';
+  }
 
-    return double.tryParse(
-          value?.toString().replaceAll(',', '') ?? '',
-        ) ??
-        0;
+  bool get isRejected => status?.trim().toLowerCase() == 'rejected';
+
+  bool get isConfirmed {
+    final String normalized = status?.trim().toLowerCase() ?? '';
+    return normalized == 'approved' ||
+        normalized == 'confirmed' ||
+        normalized == 'paid' ||
+        normalized == 'completed' ||
+        normalized == 'success';
+  }
+
+  /// proofImageUrl là field legacy. proofImages là collection mới.
+  /// Getter này gộp hai nguồn nhưng không lặp URL.
+  List<DormitoryPaymentProofModel> get allProofImages {
+    final List<DormitoryPaymentProofModel> values =
+        List<DormitoryPaymentProofModel>.from(proofImages);
+    final String legacyUrl = proofImageUrl?.trim() ?? '';
+    if (legacyUrl.isNotEmpty &&
+        !values.any((DormitoryPaymentProofModel item) => item.url == legacyUrl)) {
+      values.insert(
+        0,
+        DormitoryPaymentProofModel(id: null, url: legacyUrl, note: note),
+      );
+    }
+    return values;
+  }
+
+  static double _toDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString().replaceAll(',', '') ?? '') ?? 0;
   }
 
   static DateTime? _parseDate(dynamic value) {
-    if (value == null) {
-      return null;
-    }
-
-    if (value is DateTime) {
-      return value;
-    }
-
+    if (value == null) return null;
+    if (value is DateTime) return value;
     return DateTime.tryParse(value.toString());
   }
+}
+
+class DormitoryPaymentProofModel {
+  final Object? id;
+  final String url;
+  final String? note;
+
+  const DormitoryPaymentProofModel({
+    required this.id,
+    required this.url,
+    this.note,
+  });
+
+  factory DormitoryPaymentProofModel.fromJson(Map<String, dynamic> json) {
+    return DormitoryPaymentProofModel(
+      id: json['id'],
+      url: (json['url'] ?? json['path'] ?? json['proofImageUrl'])?.toString() ?? '',
+      note: json['note']?.toString(),
+    );
+  }
+
+  bool get canDelete => id != null && id.toString().trim().isNotEmpty;
 }
