@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vnu_core/common/log.dart';
 import 'package:vnu_core/globals.dart';
 import 'package:vnu_core/models/model.dart';
 import 'package:vnu_core/modules/auth_mode/auth_entry_mode_service.dart';
@@ -56,18 +57,48 @@ class IdpOneVnuSessionService {
 
     await Future.wait<void>(writes);
 
-    // Dùng chính API profile hiện tại để kiểm tra token mới và nạp sinh viên.
-    await Globals().refreshStudentInfo();
-
-    if (Globals().thongTinSinhVienModel.value == null) {
+    // IdP redeem đã thành công ở thời điểm này. Tải profile trực tiếp để
+    // không bị Globals.refreshStudentInfo() nuốt mất exception gốc.
+    try {
+      await _loadStudentProfileAfterIdp();
+    } catch (error, stackTrace) {
       await Globals().clearSession(deleteUserLogin: false);
       ApiRepository().setToken('');
-      throw StateError(
-        'Đăng nhập IdP thành công nhưng không tải được thông tin sinh viên.',
-      );
+      Error.throwWithStackTrace(error, stackTrace);
     }
 
     await AuthEntryModeService().markIdp();
+  }
+
+  Future<void> _loadStudentProfileAfterIdp() async {
+    Object? lastError;
+    StackTrace? lastStackTrace;
+
+    for (int attempt = 1; attempt <= 3; attempt++) {
+      try {
+        final StudentInfoModel student =
+            await ApiRepository().getSinhVienInfo();
+
+        Globals().thongTinSinhVienModel.value = student;
+        return;
+      } catch (error, stackTrace) {
+        lastError = error;
+        lastStackTrace = stackTrace;
+
+        logError(
+          '[IDP_SESSION] GET /api/sinhvien failed '
+          'attempt=$attempt type=${error.runtimeType} error=$error',
+        );
+
+        if (attempt < 3) {
+          await Future<void>.delayed(
+            Duration(milliseconds: 400 * attempt),
+          );
+        }
+      }
+    }
+
+    Error.throwWithStackTrace(lastError!, lastStackTrace!);
   }
 
   Future<void> _clearApplicantLocalData() async {

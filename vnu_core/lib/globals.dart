@@ -10,6 +10,7 @@ import 'package:vnu_core/common/file_utils.dart';
 import 'package:vnu_core/common/log.dart';
 import 'package:vnu_core/constants/config.dart';
 import 'package:vnu_core/models/model.dart';
+import 'package:vnu_core/modules/auth_mode/auth_entry_mode_service.dart';
 import 'package:vnu_core/repository/app_repository.dart';
 import 'package:vnu_core/repository/data_repository.dart';
 import 'package:vnu_core/services/services_url.dart';
@@ -97,7 +98,14 @@ logError(e.toString());
     DataRepository().saveSecureKey(kMaKhuVuc, maKhuVuc);
   }
 
-  Future<void> clearSession({bool deleteUserLogin = false}) async {
+  /// Clears only in-memory auth/user state. This is synchronous by design so
+  /// user-triggered logout can leave the authenticated UI in the same frame.
+  ///
+  /// Returns the current FCM topic snapshot so topic cleanup can continue in
+  /// the background without keeping the logout screen blocked.
+  List<String> clearSessionMemory({bool deleteUserLogin = false}) {
+    final List<String> topicSnapshot = List<String>.from(ServicesUrl().topics);
+
     token = '';
     refreshToken = '';
     usernameLogin = '';
@@ -105,19 +113,39 @@ logError(e.toString());
     currentUserModel.value = null;
     lopDaoTaoModel.value = null;
     nienKhoaDaoTaoModel.value = null;
+    ServicesUrl().topics = [];
 
-    await DataRepository().deleteSecureKey(kLoginToken);
-    await DataRepository().deleteSecureKey(kLoginRefreshToken);
-    await DataRepository().deleteSecureKey(kApplicantAccessToken);
-    await DataRepository().deleteSecureKey(kApplicantRefreshToken);
-    await DataRepository().deleteSecureKey(kSessionPrincipalType);
+    dlog(
+      '[P1A_DIAG][LOGOUT_LOCAL][MEMORY_CLEARED] '
+      'deleteUserLogin=$deleteUserLogin topicCount=${topicSnapshot.length}',
+    );
+    return topicSnapshot;
+  }
+
+  /// Critical persistent auth cleanup. Secure-storage writes and preferences
+  /// are parallelized; no network work (FCM unsubscribe) is allowed here.
+  Future<void> clearSessionStorage({bool deleteUserLogin = false}) async {
+    final Stopwatch watch = Stopwatch()..start();
+    dlog(
+      '[P1A_DIAG][LOGOUT_LOCAL][STORAGE_CLEAR_BEGIN] '
+      'deleteUserLogin=$deleteUserLogin',
+    );
+
+    final List<Future<void>> secureDeletes = <Future<void>>[
+      DataRepository().deleteSecureKey(kLoginToken),
+      DataRepository().deleteSecureKey(kLoginRefreshToken),
+      DataRepository().deleteSecureKey(kApplicantAccessToken),
+      DataRepository().deleteSecureKey(kApplicantRefreshToken),
+      DataRepository().deleteSecureKey(kSessionPrincipalType),
+      AuthEntryModeService().clear(),
+    ];
 
     if (deleteUserLogin) {
-      await DataRepository().deleteSecureKey(kLoginUserName);
-      await DataRepository().deleteSecureKey(kLoginPassword);
+      secureDeletes.addAll(<Future<void>>[
+        DataRepository().deleteSecureKey(kLoginUserName),
+        DataRepository().deleteSecureKey(kLoginPassword),
+      ]);
     }
-
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
 
     const List<String> applicantKeys = <String>[
       'applicant_id',
@@ -131,20 +159,70 @@ logError(e.toString());
       'applicant_phone',
     ];
 
-    for (final String key in applicantKeys) {
-      await prefs.remove(key);
-    }
+    final Future<void> preferencesCleanup = () async {
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      await Future.wait<bool>(
+        applicantKeys.map((String key) => prefs.remove(key)),
+      );
+    }();
+
+    await Future.wait<void>(<Future<void>>[
+      ...secureDeletes,
+      preferencesCleanup,
+    ]);
+
+    dlog(
+      '[P1A_DIAG][LOGOUT_LOCAL][STORAGE_CLEAR_DONE] '
+      'elapsedMs=${watch.elapsedMilliseconds}',
+    );
+  }
+
+  /// Non-critical network cleanup. Never put this on the logout navigation
+  /// critical path.
+  Future<void> unsubscribeTopics(Iterable<String> topics) async {
+    final List<String> snapshot = topics
+        .map((String topic) => topic.trim())
+        .where((String topic) => topic.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+
+    if (snapshot.isEmpty) return;
+
+    final Stopwatch watch = Stopwatch()..start();
+    dlog(
+      '[P1A_DIAG][LOGOUT_LOCAL][FCM_UNSUBSCRIBE_BEGIN] '
+      'topicCount=${snapshot.length}',
+    );
 
     try {
-      await Future.forEach(ServicesUrl().topics, (topic) async {
-        await FirebaseMessaging.instance.unsubscribeFromTopic(topic);
-      });
-    } catch (e) {}
+      await Future.wait<void>(
+        snapshot.map(
+          (String topic) => FirebaseMessaging.instance.unsubscribeFromTopic(topic),
+        ),
+      );
+      dlog(
+        '[P1A_DIAG][LOGOUT_LOCAL][FCM_UNSUBSCRIBE_DONE] '
+        'topicCount=${snapshot.length} elapsedMs=${watch.elapsedMilliseconds}',
+      );
+    } catch (error) {
+      logError(
+        '[P1A_DIAG][LOGOUT_LOCAL][FCM_UNSUBSCRIBE_ERROR] '
+        'type=${error.runtimeType} elapsedMs=${watch.elapsedMilliseconds}',
+      );
+    }
+  }
 
-    ServicesUrl().topics = [];
+  /// Backward-compatible full clear for non-interactive call sites.
+  Future<void> clearSession({bool deleteUserLogin = false}) async {
+    final List<String> topics = clearSessionMemory(
+      deleteUserLogin: deleteUserLogin,
+    );
+    await clearSessionStorage(deleteUserLogin: deleteUserLogin);
+    await unsubscribeTopics(topics);
   }
 
   Map<String, String> headerToken() {
     return {'Authorization': 'Bearer $token'};
   }
 }
+

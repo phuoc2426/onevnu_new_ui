@@ -34,6 +34,13 @@ class AuthEntryModeService {
     );
   }
 
+  /// Xoá dấu vết mode đăng nhập khi phiên ONEVNU kết thúc.
+  /// Nếu không xoá key này, UI có thể vẫn hiểu nhầm phiên cũ là IDP và cho
+  /// mở QR dù backend đã xoá external_credential.
+  Future<void> clear() {
+    return DataRepository().deleteSecureKey(kSessionAuthEntryMode);
+  }
+
   Future<String> currentMode() async {
     return (await DataRepository().getSecureSaveKey(kSessionAuthEntryMode))
             ?.trim()

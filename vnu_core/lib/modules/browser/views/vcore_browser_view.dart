@@ -8,17 +8,19 @@ import 'package:vnu_core/widgets/vcore_module_scaffold.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../controllers/vcore_browser_controller.dart';
+import '../widgets/vcore_webview_surface.dart';
 
 class VcoreBrowserView extends StatefulWidget {
   final String title;
   final String? url;
   final String? html;
 
-  /// false:
-  /// Giữ nguyên giao diện WebView cũ có top navbar.
+  /// true (mặc định):
+  /// Không có header/navbar mặc định; WebView chạy toàn màn hình và dùng
+  /// nút back/close dạng bong bóng.
   ///
-  /// true:
-  /// Ẩn top navbar và sử dụng nút back dạng bong bóng kéo thả.
+  /// false:
+  /// Chỉ dùng khi một màn hình cũ thực sự cần VcoreModuleScaffold + navbar.
   final bool useFloatingBackButton;
 
   /// Khi true, đây là WebView dùng cho chức năng "Nhà trọ" (motel).
@@ -35,14 +37,28 @@ class VcoreBrowserView extends StatefulWidget {
   /// - Nhấn action sẽ đóng hẳn màn WebView ngay lập tức.
   final bool forceCloseWebViewOnBack;
 
+  /// Tuỳ chỉnh chrome/header cho WebView đặc biệt (hiện dùng bởi Phòng trọ).
+  final double webViewHeaderExtent;
+  final Color webViewHeaderColor;
+  final Color webViewBackgroundColor;
+  final EdgeInsets webViewHeaderMargin;
+  final EdgeInsets webViewContentMargin;
+  final Color webViewHeaderDividerColor;
+
   const VcoreBrowserView({
     super.key,
     required this.title,
     this.url,
     this.html,
-    this.useFloatingBackButton = false,
+    this.useFloatingBackButton = true,
     this.isMotel = false,
     this.forceCloseWebViewOnBack = false,
+    this.webViewHeaderExtent = 15,
+    this.webViewHeaderColor = Colors.white,
+    this.webViewBackgroundColor = Colors.white,
+    this.webViewHeaderMargin = EdgeInsets.zero,
+    this.webViewContentMargin = const EdgeInsets.all(8),
+    this.webViewHeaderDividerColor = const Color(0xFFE5E7EB),
   }) : assert(
          url != null || html != null,
          'Phải truyền url hoặc html cho VcoreBrowserView.',
@@ -54,14 +70,6 @@ class VcoreBrowserView extends StatefulWidget {
 
 class _VcoreBrowserViewState extends State<VcoreBrowserView> {
   late final String _controllerTag;
-
-  /// Phần header trắng dành riêng cho WebView phòng trọ.
-  ///
-  /// Chiều cao này không bao gồm phần status bar/SafeArea.
-  static const double _motelHeaderExtent = 15;
-
-  /// Khoảng trắng bao quanh WebView phòng trọ.
-  static const double _motelWebViewMargin = 8;
 
   @override
   void initState() {
@@ -92,13 +100,10 @@ class _VcoreBrowserViewState extends State<VcoreBrowserView> {
     );
   }
 
-  /// Giao diện WebView cũ có top navbar.
+  /// Giao diện tương thích cũ có top navbar.
   ///
-  /// Những màn hình không truyền:
-  ///
-  /// useFloatingBackButton: true
-  ///
-  /// sẽ tiếp tục sử dụng giao diện này.
+  /// Chỉ xuất hiện khi caller chủ động truyền:
+  /// useFloatingBackButton: false.
   Widget _buildDefaultBrowser(VcoreBrowserController controller) {
     return VcoreModuleScaffold(
       title: widget.title,
@@ -106,17 +111,19 @@ class _VcoreBrowserViewState extends State<VcoreBrowserView> {
       body: Column(
         children: [
           if (widget.isMotel)
-            const SizedBox(
-              height: _motelHeaderExtent,
-              child: ColoredBox(color: Colors.white),
+            SizedBox(
+              height: widget.webViewHeaderExtent,
+              child: ColoredBox(color: widget.webViewHeaderColor),
             ),
           Expanded(
             child: ColoredBox(
-              color: Colors.white,
+              color: widget.isMotel
+                  ? widget.webViewBackgroundColor
+                  : Colors.white,
               child: Padding(
-                padding: EdgeInsets.all(
-                  widget.isMotel ? _motelWebViewMargin : 0,
-                ),
+                padding: widget.isMotel
+                    ? widget.webViewContentMargin
+                    : EdgeInsets.zero,
                 child: WebViewWidget(
                   controller: controller.webController,
                 ),
@@ -142,56 +149,34 @@ class _VcoreBrowserViewState extends State<VcoreBrowserView> {
       },
       child: Scaffold(
         backgroundColor: widget.isMotel ? Colors.white : AppColor.bgColor,
-        body: LayoutBuilder(
-          builder: (BuildContext context, BoxConstraints constraints) {
-            final EdgeInsets safePadding = MediaQuery.paddingOf(context);
-            final double motelWebViewTop =
-                safePadding.top + _motelHeaderExtent;
+        body: Stack(
+          clipBehavior: Clip.none,
+          children: <Widget>[
+            Positioned.fill(
+              child: VcoreWebViewSurface(
+                controller: controller.webController,
+                isMotel: widget.isMotel,
+                headerExtent: widget.webViewHeaderExtent,
+                headerColor: widget.webViewHeaderColor,
+                backgroundColor: widget.webViewBackgroundColor,
+                headerMargin: widget.webViewHeaderMargin,
+                webViewMargin: widget.webViewContentMargin,
+                dividerColor: widget.webViewHeaderDividerColor,
+              ),
+            ),
+            Positioned.fill(
+              child: Obx(() {
+                final bool isCloseAction =
+                    widget.forceCloseWebViewOnBack ||
+                    !controller.canGoBack.value;
 
-            return Stack(
-              clipBehavior: Clip.none,
-              children: <Widget>[
-                if (widget.isMotel) ...<Widget>[
-                  const Positioned.fill(
-                    child: ColoredBox(color: Colors.white),
-                  ),
-                  Positioned(
-                    top: motelWebViewTop - 1,
-                    left: 0,
-                    right: 0,
-                    height: 1,
-                    child: const ColoredBox(color: Color(0xFFE5E7EB)),
-                  ),
-                  Positioned(
-                    top: motelWebViewTop,
-                    left: _motelWebViewMargin,
-                    right: _motelWebViewMargin,
-                    bottom: _motelWebViewMargin,
-                    child: WebViewWidget(
-                      controller: controller.webController,
-                    ),
-                  ),
-                ] else
-                  Positioned.fill(
-                    child: WebViewWidget(
-                      controller: controller.webController,
-                    ),
-                  ),
-                Positioned.fill(
-                  child: Obx(() {
-                    final bool isCloseAction =
-                        widget.forceCloseWebViewOnBack ||
-                        !controller.canGoBack.value;
-
-                    return VcoreFloatingBackBubble(
-                      isCloseAction: isCloseAction,
-                      onBack: () => _handleFloatingBack(controller),
-                    );
-                  }),
-                ),
-              ],
-            );
-          },
+                return VcoreFloatingBackBubble(
+                  isCloseAction: isCloseAction,
+                  onBack: () => _handleFloatingBack(controller),
+                );
+              }),
+            ),
+          ],
         ),
       ),
     );
@@ -224,3 +209,4 @@ class _VcoreBrowserViewState extends State<VcoreBrowserView> {
     super.dispose();
   }
 }
+

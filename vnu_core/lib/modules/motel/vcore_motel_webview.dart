@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:vnu_core/modules/browser/views/vcore_browser_view.dart';
 
@@ -11,6 +12,13 @@ void openMotelWebView() {
       url: kMotelWebUrl,
       useFloatingBackButton: true,
       isMotel: true,
+      webViewHeaderExtent: 15,
+      webViewHeaderColor: Colors.white,
+      webViewBackgroundColor: Colors.white,
+      webViewHeaderMargin: EdgeInsets.zero,
+      webViewContentMargin: EdgeInsets.all(8),
+      webViewHeaderDividerColor: Color(0xFFE5E7EB),
     ),
   );
 }
+

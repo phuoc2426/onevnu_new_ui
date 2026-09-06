@@ -13,6 +13,7 @@ import 'package:students/bootstrap/app_bootstrap.dart';
 
 import 'package:vnu_core/common/log.dart';
 import 'package:vnu_core/globals.dart';
+import 'package:vnu_core/modules/idp_auth/services/idp_auth_callback_service.dart';
 import 'package:vnu_core/modules/sync/views/vcore_sync_view.dart';
 import 'package:vnu_core/modules/sync/vneid_deep_link_service.dart';
 import 'package:vnu_core/modules/tabbar/views/vcore_tabbar_view.dart';
@@ -101,7 +102,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     // Splash, but AppUpdateGate stays hidden until Splash has navigated away.
     unawaited(AppUpdateCoordinator.instance.start());
 
-    unawaited(_initVneidDeepLinks());
+    unawaited(_initAppLinks());
     unawaited(_initializeNotificationRuntime());
   }
 
@@ -157,36 +158,46 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     return VnuCore().runVnuApp(mainScreen: _buildMainScreen());
   }
 
-  Future<void> _initVneidDeepLinks() async {
+  Future<void> _initAppLinks() async {
     try {
-      final initialLink = await _appLinks.getInitialLink();
-
+      final Uri? initialLink = await _appLinks.getInitialLink();
       if (initialLink != null) {
-        _handleVneidDeepLink(initialLink);
+        _handleIncomingAppLink(initialLink);
       }
     } catch (e) {
-      logError('VNeID getInitialLink error: $e');
+      logError('AppLink getInitialLink error: ${e.runtimeType}');
     }
 
     _appLinksSubscription = _appLinks.uriLinkStream.listen(
-      _handleVneidDeepLink,
+      _handleIncomingAppLink,
       onError: (Object error) {
-        logError('VNeID uriLinkStream error: $error');
+        logError('AppLink uriLinkStream error: ${error.runtimeType}');
       },
     );
   }
 
+  void _handleIncomingAppLink(Uri uri) {
+    // SECURITY: IDP callback carries a one-time login ticket. Handle it before
+    // any generic deep-link logging and never print the raw URI/query string.
+    if (IdpAuthCallbackService().handleUri(uri)) {
+      logInfo(
+        '[IDP_BROWSER][APP_LINK_ROUTED] host=${uri.host} path=${uri.path}',
+      );
+      return;
+    }
+
+    _handleVneidDeepLink(uri);
+  }
+
   void _handleVneidDeepLink(Uri uri) {
     logInfo('==== VNeID DEEP LINK RECEIVED IN MAIN ====');
-    logInfo('VNeID raw uri: $uri');
     logInfo('VNeID scheme: ${uri.scheme}');
     logInfo('VNeID host: ${uri.host}');
     logInfo('VNeID path: ${uri.path}');
-    logInfo('VNeID pathSegments: ${uri.pathSegments}');
-    logInfo('VNeID queryParameters: ${uri.queryParameters}');
+    // Do not log query values; transition codes are authentication material.
+    logInfo('VNeID query keys: ${uri.queryParameters.keys.toList()}');
 
     final handled = VneidDeepLinkService().handleUri(uri);
-
     logInfo('VNeID handled by service: $handled');
 
     if (handled) {
@@ -419,7 +430,3 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     );
   }
 }
-
-
-
-

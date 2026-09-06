@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:vnu_core/common/log.dart';
+import 'package:vnu_core/modules/browser/vcore_webview_support.dart';
+import 'package:vnu_core/modules/browser/widgets/vcore_webview_surface.dart';
 import 'package:vnu_core/modules/idp_auth/config/idp_auth_config.dart';
 import 'package:vnu_core/widgets/vcore_floating_back_bubble.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -28,9 +31,6 @@ class IdpLoginWebView extends StatefulWidget {
   });
 
   final Uri startUri;
-
-  /// true: nút bubble luôn đóng hẳn màn IDP WebView, không đi history.
-  /// false: còn history thì Back; hết history thì đổi X đỏ và đóng màn.
   final bool forceCloseWebViewOnBack;
 
   @override
@@ -39,13 +39,22 @@ class IdpLoginWebView extends StatefulWidget {
 
 class _IdpLoginWebViewState extends State<IdpLoginWebView> {
   late final WebViewController _controller;
+  final Stopwatch _lifetimeWatch = Stopwatch()..start();
+  Stopwatch _pageWatch = Stopwatch();
   int _progress = 0;
+  int _lastProgressBucket = -1;
   bool _finished = false;
   bool _canGoBack = false;
+  bool _layoutLogged = false;
 
   @override
   void initState() {
     super.initState();
+    _trace(
+      'INIT',
+      'startPage=${VcoreWebViewSupport.safePage(widget.startUri.toString())} '
+      'forceClose=${widget.forceCloseWebViewOnBack}',
+    );
 
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -53,33 +62,126 @@ class _IdpLoginWebViewState extends State<IdpLoginWebView> {
       ..setNavigationDelegate(
         NavigationDelegate(
           onProgress: (int progress) {
+            final int bucket = (progress ~/ 25).clamp(0, 4).toInt();
+            if (bucket != _lastProgressBucket || progress == 100) {
+              _lastProgressBucket = bucket;
+              _trace(
+                'PROGRESS',
+                'progress=$progress pageElapsedMs=${_pageWatch.elapsedMilliseconds}',
+              );
+            }
             if (mounted) setState(() => _progress = progress);
           },
-          onPageStarted: (_) {
+          onPageStarted: (String url) {
+            _pageWatch = Stopwatch()..start();
+            _lastProgressBucket = -1;
+            _trace(
+              'PAGE_STARTED',
+              'page=${VcoreWebViewSupport.safePage(url)} '
+              'lifetimeMs=${_lifetimeWatch.elapsedMilliseconds}',
+            );
             _refreshBackState();
           },
-          onPageFinished: (_) {
-            _refreshBackState();
+          onPageFinished: (String url) async {
+            _trace(
+              'PAGE_FINISHED_RAW',
+              'page=${VcoreWebViewSupport.safePage(url)} '
+              'pageElapsedMs=${_pageWatch.elapsedMilliseconds}',
+            );
+            await VcoreWebViewSupport.normalizeResponsiveLayout(
+              _controller,
+              traceTag: 'IDP',
+            );
+            _trace(
+              'PAGE_FINISHED_NORMALIZED',
+              'page=${VcoreWebViewSupport.safePage(url)} '
+              'pageElapsedMs=${_pageWatch.elapsedMilliseconds} '
+              'lifetimeMs=${_lifetimeWatch.elapsedMilliseconds}',
+            );
+            await _refreshBackState();
+          },
+          onWebResourceError: (WebResourceError error) {
+            _trace(
+              'RESOURCE_ERROR',
+              'code=${error.errorCode} '
+              'isMainFrame=${error.isForMainFrame} '
+              'description=${error.description}',
+            );
           },
           onNavigationRequest: (NavigationRequest request) {
             final Uri? uri = Uri.tryParse(request.url);
-            if (uri != null && IdpAuthConfig.isAppCallback(uri)) {
-              _finishFromCallback(uri);
+            final bool callback =
+                uri != null && IdpAuthConfig.isAppCallback(uri);
+            _trace(
+              'NAVIGATION',
+              'page=${VcoreWebViewSupport.safePage(request.url)} '
+              'mainFrame=${request.isMainFrame} callback=$callback',
+            );
+            if (callback) {
+              _trace('APP_CALLBACK', 'received=true');
+              _finishFromCallback(uri!);
               return NavigationDecision.prevent;
             }
             return NavigationDecision.navigate;
           },
         ),
-      )
-      ..loadRequest(widget.startUri);
+      );
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _layoutLogged) return;
+      _layoutLogged = true;
+      final MediaQueryData mq = MediaQuery.of(context);
+      _trace(
+        'FLUTTER_VIEWPORT',
+        'logicalWidth=${mq.size.width.toStringAsFixed(2)} '
+        'logicalHeight=${mq.size.height.toStringAsFixed(2)} '
+        'devicePixelRatio=${mq.devicePixelRatio.toStringAsFixed(2)} '
+        'padding=${mq.padding} viewInsets=${mq.viewInsets}',
+      );
+    });
+
+    _loadStartUri();
+  }
+
+  Future<void> _loadStartUri() async {
+    final Stopwatch watch = Stopwatch()..start();
+    try {
+      await VcoreWebViewSupport.configurePlatform(
+        _controller,
+        traceTag: 'IDP',
+      );
+      _trace('PLATFORM_READY', 'elapsedMs=${watch.elapsedMilliseconds}');
+      _trace(
+        'LOAD_START_URI',
+        'page=${VcoreWebViewSupport.safePage(widget.startUri.toString())}',
+      );
+      await _controller.loadRequest(widget.startUri);
+      _trace('LOAD_REQUEST_DISPATCHED', 'elapsedMs=${watch.elapsedMilliseconds}');
+    } catch (error, stackTrace) {
+      _trace(
+        'LOAD_ERROR',
+        'type=${error.runtimeType} message=$error '
+        'elapsedMs=${watch.elapsedMilliseconds}',
+      );
+      _traceStack(stackTrace);
+      rethrow;
+    }
   }
 
   void _finishFromCallback(Uri uri) {
-    if (_finished || !mounted) return;
+    if (_finished || !mounted) {
+      _trace('CALLBACK_IGNORED', 'finished=$_finished mounted=$mounted');
+      return;
+    }
     _finished = true;
 
     final String ticket = uri.queryParameters['ticket']?.trim() ?? '';
     if (ticket.isNotEmpty) {
+      _trace(
+        'CALLBACK_RESULT',
+        'success=true ticketLength=${ticket.length} '
+        'lifetimeMs=${_lifetimeWatch.elapsedMilliseconds}',
+      );
       Navigator.of(context).pop(IdpWebLoginResult.success(ticket));
       return;
     }
@@ -88,27 +190,37 @@ class _IdpLoginWebViewState extends State<IdpLoginWebView> {
         uri.queryParameters['error']?.trim() ??
         'Đăng nhập IdP không thành công.';
 
+    _trace(
+      'CALLBACK_RESULT',
+      'success=false errorLength=${error.length} '
+      'lifetimeMs=${_lifetimeWatch.elapsedMilliseconds}',
+    );
     Navigator.of(context).pop(IdpWebLoginResult.failure(error));
   }
 
   Future<void> _refreshBackState() async {
-    final bool canGoBack = await _controller.canGoBack();
-    if (!mounted || canGoBack == _canGoBack) return;
-
-    setState(() {
-      _canGoBack = canGoBack;
-    });
+    try {
+      final bool canGoBack = await _controller.canGoBack();
+      _trace('BACK_STATE', 'canGoBack=$canGoBack previous=$_canGoBack');
+      if (!mounted || canGoBack == _canGoBack) return;
+      setState(() => _canGoBack = canGoBack);
+    } catch (error, stackTrace) {
+      _trace('BACK_STATE_ERROR', 'type=${error.runtimeType} message=$error');
+      _traceStack(stackTrace);
+    }
   }
 
   Future<void> _closeWebView() async {
+    _trace('CLOSE', 'lifetimeMs=${_lifetimeWatch.elapsedMilliseconds}');
     if (!mounted) return;
-
-    /// Pop route IDP WebView. Sau khi route bị pop, State.dispose() giải phóng
-    /// WebView; không tiếp tục lần ngược history nội bộ nữa.
     Navigator.of(context).pop();
   }
 
   Future<void> _back() async {
+    _trace(
+      'BACK_ACTION',
+      'forceClose=${widget.forceCloseWebViewOnBack} canGoBack=$_canGoBack',
+    );
     if (widget.forceCloseWebViewOnBack) {
       await _closeWebView();
       return;
@@ -119,8 +231,30 @@ class _IdpLoginWebViewState extends State<IdpLoginWebView> {
       await _refreshBackState();
       return;
     }
-
     await _closeWebView();
+  }
+
+  @override
+  void dispose() {
+    _trace(
+      'DISPOSE',
+      'finished=$_finished lifetimeMs=${_lifetimeWatch.elapsedMilliseconds}',
+    );
+    super.dispose();
+  }
+
+  void _trace(String event, String details) {
+    dlog('[WEBVIEW_DIAG][IDP][$event] $details', wrapWidth: 2000);
+  }
+
+  void _traceStack(StackTrace stackTrace) {
+    final String compact = stackTrace
+        .toString()
+        .split('\n')
+        .where((String line) => line.trim().isNotEmpty)
+        .take(8)
+        .join(' | ');
+    dlog('[WEBVIEW_DIAG][IDP][STACK] $compact', wrapWidth: 2000);
   }
 
   @override
@@ -134,23 +268,20 @@ class _IdpLoginWebViewState extends State<IdpLoginWebView> {
         backgroundColor: Colors.white,
         body: Stack(
           children: <Widget>[
-            /// Bỏ hoàn toàn AppBar/navbar cũ. Chỉ giữ SafeArea hệ thống.
             Positioned.fill(
-              child: SafeArea(
-                bottom: false,
-                child: Column(
-                  children: <Widget>[
-                    if (_progress < 100)
-                      LinearProgressIndicator(value: _progress / 100.0),
-                    Expanded(
-                      child: WebViewWidget(controller: _controller),
-                    ),
-                  ],
+              child: VcoreWebViewSurface(controller: _controller),
+            ),
+            if (_progress < 100)
+              Positioned(
+                top: MediaQuery.paddingOf(context).top,
+                left: 0,
+                right: 0,
+                child: LinearProgressIndicator(
+                  value: _progress <= 0 ? null : _progress / 100.0,
+                  minHeight: 2,
+                  backgroundColor: Colors.transparent,
                 ),
               ),
-            ),
-
-            /// Dùng đúng component bubble đã tách từ chức năng Nhà trọ.
             Positioned.fill(
               child: VcoreFloatingBackBubble(
                 isCloseAction:

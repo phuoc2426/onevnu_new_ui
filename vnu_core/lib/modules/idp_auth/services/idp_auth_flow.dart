@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:vnu_core/modules/idp_auth/config/idp_auth_config.dart';
+import 'package:uuid/uuid.dart';
+import 'package:vnu_core/common/log.dart';
+import 'package:vnu_core/common/session_logout_gate.dart';
 import 'package:vnu_core/modules/idp_auth/repository/idp_auth_repository.dart';
+import 'package:vnu_core/modules/idp_auth/services/idp_device_binding_service.dart';
 import 'package:vnu_core/modules/idp_auth/services/idp_onevnu_session_service.dart';
 import 'package:vnu_core/modules/idp_auth/views/idp_login_webview.dart';
 import 'package:vnu_core/services/app_config_service.dart';
@@ -12,78 +15,153 @@ class IdpAuthFlow {
 
   factory IdpAuthFlow() => _instance;
 
-  Future<bool> login(BuildContext context) async {
-    Uri? startUri;
+  /// Opens the VNU IDP authorization URL inside the ONEVNU WebView.
+  /// Backend still owns state + nonce + PKCE verifier + code exchange + IDP tokens.
+  /// Flutter only keeps the per-login possession secret in memory.
+  Future<bool> login(
+    BuildContext context, {
+    bool forceLogin = false,
+    String? flowId,
+  }) async {
+    final String effectiveFlowId =
+        (flowId != null && flowId.trim().isNotEmpty)
+            ? flowId.trim()
+            : const Uuid().v4();
+    final Stopwatch total = Stopwatch()..start();
+    _trace('FLOW_BEGIN', 'flowId=$effectiveFlowId forceLogin=$forceLogin');
 
-    // TEMP TEST: URL nằm duy nhất trong IdpAuthConfig.temporaryTestStartUrl.
-    // Khi comment dòng gán idp-test ở IdpAuthConfig, giá trị này là null
-    // và block ORIGINAL FLOW bên dưới chạy nguyên như source ban đầu.
-    final String testStartUrl =
-        IdpAuthConfig.temporaryTestStartUrl?.trim() ?? '';
-    if (testStartUrl.isNotEmpty) {
-      startUri = Uri.tryParse(testStartUrl);
-    }
-
-    // ORIGINAL FLOW: bắt buộc lấy IDP start URL từ GET /api/config.
-    if (startUri == null) {
+    try {
+      await SessionLogoutGate.waitForCriticalLogout();
+      final Stopwatch configWatch = Stopwatch()..start();
       final AppConfigService configService = AppConfigService();
       await configService.ensureLoaded(forceRefresh: true);
-
-      if (!configService.isLoadedSuccessfully) {
+      _trace(
+        'CONFIG_DONE',
+        'forceLogin=$forceLogin elapsedMs=${configWatch.elapsedMilliseconds} '
+        'loaded=${configService.isLoadedSuccessfully} '
+        'idpLogin=${configService.loginRuntimeConfig.idpLogin}',
+      );
+      if (!configService.isLoadedSuccessfully ||
+          !configService.loginRuntimeConfig.idpLogin) {
         throw StateError(
-          configService.lastLoadError ??
-              'Không tải được cấu hình đăng nhập từ máy chủ.',
+          configService.lastLoadError ?? 'VNU IDP hiện không khả dụng.',
         );
       }
 
-      final config = configService.loginRuntimeConfig;
-      final String remoteStartUrl = config.idpStartUrl.trim();
-      if (!config.idpLogin || remoteStartUrl.isEmpty) {
-        throw StateError(
-          'VNU IDP hiện không được bật hoặc chưa có URL đăng nhập hợp lệ. '
-          'Vui lòng sử dụng đăng nhập tài khoản/mật khẩu.',
-        );
-      }
+      final Stopwatch bindingWatch = Stopwatch()..start();
+      final IdpLoginBinding binding =
+          await IdpDeviceBindingService().createLoginBinding();
+      _trace(
+        'BINDING_DONE',
+        'elapsedMs=${bindingWatch.elapsedMilliseconds} '
+        'deviceIdLength=${binding.deviceId.length} '
+        'challengeLength=${binding.challenge.length} '
+        'secretLength=${binding.secret.length}',
+      );
 
-      final Uri? remoteUri = Uri.tryParse(remoteStartUrl);
-      if (remoteUri == null ||
-          !remoteUri.hasScheme ||
-          (remoteUri.scheme != 'http' && remoteUri.scheme != 'https') ||
-          remoteUri.host.isEmpty) {
-        throw StateError('URL bắt đầu đăng nhập VNU IDP không hợp lệ.');
-      }
+      // IMPORTANT: never open /api/auth/idp/mobile/start directly.
+      final Stopwatch initWatch = Stopwatch()..start();
+      final Uri authorizationUri = await IdpAuthRepository().initLogin(
+        deviceId: binding.deviceId,
+        bindingChallenge: binding.challenge,
+        forceLogin: forceLogin,
+        flowId: effectiveFlowId,
+      );
+      _trace(
+        'INIT_DONE',
+        'elapsedMs=${initWatch.elapsedMilliseconds} '
+        'host=${authorizationUri.host} path=${authorizationUri.path}',
+      );
 
-      startUri = remoteUri;
-    }
-
-    final Uri resolvedStartUri = startUri!;
-    if (!resolvedStartUri.hasScheme ||
-        (resolvedStartUri.scheme != 'http' &&
-            resolvedStartUri.scheme != 'https') ||
-        resolvedStartUri.host.isEmpty) {
-      throw StateError('URL bắt đầu đăng nhập VNU IDP không hợp lệ.');
-    }
-
-    final IdpWebLoginResult? webResult =
-        await Navigator.of(context).push<IdpWebLoginResult>(
-      MaterialPageRoute<IdpWebLoginResult>(
-        builder: (_) => IdpLoginWebView(
-          startUri: resolvedStartUri,
-          // IDP có nhiều redirect nội bộ nên bật force-close để người dùng
-          // luôn thoát được khỏi WebView, không bị mắc trong history SSO.
-          forceCloseWebViewOnBack: true,
+      final Stopwatch webViewWatch = Stopwatch()..start();
+      _trace(
+        'WEBVIEW_OPEN',
+        'host=${authorizationUri.host} forceLogin=$forceLogin',
+      );
+      final IdpWebLoginResult? callback =
+          await Navigator.of(context).push<IdpWebLoginResult>(
+        MaterialPageRoute<IdpWebLoginResult>(
+          builder: (_) => IdpLoginWebView(
+            startUri: authorizationUri,
+            forceCloseWebViewOnBack: false,
+          ),
         ),
-      ),
-    );
+      );
+      _trace(
+        'WEBVIEW_CLOSED',
+        'elapsedMs=${webViewWatch.elapsedMilliseconds} '
+        'result=${callback == null ? "cancelled" : callback.isSuccess ? "success" : "failure"} '
+        'ticketLength=${callback?.ticket?.length ?? 0} '
+        'errorLength=${callback?.error?.length ?? 0}',
+      );
 
-    if (webResult == null) return false;
-    if (!webResult.isSuccess) {
-      throw StateError(webResult.error ?? 'Đăng nhập IdP không thành công.');
+      if (callback == null) {
+        _trace('FLOW_CANCELLED', 'totalMs=${total.elapsedMilliseconds}');
+        return false;
+      }
+      if (!callback.isSuccess) {
+        throw StateError(
+          callback.error ?? 'Đăng nhập VNU IDP không thành công.',
+        );
+      }
+
+      final Stopwatch redeemWatch = Stopwatch()..start();
+      if (forceLogin) {
+        await IdpAuthRepository().redeemReauthTicket(
+          ticket: callback.ticket!,
+          bindingSecret: binding.secret,
+          deviceId: binding.deviceId,
+          flowId: effectiveFlowId,
+        );
+        _trace(
+          'REAUTH_REDEEM_DONE',
+          'elapsedMs=${redeemWatch.elapsedMilliseconds} '
+          'totalMs=${total.elapsedMilliseconds}',
+        );
+        return true;
+      }
+
+      final response = await IdpAuthRepository().redeemTicket(
+        ticket: callback.ticket!,
+        bindingSecret: binding.secret,
+        deviceId: binding.deviceId,
+        flowId: effectiveFlowId,
+      );
+      _trace(
+        'REDEEM_DONE',
+        'elapsedMs=${redeemWatch.elapsedMilliseconds}',
+      );
+
+      final Stopwatch sessionWatch = Stopwatch()..start();
+      await IdpOneVnuSessionService().apply(response);
+      _trace(
+        'SESSION_APPLIED',
+        'elapsedMs=${sessionWatch.elapsedMilliseconds} '
+        'totalMs=${total.elapsedMilliseconds}',
+      );
+      return true;
+    } catch (error, stackTrace) {
+      _trace(
+        'FLOW_ERROR',
+        'flowId=$effectiveFlowId forceLogin=$forceLogin type=${error.runtimeType} message=$error '
+        'totalMs=${total.elapsedMilliseconds}',
+      );
+      _traceStack(stackTrace);
+      rethrow;
     }
+  }
 
-    final response =
-        await IdpAuthRepository().redeemTicket(webResult.ticket!);
-    await IdpOneVnuSessionService().apply(response);
-    return true;
+  void _trace(String event, String details) {
+    dlog('[P0_DIAG][IDP_FLOW][$event] $details', wrapWidth: 1000);
+  }
+
+  void _traceStack(StackTrace stackTrace) {
+    final String compact = stackTrace
+        .toString()
+        .split('\n')
+        .where((String line) => line.trim().isNotEmpty)
+        .take(8)
+        .join(' | ');
+    dlog('[P0_DIAG][IDP_FLOW][STACK] $compact', wrapWidth: 1000);
   }
 }

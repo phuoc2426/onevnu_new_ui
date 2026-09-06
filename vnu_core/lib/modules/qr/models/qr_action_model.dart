@@ -9,6 +9,12 @@ class QrResolvedAction {
     required this.requiresConfirmation,
     required this.status,
     this.expiresAt,
+    this.requestingService,
+    this.requestingHost,
+    this.requestingClientId,
+    this.requestedAt,
+    this.requestingContextVerified = false,
+    this.localAuthenticationRequired = false,
   });
 
   final String sessionId;
@@ -20,6 +26,13 @@ class QrResolvedAction {
   final bool requiresConfirmation;
   final String status;
   final DateTime? expiresAt;
+
+  final String? requestingService;
+  final String? requestingHost;
+  final String? requestingClientId;
+  final DateTime? requestedAt;
+  final bool requestingContextVerified;
+  final bool localAuthenticationRequired;
 
   bool get isIdp => provider.toUpperCase() == 'VNU_IDP' ||
       type.toUpperCase().contains('IDP');
@@ -35,7 +48,19 @@ class QrResolvedAction {
       requiresConfirmation: json['requiresConfirmation'] != false,
       status: json['status']?.toString().trim() ?? '',
       expiresAt: DateTime.tryParse(json['expiresAt']?.toString() ?? ''),
+      requestingService: _optional(json['requestingService']),
+      requestingHost: _optional(json['requestingHost']),
+      requestingClientId: _optional(json['requestingClientId']),
+      requestedAt: DateTime.tryParse(json['requestedAt']?.toString() ?? ''),
+      requestingContextVerified: json['requestingContextVerified'] == true,
+      localAuthenticationRequired:
+          json['localAuthenticationRequired'] == true,
     );
+  }
+
+  static String? _optional(Object? value) {
+    final String text = value?.toString().trim() ?? '';
+    return text.isEmpty ? null : text;
   }
 }
 

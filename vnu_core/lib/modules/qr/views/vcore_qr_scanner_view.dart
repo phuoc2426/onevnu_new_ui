@@ -3,9 +3,12 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:vnu_core/common/error/app_feedback.dart';
+import 'package:vnu_core/common/log.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:local_auth/local_auth.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:uuid/uuid.dart';
 import 'package:vnu_core/common/utils.dart';
 import 'package:vnu_core/modules/idp_auth/services/idp_auth_flow.dart';
 import 'package:vnu_core/modules/auth_mode/auth_entry_mode_service.dart';
@@ -44,6 +47,14 @@ class _VcoreQrScannerViewState extends State<VcoreQrScannerView>
   static const Color _accentDeep = Color(0xFF087C49);
   static const Color _darkSurface = Color(0xFF06100C);
 
+  // Backend controls the real retry schedule. These are client-side circuit
+  // breakers only, preventing a malformed/old backend from keeping the QR view
+  // in an infinite retry loop.
+  static const Duration _idpNotReadyClientHardCap = Duration(seconds: 25);
+  static const int _idpNotReadyClientMaxCycles = 10;
+
+  final LocalAuthentication _localAuthentication = LocalAuthentication();
+
   final MobileScannerController _scannerController = MobileScannerController(
     autoStart: false,
     facing: CameraFacing.back,
@@ -72,6 +83,57 @@ class _VcoreQrScannerViewState extends State<VcoreQrScannerView>
   String _stageMessage = 'Đưa mã QR vào khung để bắt đầu';
   final Map<_VerificationStage, DateTime> _stageTimes =
       <_VerificationStage, DateTime>{};
+
+  void _trace(String event, [String details = '']) {
+    final String suffix = details.trim().isEmpty ? '' : ' ${details.trim()}';
+    dlog('[QR_FLOW][SCANNER][$event]$suffix', wrapWidth: 1000);
+  }
+
+  void _traceError(String event, Object error, StackTrace stackTrace) {
+    final String compactStack = stackTrace
+        .toString()
+        .split('\n')
+        .where((String line) => line.trim().isNotEmpty)
+        .take(8)
+        .join(' | ');
+
+    String apiDetails = '';
+    if (error is QrApiException) {
+      apiDetails =
+          ' code=${error.code}'
+          ' status=${error.statusCode ?? "none"}'
+          ' providerStatus=${error.providerStatus ?? "none"}'
+          ' providerError=${error.providerError ?? "none"}'
+          ' providerRequestId=${error.providerRequestId ?? "none"}'
+          ' stage=${error.failureStage ?? "none"}'
+          ' classification=${error.classification ?? "none"}'
+          ' networkKind=${error.networkKind ?? "none"}'
+          ' outcome=${error.outcome ?? "none"}'
+          ' retryable=${error.retryable ?? "none"}'
+          ' userAction=${error.userAction ?? "none"}'
+          ' flowId=${error.flowId ?? "none"}'
+          ' rid=${error.requestId ?? "none"}';
+    }
+
+    final DateTime? flowStartedAt =
+        _stageTimes[_VerificationStage.qrReceived];
+    final int? flowElapsedMs = flowStartedAt == null
+        ? null
+        : DateTime.now().difference(flowStartedAt).inMilliseconds;
+
+    _trace(
+      event,
+      'stage=${_stage.name} type=${error.runtimeType}$apiDetails '
+      'flowElapsedMs=${flowElapsedMs ?? "none"} message=$error',
+    );
+    dlog('[QR_FLOW][SCANNER][STACK] $compactStack', wrapWidth: 1000);
+  }
+
+  String _sessionPrefix(String value) {
+    final String trimmed = value.trim();
+    if (trimmed.isEmpty) return 'none';
+    return trimmed.length <= 8 ? trimmed : trimmed.substring(0, 8);
+  }
 
   @override
   void initState() {
@@ -123,8 +185,13 @@ class _VcoreQrScannerViewState extends State<VcoreQrScannerView>
   }
 
   Future<void> _guardAndStartScanner() async {
+    _trace('ACCESS_CHECK_START');
     final QrAccessDecision decision =
         await AuthEntryModeService().qrAccessDecision();
+    _trace(
+      'ACCESS_CHECK_RESULT',
+      'allowed=${decision.allowed} messageLength=${decision.message.length}',
+    );
     if (!mounted || _disposed) return;
 
     if (!decision.allowed) {
@@ -139,12 +206,15 @@ class _VcoreQrScannerViewState extends State<VcoreQrScannerView>
   Future<void> _startScanner() async {
     if (_disposed) return;
 
+    _trace('SCANNER_START_REQUEST');
     await _barcodeSubscription?.cancel();
     _barcodeSubscription = _scannerController.barcodes.listen(_onDetect);
 
     try {
       await _scannerController.start();
-    } catch (error) {
+      _trace('SCANNER_STARTED');
+    } catch (error, stackTrace) {
+      _traceError('SCANNER_START_ERROR', error, stackTrace);
       if (mounted && !_disposed) {
         AppFeedback.showError(
           error,
@@ -174,12 +244,22 @@ class _VcoreQrScannerViewState extends State<VcoreQrScannerView>
 
     if (rawQr == null || rawQr.isEmpty) return;
 
+    _trace(
+      'SCAN_DETECTED',
+      'barcodes=${capture.barcodes.length} rawLength=${rawQr.length}',
+    );
     HapticFeedback.mediumImpact();
     unawaited(_resolveAndConfirm(rawQr));
   }
 
   Future<void> _resolveAndConfirm(String rawQr) async {
-    if (_processing) return;
+    final String flowId = const Uuid().v4();
+    if (_processing) {
+      _trace('FLOW_IGNORED', 'reason=already_processing');
+      return;
+    }
+
+    _trace('FLOW_START', 'flowId=$flowId rawLength=${rawQr.length}');
 
     setState(() {
       _processing = true;
@@ -190,6 +270,7 @@ class _VcoreQrScannerViewState extends State<VcoreQrScannerView>
     });
 
     await _pauseDetection();
+    _trace('DETECTION_PAUSED');
 
     // Keep the first state visible long enough to be perceived.
     await Future<void>.delayed(const Duration(milliseconds: 260));
@@ -201,23 +282,90 @@ class _VcoreQrScannerViewState extends State<VcoreQrScannerView>
     );
 
     try {
-      final QrResolvedAction action = await QrRepository().resolve(rawQr);
+      _trace('RESOLVE_CALL');
+      final QrResolvedAction action = await QrRepository().resolve(rawQr, flowId: flowId);
+      _trace(
+        'RESOLVE_OK',
+        'session=${_sessionPrefix(action.sessionId)} '
+        'provider=${action.provider} type=${action.type} '
+        'requiresConfirmation=${action.requiresConfirmation} '
+        'localAuthRequired=${action.localAuthenticationRequired} '
+        'contextVerified=${action.requestingContextVerified} '
+        'requestingHost=${action.requestingHost ?? "none"} '
+        'status=${action.status}',
+      );
       if (!mounted || _disposed) return;
 
       setState(() {
         _stageMessage = 'Yêu cầu hợp lệ · sẵn sàng xác minh';
       });
 
-      final bool confirmed =
-          !action.requiresConfirmation ||
-          await _showConfirmation(action) == true;
+      // Normal VNU IDP QR approval is deliberately simple: the user is already
+      // authenticated in ONEVNU and must explicitly tap "Cho phép". Optional
+      // device-local auth is controlled separately by the backend feature flag.
+      bool confirmed = true;
+      if (action.requiresConfirmation) {
+        _trace(
+          'CONFIRM_OPEN',
+          'session=${_sessionPrefix(action.sessionId)} '
+          'actionLabelLength=${action.actionLabel.length}',
+        );
+        final bool? confirmationResult = await _showConfirmation(action);
+        confirmed = confirmationResult == true;
+        _trace(
+          'CONFIRM_RESULT',
+          'session=${_sessionPrefix(action.sessionId)} '
+          'result=${confirmationResult == null ? "dismissed" : confirmed}',
+        );
+      } else {
+        _trace(
+          'CONFIRM_SKIPPED',
+          'session=${_sessionPrefix(action.sessionId)}',
+        );
+      }
 
       if (!confirmed) {
+        _trace(
+          'CANCEL_DISPATCH',
+          'session=${_sessionPrefix(action.sessionId)}',
+        );
         try {
-          await QrRepository().cancel(action.sessionId);
-        } catch (_) {}
+          await QrRepository().cancel(action.sessionId, flowId: flowId);
+          _trace(
+            'CANCEL_DONE',
+            'session=${_sessionPrefix(action.sessionId)}',
+          );
+        } catch (cancelError, cancelStack) {
+          _traceError('CANCEL_ERROR', cancelError, cancelStack);
+        }
         await _resumeAfterAction();
         return;
+      }
+
+      if (action.isIdp && action.localAuthenticationRequired) {
+        _trace(
+          'LOCAL_AUTH_START',
+          'session=${_sessionPrefix(action.sessionId)}',
+        );
+        final bool locallyVerified = await _authenticateLocalIdentity();
+        _trace(
+          'LOCAL_AUTH_RESULT',
+          'session=${_sessionPrefix(action.sessionId)} success=$locallyVerified',
+        );
+        if (!locallyVerified) {
+          try {
+            await QrRepository().cancel(action.sessionId, flowId: flowId);
+          } catch (cancelError, cancelStack) {
+            _traceError('LOCAL_AUTH_CANCEL_ERROR', cancelError, cancelStack);
+          }
+          if (mounted && !_disposed) {
+            snackBarWarning(
+              'Bạn cần xác thực bằng sinh trắc học hoặc mã khóa thiết bị để cho phép đăng nhập QR.',
+            );
+          }
+          await _resumeAfterAction();
+          return;
+        }
       }
 
       _setStage(
@@ -227,27 +375,56 @@ class _VcoreQrScannerViewState extends State<VcoreQrScannerView>
             : 'Đang xác thực danh tính và quyền truy cập',
       );
 
-      await _execute(action);
-    } catch (error) {
+      _trace(
+        'EXECUTE_DISPATCH',
+        'session=${_sessionPrefix(action.sessionId)} isIdp=${action.isIdp}',
+      );
+      await _execute(action, flowId);
+    } catch (error, stackTrace) {
+      _traceError('FLOW_ERROR', error, stackTrace);
       if (!mounted || _disposed) return;
+      if (await _handleKnownQrFailure(error, flowId: flowId, session: 'none')) {
+        return;
+      }
       AppFeedback.showError(error);
       await _resumeAfterAction();
     }
   }
 
-  Future<void> _execute(QrResolvedAction action) async {
+  Future<void> _execute(QrResolvedAction action, String flowId) async {
+    final String session = _sessionPrefix(action.sessionId);
+    _trace('EXECUTE_START', 'flowId=$flowId session=$session');
+
     try {
-      final QrExecutionResult result = await QrRepository().execute(
-        action.sessionId,
+      final QrExecutionResult result = await _executeWithIdpReadinessRetry(
+        action,
+        flowId,
       );
 
+      _trace(
+        'EXECUTE_OK',
+        'session=$session status=${result.status} '
+        'messageLength=${result.message.length}',
+      );
       if (!mounted || _disposed) return;
       await _completeSuccess(result.message);
-    } catch (error) {
+    } catch (error, stackTrace) {
+      _traceError('EXECUTE_ERROR', error, stackTrace);
       if (!mounted || _disposed) return;
 
+      if (action.isIdp && await _handleKnownQrFailure(
+        error,
+        flowId: flowId,
+        session: session,
+        excludeReauth: true,
+      )) {
+        return;
+      }
+
       if (action.isIdp && _requiresIdpReauth(error)) {
+        _trace('IDP_REAUTH_REQUIRED', 'session=$session');
         final bool reLogin = await _askIdpLogin();
+        _trace('IDP_REAUTH_DECISION', 'session=$session accepted=$reLogin');
 
         if (!reLogin || !mounted || _disposed) {
           await _resumeAfterAction();
@@ -260,7 +437,13 @@ class _VcoreQrScannerViewState extends State<VcoreQrScannerView>
             'Đang làm mới phiên đăng nhập VNU IDP',
           );
 
-          final bool loggedIn = await IdpAuthFlow().login(context);
+          _trace('IDP_LOGIN_START', 'session=$session');
+          final bool loggedIn = await IdpAuthFlow().login(
+            context,
+            forceLogin: true,
+            flowId: flowId,
+          );
+          _trace('IDP_LOGIN_RESULT', 'session=$session success=$loggedIn');
           if (!loggedIn || !mounted || _disposed) {
             await _resumeAfterAction();
             return;
@@ -271,30 +454,236 @@ class _VcoreQrScannerViewState extends State<VcoreQrScannerView>
             'Đã đăng nhập · đang xác minh lại danh tính',
           );
 
-          final QrExecutionResult retry = await QrRepository().execute(
-            action.sessionId,
+          if (action.localAuthenticationRequired) {
+            _trace('LOCAL_AUTH_RETRY_START', 'session=$session');
+            final bool retryLocallyVerified =
+                await _authenticateLocalIdentity();
+            _trace(
+              'LOCAL_AUTH_RETRY_RESULT',
+              'session=$session success=$retryLocallyVerified',
+            );
+            if (!retryLocallyVerified) {
+              await _resumeAfterAction();
+              return;
+            }
+          }
+
+          _trace('EXECUTE_RETRY', 'session=$session');
+          final QrExecutionResult retry = await _executeWithIdpReadinessRetry(
+            action,
+            flowId,
+          );
+          _trace(
+            'EXECUTE_RETRY_OK',
+            'session=$session status=${retry.status} '
+            'messageLength=${retry.message.length}',
           );
 
           if (!mounted || _disposed) return;
           await _completeSuccess(retry.message);
           return;
-        } catch (idpError) {
+        } catch (idpError, idpStack) {
+          _traceError('IDP_REAUTH_FLOW_ERROR', idpError, idpStack);
           if (mounted && !_disposed) {
-            AppFeedback.showError(idpError);
+            _showFlowError(idpError);
           }
           await _resumeAfterAction();
           return;
         }
       }
 
-      AppFeedback.showError(error);
+      _showFlowError(error);
       await _resumeAfterAction();
     }
+  }
+
+  Future<QrExecutionResult> _executeWithIdpReadinessRetry(
+    QrResolvedAction action,
+    String flowId,
+  ) async {
+    final Stopwatch waitWindow = Stopwatch()..start();
+    int cycle = 0;
+
+    while (true) {
+      if (!mounted || _disposed) {
+        throw StateError('QR scanner view disposed during provider wait.');
+      }
+
+      cycle += 1;
+      try {
+        return await QrRepository().execute(
+          action.sessionId,
+          flowId: flowId,
+        );
+      } on QrApiException catch (error) {
+        final bool confirmedNotReady =
+            action.isIdp &&
+            error.code == kQrErrorIdpChallengeNotReady &&
+            error.providerStatus == 404 &&
+            (error.providerError ?? '').toLowerCase() == 'not_found' &&
+            error.retryable == true;
+
+        if (!confirmedNotReady) rethrow;
+
+        final int advisedMs = error.retryAfterMs ?? 1000;
+        final int boundedMs = advisedMs.clamp(250, 5000).toInt();
+        final int hardCapRemainingMs =
+            _idpNotReadyClientHardCap.inMilliseconds -
+                waitWindow.elapsedMilliseconds;
+
+        _trace(
+          'IDP_CHALLENGE_NOT_READY',
+          'flowId=$flowId session=${_sessionPrefix(action.sessionId)} '
+          'cycle=$cycle backendAttempt=${error.attempt ?? "none"}/${error.maxAttempts ?? "none"} '
+          'providerStatus=${error.providerStatus} providerError=${error.providerError} '
+          'retryAfterMs=$boundedMs waitElapsedMs=${error.waitElapsedMs ?? waitWindow.elapsedMilliseconds} '
+          'graceMs=${error.graceMs ?? "none"} rid=${error.requestId ?? "none"} '
+          'action=WAIT_AND_RETRY_SAME_SESSION',
+        );
+
+        if (cycle >= _idpNotReadyClientMaxCycles || hardCapRemainingMs <= 0) {
+          _trace(
+            'IDP_CHALLENGE_CLIENT_CIRCUIT_BREAKER',
+            'flowId=$flowId session=${_sessionPrefix(action.sessionId)} '
+            'cycle=$cycle elapsedMs=${waitWindow.elapsedMilliseconds} '
+            'action=RESCAN_CURRENT_QR',
+          );
+          throw QrApiException(
+            code: kQrErrorChallengeUnavailable,
+            message:
+                'Mã QR chưa sẵn sàng sau thời gian chờ. Vui lòng quét lại mã đang hiển thị.',
+            statusCode: 410,
+            requestId: error.requestId,
+            flowId: flowId,
+            providerStatus: error.providerStatus,
+            providerError: error.providerError,
+            failureStage: 'IDP_APPROVE',
+            classification: 'CLIENT_NOT_READY_CIRCUIT_BREAKER',
+            retryable: false,
+            userAction: 'RESCAN_CURRENT_QR',
+            outcome: 'NOT_APPROVED_CONFIRMED',
+          );
+        }
+
+        final int actualDelayMs = math.min(boundedMs, hardCapRemainingMs);
+        _setStage(
+          _VerificationStage.authenticating,
+          'Đang chuẩn bị xác nhận mã QR · ONEVNU sẽ tự thử lại',
+        );
+        await Future<void>.delayed(Duration(milliseconds: actualDelayMs));
+      }
+    }
+  }
+
+  Future<bool> _handleKnownQrFailure(
+    Object error, {
+    required String flowId,
+    required String session,
+    bool excludeReauth = false,
+  }) async {
+    if (error is! QrApiException) return false;
+
+    _trace(
+      'CLASSIFIED_FAILURE',
+      'flowId=$flowId session=$session code=${error.code} '
+      'stage=${error.failureStage ?? "none"} '
+      'classification=${error.classification ?? "none"} '
+      'providerStatus=${error.providerStatus ?? "none"} '
+      'providerError=${error.providerError ?? "none"} '
+      'networkKind=${error.networkKind ?? "none"} '
+      'outcome=${error.outcome ?? "none"} '
+      'retryable=${error.retryable ?? "none"} '
+      'userAction=${error.userAction ?? "none"} '
+      'retryAfterMs=${error.retryAfterMs ?? "none"} '
+      'waitElapsedMs=${error.waitElapsedMs ?? "none"} graceMs=${error.graceMs ?? "none"} '
+      'attempt=${error.attempt ?? "none"}/${error.maxAttempts ?? "none"} '
+      'rid=${error.requestId ?? "none"}',
+    );
+
+    if (!excludeReauth && error.code == kQrErrorIdpReauthRequired) {
+      return false;
+    }
+
+    switch (error.code) {
+      case kQrErrorChallengeStale:
+      case kQrErrorChallengeUnavailable:
+      case kQrErrorExpired:
+      case kQrErrorAlreadyUsed:
+        snackBarWarning(
+          error.message.isEmpty
+              ? 'Mã QR không còn hiệu lực. Hãy quét mã đang hiển thị hiện tại.'
+              : error.message,
+        );
+        await _resumeAfterAction();
+        return true;
+      case kQrErrorOutcomeUnknown:
+        snackBarWarning(
+          'Chưa xác định được kết quả xác nhận QR. Hãy kiểm tra trang web; nếu chưa đăng nhập, tạo mã QR mới rồi quét lại.',
+        );
+        await _resumeAfterAction();
+        return true;
+      case kQrErrorExecutionInProgress:
+        snackBarWarning('Yêu cầu QR đang được xử lý. Vui lòng chờ trong giây lát.');
+        await _resumeAfterAction();
+        return true;
+      case kQrErrorDeviceMismatch:
+        snackBarWarning(
+          'Phiên QR này được tạo trên thiết bị khác. Vui lòng quét lại mã bằng thiết bị hiện tại.',
+        );
+        await _resumeAfterAction();
+        return true;
+      case kQrErrorDeviceBindingRequired:
+        snackBarWarning(
+          'Phiên bản/phiên đăng nhập hiện tại chưa có thông tin thiết bị. Vui lòng mở lại OneVNU và đăng nhập lại.',
+        );
+        await _resumeAfterAction();
+        return true;
+      case kQrErrorTemporary:
+        snackBarWarning(
+          error.message.isEmpty
+              ? 'VNU IDP đang tạm thời không phản hồi. Vui lòng thử lại sau.'
+              : error.message,
+        );
+        await _resumeAfterAction();
+        return true;
+      case kQrErrorInvalidFormat:
+      case kQrErrorInvalidPayload:
+      case kQrErrorUnsupported:
+        snackBarWarning(
+          error.message.isEmpty
+              ? 'Mã QR không đúng định dạng OneVNU hỗ trợ. Vui lòng quét mã QR VNU đang hiển thị.'
+              : error.message,
+        );
+        await _resumeAfterAction();
+        return true;
+      case kQrErrorSecurityPolicyRejected:
+        snackBarError(
+          'Mã QR không thuộc miền/đường dẫn VNU IDP được OneVNU cho phép. Không xác nhận mã này.',
+        );
+        await _resumeAfterAction();
+        return true;
+    }
+
+    if (error.userAction == 'RESCAN_CURRENT_QR') {
+      snackBarWarning(error.message);
+      await _resumeAfterAction();
+      return true;
+    }
+    return false;
+  }
+
+  void _showFlowError(Object error) {
+    if (error is QrApiException) {
+      snackBarError(error.message);
+      return;
+    }
+    AppFeedback.showError(error);
   }
 
   void _setStage(_VerificationStage stage, String message) {
     if (!mounted || _disposed) return;
 
+    _trace('STAGE', 'from=${_stage.name} to=${stage.name}');
     setState(() {
       _stage = stage;
       _stageMessage = message;
@@ -303,6 +692,7 @@ class _VcoreQrScannerViewState extends State<VcoreQrScannerView>
   }
 
   Future<void> _completeSuccess(String backendMessage) async {
+    _trace('SUCCESS_SEQUENCE_START', 'messageLength=${backendMessage.length}');
     _setStage(
       _VerificationStage.completing,
       'Đang hoàn tất và ghi nhận kết quả xác minh',
@@ -338,6 +728,7 @@ class _VcoreQrScannerViewState extends State<VcoreQrScannerView>
     await Future<void>.delayed(const Duration(milliseconds: 1400));
     if (!mounted || _disposed) return;
 
+    _trace('SUCCESS_SEQUENCE_DONE');
     Navigator.of(context).pop();
   }
 
@@ -348,9 +739,30 @@ class _VcoreQrScannerViewState extends State<VcoreQrScannerView>
     }
   }
 
+  bool _isStaleChallenge(Object error) {
+    return error is QrApiException &&
+        error.code == kQrErrorChallengeStale;
+  }
+
   bool _requiresIdpReauth(Object error) {
     return error is QrApiException &&
         error.code == kQrErrorIdpReauthRequired;
+  }
+
+  Future<bool> _authenticateLocalIdentity() async {
+    try {
+      return await _localAuthentication.authenticate(
+        localizedReason:
+            'Xác nhận danh tính để cho phép phiên web đăng nhập bằng tài khoản VNU của bạn',
+        options: const AuthenticationOptions(
+          biometricOnly: false,
+          stickyAuth: true,
+        ),
+      );
+    } catch (error, stackTrace) {
+      _traceError('LOCAL_AUTH_ERROR', error, stackTrace);
+      return false;
+    }
   }
 
   Future<void> _safeToggleTorch() async {
@@ -364,6 +776,11 @@ class _VcoreQrScannerViewState extends State<VcoreQrScannerView>
   }
 
   Future<bool?> _showConfirmation(QrResolvedAction action) {
+    _trace(
+      'CONFIRM_SHEET_BUILD',
+      'session=${_sessionPrefix(action.sessionId)} '
+      'titleLength=${action.title.length} descriptionLength=${action.description.length}',
+    );
     return showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -391,8 +808,68 @@ class _VcoreQrScannerViewState extends State<VcoreQrScannerView>
                   style: _bodyStyle,
                 ),
               ],
+              if (action.requestingContextVerified &&
+                  (action.requestingService != null ||
+                      action.requestingHost != null)) ...<Widget>[
+                const SizedBox(height: 16),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.06),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.white.withOpacity(0.10)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        'Đăng nhập vào',
+                        style: _bodyStyle.copyWith(
+                          color: Colors.white70,
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        action.requestingService ?? action.requestingHost!,
+                        style: _bodyStyle.copyWith(
+                          color: _accent,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 14),
-              _Chip('${action.provider} · ${action.type}'),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFB84D).withOpacity(0.10),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: const Color(0xFFFFB84D).withOpacity(0.35),
+                  ),
+                ),
+                child: Text(
+                  'Chỉ chọn Cho phép nếu bạn vừa chủ động quét mã QR trên trang VNU đang đăng nhập.',
+                  textAlign: TextAlign.center,
+                  style: _bodyStyle.copyWith(
+                    color: const Color(0xFFFFD28A),
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+              if (action.localAuthenticationRequired) ...<Widget>[
+                const SizedBox(height: 10),
+                Text(
+                  'Sau bước này, OneVNU sẽ yêu cầu sinh trắc học hoặc mã khóa thiết bị.',
+                  textAlign: TextAlign.center,
+                  style: _bodyStyle.copyWith(fontSize: 12),
+                ),
+              ],
               const SizedBox(height: 26),
               Row(
                 children: <Widget>[
@@ -419,6 +896,7 @@ class _VcoreQrScannerViewState extends State<VcoreQrScannerView>
   }
 
   Future<bool> _askIdpLogin() async {
+    _trace('IDP_REAUTH_DIALOG_OPEN');
     final bool? result = await showDialog<bool>(
       context: context,
       builder: (BuildContext dialogContext) {
@@ -446,12 +924,17 @@ class _VcoreQrScannerViewState extends State<VcoreQrScannerView>
       },
     );
 
+    _trace(
+      'IDP_REAUTH_DIALOG_RESULT',
+      'result=${result == null ? "dismissed" : result}',
+    );
     return result == true;
   }
 
   Future<void> _resumeAfterAction() async {
     if (!mounted || _disposed) return;
 
+    _trace('FLOW_RESUME_SCANNER');
     setState(() {
       _processing = false;
       _showSuccessOverlay = false;
@@ -2450,4 +2933,3 @@ class _Dialog extends StatelessWidget {
     );
   }
 }
-

@@ -8,12 +8,12 @@ final RegExp _bearerPattern = RegExp(
 );
 
 final RegExp _jsonSecretPattern = RegExp(
-  r'("(?:password|oldPassword|newPassword|reNewPassword|accessToken|access_token|refreshToken|refresh_token|authorization|token|otp|secret|cccd|identityNo|identity_no)"\s*:\s*")[^"]*(")',
+  r'("(?:password|oldPassword|newPassword|reNewPassword|accessToken|access_token|refreshToken|refresh_token|idToken|id_token|authorization|token|otp|secret|clientSecret|client_secret|challengeSecret|challenge_secret|bindingSecret|binding_secret|redeemBindingChallenge|redeem_binding_challenge|loginTicket|login_ticket|ticket|deviceToken|device_token|cccd|identityNo|identity_no)"\s*:\s*")[^"]*(")',
   caseSensitive: false,
 );
 
 final RegExp _plainSecretPattern = RegExp(
-  r'((?:password|oldPassword|newPassword|reNewPassword|accessToken|access_token|refreshToken|refresh_token|authorization|token|otp|secret|cccd|identityNo|identity_no)\s*[=:]\s*)[^\s,;}&]+',
+  r'((?:password|oldPassword|newPassword|reNewPassword|accessToken|access_token|refreshToken|refresh_token|idToken|id_token|authorization|token|otp|secret|clientSecret|client_secret|challengeSecret|challenge_secret|bindingSecret|binding_secret|redeemBindingChallenge|redeem_binding_challenge|loginTicket|login_ticket|ticket|deviceToken|device_token|cccd|identityNo|identity_no)\s*[=:]\s*)[^\s,;}&]+',
   caseSensitive: false,
 );
 

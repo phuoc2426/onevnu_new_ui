@@ -1,12 +1,17 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:uuid/uuid.dart';
 import 'package:vnu_core/common/app_text_styles.dart';
+import 'package:vnu_core/common/log.dart';
+import 'package:vnu_core/common/session_logout_gate.dart';
 import 'package:vnu_core/common/space_widget.dart';
 import 'package:vnu_core/common/utils.dart';
 import 'package:vnu_core/common/guide/guide.dart';
 import 'package:vnu_core/constants/constant.dart';
 import 'package:vnu_core/globals.dart';
+import 'package:vnu_core/repository/app_repository.dart';
 import 'package:vnu_core/screens/vcore_admission_view.dart';
 import 'package:vnu_core/modules/bookmark/views/vcore_bookmark_view.dart';
 import 'package:vnu_core/modules/profile/views/vcore_profile_avatar_widget.dart';
@@ -23,6 +28,100 @@ import 'package:flutter/foundation.dart';
 
 class VcoreProfileView extends GetView<VcoreProfileController> {
   const VcoreProfileView({super.key});
+
+  void _startFastLogout(BuildContext context) {
+    final Stopwatch totalWatch = Stopwatch()..start();
+    final String accessTokenSnapshot = Globals().token.trim();
+
+    dlog(
+      '[P1A_DIAG][LOGOUT_UI][CONFIRMED_FAST] '
+      'tokenPresent=${accessTokenSnapshot.isNotEmpty}',
+    );
+
+    // Phase 1: synchronous only. Invalidate authenticated RAM state and leave
+    // the current screen immediately. No HTTP, secure-storage or FCM await is
+    // allowed before navigation.
+    final List<String> topicSnapshot = Globals().clearSessionMemory(
+      deleteUserLogin: false,
+    );
+    ApiRepository().setToken('');
+
+    // Phase 2 is scheduled after the current UI stack unwinds. The logout gate
+    // is armed now, so an extremely fast re-login waits for old secure-storage
+    // deletes/server revocation instead of racing them.
+    final Future<void> criticalLogout = Future<void>.delayed(
+      Duration.zero,
+      () async {
+        final Stopwatch serverWatch = Stopwatch()..start();
+        final Future<void> serverLogout = ApiRepository()
+            .signOutWithAccessToken(accessTokenSnapshot)
+            .timeout(const Duration(seconds: 3))
+            .then<void>((_) {
+              dlog(
+                '[P1A_DIAG][LOGOUT_UI][SERVER_BACKGROUND_DONE] '
+                'elapsedMs=${serverWatch.elapsedMilliseconds}',
+              );
+            })
+            .catchError((Object error, StackTrace stackTrace) {
+              logError(
+                '[P1A_DIAG][LOGOUT_UI][SERVER_BACKGROUND_ERROR] '
+                'type=${error.runtimeType} '
+                'elapsedMs=${serverWatch.elapsedMilliseconds}\n$stackTrace',
+              );
+            });
+
+        final Stopwatch storageWatch = Stopwatch()..start();
+        final Future<void> storageCleanup = Globals()
+            .clearSessionStorage(deleteUserLogin: false)
+            .then<void>((_) {
+              dlog(
+                '[P1A_DIAG][LOGOUT_UI][STORAGE_BACKGROUND_DONE] '
+                'elapsedMs=${storageWatch.elapsedMilliseconds}',
+              );
+            })
+            .catchError((Object error, StackTrace stackTrace) {
+              logError(
+                '[P1A_DIAG][LOGOUT_UI][STORAGE_BACKGROUND_ERROR] '
+                'type=${error.runtimeType} '
+                'elapsedMs=${storageWatch.elapsedMilliseconds}\n$stackTrace',
+              );
+            });
+
+        await Future.wait<void>(<Future<void>>[serverLogout, storageCleanup]);
+        dlog(
+          '[P1A_DIAG][LOGOUT_UI][CRITICAL_BACKGROUND_DONE] '
+          'elapsedMs=${totalWatch.elapsedMilliseconds}',
+        );
+      },
+    );
+    SessionLogoutGate.begin(criticalLogout);
+
+    // FCM unsubscribe is explicitly non-critical and scheduled after this
+    // frame. It does not block navigation or new-login safety cleanup.
+    unawaited(
+      Future<void>.delayed(
+        Duration.zero,
+        () => Globals().unsubscribeTopics(topicSnapshot),
+      ),
+    );
+
+    if (context.mounted) {
+      dlog(
+        '[P1A_DIAG][LOGOUT_UI][NAVIGATE_IMMEDIATE] '
+        'elapsedMs=${totalWatch.elapsedMilliseconds}',
+      );
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const VcoreAdmissionView()),
+        (route) => false,
+      );
+    } else {
+      dlog(
+        '[P1A_DIAG][LOGOUT_UI][NAVIGATE_SKIPPED] '
+        'reason=context_unmounted elapsedMs=${totalWatch.elapsedMilliseconds}',
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -375,14 +474,7 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
                         cancelStr: "Đóng",
                         withoutBinding: true,
                         callBackOK: () {
-                          Globals().clearSession(deleteUserLogin: false);
-                          Navigator.pushAndRemoveUntil(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const VcoreAdmissionView(),
-                            ),
-                            (route) => false,
-                          );
+                          _startFastLogout(context);
                         },
                       );
                     },

@@ -2,11 +2,14 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:uuid/uuid.dart';
 import 'package:vnu_core/common/log.dart';
+import 'package:vnu_core/common/session_logout_gate.dart';
 import 'package:vnu_core/constants/enum.dart';
 import 'package:vnu_core/data_request/phan_anh_hien_truong_request.dart';
 import 'package:vnu_core/data_request/tao_hoi_dap_request.dart';
 import 'package:vnu_core/models/box_service_model.dart';
+import 'package:vnu_core/modules/idp_auth/services/idp_client_metadata_service.dart';
 import 'package:vnu_core/services/app_config_service.dart';
 import 'package:vnu_core/services/services_url.dart';
 
@@ -69,6 +72,8 @@ class ApiRepository {
     String password,
     String deviceToken,
   ) async {
+    await SessionLogoutGate.waitForCriticalLogout();
+
     final response = await _dio.post<Map<String, dynamic>>(
       '/api/auth/signin',
       data: {
@@ -174,8 +179,70 @@ class ApiRepository {
     );
   }
 
-  Future<BaseResponse> signOut() {
-    return _apiClient.signOut();
+  /// Đăng xuất server-side bằng token hiện tại.
+  Future<void> signOut() {
+    return signOutWithAccessToken(Globals().token);
+  }
+
+  /// Đăng xuất server-side bằng snapshot access token truyền vào.
+  ///
+  /// User-triggered fast logout clears Globals().token before the background
+  /// HTTP request actually runs, therefore this method MUST NOT re-read the
+  /// global token. Request-specific Authorization also survives setToken('').
+  /// Backend returns HTTP 204 No Content, so the response body is ignored.
+  Future<void> signOutWithAccessToken(String tokenSnapshot) async {
+    final String accessToken = tokenSnapshot.trim();
+    if (accessToken.isEmpty) {
+      dlog('[P0_DIAG][LOGOUT_FLUTTER][SKIP] reason=no_access_token');
+      return;
+    }
+
+    final String traceId = const Uuid().v4();
+    final String flowId = const Uuid().v4();
+    final Map<String, dynamic> clientHeaders =
+        await IdpClientMetadataService().headers(
+      requestId: traceId,
+      flowId: flowId,
+    );
+    final Stopwatch stopwatch = Stopwatch()..start();
+    dlog(
+      '[P1A_DIAG][LOGOUT_FLUTTER][REQUEST] flowId=$flowId rid=$traceId '
+      'endpoint=/api/auth/signout accessTokenLength=${accessToken.length}',
+      wrapWidth: 1000,
+    );
+
+    try {
+      final Response<void> response = await _dio.post<void>(
+        '/api/auth/signout',
+        options: Options(
+          sendTimeout: const Duration(seconds: 2),
+          receiveTimeout: const Duration(seconds: 2),
+          headers: <String, dynamic>{
+            ...clientHeaders,
+            'Accept': 'application/json',
+            'Authorization': 'Bearer $accessToken',
+          },
+        ),
+      );
+      final String backendRid =
+          response.headers.value('X-Request-Id')?.trim() ?? traceId;
+      dlog(
+        '[P1A_DIAG][LOGOUT_FLUTTER][RESPONSE] flowId=$flowId rid=$backendRid '
+        'status=${response.statusCode} elapsedMs=${stopwatch.elapsedMilliseconds}',
+        wrapWidth: 1000,
+      );
+    } on DioException catch (error, stackTrace) {
+      final String backendRid = _diagRequestId(error.response, traceId);
+      dlog(
+        '[P1A_DIAG][LOGOUT_FLUTTER][ERROR] flowId=$flowId rid=$backendRid '
+        'status=${error.response?.statusCode} dioType=${error.type} '
+        'elapsedMs=${stopwatch.elapsedMilliseconds} '
+        'body=${_diagSafeBody(error.response?.data)}',
+        wrapWidth: 1000,
+      );
+      _diagStack('[P0_DIAG][LOGOUT_FLUTTER][STACK]', stackTrace);
+      rethrow;
+    }
   }
 
   Future<CurrentUserModel> getCurrentUser() {
@@ -1355,16 +1422,77 @@ class ApiRepository {
   }
 
   Future<void> applicantSignout() async {
-    await _dio.post<void>(
-      '/api/applicant/auth/signout',
-      options: Options(
-        headers: {
-          'Accept': 'application/json',
-          if (Globals().token.isNotEmpty)
-            'Authorization': 'Bearer ${Globals().token}',
-        },
-      ),
+    final String traceId = const Uuid().v4();
+    final Stopwatch stopwatch = Stopwatch()..start();
+    dlog(
+      '[P0_DIAG][APPLICANT_LOGOUT_FLUTTER][REQUEST] rid=$traceId '
+      'endpoint=/api/applicant/auth/signout tokenPresent=${Globals().token.isNotEmpty}',
+      wrapWidth: 1000,
     );
+    try {
+      final Response<void> response = await _dio.post<void>(
+        '/api/applicant/auth/signout',
+        options: Options(
+          headers: {
+            'Accept': 'application/json',
+            'X-Request-Id': traceId,
+            if (Globals().token.isNotEmpty)
+              'Authorization': 'Bearer ${Globals().token}',
+          },
+        ),
+      );
+      dlog(
+        '[P0_DIAG][APPLICANT_LOGOUT_FLUTTER][RESPONSE] '
+        'rid=${response.headers.value('X-Request-Id')?.trim() ?? traceId} '
+        'status=${response.statusCode} elapsedMs=${stopwatch.elapsedMilliseconds}',
+        wrapWidth: 1000,
+      );
+    } on DioException catch (error, stackTrace) {
+      dlog(
+        '[P0_DIAG][APPLICANT_LOGOUT_FLUTTER][ERROR] '
+        'rid=${_diagRequestId(error.response, traceId)} '
+        'status=${error.response?.statusCode} dioType=${error.type} '
+        'elapsedMs=${stopwatch.elapsedMilliseconds} '
+        'body=${_diagSafeBody(error.response?.data)}',
+        wrapWidth: 1000,
+      );
+      _diagStack('[P0_DIAG][APPLICANT_LOGOUT_FLUTTER][STACK]', stackTrace);
+      rethrow;
+    }
+  }
+
+  String _diagRequestId(Response<dynamic>? response, String fallback) {
+    if (response == null) return fallback;
+    final dynamic data = response.data;
+    if (data is Map) {
+      final String value =
+          (data['requestId'] ?? data['request_id'])?.toString().trim() ?? '';
+      if (value.isNotEmpty) return value;
+    }
+    final String header = response.headers.value('X-Request-Id')?.trim() ?? '';
+    return header.isEmpty ? fallback : header;
+  }
+
+  String _diagSafeBody(dynamic data) {
+    if (data == null) return 'null';
+    String raw;
+    try {
+      raw = data is String ? data : jsonEncode(data);
+    } catch (_) {
+      raw = data.toString();
+    }
+    final String safe = sanitizeLogMessage(raw).replaceAll(RegExp(r'\s+'), ' ');
+    return safe.length <= 600 ? safe : '${safe.substring(0, 600)}...[truncated]';
+  }
+
+  void _diagStack(String tag, StackTrace stackTrace) {
+    final String compact = stackTrace
+        .toString()
+        .split('\n')
+        .where((String line) => line.trim().isNotEmpty)
+        .take(8)
+        .join(' | ');
+    dlog('$tag $compact', wrapWidth: 1000);
   }
 
   void dispose() {

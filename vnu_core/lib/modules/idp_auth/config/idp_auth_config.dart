@@ -1,23 +1,31 @@
-/// Constants that belong to the app-side callback protocol only.
+/// App-side constants for the ONEVNU IDP callback protocol.
 ///
-/// IDP hosts and start URLs are runtime configuration from GET /api/config.
-/// Do not add compile-time IDP/admin URLs back here: that would allow Flutter
-/// to disagree with the server's current login mode.
+/// The OAuth redirect_uri remains the BACKEND callback. The final redirect from
+/// backend -> app carries only a one-time ONEVNU login ticket.
+///
+/// P0 WebView mode accepts both:
+/// - onevnu://idp/callback            (current server runtime)
+/// - https://onevnu-admin.vnu.edu.vn/idp/callback (verified HTTPS transition)
 class IdpAuthConfig {
   const IdpAuthConfig._();
 
-  static const String callbackScheme = 'onevnu';
-  static const String callbackHost = 'idp';
-  static const String callbackPath = '/callback';
+  static const String callbackScheme = 'https';
+  static const String callbackHost = 'onevnu-admin.vnu.edu.vn';
+  static const String callbackPath = '/idp/callback';
 
-  /// TEMP ONLY - ép màn đăng nhập mở thẳng IDP test để kiểm tra UI.
+  static const String webViewCallbackScheme = 'onevnu';
+  static const String webViewCallbackHost = 'idp';
+  static const String webViewCallbackPath = '/callback';
+
+  static const Duration callbackTimeout = Duration(minutes: 6);
+
+  /// TEMP TEST hook kept disabled. Runtime IDP mode still comes from /api/config.
   ///
-  /// ĐỂ QUAY VỀ LUỒNG API BAN ĐẦU: chỉ comment đúng dòng gán URL bên dưới.
-  /// Khi dòng đó bị comment, getter trả null; Login V3/V4 và IdpAuthFlow
-  /// sẽ lại lấy phương thức + idpStartUrl từ GET /api/config.
+  /// IMPORTANT: never set this to /api/auth/idp/mobile/start in P0 because that
+  /// endpoint requires deviceId + bindingChallenge. Production login must first
+  /// call POST /api/auth/idp/init through IdpAuthRepository.
   static String? get temporaryTestStartUrl {
     String? url;
-    // url = 'https://idp.vnu.edu.vn'; // TEMP TEST: COMMENT DÒNG NÀY ĐỂ VỀ API
     return url;
   }
 
@@ -27,8 +35,19 @@ class IdpAuthConfig {
   }
 
   static bool isAppCallback(Uri uri) {
-    return uri.scheme == callbackScheme &&
-        uri.host == callbackHost &&
+    final String scheme = uri.scheme.toLowerCase();
+    final String host = uri.host.toLowerCase();
+
+    final bool currentWebViewCallback =
+        scheme == webViewCallbackScheme &&
+        host == webViewCallbackHost &&
+        uri.path == webViewCallbackPath;
+
+    final bool verifiedHttpsCallback =
+        scheme == callbackScheme &&
+        host == callbackHost &&
         uri.path == callbackPath;
+
+    return currentWebViewCallback || verifiedHttpsCallback;
   }
 }
