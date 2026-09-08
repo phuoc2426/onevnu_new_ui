@@ -245,6 +245,22 @@ class ApiRepository {
     }
   }
 
+  /// Lightweight server-side auth-session check used on app startup/resume.
+  /// 401 is intentionally allowed to pass through DioOptions.ApiInterceptor,
+  /// which fires the existing TokenExpiredEvent and fast-logout path.
+  Future<Map<String, dynamic>> getSessionStatus() async {
+    final Response<Map<String, dynamic>> response =
+        await _dio.get<Map<String, dynamic>>(
+      '/api/auth/session/status',
+      options: Options(
+        receiveTimeout: const Duration(seconds: 5),
+        sendTimeout: const Duration(seconds: 5),
+        headers: const <String, dynamic>{'Accept': 'application/json'},
+      ),
+    );
+    return response.data ?? <String, dynamic>{};
+  }
+
   Future<CurrentUserModel> getCurrentUser() {
     return _apiClient.getCurrentUser();
   }

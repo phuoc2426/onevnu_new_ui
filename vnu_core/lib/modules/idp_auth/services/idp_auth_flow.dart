@@ -105,6 +105,12 @@ class IdpAuthFlow {
         );
       }
 
+      _sessionTrace(
+        'WEBVIEW_CALLBACK_OK',
+        'flowId=$effectiveFlowId forceLogin=$forceLogin '
+        'ticketPresent=${callback.ticket != null && callback.ticket!.isNotEmpty}',
+      );
+
       final Stopwatch redeemWatch = Stopwatch()..start();
       if (forceLogin) {
         await IdpAuthRepository().redeemReauthTicket(
@@ -117,6 +123,10 @@ class IdpAuthFlow {
           'REAUTH_REDEEM_DONE',
           'elapsedMs=${redeemWatch.elapsedMilliseconds} '
           'totalMs=${total.elapsedMilliseconds}',
+        );
+        _sessionTrace(
+          'REAUTH_REDEEM_OK',
+          'flowId=$effectiveFlowId elapsedMs=${redeemWatch.elapsedMilliseconds}',
         );
         return true;
       }
@@ -131,6 +141,10 @@ class IdpAuthFlow {
         'REDEEM_DONE',
         'elapsedMs=${redeemWatch.elapsedMilliseconds}',
       );
+      _sessionTrace(
+        'ONEVNU_REDEEM_OK',
+        'flowId=$effectiveFlowId elapsedMs=${redeemWatch.elapsedMilliseconds}',
+      );
 
       final Stopwatch sessionWatch = Stopwatch()..start();
       await IdpOneVnuSessionService().apply(response);
@@ -138,6 +152,10 @@ class IdpAuthFlow {
         'SESSION_APPLIED',
         'elapsedMs=${sessionWatch.elapsedMilliseconds} '
         'totalMs=${total.elapsedMilliseconds}',
+      );
+      _sessionTrace(
+        'ONEVNU_SESSION_READY',
+        'flowId=$effectiveFlowId totalMs=${total.elapsedMilliseconds}',
       );
       return true;
     } catch (error, stackTrace) {
@@ -153,6 +171,11 @@ class IdpAuthFlow {
 
   void _trace(String event, String details) {
     dlog('[P0_DIAG][IDP_FLOW][$event] $details', wrapWidth: 1000);
+  }
+
+  void _sessionTrace(String event, String details) {
+    // Diagnostic-only correlation marker. Keycloak sid/sub/tokens stay backend-only.
+    dlog('[P1B_SESSION][FLUTTER][$event] $details', wrapWidth: 1000);
   }
 
   void _traceStack(StackTrace stackTrace) {

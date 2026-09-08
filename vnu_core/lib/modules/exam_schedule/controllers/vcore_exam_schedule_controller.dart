@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:vnu_core/common/error/app_feedback.dart';
-import 'package:vnu_core/common/academic_period_config.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
@@ -49,8 +48,6 @@ class VcoreExamScheduleController extends GetxController {
   RxBool showExtraTermCourses = false.obs;
   bool skipAutoSelectNearest = false;
   ScheduleOverrideConfig scheduleOverrideConfig = ScheduleOverrideConfig.empty();
-  AcademicPeriodConfig academicPeriodConfig = AcademicPeriodConfig.projectDefault();
-  RxBool hasPersonalAcademicPeriodOverride = false.obs;
 
   // Mỗi lần tải lịch có một generation riêng. Response/cache của generation
   // cũ không được phép ghi đè state của học kỳ mới.
@@ -210,6 +207,11 @@ class VcoreExamScheduleController extends GetxController {
     return text.isEmpty ? '?' : text;
   }
 
+  String _lessonLabel(String? value) {
+    final text = value?.trim() ?? '';
+    return text.isEmpty ? '?' : 'Tiết $text';
+  }
+
   String _buildExamLocation(LichThiHocKyModel exam) {
     final room = _unknownIfBlank(exam.phongThi);
     final address = exam.diaChi?.trim() ?? '';
@@ -249,10 +251,6 @@ class VcoreExamScheduleController extends GetxController {
     return teachers.isEmpty ? '?' : teachers;
   }
 
-  String _lessonLabel(String? value) {
-    final text = value?.trim() ?? '';
-    return text.isEmpty ? '?' : 'Tiết $text';
-  }
 
   HocKyDateRange _classDateRange({
     required HocKyModel sem,
@@ -292,28 +290,8 @@ class VcoreExamScheduleController extends GetxController {
     required ScheduleCourseOverride? override,
     bool fromExtraTerm = false,
   }) {
-    final globalRange = academicPeriodConfig.resolveLessonRange(
-      classSession.tietBatDau,
-      classSession.tietKetThuc,
-    );
-
-    final overrideStart = _unknownIfBlank(override?.startTime);
-    final overrideEnd = _unknownIfBlank(override?.endTime);
-    final hasOverrideStart = overrideStart != '?';
-    final hasOverrideEnd = overrideEnd != '?';
-
-    final actualStartTime = hasOverrideStart
-        ? overrideStart
-        : (globalRange?.startTime ?? '?');
-    final actualEndTime = hasOverrideEnd
-        ? overrideEnd
-        : hasOverrideStart
-            ? (AcademicPeriodConfig.addMinutes(
-                  overrideStart,
-                  academicPeriodConfig.lessonDurationMinutes,
-                ) ?? globalRange?.endTime ?? '?')
-            : (globalRange?.endTime ?? '?');
-
+    // Giữ nguyên số tiết từ dữ liệu thời khóa biểu nhưng không quy đổi tiết sang giờ.
+    // startTime/endTime ở classSession chỉ là nhãn tiết; actualStart/End không được dựng.
     return ScheduleEvent(
       type: ScheduleType.classSession,
       title: _unknownIfBlank(classSession.tenHocPhan) == '?'
@@ -327,8 +305,8 @@ class VcoreExamScheduleController extends GetxController {
       hocPhanCode: _unknownIfBlank(classSession.maHocPhan),
       soTinChi: _unknownIfBlank(classSession.soTinChi),
       nhom: _unknownIfBlank(classSession.nhom),
-      actualStartTime: actualStartTime == '?' ? null : actualStartTime,
-      actualEndTime: actualEndTime == '?' ? null : actualEndTime,
+      actualStartTime: null,
+      actualEndTime: null,
       fromExtraTerm: fromExtraTerm,
       sourceNote: fromExtraTerm ? 'Kỳ phụ' : null,
     );
@@ -796,18 +774,8 @@ class VcoreExamScheduleController extends GetxController {
   Future<void> refreshData() => _loadData();
 
   Future<void> _loadData() async {
-    // One resolver supplies the exact same clock values to Home and Calendar.
-    // Server -> LKG cache on network failure -> exact project default.
-    final periodRepository = AcademicPeriodConfigRepository();
-    academicPeriodConfig = await periodRepository.load();
-    hasPersonalAcademicPeriodOverride.value =
-        await periodRepository.hasPersonalOverride();
-    logInfo(
-      '[SCHEDULE_PERIOD_CONFIG] action=apply_to_controller '
-      'personal=${hasPersonalAcademicPeriodOverride.value} '
-      'duration=${academicPeriodConfig.lessonDurationMinutes} '
-      'break=${academicPeriodConfig.defaultBreakMinutes}',
-    );
+    // Không nạp hay áp dụng cấu hình giờ học cho lịch học.
+    // Lịch thi tiếp tục dùng giờ thi thật từ API.
     final sem = hocKySelected.value;
     if (sem == null) {
       _invalidateScheduleLoads('load-without-semester');
@@ -1205,113 +1173,11 @@ class VcoreExamScheduleController extends GetxController {
     _keepSelectedDayInsideCurrentRange();
     update();
     logSuccess('[SCHEDULE_ADJUST] action=clear_term_range status=success');
-    snackBarSuccess('\u0110\u00e3 kh\u00f4i ph\u1ee5c th\u1eddi gian t\u1eeb h\u1ec7 th\u1ed1ng.');
+    snackBarSuccess('Đã khôi phục ngày học kỳ từ hệ thống.');
   }
 
-  /// Lưu đồng thời khoảng ngày + cấu hình giờ tiết cá nhân trên app.
-  /// Không đóng sheet; eventsMap được regenerate ngay.
-  Future<bool> savePersonalScheduleAdjustments({
-    required DateTime startDate,
-    required DateTime endDate,
-    required AcademicPeriodConfig periodConfig,
-  }) async {
-    final sem = hocKySelected.value;
-    if (sem == null) return false;
-
-    final start = HocKyDateHelper.dateOnly(startDate);
-    final end = HocKyDateHelper.dateOnly(endDate);
-    if (end.isBefore(start)) {
-      snackBarError('Ngày kết thúc phải từ ngày bắt đầu trở đi.');
-      logWarning(
-        '[SCHEDULE_ADJUST] action=save_all status=rejected reason=invalid_range',
-      );
-      return false;
-    }
-
-    logInfo(
-      '[SCHEDULE_ADJUST] action=save_all status=started '
-      'semester=${sem.id ?? sem.ten ?? '-'} scope=$_termOverrideScope '
-      'start=${_formatIsoDate(start)} end=${_formatIsoDate(end)} '
-      'duration=${periodConfig.lessonDurationMinutes} '
-      'break=${periodConfig.defaultBreakMinutes}',
-    );
-
-    final normalizedPeriods = periodConfig.copyWith(
-      configured: true,
-      enabled: true,
-      version: 'personal-v1',
-      updatedAt: DateTime.now(),
-    );
-
-    final periodSaved =
-        await AcademicPeriodConfigRepository().savePersonal(normalizedPeriods);
-    if (!periodSaved) {
-      logError(
-        '[SCHEDULE_ADJUST] action=save_all status=failed step=period_cache',
-      );
-      snackBarError('Không thể lưu cấu hình giờ tiết. Vui lòng thử lại.');
-      return false;
-    }
-
-    scheduleOverrideConfig = scheduleOverrideConfig.withTermOverride(
-      sem,
-      ScheduleTermOverride(
-        startDate: _formatIsoDate(start),
-        endDate: _formatIsoDate(end),
-      ),
-      scope: _termOverrideScope,
-    );
-    await ScheduleOverrideConfigCache().save(scheduleOverrideConfig);
-
-    academicPeriodConfig = normalizedPeriods;
-    hasPersonalAcademicPeriodOverride.value = true;
-    _generateEventsMap(sem);
-    _keepSelectedDayInsideCurrentRange();
-    update();
-
-    logSuccess(
-      '[SCHEDULE_ADJUST] action=save_all status=success '
-      'start=${_formatIsoDate(start)} end=${_formatIsoDate(end)} '
-      'periods=${normalizedPeriods.maxPeriods}',
-    );
-    snackBarSuccess('Đã lưu điều chỉnh lịch học.');
-    return true;
-  }
-
-  /// Xóa toàn bộ điều chỉnh cá nhân của màn lịch và regenerate ngay.
-  Future<bool> restorePersonalScheduleDefaults() async {
-    final sem = hocKySelected.value;
-    if (sem == null) return false;
-
-    logInfo(
-      '[SCHEDULE_ADJUST] action=restore_all status=started '
-      'semester=${sem.id ?? sem.ten ?? '-'} scope=$_termOverrideScope',
-    );
-
-    scheduleOverrideConfig = scheduleOverrideConfig.withTermOverride(
-      sem,
-      null,
-      scope: _termOverrideScope,
-    );
-    await ScheduleOverrideConfigCache().save(scheduleOverrideConfig);
-
-    final repository = AcademicPeriodConfigRepository();
-    await repository.clearPersonal();
-    academicPeriodConfig = await repository.load(ignorePersonal: true);
-    hasPersonalAcademicPeriodOverride.value = false;
-
-    _generateEventsMap(sem);
-    _keepSelectedDayInsideCurrentRange();
-    update();
-
-    logSuccess(
-      '[SCHEDULE_ADJUST] action=restore_all status=success '
-      'duration=${academicPeriodConfig.lessonDurationMinutes} '
-      'break=${academicPeriodConfig.defaultBreakMinutes}',
-    );
-    snackBarSuccess('Đã khôi phục lịch học mặc định.');
-    return true;
-  }
+  // Cấu hình giờ học đã bị loại bỏ khỏi chức năng lịch học.
+  // Chỉ giữ override ngày bắt đầu/kết thúc học kỳ.
 
   String _formatIsoDate(DateTime date) {
     final y = date.year.toString().padLeft(4, '0');
@@ -1531,4 +1397,5 @@ class VcoreExamScheduleController extends GetxController {
     updateSelectedEvents();
   }
 }
+
 

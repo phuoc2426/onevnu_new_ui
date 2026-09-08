@@ -18,6 +18,7 @@ import 'package:vnu_core/modules/sync/views/vcore_sync_view.dart';
 import 'package:vnu_core/modules/sync/vneid_deep_link_service.dart';
 import 'package:vnu_core/modules/tabbar/views/vcore_tabbar_view.dart';
 import 'package:vnu_core/services/app_update_coordinator.dart';
+import 'package:vnu_core/services/session_status_coordinator.dart';
 import 'package:vnu_core/vnu_core.dart';
 import 'package:vnu_noi_tru/vnu_noi_tru.dart';
 
@@ -104,6 +105,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
     unawaited(_initAppLinks());
     unawaited(_initializeNotificationRuntime());
+    unawaited(SessionStatusCoordinator.instance.onStartup());
   }
 
   Future<void> _initializeNotificationRuntime() async {
@@ -128,6 +130,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       // background -> foreground transition. If the installed version is still
       // below minimumVersion, the global gate remains blocking.
       unawaited(AppUpdateCoordinator.instance.onAppResumed());
+      unawaited(SessionStatusCoordinator.instance.onAppResumed());
     }
   }
 
