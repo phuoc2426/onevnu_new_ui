@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'dart:math';
 
 import 'package:app_links/app_links.dart';
@@ -21,7 +20,7 @@ import 'package:vnu_core/services/app_update_coordinator.dart';
 import 'package:vnu_core/services/session_status_coordinator.dart';
 import 'package:vnu_core/vnu_core.dart';
 import 'package:vnu_noi_tru/vnu_noi_tru.dart';
-
+import 'dart:io' show Platform;
 // Nếu cần bật DevicePreview thì mở lại import này.
 // import 'package:device_preview/device_preview.dart';
 
@@ -30,33 +29,9 @@ import 'package:vnu_noi_tru/vnu_noi_tru.dart';
 /// would split guide state between the root tabbar and pushed routes.
 Widget _buildMainScreen() => const VcoreTabbarView();
 
-/// LEGACY TLS MODE - GLOBAL BYPASS.
-///
-/// This restores the old permissive behavior for every Dart `HttpClient`
-/// created in the main isolate. It therefore also covers clients that do NOT
-/// use `DioOptions`, for example raw `Dio()`, package:http IO clients,
-/// downloads and image/cache requests backed by dart:io.
-///
-/// WARNING: this accepts invalid, expired, self-signed and otherwise
-/// untrusted certificates for every HTTPS host reached through dart:io.
-class _OneVnuLegacyTlsHttpOverrides extends HttpOverrides {
-  @override
-  HttpClient createHttpClient(SecurityContext? context) {
-    final HttpClient client = super.createHttpClient(context);
-    client.badCertificateCallback = (
-      X509Certificate certificate,
-      String host,
-      int port,
-    ) => true;
-    return client;
-  }
-}
-
 Future<void> main() async {
-  // Install before AppBootstrap so all Dart HTTP created during startup and
-  // later runtime uses the legacy permissive TLS behavior.
-  HttpOverrides.global = _OneVnuLegacyTlsHttpOverrides();
-
+  // Use the platform/default TLS trust behavior. Do not install a global
+  // bad-certificate override: Android/iOS decide certificate trust normally.
   final bootstrap = await AppBootstrap.initialize();
   runApp(
     MyApp(
@@ -433,3 +408,4 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     );
   }
 }
+

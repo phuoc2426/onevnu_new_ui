@@ -1016,6 +1016,10 @@ class VcoreExamScheduleController extends GetxController {
       // Dart weekday representation: 1 = Monday, ..., 7 = Sunday
       // ngayTrongTuan mapping matches: '1' is Thứ 2 (Monday), ..., '7' is Chủ nhật (Sunday)
       int targetWeekday = ngayTrongTuan;
+      if (targetWeekday < DateTime.monday ||
+          targetWeekday > DateTime.sunday) {
+        continue;
+      }
 
       final classRange = _classDateRange(
         sem: sem,
@@ -1026,25 +1030,25 @@ class VcoreExamScheduleController extends GetxController {
         defaultEnd: endDate,
       );
 
-      for (var date = classRange.start;
-      date.isBefore(classRange.end) || date.isAtSameMomentAs(classRange.end);
-      date = date.add(const Duration(days: 1))) {
-        if (date.weekday == targetWeekday) {
-          final key = _normalizeDate(date);
+      // Jump directly to the first matching weekday, then advance by 7 days.
+      // This avoids scanning every day of the semester for every class.
+      final firstDate = _normalizeDate(classRange.start);
+      final lastDate = _normalizeDate(classRange.end);
+      final daysUntilTarget = (targetWeekday - firstDate.weekday + 7) % 7;
+      var date = firstDate.add(Duration(days: daysUntilTarget));
 
-          final event = _buildClassEvent(
-            sem: sem,
-            classSession: classSession,
-            date: date,
-            override: override,
-          );
+      while (!date.isAfter(lastDate)) {
+        final key = _normalizeDate(date);
 
-          if (!tempMap.containsKey(key)) {
-            tempMap[key] = [];
-          }
+        final event = _buildClassEvent(
+          sem: sem,
+          classSession: classSession,
+          date: date,
+          override: override,
+        );
 
-          tempMap[key]!.add(event);
-        }
+        (tempMap[key] ??= []).add(event);
+        date = date.add(const Duration(days: 7));
       }
     }
 
@@ -1397,5 +1401,6 @@ class VcoreExamScheduleController extends GetxController {
     updateSelectedEvents();
   }
 }
+
 
 

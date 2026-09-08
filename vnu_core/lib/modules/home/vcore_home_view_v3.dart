@@ -22,6 +22,7 @@ import 'package:vnu_core/modules/cam_nang/views/vcore_cam_nang_view.dart';
 import 'package:vnu_core/modules/course_points/views/vcore_course_points_view.dart';
 import 'package:vnu_core/modules/exam_schedule/views/vcore_exam_schedule_view.dart';
 import 'package:vnu_core/modules/home/vcore_home_controller.dart';
+import 'package:vnu_core/models/thoi_khoa_bieu_model.dart';
 import 'package:vnu_core/modules/inmapz/vcore_immap_view.dart';
 import 'package:vnu_core/modules/motel/vcore_motel_webview.dart';
 import 'package:vnu_core/modules/news/views/vcore_news_detail_view.dart';
@@ -1654,11 +1655,29 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
     );
   }
 
+  void _openScheduleView({DateTime? initialDate}) {
+    debugPrint(
+      '[HOME_TKB] open schedule list-only initialDate=${initialDate?.toIso8601String() ?? 'none'}',
+    );
+
+    Get.to(
+      () => VcoreExamScheduleView(
+        initialDate: initialDate,
+        initialHocKyId: widget.controller.currentScheduleHocKyId,
+        initialKieuTruong: widget.controller.currentScheduleKieuTruong,
+        showInitialNotice: true,
+      ),
+    )?.then((_) {
+      widget.controller.fetchScheduleData();
+    });
+  }
+
   Widget _buildOverview() {
     return Obx(() {
-      // Cùng nguồn eventsMap với màn "Lịch học & lịch thi".
-      final todayClassCount =
-          widget.controller.getTodayClassEvents().length.toString();
+      // Không dùng eventsMap/date-range để tuyên bố "tiết học hôm nay".
+      // Khi nguồn TKB chỉ có thứ + tiết, Home chỉ hiển thị số dòng TKB tuần.
+      final weeklyClassCount =
+          widget.controller.listThoiKhoaBieu.length.toString();
       final todayExamCount =
           widget.controller.getTodayExamEvents().length.toString();
       final notifyCount =
@@ -1677,8 +1696,8 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
       final items = [
         _OverviewItem(
           Icons.menu_book_rounded,
-          todayClassCount,
-          'Tiết học\nhôm nay',
+          weeklyClassCount,
+          'Lịch học\ntheo thứ',
           AppColors.overviewGreen,
         ),
         _OverviewItem(
@@ -1727,34 +1746,11 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                   child: GestureDetector(
                     onTap: () {
                       if (index == 0) {
-                        // Nếu hôm nay thực sự có lịch thì mở đúng hôm nay.
-                        // Nếu không có, đưa sinh viên tới buổi học gần nhất thay vì
-                        // mở một ngày trống trên calendar.
-                        final hasClassToday = widget.controller
-                            .getTodayClassEvents()
-                            .isNotEmpty;
-                        final targetDate = hasClassToday
-                            ? DateTime.now()
-                            : widget.controller
-                                    .getNearestUpcomingClassEventDate() ??
-                                DateTime.now();
-
-                        Get.to(
-                          () => VcoreExamScheduleView(
-                            initialDate: targetDate,
-                            initialHocKyId:
-                                widget.controller.currentScheduleHocKyId,
-                            initialKieuTruong:
-                                widget.controller.currentScheduleKieuTruong,
-                          ),
-                        )?.then((_) {
-                          // Có thể sinh viên vừa chỉnh khoảng ngày học trong màn lịch.
-                          // Tải lại để phần Home dùng cùng một mốc thời gian.
-                          widget.controller.fetchScheduleData();
-                        });
+                        // Class date is intentionally not inferred anymore.
+                        _openScheduleView();
                       } else if (index == 1) {
-                        // Tương tự lịch học: nếu hôm nay không thi thì mở kỳ thi
-                        // gần nhất, tránh đưa người dùng vào một ngày calendar trống.
+                        // Exam date is a real per-record field, so it can still
+                        // be used as context when opening the combined screen.
                         final hasExamToday = widget.controller
                             .getTodayExamEvents()
                             .isNotEmpty;
@@ -1763,18 +1759,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                             : widget.controller
                                     .getNearestUpcomingExamEventDate() ??
                                 DateTime.now();
-
-                        Get.to(
-                          () => VcoreExamScheduleView(
-                            initialDate: targetDate,
-                            initialHocKyId:
-                                widget.controller.currentScheduleHocKyId,
-                            initialKieuTruong:
-                                widget.controller.currentScheduleKieuTruong,
-                          ),
-                        )?.then((_) {
-                          widget.controller.fetchScheduleData();
-                        });
+                        _openScheduleView(initialDate: targetDate);
                       } else if (index == 2) {
                         Get.to(() => const VcoreNotifyViewV3())?.then((_) {
                           widget.controller.updateUnreadCounts();
@@ -1919,46 +1904,68 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
   }
 
   Widget _buildUpcomingStudyTimeline() {
-    // Không tự suy luận weekday/ngày nữa. Danh sách này lấy trực tiếp từ
-    // eventsMap mà chính màn Lịch học & lịch thi dùng để vẽ calendar.
-    final upcomingSchedule =
-        widget.controller.getUpcomingClassEvents(days: 120);
+    // LIST-ONLY HOME: đọc trực tiếp listThoiKhoaBieu.
+    // Không dùng getUpcomingClassEvents/getUpcomingClassSchedule vì các hàm đó
+    // cần dựng DateTime cụ thể từ thứ + khoảng học kỳ.
+    final weeklySchedule = _weeklyStudyPreviewItems();
 
     return _schedulePanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _panelTitle('Lịch học sắp tới', hasArrow: true),
-          const SizedBox(height: 12),
+          _panelTitle(
+            'Lịch học sắp tới',
+            hasArrow: true,
+            onTap: () => _openScheduleView(),
+          ),
+          const SizedBox(height: 10),
           Expanded(
-            child: upcomingSchedule.isEmpty
-                ? const Center(
-                    child: Text(
-                      'Không có lịch học sắp tới',
-                      style: TextStyle(
-                        color: Colors.grey,
-                        fontSize: AppFontSizes.small,
+            child: weeklySchedule.isEmpty
+                ? GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => _openScheduleView(),
+                    child: const Center(
+                      child: Text(
+                        'Chưa có dữ liệu lịch học theo thứ',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.grey,
+                          fontSize: AppFontSizes.small,
+                        ),
                       ),
                     ),
                   )
                 : ListView.builder(
-                    itemCount: min(upcomingSchedule.length, 3),
+                    itemCount: min(weeklySchedule.length, 3),
                     padding: EdgeInsets.zero,
                     physics: const NeverScrollableScrollPhysics(),
                     itemBuilder: (context, index) {
-                      final event = upcomingSchedule[index];
+                      final item = weeklySchedule[index];
+                      final weekday = _studyWeekdayLabel(item.ngayTrongTuan);
+                      final lesson = _studyLessonRange(
+                        item.tietBatDau,
+                        item.tietKetThuc,
+                      );
+                      final room = item.tenPhong?.trim().isNotEmpty == true
+                          ? item.tenPhong!.trim()
+                          : 'Chưa cập nhật phòng';
 
                       return _timelineItem(
-                        time:
-                            '${DateFormat('dd/MM').format(event.date)} • ${event.displayStartTime}',
-                        title: event.title,
-                        room: event.location,
+                        // Chỉ hiển thị THỨ ở cột thời gian. Không có dd/MM.
+                        time: weekday,
+                        title: item.tenHocPhan?.trim().isNotEmpty == true
+                            ? item.tenHocPhan!.trim()
+                            : 'Học phần chưa cập nhật',
+                        // Tiết là dữ liệu gốc SEC_START/SEC_END nên vẫn giữ;
+                        // không đổi thành giờ đồng hồ.
+                        room: '$lesson • $room',
                         color: index == 0
                             ? const Color(0xFF059669)
                             : index == 1
                             ? const Color(0xFF3B82F6)
                             : const Color(0xFFF59E0B),
-                        isLast: index == min(upcomingSchedule.length, 3) - 1,
+                        isLast: index == min(weeklySchedule.length, 3) - 1,
+                        onTap: () => _openScheduleView(),
                       );
                     },
                   ),
@@ -1966,6 +1973,72 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
         ],
       ),
     );
+  }
+
+  List<ThoiKhoaBieuModel> _weeklyStudyPreviewItems() {
+    final items = List<ThoiKhoaBieuModel>.from(
+      widget.controller.listThoiKhoaBieu,
+    );
+    final currentWeekday = DateTime.now().weekday; // 1=Mon ... 7=Sun
+
+    int weekdayOf(ThoiKhoaBieuModel item) {
+      final value = int.tryParse(item.ngayTrongTuan?.trim() ?? '');
+      if (value == null || value < 1 || value > 7) return 99;
+      return value;
+    }
+
+    int rank(ThoiKhoaBieuModel item) {
+      final weekday = weekdayOf(item);
+      if (weekday == 99) return 99;
+      // Chỉ để sắp xếp pattern tuần từ hôm nay trở đi. Không tạo ngày cụ thể.
+      return (weekday - currentWeekday + 7) % 7;
+    }
+
+    items.sort((a, b) {
+      final rankCompare = rank(a).compareTo(rank(b));
+      if (rankCompare != 0) return rankCompare;
+
+      final weekdayCompare = weekdayOf(a).compareTo(weekdayOf(b));
+      if (weekdayCompare != 0) return weekdayCompare;
+
+      final lessonA = int.tryParse(a.tietBatDau?.trim() ?? '') ?? 999;
+      final lessonB = int.tryParse(b.tietBatDau?.trim() ?? '') ?? 999;
+      final lessonCompare = lessonA.compareTo(lessonB);
+      if (lessonCompare != 0) return lessonCompare;
+
+      return (a.tenHocPhan ?? '').compareTo(b.tenHocPhan ?? '');
+    });
+
+    return items;
+  }
+
+  String _studyWeekdayLabel(String? raw) {
+    switch (raw?.trim()) {
+      case '1':
+        return 'Thứ 2';
+      case '2':
+        return 'Thứ 3';
+      case '3':
+        return 'Thứ 4';
+      case '4':
+        return 'Thứ 5';
+      case '5':
+        return 'Thứ 6';
+      case '6':
+        return 'Thứ 7';
+      case '7':
+        return 'CN';
+      default:
+        return 'Chưa rõ';
+    }
+  }
+
+  String _studyLessonRange(String? start, String? end) {
+    final s = start?.trim() ?? '';
+    final e = end?.trim() ?? '';
+    if (s.isEmpty && e.isEmpty) return 'Chưa cập nhật tiết';
+    if (s.isNotEmpty && e.isNotEmpty) return 'Tiết $s-$e';
+    return 'Tiết ${s.isNotEmpty ? s : e}';
   }
 
   Widget _buildUpcomingExamTimeline() {
@@ -1978,7 +2051,11 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _panelTitle('Lịch thi sắp tới', hasArrow: true),
+          _panelTitle(
+            'Lịch thi sắp tới',
+            hasArrow: true,
+            onTap: () => _openScheduleView(),
+          ),
           const SizedBox(height: 12),
           Expanded(
             child: upcomingExams.isEmpty
@@ -2009,6 +2086,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                             ? const Color(0xFF7C3AED)
                             : const Color(0xFFF97316),
                         isLast: index == min(upcomingExams.length, 3) - 1,
+                        onTap: () => _openScheduleView(),
                       );
                     },
                   ),
@@ -2412,8 +2490,12 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
     );
   }
 
-  Widget _panelTitle(String title, {bool hasArrow = false}) {
-    return Row(
+  Widget _panelTitle(
+    String title, {
+    bool hasArrow = false,
+    VoidCallback? onTap,
+  }) {
+    final content = Row(
       children: [
         Expanded(
           child: Text(
@@ -2434,6 +2516,20 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
             size: 18,
           ),
       ],
+    );
+
+    if (onTap == null) return content;
+    return Semantics(
+      button: true,
+      label: 'Mở $title',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          child: content,
+        ),
+      ),
     );
   }
 
@@ -2519,9 +2615,10 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
     required String room,
     required Color color,
     bool isLast = false,
+    VoidCallback? onTap,
   }) {
-    return ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: 47),
+    final content = ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 58),
       child: IntrinsicHeight(
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2531,74 +2628,106 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                if (!isLast)
+                  if (!isLast)
+                    Positioned(
+                      top: 14,
+                      left: 5,
+                      bottom: -8,
+                      child: Container(
+                        width: 1,
+                        color: Colors.grey.withOpacity(0.32),
+                      ),
+                    ),
                   Positioned(
-                    top: 13,
-                    left: 5,
-                    bottom: -13,
+                    top: 5,
+                    left: 0,
                     child: Container(
-                      width: 1,
-                      color: Colors.grey.withOpacity(0.35),
+                      width: 11,
+                      height: 11,
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                      ),
                     ),
                   ),
-                Positioned(
-                  top: 4,
-                  left: 0,
-                  child: Container(
-                    width: 11,
-                    height: 11,
-                    decoration: BoxDecoration(
-                      color: color,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 4),
-          SizedBox(
-            width: 86,
-            child: Text(
-              time,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: AppColors.homeTextSub,
-                fontSize: AppFontSizes.font11,
-                fontWeight: FontWeight.bold,
+                ],
               ),
             ),
-          ),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppColors.darkNavy,
-                    fontSize: AppFontSizes.small,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  room,
-                  maxLines: 1,
+            const SizedBox(width: 5),
+            SizedBox(
+              width: 58,
+              child: Align(
+                alignment: Alignment.topLeft,
+                child: Text(
+                  time,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: AppColors.homeTextSub,
                     fontSize: AppFontSizes.font11,
+                    height: 1.25,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
-              ],
+              ),
             ),
-          ),
-        ],
+            const SizedBox(width: 7),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 7),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.darkNavy,
+                        fontSize: AppFontSizes.small,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      room,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.homeTextSub,
+                        fontSize: AppFontSizes.font11,
+                        height: 1.25,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (onTap != null) ...[
+              const SizedBox(width: 3),
+              const Align(
+                alignment: Alignment.center,
+                child: Icon(
+                  Icons.chevron_right_rounded,
+                  size: 16,
+                  color: Color(0xFF98A2B3),
+                ),
+              ),
+            ],
+          ],
         ),
+      ),
+    );
+
+    if (onTap == null) return content;
+    return Semantics(
+      button: true,
+      label: 'Mở lịch học và lịch thi',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: content,
       ),
     );
   }
