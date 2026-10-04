@@ -38,14 +38,15 @@ class IdpAuthFlow {
 
   factory IdpAuthFlow() => _instance;
 
-  /// Default transport is Custom Tab. The login screen no longer exposes a
-  /// browser selector; WebView/System Browser remain available only for
-  /// compatibility with explicit internal callers.
+  /// Default transport is the external system browser on both Android and iOS.
+  /// This keeps the VNU SSO flow in Chrome/Safari and avoids platform-specific
+  /// behavior from embedded browser containers. WebView/Custom Tab remain only
+  /// for explicit internal compatibility callers.
   Future<bool> login(
     BuildContext context, {
     bool forceLogin = false,
     String? flowId,
-    IdpBrowserMode browserMode = IdpBrowserMode.customTab,
+    IdpBrowserMode browserMode = IdpBrowserMode.systemBrowser,
     bool skipConfigGate = false,
   }) async {
     final String effectiveFlowId =

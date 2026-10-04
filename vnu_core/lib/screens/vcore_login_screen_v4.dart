@@ -326,7 +326,7 @@ class _VCoreLoginScreenV4State extends State<VCoreLoginScreenV4> {
 
     logInfo(
       '[IDP_LOGIN_CLICK] source=${IdpAuthConfig.loginConfigSourceLabel} '
-      'browserMode=customTab '
+      'browserMode=systemBrowser '
       'screenIdpLogin=${_loginRuntimeConfig.idpLogin}',
     );
 
@@ -335,7 +335,7 @@ class _VCoreLoginScreenV4State extends State<VCoreLoginScreenV4> {
     try {
       final bool success = await IdpAuthFlow().login(
         context,
-        browserMode: IdpBrowserMode.customTab,
+        browserMode: IdpBrowserMode.systemBrowser,
         skipConfigGate: true,
       );
 
