@@ -765,6 +765,33 @@ class ApiRepository {
     return _apiClient.updateSinhVienInfo(sinhvien);
   }
 
+  /// Xác minh CCCD đã quét và đồng bộ MSSV với hồ sơ KTX legacy.
+  ///
+  /// Mobile API tự lấy MSSV từ principal đăng nhập; Flutter không được phép
+  /// gửi studentCode để thay đổi danh tính mục tiêu.
+  Future<Map<String, dynamic>> verifyCccdAndLink({
+    required String identityNo,
+    required String fullName,
+    required DateTime dateOfBirth,
+  }) async {
+    String twoDigits(int value) => value.toString().padLeft(2, '0');
+    final DateTime localDob = dateOfBirth.toLocal();
+    final String dob =
+        '${localDob.year.toString().padLeft(4, '0')}-'
+        '${twoDigits(localDob.month)}-${twoDigits(localDob.day)}';
+
+    final Response<Map<String, dynamic>> response =
+        await _dio.post<Map<String, dynamic>>(
+      '/api/sinhvien/verify-cccd-link',
+      data: <String, dynamic>{
+        'identityNo': identityNo.trim(),
+        'fullName': fullName.trim(),
+        'dob': dob,
+      },
+    );
+    return response.data ?? <String, dynamic>{};
+  }
+
   Future<void> updateDiaChiTamTru(StudentInfoModel sinhvien) {
     final body = {
       "diaChiTamTru": sinhvien.diaChiTamTru,

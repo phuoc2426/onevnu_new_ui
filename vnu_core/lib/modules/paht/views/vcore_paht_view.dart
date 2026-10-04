@@ -23,7 +23,7 @@ class VcorePahtView extends GetView<VcorePahtController> {
       tag: const Uuid().v4(),
       builder: (controller) {
         return VcoreModuleScaffold(
-          title: 'Phản ánh hiện trường',
+          title: 'Phản ánh, góp ý',
           actions: [
             IconButton(
                 onPressed: () {

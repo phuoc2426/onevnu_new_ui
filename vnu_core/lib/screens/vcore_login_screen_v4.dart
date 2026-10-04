@@ -1,4 +1,3 @@
-import 'package:vnu_core/common/error/app_feedback.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -19,20 +18,24 @@ import 'package:vnu_core/modules/admission/controllers/applicant_auth_controller
 import 'package:vnu_core/modules/inmapz/vcore_immap_view.dart';
 import 'package:vnu_core/modules/idp_auth/config/idp_auth_config.dart';
 import 'package:vnu_core/modules/idp_auth/services/idp_auth_flow.dart';
+import 'package:vnu_core/modules/auth_mode/login_config_resolver.dart';
 import 'package:vnu_core/modules/auth_mode/login_runtime_config.dart';
-import 'package:vnu_core/services/app_config_service.dart';
 import 'package:vnu_core/modules/motel/vcore_motel_webview.dart';
+import 'package:vnu_core/modules/network_diagnostic/network_diagnostic_screen.dart';
 import 'package:vnu_core/modules/profile/views/vcore_profile_domain_dialog.dart';
 import 'package:vnu_core/modules/profile/views/vcore_profile_forgot_pass_view_v2.dart';
 import 'package:vnu_core/modules/profile/views/widget/vcore_profile_textfield_widget.dart';
 import 'package:vnu_core/repository/data_repository.dart';
+import 'package:vnu_core/screens/cccd_registration_screen.dart';
 import 'package:vnu_core/services/services_url.dart';
 import 'package:vnu_core/vnu_core.dart';
 import 'package:vnu_core/widgets/buttons_widget.dart';
 import 'package:vnu_core/widgets/progress_hub_widget.dart';
 import 'package:vnu_core/widgets/field/vnu_text_field.dart';
 
-enum _LoginMode { student, applicant }
+enum _LoginMode { student, cccd, applicant }
+
+enum _StudentLoginMethod { idp, password }
 
 class VCoreLoginScreenV4 extends StatefulWidget {
   static const int serialTaps = 10;
@@ -72,10 +75,10 @@ class _VCoreLoginScreenV4State extends State<VCoreLoginScreenV4> {
   bool isEnableLoginBio = false;
   bool _obscurePassword = true;
   bool _idpLoading = false;
-  bool _loginConfigLoading = true;
   LoginRuntimeConfig _loginRuntimeConfig = LoginRuntimeConfig.defaults;
-  String? _loginConfigError;
   bool _loginConfigRefreshRunning = false;
+  _StudentLoginMethod _studentLoginMethod = _StudentLoginMethod.idp;
+  bool _studentLoginMethodUserSelected = false;
 
   String userNameLocal = '';
   String passwordLocal = '';
@@ -98,9 +101,9 @@ class _VCoreLoginScreenV4State extends State<VCoreLoginScreenV4> {
   void initState() {
     super.initState();
 
-    _loginMode = widget.initialApplicantTab
-        ? _LoginMode.applicant
-        : _LoginMode.student;
+    // Always open the login screen on VNU SSO. Optional login modes remain
+    // available as tabs only when /api/config enables them.
+    _loginMode = _LoginMode.student;
 
     if (kDebugMode) {
       if (ServicesUrl().baseUrl.contains('rteam.vn')) {
@@ -113,72 +116,62 @@ class _VCoreLoginScreenV4State extends State<VCoreLoginScreenV4> {
     }
 
     _checkBio();
-
-    // TEMP TEST: nếu IdpAuthConfig có test URL thì ép Student login sang IDP
-    // và KHÔNG đọc /api/config. Comment đúng dòng idp-test trong
-    // IdpAuthConfig để quay về cơ chế server-driven ban đầu.
-    final String testIdpUrl =
-        IdpAuthConfig.temporaryTestStartUrl?.trim() ?? '';
-    if (testIdpUrl.isNotEmpty) {
-      _loginRuntimeConfig = LoginRuntimeConfig(
-        idpLogin: true,
-        idpStartUrl: testIdpUrl,
-        idpWebUrl: testIdpUrl,
-        passwordFallbackEnabled: false,
-        qrEnabled: false,
-      );
-      _loginConfigLoading = false;
-      _loginConfigError = null;
-      logWarning('[LOGIN_IDP_TEST] force IDP UI: $testIdpUrl');
-    } else {
-      _loadLoginRuntimeConfig(showLoading: true, reason: 'initial');
-    }
+    _loadLoginRuntimeConfig(reason: 'initial');
   }
 
   Future<void> _loadLoginRuntimeConfig({
-    required bool showLoading,
     required String reason,
   }) async {
     if (_loginConfigRefreshRunning) return;
 
     _loginConfigRefreshRunning = true;
 
-    if (showLoading && mounted) {
-      setState(() {
-        _loginConfigLoading = true;
-        _loginConfigError = null;
-      });
-    }
-
     try {
-      final AppConfigService configService = AppConfigService();
-      await configService.ensureLoaded(forceRefresh: true);
+      final LoginRuntimeConfig config =
+          await LoginConfigResolver().resolve(forceRefresh: true);
       if (!mounted) return;
 
       setState(() {
-        _loginRuntimeConfig = configService.loginRuntimeConfig;
-        _loginConfigLoading = false;
-        _loginConfigError = configService.isLoadedSuccessfully
-            ? null
-            : (configService.lastLoadError ??
-                'Không tải được cấu hình đăng nhập từ máy chủ.');
+        _loginRuntimeConfig = config;
+
+        // VNU SSO is always the default login method. Optional methods are
+        // exposed only when /api/config explicitly enables their flags.
+        if (!_studentLoginMethodUserSelected ||
+            !config.studentCodeLoginEnabled) {
+          _studentLoginMethod = _StudentLoginMethod.idp;
+        }
+
+        if (_loginMode == _LoginMode.cccd && !config.cccdLoginEnabled) {
+          _loginMode = _LoginMode.student;
+        }
+        if (_loginMode == _LoginMode.applicant &&
+            !config.applicantLoginEnabled) {
+          _loginMode = _LoginMode.student;
+        }
       });
 
       logInfo(
         '[LOGIN_CONFIG_RUNTIME] reason=$reason '
-        'loaded=${configService.isLoadedSuccessfully} '
-        'idpLogin=${_loginRuntimeConfig.idpLogin} '
-        'qrEnabled=${_loginRuntimeConfig.qrEnabled}',
+        'source=${IdpAuthConfig.loginConfigSourceLabel} '
+        'idpLogin=${config.idpLogin} qrEnabled=${config.qrEnabled} '
+        'studentCode=${config.studentCodeLoginEnabled} '
+        'cccd=${config.cccdLoginEnabled} '
+        'applicant=${config.applicantLoginEnabled} '
+        'selectedMethod=${_studentLoginMethod.name}',
       );
     } catch (error, stackTrace) {
-      if (showLoading && mounted) {
+      if (mounted) {
         setState(() {
-          _loginConfigLoading = false;
-          _loginConfigError = error.toString();
+          _loginRuntimeConfig = LoginRuntimeConfig.defaults;
+          _loginMode = _LoginMode.student;
+          _studentLoginMethod = _StudentLoginMethod.idp;
+          _studentLoginMethodUserSelected = false;
         });
       }
       logError(
-        '[LOGIN_CONFIG_RUNTIME] reason=$reason error=$error\n$stackTrace',
+        '[LOGIN_CONFIG_RUNTIME] reason=$reason '
+        'source=${IdpAuthConfig.loginConfigSourceLabel} '
+        'failClosed=true error=$error\n$stackTrace',
       );
     } finally {
       _loginConfigRefreshRunning = false;
@@ -260,6 +253,13 @@ class _VCoreLoginScreenV4State extends State<VCoreLoginScreenV4> {
   }
 
   void _selectLoginMode(_LoginMode mode) {
+    if (mode == _LoginMode.cccd && !_loginRuntimeConfig.cccdLoginEnabled) {
+      return;
+    }
+    if (mode == _LoginMode.applicant &&
+        !_loginRuntimeConfig.applicantLoginEnabled) {
+      return;
+    }
     if (_loginMode == mode) return;
 
     FocusManager.instance.primaryFocus?.unfocus();
@@ -269,95 +269,38 @@ class _VCoreLoginScreenV4State extends State<VCoreLoginScreenV4> {
     });
   }
 
-  Future<bool> _verifyLoginMethodBeforeSubmit({
-    required bool expectedIdpLogin,
-  }) async {
-    // TEMP TEST không đọc /api/config ở màn login. Chỉ IDP flow được phép chạy.
-    if (IdpAuthConfig.temporaryTestEnabled) {
-      return expectedIdpLogin;
+  void _selectStudentLoginMethod(_StudentLoginMethod method) {
+    FocusManager.instance.primaryFocus?.unfocus();
+
+    if (method == _StudentLoginMethod.idp && !_loginRuntimeConfig.idpLogin) {
+      snackBarWarning('VNU SSO hiện chưa khả dụng.');
+      return;
+    }
+    if (method == _StudentLoginMethod.password &&
+        !_loginRuntimeConfig.studentCodeLoginEnabled) {
+      return;
     }
 
-    if (_loginConfigRefreshRunning) {
-      snackBarWarning(
-        'Đang kiểm tra phương thức đăng nhập. Vui lòng thử lại.',
-      );
-      return false;
-    }
+    if (_studentLoginMethod == method) return;
 
-    _loginConfigRefreshRunning = true;
-    try {
-      final bool methodShownBeforeCheck = _loginRuntimeConfig.idpLogin;
-      final LoginRuntimeConfig latest =
-          await AppConfigService().fetchLatestLoginRuntimeConfig();
-      if (!mounted) return false;
+    setState(() {
+      _studentLoginMethod = method;
+      _studentLoginMethodUserSelected = true;
+    });
 
-      final bool methodChanged =
-          latest.idpLogin != methodShownBeforeCheck;
-      final bool clickedFlowIsStillValid =
-          latest.idpLogin == expectedIdpLogin;
-
-      setState(() {
-        _loginRuntimeConfig = latest;
-        _loginConfigError = null;
-        _loginConfigLoading = false;
-      });
-
-      if (methodChanged || !clickedFlowIsStillValid) {
-        // The server is the source of truth. Never continue the old flow after
-        // /api/config says the active authentication method has changed.
-        _studentCodeController.clear();
-        _passwordController.clear();
-        userNameLocal = '';
-        passwordLocal = '';
-
-        snackBarWarning(
-          latest.idpLogin
-              ? 'Phương thức đăng nhập đã chuyển sang tài khoản VNU. '
-                  'Màn hình đã được cập nhật, vui lòng đăng nhập lại.'
-              : 'Phương thức đăng nhập đã chuyển sang mã sinh viên và mật khẩu. '
-                  'Màn hình đã được cập nhật, vui lòng nhập lại thông tin.',
-        );
-
-        logInfo(
-          '[LOGIN_METHOD_CHECK] changed=true '
-          'shownIdp=$methodShownBeforeCheck '
-          'clickedIdp=$expectedIdpLogin '
-          'actualIdp=${latest.idpLogin}',
-        );
-        return false;
-      }
-
-      logInfo(
-        '[LOGIN_METHOD_CHECK] changed=false actualIdp=${latest.idpLogin}',
-      );
-      return true;
-    } catch (error, stackTrace) {
-      logError(
-        '[LOGIN_METHOD_CHECK] direct_check_failed=true error=$error\n$stackTrace',
-      );
-
-      // Do not continue with a stale cached method. Otherwise an IDP screen can
-      // remain visible after the server has switched to password login and the
-      // user only sees a downstream IdpAuthFlow error.
-      if (mounted) {
-        snackBarWarning(
-          'Không kiểm tra được phương thức đăng nhập hiện tại. '
-          'Vui lòng kiểm tra kết nối và thử lại.',
-        );
-      }
-      return false;
-    } finally {
-      _loginConfigRefreshRunning = false;
-    }
+    logInfo(
+      '[LOGIN_METHOD_SELECT] method=${method.name} '
+      'idpAvailable=${_loginRuntimeConfig.idpLogin} '
+      'studentCode=${_loginRuntimeConfig.studentCodeLoginEnabled}',
+    );
   }
 
   Future<void> _loginStudent() async {
     FocusManager.instance.primaryFocus?.unfocus();
 
-    final bool canContinue = await _verifyLoginMethodBeforeSubmit(
-      expectedIdpLogin: false,
-    );
-    if (!canContinue || !mounted) return;
+    if (!_loginRuntimeConfig.studentCodeLoginEnabled) {
+      return;
+    }
 
     _authCubit.loginMobile(
       _studentCodeController.text.trim(),
@@ -371,18 +314,35 @@ class _VCoreLoginScreenV4State extends State<VCoreLoginScreenV4> {
     FocusManager.instance.primaryFocus?.unfocus();
 
     if (_idpLoading) return;
+    if (!_loginRuntimeConfig.idpLogin) {
+      await _loadLoginRuntimeConfig(reason: 'idp_click_retry');
+      if (!_loginRuntimeConfig.idpLogin) {
+        if (mounted) {
+          snackBarWarning('VNU SSO hiện chưa khả dụng.');
+        }
+        return;
+      }
+    }
 
-    final bool canContinue = await _verifyLoginMethodBeforeSubmit(
-      expectedIdpLogin: true,
+    logInfo(
+      '[IDP_LOGIN_CLICK] source=${IdpAuthConfig.loginConfigSourceLabel} '
+      'browserMode=customTab '
+      'screenIdpLogin=${_loginRuntimeConfig.idpLogin}',
     );
-    if (!canContinue || !mounted) return;
 
     setState(() => _idpLoading = true);
 
     try {
-      final bool success = await IdpAuthFlow().login(context);
+      final bool success = await IdpAuthFlow().login(
+        context,
+        browserMode: IdpBrowserMode.customTab,
+        skipConfigGate: true,
+      );
 
       if (!success) {
+        if (mounted) {
+          snackBarWarning('Đăng nhập VNU SSO chưa hoàn tất.');
+        }
         return;
       }
 
@@ -391,24 +351,20 @@ class _VCoreLoginScreenV4State extends State<VCoreLoginScreenV4> {
       }
     } catch (error, stackTrace) {
       logError(
-        'Đăng nhập tài khoản VNU lỗi: '
-            '$error\n$stackTrace',
+        'Đăng nhập VNU SSO lỗi: $error\n$stackTrace',
       );
-
-      AppFeedback.showError(error);
+      if (mounted) {
+        snackBarError('Không thể hoàn tất đăng nhập VNU SSO. Vui lòng thử lại.');
+      }
     } finally {
       if (mounted) {
         setState(() => _idpLoading = false);
       }
     }
   }
+
   Future<void> _loginWithBio() async {
     FocusManager.instance.primaryFocus?.unfocus();
-
-    final bool canContinue = await _verifyLoginMethodBeforeSubmit(
-      expectedIdpLogin: false,
-    );
-    if (!canContinue || !mounted) return;
 
     if (userNameLocal.isEmpty || passwordLocal.isEmpty) {
       snackBarWarning(
@@ -646,8 +602,9 @@ class _VCoreLoginScreenV4State extends State<VCoreLoginScreenV4> {
                                     idpLoading: _idpLoading,
                                     onIdpLogin: _loginWithIdp,
                                     loginRuntimeConfig: _loginRuntimeConfig,
-                                    loginConfigLoading: _loginConfigLoading,
-                                    loginConfigError: _loginConfigError,
+                                    studentLoginMethod: _studentLoginMethod,
+                                    onStudentLoginMethodChanged:
+                                        _selectStudentLoginMethod,
                                     onTogglePassword: () {
                                       setState(() {
                                         _obscurePassword = !_obscurePassword;
@@ -704,8 +661,8 @@ class _LoginCard extends StatelessWidget {
     required this.idpLoading,
     required this.onIdpLogin,
     required this.loginRuntimeConfig,
-    required this.loginConfigLoading,
-    required this.loginConfigError,
+    required this.studentLoginMethod,
+    required this.onStudentLoginMethodChanged,
     required this.onTogglePassword,
   });
 
@@ -729,8 +686,8 @@ class _LoginCard extends StatelessWidget {
   final bool idpLoading;
   final VoidCallback onIdpLogin;
   final LoginRuntimeConfig loginRuntimeConfig;
-  final bool loginConfigLoading;
-  final String? loginConfigError;
+  final _StudentLoginMethod studentLoginMethod;
+  final ValueChanged<_StudentLoginMethod> onStudentLoginMethodChanged;
   final VoidCallback onTogglePassword;
 
   bool get _isStudent => loginMode == _LoginMode.student;
@@ -757,6 +714,8 @@ class _LoginCard extends StatelessWidget {
         children: <Widget>[
           _LoginModeTabs(
             selectedMode: loginMode,
+            showCccd: loginRuntimeConfig.cccdLoginEnabled,
+            showApplicant: loginRuntimeConfig.applicantLoginEnabled,
             onChanged: onLoginModeChanged,
           ),
           const SizedBox(height: 20),
@@ -774,125 +733,86 @@ class _LoginCard extends StatelessWidget {
                 ),
               );
             },
-            child: _isStudent ? _buildStudentEntry() : _buildApplicantForm(),
+            child: _isStudent
+                ? _buildStudentEntry()
+                : loginMode == _LoginMode.cccd
+                    ? _buildCccdEntry(context)
+                    : _buildApplicantForm(),
           ),
           const SizedBox(height: 24),
           const _DividerText(),
           const SizedBox(height: 16),
           const _UtilityButtons(),
+          if (kOneVnuNetworkDiagnosticEnabled) ...<Widget>[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const NetworkDiagnosticScreen(),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.network_check_rounded, size: 20),
+                label: const Text('Chẩn đoán kết nối VNU'),
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 
   Widget _buildStudentEntry() {
-    if (loginConfigLoading) {
-      return const Padding(
-        key: ValueKey<String>('login-config-loading'),
-        padding: EdgeInsets.symmetric(vertical: 28),
-        child: Column(
-          children: <Widget>[
-            CircularProgressIndicator(),
-            SizedBox(height: 12),
-            Text(
-              'Đang chuẩn bị đăng nhập...',
-              style: TextStyle(
-                color: _VCoreLoginScreenV4State.textMuted,
-                fontSize: AppFontSizes.small,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    final String configError = loginConfigError?.trim() ?? '';
-
-    if (configError.isNotEmpty) {
-      return Column(
-        key: const ValueKey<String>('student-config-error'),
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFF6E8),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: const Color(0xFFFFD99C),
-              ),
-            ),
-            child: const Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Icon(
-                  Icons.cloud_off_rounded,
-                  color: Color(0xFF9A6515),
-                ),
-                SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Không thể kết nối đến hệ thống đăng nhập. '
-                        'Vui lòng kiểm tra kết nối mạng và thử lại.',
-                    style: TextStyle(
-                      color: Color(0xFF805313),
-                      fontSize: AppFontSizes.small,
-                      height: 1.4,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-        ],
-      );
-    }
-
-    if (!loginRuntimeConfig.idpLogin) {
-      return _buildStudentForm();
-    }
+    final bool idpAvailable = loginRuntimeConfig.idpLogin;
+    final bool showStudentCode = loginRuntimeConfig.studentCodeLoginEnabled;
+    final _StudentLoginMethod effectiveMethod = !idpAvailable && showStudentCode
+        ? _StudentLoginMethod.password
+        : showStudentCode
+            ? studentLoginMethod
+            : _StudentLoginMethod.idp;
 
     return Column(
-      key: const ValueKey<String>('student-login-idp'),
+      key: const ValueKey<String>('student-login-method'),
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: _VCoreLoginScreenV4State.green.withOpacity(0.07),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: _VCoreLoginScreenV4State.green.withOpacity(0.14),
-            ),
+        if (showStudentCode) ...<Widget>[
+          _StudentLoginMethodSelector(
+            value: effectiveMethod,
+            idpAvailable: idpAvailable,
+            onChanged: onStudentLoginMethodChanged,
           ),
-          child: const Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Icon(
-                Icons.account_circle_outlined,
-                color: _VCoreLoginScreenV4State.green,
-                size: 22,
+          const SizedBox(height: 18),
+        ],
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 220),
+          switchInCurve: Curves.easeOut,
+          switchOutCurve: Curves.easeIn,
+          transitionBuilder: (Widget child, Animation<double> animation) {
+            return FadeTransition(
+              opacity: animation,
+              child: SizeTransition(
+                sizeFactor: animation,
+                axisAlignment: -1,
+                child: child,
               ),
-              SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Sử dụng tài khoản VNU để truy cập OneVNU.',
-                  style: TextStyle(
-                    color: _VCoreLoginScreenV4State.textDark,
-                    fontSize: AppFontSizes.small,
-                    height: 1.4,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
+            );
+          },
+          child: effectiveMethod == _StudentLoginMethod.idp
+              ? _buildIdpEntryOption()
+              : _buildStudentForm(),
         ),
-        const SizedBox(height: 18),
+      ],
+    );
+  }
+
+  Widget _buildIdpEntryOption() {
+    return Column(
+      key: const ValueKey<String>('student-login-idp-option'),
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
         _IdpLoginButton(
           isLoading: idpLoading,
           onTap: idpLoading ? null : onIdpLogin,
@@ -900,6 +820,7 @@ class _LoginCard extends StatelessWidget {
       ],
     );
   }
+
   Widget _buildStudentForm() {
     return Column(
       key: const ValueKey<String>('student-login-form'),
@@ -908,7 +829,7 @@ class _LoginCard extends StatelessWidget {
         _InputField(
           controller: studentCodeController,
           icon: Icons.person_outline_rounded,
-          hintText: 'Mã sinh viên',
+          hintText: 'Tài khoản VNU / mã sinh viên',
           textInputAction: TextInputAction.next,
         ),
         const SizedBox(height: 12),
@@ -933,7 +854,7 @@ class _LoginCard extends StatelessWidget {
           children: <Widget>[
             Expanded(
               child: _MainLoginButton(
-                title: 'Đăng nhập',
+                title: 'Đăng nhập Tài khoản VNU',
                 onTap: onStudentLogin,
               ),
             ),
@@ -942,6 +863,25 @@ class _LoginCard extends StatelessWidget {
               _BioLoginButton(isBioByFaceId: isBioByFaceId, onTap: onBioLogin),
             ],
           ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCccdEntry(BuildContext context) {
+    return Column(
+      key: const ValueKey<String>('cccd-login-entry'),
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        _MainLoginButton(
+          title: 'Đăng nhập bằng CCCD',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const CccdRegistrationScreen(),
+              ),
+            );
+          },
         ),
       ],
     );
@@ -970,8 +910,6 @@ class _LoginCard extends StatelessWidget {
             onApplicantLogin();
           },
         ),
-        const SizedBox(height: 14),
-        const _ApplicantLoginNotice(),
         const SizedBox(height: 18),
         Obx(
           () => _MainLoginButton(
@@ -988,9 +926,16 @@ class _LoginCard extends StatelessWidget {
 }
 
 class _LoginModeTabs extends StatelessWidget {
-  const _LoginModeTabs({required this.selectedMode, required this.onChanged});
+  const _LoginModeTabs({
+    required this.selectedMode,
+    required this.showCccd,
+    required this.showApplicant,
+    required this.onChanged,
+  });
 
   final _LoginMode selectedMode;
+  final bool showCccd;
+  final bool showApplicant;
   final ValueChanged<_LoginMode> onChanged;
 
   @override
@@ -1002,23 +947,32 @@ class _LoginModeTabs extends StatelessWidget {
             title: 'Sinh viên',
             icon: Icons.school_outlined,
             selected: selectedMode == _LoginMode.student,
-            onTap: () {
-              onChanged(_LoginMode.student);
-            },
+            onTap: () => onChanged(_LoginMode.student),
           ),
         ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _LoginModeTab(
-            title: 'Tân sinh viên',
-            icon: Icons.how_to_reg_outlined,
-            selected: selectedMode == _LoginMode.applicant,
-            onTap: () {
-              onChanged(_LoginMode.applicant);
-            },
-            fontSize: 10,
+        if (showCccd) ...<Widget>[
+          const SizedBox(width: 8),
+          Expanded(
+            child: _LoginModeTab(
+              title: 'CCCD',
+              icon: Icons.badge_outlined,
+              selected: selectedMode == _LoginMode.cccd,
+              onTap: () => onChanged(_LoginMode.cccd),
+            ),
           ),
-        ),
+        ],
+        if (showApplicant) ...<Widget>[
+          const SizedBox(width: 8),
+          Expanded(
+            child: _LoginModeTab(
+              title: 'Tân sinh viên',
+              icon: Icons.how_to_reg_outlined,
+              selected: selectedMode == _LoginMode.applicant,
+              onTap: () => onChanged(_LoginMode.applicant),
+              fontSize: 10,
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -1111,51 +1065,6 @@ class _LoginModeTab extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _ApplicantLoginNotice extends StatelessWidget {
-  const _ApplicantLoginNotice();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: _VCoreLoginScreenV4State.green.withOpacity(0.07),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: _VCoreLoginScreenV4State.green.withOpacity(0.14),
-        ),
-      ),
-      child: const Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Icon(
-            Icons.info_outline_rounded,
-            color: _VCoreLoginScreenV4State.green,
-            size: 19,
-          ),
-          SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'Dành cho tân sinh viên '
-              'có tên trong danh sách '
-              'trúng tuyển. Sử dụng CCCD '
-              'và số điện thoại đã đăng ký '
-              'với nhà trường.',
-              style: TextStyle(
-                color: _VCoreLoginScreenV4State.textMuted,
-                fontSize: AppFontSizes.small,
-                height: 1.4,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -1420,31 +1329,120 @@ class _BioLoginButton extends StatelessWidget {
   }
 }
 
-class _IdpDividerText extends StatelessWidget {
-  const _IdpDividerText();
+class _StudentLoginMethodSelector extends StatelessWidget {
+  const _StudentLoginMethodSelector({
+    required this.value,
+    required this.idpAvailable,
+    required this.onChanged,
+  });
+
+  final _StudentLoginMethod value;
+  final bool idpAvailable;
+  final ValueChanged<_StudentLoginMethod> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    return const Row(
-      children: <Widget>[
-        Expanded(
-          child: Divider(color: _VCoreLoginScreenV4State.border, thickness: 1),
-        ),
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: 12),
-          child: Text(
-            'Hoặc đăng nhập tập trung',
-            style: TextStyle(
-              color: _VCoreLoginScreenV4State.textMuted,
-              fontSize: AppFontSizes.mediumSmall,
-              fontWeight: FontWeight.w600,
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3F6F8),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _VCoreLoginScreenV4State.border),
+      ),
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            child: _LoginMethodSegment(
+              icon: Icons.account_balance_rounded,
+              title: 'VNU SSO',
+              selected: value == _StudentLoginMethod.idp,
+              enabled: idpAvailable,
+              onTap: () => onChanged(_StudentLoginMethod.idp),
             ),
           ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: _LoginMethodSegment(
+              icon: Icons.person_outline_rounded,
+              title: 'Mã sinh viên',
+              selected: value == _StudentLoginMethod.password,
+              enabled: true,
+              onTap: () => onChanged(_StudentLoginMethod.password),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LoginMethodSegment extends StatelessWidget {
+  const _LoginMethodSegment({
+    required this.icon,
+    required this.title,
+    required this.selected,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final bool selected;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color foreground = !enabled
+        ? _VCoreLoginScreenV4State.textMuted.withOpacity(0.55)
+        : selected
+            ? _VCoreLoginScreenV4State.greenDark
+            : _VCoreLoginScreenV4State.textMuted;
+
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(13),
+      child: InkWell(
+        onTap: enabled ? onTap : null,
+        borderRadius: BorderRadius.circular(13),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          decoration: BoxDecoration(
+            color: selected ? Colors.white : Colors.transparent,
+            borderRadius: BorderRadius.circular(13),
+            boxShadow: selected
+                ? <BoxShadow>[
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.06),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[
+              Icon(icon, color: foreground, size: 18),
+              const SizedBox(width: 7),
+              Flexible(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: foreground,
+                    fontSize: AppFontSizes.small,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-        Expanded(
-          child: Divider(color: _VCoreLoginScreenV4State.border, thickness: 1),
-        ),
-      ],
+      ),
     );
   }
 }
@@ -1496,7 +1494,7 @@ class _IdpLoginButton extends StatelessWidget {
                 ),
               const SizedBox(width: 10),
               const Text(
-                'Đăng nhập',
+                'Tiếp tục với VNU SSO',
                 style: TextStyle(
                   color: _VCoreLoginScreenV4State.textDark,
                   fontSize: AppFontSizes.mediumLarge,
@@ -1516,6 +1514,7 @@ class _IdpLoginButton extends StatelessWidget {
     );
   }
 }
+
 
 class _DividerText extends StatelessWidget {
   const _DividerText();

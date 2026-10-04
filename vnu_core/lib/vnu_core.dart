@@ -209,49 +209,49 @@ class VnuCore {
     return false;
   }
 
-  Future<void> addFirebaseTokenSwitchDomain(String? firebaseToken) async {
-    try {
-      if (firebaseToken != null && firebaseToken.isNotEmpty) {
-        ApiRepository()
-            .deviceToken(
-              '',
-              firebaseToken,
-              Platform.isAndroid ? 'Android' : 'iOS',
-            )
-            .then((result) {
-              ServicesUrl().firebaseToken = firebaseToken;
-              logSuccess("add token to account success...");
-            })
-            .catchError((err) {
-              logError("add token to account error: $err");
-            });
-      }
-    } catch (e) {
-      logError(e.toString());
-    }
+  Future<void> addFirebaseTokenSwitchDomain(String? firebaseToken) {
+    // Domain is fixed in current builds. Keep the legacy entry point but route
+    // it through the same authenticated session-binding primitive.
+    return addFirebaseToken(firebaseToken);
   }
 
+  /// Cache the latest FCM registration token and, when a ONEVNU session exists,
+  /// bind it to the *current* Token row.
+  ///
+  /// Important: equality with the cached FCM value must never skip the bind.
+  /// A new USER/APPLICANT login can reuse the same FCM token while owning a new
+  /// ONEVNU access/refresh session. Rebinding is therefore intentionally
+  /// idempotent and is performed on every authenticated synchronization call.
   Future<void> addFirebaseToken(String? firebaseToken) async {
+    final String normalized = firebaseToken?.trim() ?? '';
+    if (normalized.isEmpty) return;
+
+    final String oldDeviceToken =
+        ServicesUrl().firebaseToken?.trim() ?? '';
+
+    // The FCM token can rotate before authentication. Cache it locally, but do
+    // not create an orphan Device on the backend until a ONEVNU session exists.
+    ServicesUrl().firebaseToken = normalized;
+
+    if (Globals().token.trim().isEmpty) {
+      logInfo('[FCM] token cached locally; session not authenticated yet');
+      return;
+    }
+
     try {
-      if (firebaseToken != null &&
-          firebaseToken.isNotEmpty &&
-          ServicesUrl().firebaseToken != firebaseToken) {
-        ApiRepository()
-            .deviceToken(
-              ServicesUrl().firebaseToken ?? '',
-              firebaseToken,
-              Platform.isAndroid ? 'Android' : 'iOS',
-            )
-            .then((result) {
-              ServicesUrl().firebaseToken = firebaseToken;
-              logSuccess("add token to account success...");
-            })
-            .catchError((err) {
-              logError("add token to account error: $err");
-            });
-      }
-    } catch (e) {
-      logError(e.toString());
+      await ApiRepository().deviceToken(
+        oldDeviceToken,
+        normalized,
+        Platform.isAndroid
+            ? 'Android'
+            : Platform.isIOS
+                ? 'iOS'
+                : Platform.operatingSystem,
+      );
+      logSuccess('[FCM] token bound to current ONEVNU session');
+    } catch (error, stackTrace) {
+      logError('[FCM] token binding failed: $error\n$stackTrace');
+      rethrow;
     }
   }
 
@@ -548,6 +548,3 @@ class VnuCore {
     }
   }
 }
-
-
-

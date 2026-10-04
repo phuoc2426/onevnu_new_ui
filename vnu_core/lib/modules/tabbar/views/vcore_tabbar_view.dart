@@ -125,13 +125,9 @@ class _VcoreTabbarViewState extends State<VcoreTabbarView> {
     _registerGuideActions();
     AppConfigService().ensureLoaded();
 
-    try {
-      FirebaseMessaging.instance.getToken().then(
-        (firebaseToken) => VnuCore().addFirebaseToken(firebaseToken),
-      );
-    } catch (e) {
-      logError(e.toString());
-    }
+    // Self-heal Token -> Device after navigation/restores. The bind is
+    // idempotent even when Firebase returns the same token as last time.
+    unawaited(_syncFcmForCurrentSession());
 
     Globals().fetchUnreadCount();
 
@@ -151,6 +147,16 @@ class _VcoreTabbarViewState extends State<VcoreTabbarView> {
   void dispose() {
     _unregisterGuideActions();
     super.dispose();
+  }
+
+
+  Future<void> _syncFcmForCurrentSession() async {
+    try {
+      final String? firebaseToken = await FirebaseMessaging.instance.getToken();
+      await VnuCore().addFirebaseToken(firebaseToken);
+    } catch (error, stackTrace) {
+      logError('[FCM][TABBAR] session binding failed: $error\n$stackTrace');
+    }
   }
 
   Future<void> _loadAndRefreshStartInfo() async {
@@ -311,5 +317,3 @@ class _VcoreTabbarViewState extends State<VcoreTabbarView> {
     );
   }
 }
-
-

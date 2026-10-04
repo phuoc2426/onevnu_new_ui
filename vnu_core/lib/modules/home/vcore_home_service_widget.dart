@@ -15,7 +15,7 @@ import 'package:vnu_core/models/box_service_model.dart';
 import 'package:vnu_core/modules/course_points/views/vcore_course_points_view.dart';
 import 'package:vnu_core/modules/inmapz/vcore_immap_view.dart';
 import 'package:vnu_core/modules/motel/vcore_motel_webview.dart';
-import 'package:vnu_core/modules/paht/views/vcore_paht_view.dart';
+import 'package:vnu_core/modules/paht_v2/views/vcore_paht_view_v2.dart';
 import 'package:vnu_core/modules/student_card/views/vcore_student_card_view.dart';
 import 'package:vnu_core/modules/sync/views/vcore_sync_view.dart';
 import 'package:vnu_core/modules/time_schedule/views/vcore_time_schedule_view.dart';
@@ -299,7 +299,7 @@ class _VcoreHomeServiceWidgetState extends State<VcoreHomeServiceWidget> {
         Get.to(() => const VcoreExamScheduleView());
         break;
       case HomeService.PhanAnhHienTruong:
-        Get.to(() => const VcorePahtView());
+        Get.to(() => const VcorePahtViewV2());
         break;
       case HomeService.DongBo:
         Get.to(() => const VcoreSyncView());
@@ -316,3 +316,4 @@ class _VcoreHomeServiceWidgetState extends State<VcoreHomeServiceWidget> {
     }
   }
 }
+

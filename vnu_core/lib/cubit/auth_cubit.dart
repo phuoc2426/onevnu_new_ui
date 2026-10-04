@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:vnu_core/common/error/app_error_mapper.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:bloc/bloc.dart';
@@ -74,7 +77,7 @@ class AuthCubit extends Cubit<AuthState> {
       //Globals().fireBaseToken
       logSuccess('Start login time --> ${DateTime.now().toIso8601String()}');
       var reponse = await ApiRepository()
-          .signin(username, passsword, ServicesUrl().firebaseToken ?? '');
+          .signin(username, passsword, '');
       if (reponse.refreshToken != null) {
         // ONEVNU_STALE_STUDENT_FIX_20260725_LOGIN_CLEAR
         Globals().thongTinSinhVienModel.value = null;
@@ -98,17 +101,31 @@ class AuthCubit extends Cubit<AuthState> {
           await prefs.remove(key);
         }
 
-        //save login info
-        DataRepository().saveSecureUserLogin(username, passsword);
+        // USER login must replace any Applicant session stored on this install.
+        await Future.wait<void>(<Future<void>>[
+          DataRepository().deleteSecureKey(kApplicantAccessToken),
+          DataRepository().deleteSecureKey(kApplicantRefreshToken),
+          DataRepository().saveSecureUserLogin(username, passsword),
+        ]);
 
-        //save token
+        // Save the authenticated ONEVNU session first. FCM is deliberately not
+        // part of /signin and is synchronized afterwards on a best-effort path.
         Globals().token = reponse.accessToken ?? '';
+        Globals().refreshToken = reponse.refreshToken ?? '';
         Globals().usernameLogin = username;
 
         ApiRepository().setToken(Globals().token);
-        DataRepository().saveSecureKey(kLoginToken, Globals().token);
-        DataRepository()
-            .saveSecureKey(kLoginRefreshToken, reponse.refreshToken ?? '');
+        await Future.wait<void>(<Future<void>>[
+          DataRepository().saveSecureKey(kLoginToken, Globals().token),
+          DataRepository().saveSecureKey(
+            kLoginRefreshToken,
+            Globals().refreshToken,
+          ),
+          DataRepository().saveSecureKey(
+            kSessionPrincipalType,
+            kPrincipalTypeUser,
+          ),
+        ]);
 
         // Cần bỏ để tăng tốc độ login - thời gian chờ đang hơi lâu.
         // Chuyển load async ở tabbar
@@ -132,6 +149,9 @@ class AuthCubit extends Cubit<AuthState> {
 
         await AuthEntryModeService().markPassword();
 
+        // Never fail a successful password login because FCM/APNs is delayed.
+        unawaited(_syncFcmAfterPasswordLogin());
+
         emit(AuthDismissHub());
 
         logSuccess(
@@ -147,6 +167,34 @@ class AuthCubit extends Cubit<AuthState> {
     } catch (e) {
       emit(AuthDismissHub());
       emit(AuthError(AppErrorMapper.map(e).userMessage));
+    }
+  }
+
+
+  Future<void> _syncFcmAfterPasswordLogin() async {
+    try {
+      final FirebaseMessaging messaging = FirebaseMessaging.instance;
+      await messaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+
+      if (Platform.isIOS) {
+        for (int attempt = 0; attempt < 8; attempt++) {
+          final String? apnsToken = await messaging.getAPNSToken();
+          if (apnsToken != null && apnsToken.trim().isNotEmpty) break;
+          await Future<void>.delayed(const Duration(milliseconds: 250));
+        }
+      }
+
+      final String? firebaseToken = await messaging.getToken();
+      await VnuCore().addFirebaseToken(firebaseToken);
+    } catch (error, stackTrace) {
+      logError(
+        '[FCM][PASSWORD_LOGIN] post-login binding failed: '
+        '$error\n$stackTrace',
+      );
     }
   }
 

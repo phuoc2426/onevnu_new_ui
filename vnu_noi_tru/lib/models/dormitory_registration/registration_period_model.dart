@@ -49,6 +49,7 @@ class RegistrationPeriodModel {
   final DateTime? endTime;
   final int? maxApprovalDays;
   final String? description;
+  final DateTime? deletedAt;
 
   RegistrationPeriodModel({
     this.id,
@@ -59,12 +60,14 @@ class RegistrationPeriodModel {
     this.endTime,
     this.maxApprovalDays,
     this.description,
+    this.deletedAt,
   });
 
   factory RegistrationPeriodModel.fromJson(Map<String, dynamic> json) {
     int? _parseInt(dynamic v) {
       if (v == null) return null;
       if (v is int) return v;
+      if (v is num) return v.toInt();
       if (v is String) return int.tryParse(v);
       return null;
     }
@@ -83,7 +86,8 @@ class RegistrationPeriodModel {
       maxApprovalDays: _parseInt(
         json['max_approval_days'] ?? json['maxApprovalDays'],
       ),
-      description: json['description'] as String?,
+      description: json['description']?.toString(),
+      deletedAt: _parseDateTime(json['deleted_at'] ?? json['deletedAt']),
     );
   }
 
@@ -96,5 +100,12 @@ class RegistrationPeriodModel {
     'end_time': endTime?.toIso8601String(),
     'max_approval_days': maxApprovalDays,
     'description': description,
+    'deleted_at': deletedAt?.toIso8601String(),
   };
+}
+
+DateTime? _parseDateTime(dynamic value) {
+  if (value == null) return null;
+  if (value is DateTime) return value;
+  return DateTime.tryParse(value.toString());
 }

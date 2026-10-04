@@ -18,6 +18,10 @@ class DRStudentHistorySheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final Map<String, dynamic> root = _asMap(data);
     final dynamic student = _firstValue(root, const <String>['student']);
+    final dynamic pendingChanges = _firstValue(
+      root,
+      const <String>['pendingChanges', 'pending_changes'],
+    );
     final List<dynamic> accommodations = _listValue(
       root,
       const <String>['accommodations'],
@@ -127,6 +131,10 @@ class DRStudentHistorySheet extends StatelessWidget {
                     padding: const EdgeInsets.fromLTRB(14, 12, 14, 28),
                     children: <Widget>[
                       _buildStudentSection(student),
+                      if (_hasPendingChanges(pendingChanges)) ...<Widget>[
+                        const SizedBox(height: 10),
+                        _buildPendingChangesSection(pendingChanges),
+                      ],
                       const SizedBox(height: 10),
                       _buildAccommodationSection(accommodations),
                       const SizedBox(height: 10),
@@ -164,6 +172,11 @@ class DRStudentHistorySheet extends StatelessWidget {
         _groupTitle('Thông tin cơ bản'),
         ..._rows(<_DisplayEntry>[
           _entry(
+            'Mã sinh viên',
+            student,
+            const <String>['studentCode', 'student_code'],
+          ),
+          _entry(
             'Họ và tên',
             student,
             const <String>['fullName', 'full_name'],
@@ -186,6 +199,30 @@ class DRStudentHistorySheet extends StatelessWidget {
             const <String>['phoneNumber', 'phone_number', 'phone'],
           ),
           _entry('Email', student, const <String>['email']),
+          _entry(
+            'Đối tượng',
+            student,
+            const <String>['studentTypeLabel', 'student_type_label', 'studentType', 'student_type'],
+            transform: _studentTypeLabel,
+          ),
+          _entry(
+            'Loại cư trú',
+            student,
+            const <String>[
+              'residenceTypeLabel',
+              'residence_type_label',
+              'residenceType',
+              'residence_type',
+            ],
+            transform: _residenceTypeLabel,
+          ),
+          _entry(
+            'Trạng thái sinh viên',
+            student,
+            const <String>['statusLabel', 'status_label', 'status'],
+            transform: _statusLabel,
+            hideNumericOnly: true,
+          ),
         ]),
         const SizedBox(height: 12),
         _groupTitle('Giấy tờ và nhân thân'),
@@ -194,6 +231,11 @@ class DRStudentHistorySheet extends StatelessWidget {
             'Loại giấy tờ',
             student,
             const <String>['identityType', 'identity_type'],
+          ),
+          _entry(
+            'Tên giấy tờ',
+            student,
+            const <String>['identityName', 'identity_name'],
           ),
           _entry(
             'Số giấy tờ',
@@ -217,7 +259,28 @@ class DRStudentHistorySheet extends StatelessWidget {
           _entry(
             'Quốc tịch',
             student,
-            const <String>['nationality', 'national', 'country'],
+            const <String>[
+              'countryName',
+              'country_name',
+              'nationality',
+              'national',
+              'country',
+            ],
+          ),
+          _entry(
+            'Mã quốc gia',
+            student,
+            const <String>['countryCode', 'country_code'],
+          ),
+          _entry(
+            'Đối tượng ưu tiên',
+            student,
+            const <String>[
+              'priorityObjectName',
+              'priority_object_name',
+              'priorityObject',
+              'priority_object',
+            ],
           ),
         ]),
         const SizedBox(height: 12),
@@ -226,9 +289,12 @@ class DRStudentHistorySheet extends StatelessWidget {
           _entry(
             'Thường trú',
             student,
+            const <String>['permanentAddress', 'permanent_address'],
+          ),
+          _entry(
+            'Thường trú theo VNeID',
+            student,
             const <String>[
-              'permanentAddress',
-              'permanent_address',
               'vneidPermanentAddress',
               'vneid_permanent_address',
             ],
@@ -241,9 +307,12 @@ class DRStudentHistorySheet extends StatelessWidget {
           _entry(
             'Tạm trú',
             student,
+            const <String>['temporaryAddress', 'temporary_address'],
+          ),
+          _entry(
+            'Tạm trú theo VNeID',
+            student,
             const <String>[
-              'temporaryAddress',
-              'temporary_address',
               'vneidTemporaryAddress',
               'vneid_temporary_address',
             ],
@@ -276,7 +345,12 @@ class DRStudentHistorySheet extends StatelessWidget {
           _entry(
             'Niên khóa',
             student,
-            const <String>['academicYear', 'academic_year'],
+            const <String>[
+              'academicYearNormalized',
+              'academic_year_normalized',
+              'academicYear',
+              'academic_year',
+            ],
           ),
           _entry(
             'Hệ đào tạo',
@@ -299,6 +373,107 @@ class DRStudentHistorySheet extends StatelessWidget {
         ],
       ],
     );
+  }
+
+  bool _hasPendingChanges(dynamic rawValue) {
+    if (rawValue is Map) return rawValue.isNotEmpty;
+    if (rawValue is Iterable && rawValue is! String) return rawValue.isNotEmpty;
+    return false;
+  }
+
+  Map<String, dynamic> _pendingChangesMap(dynamic rawValue) {
+    if (rawValue is Map) return _asMap(rawValue);
+    if (rawValue is Iterable && rawValue is! String) {
+      for (final dynamic item in rawValue) {
+        final Map<String, dynamic> value = _asMap(item);
+        if (value.isNotEmpty) return value;
+      }
+    }
+    return <String, dynamic>{};
+  }
+
+  Widget _buildPendingChangesSection(dynamic rawValue) {
+    final Map<String, dynamic> pending = _pendingChangesMap(rawValue);
+    final List<dynamic> changes = _listValue(
+      pending,
+      const <String>['changes'],
+    );
+    final String status = _text(
+      pending,
+      const <String>['statusLabel', 'status_label', 'status'],
+    );
+
+    return _sectionCard(
+      icon: Icons.pending_actions_rounded,
+      title: 'Yêu cầu cập nhật hồ sơ',
+      subtitle: status.isEmpty ? 'Đang chờ xử lý' : _statusLabel(status),
+      initiallyExpanded: true,
+      children: <Widget>[
+        ..._rows(<_DisplayEntry>[
+          _entry(
+            'Mã yêu cầu',
+            pending,
+            const <String>['requestId', 'request_id'],
+          ),
+          _entry(
+            'Trạng thái',
+            pending,
+            const <String>['statusLabel', 'status_label', 'status'],
+            transform: _statusLabel,
+          ),
+          _dateEntry(
+            'Thời gian gửi',
+            pending,
+            const <String>['submittedAt', 'submitted_at'],
+          ),
+        ]),
+        if (changes.isEmpty)
+          _emptyText('Yêu cầu đang chờ xử lý, chưa có chi tiết trường thay đổi')
+        else
+          ...changes.asMap().entries.map((MapEntry<int, dynamic> item) {
+            final Map<String, dynamic> change = _asMap(item.value);
+            final String label = _text(
+              change,
+              const <String>['label', 'field'],
+            );
+            final String section = _text(
+              change,
+              const <String>['sectionLabel', 'section_label', 'section'],
+            );
+            final String currentValue = _pendingValue(
+              _firstValue(change, const <String>['currentValue', 'current_value']),
+            );
+            final String proposedValue = _pendingValue(
+              _firstValue(change, const <String>['proposedValue', 'proposed_value']),
+            );
+
+            return _itemContainer(
+              title: label.isEmpty ? 'Thay đổi ${item.key + 1}' : label,
+              badge: section.isEmpty ? null : section,
+              children: _rows(<_DisplayEntry>[
+                _DisplayEntry('Giá trị hiện tại', currentValue),
+                _DisplayEntry('Giá trị đề nghị', proposedValue),
+                _entry(
+                  'Kết quả xử lý',
+                  change,
+                  const <String>['decision', 'decisionLabel', 'decision_label'],
+                  transform: _statusLabel,
+                ),
+              ]),
+            );
+          }),
+      ],
+    );
+  }
+
+  String _pendingValue(dynamic value) {
+    final String friendly = _friendlyValue(value);
+    if (friendly.isNotEmpty) return friendly;
+    if (value == null) return '';
+    if (value is Map || (value is Iterable && value is! String)) {
+      return value.toString();
+    }
+    return value.toString().trim();
   }
 
   Widget _buildFamilyMember(dynamic rawMember, int index) {
@@ -516,6 +691,27 @@ class DRStudentHistorySheet extends StatelessWidget {
                       'priority_object',
                     ],
                   ),
+                  _entry(
+                    'Trạng thái yêu cầu',
+                    value,
+                    const <String>[
+                      'requestStatusLabel',
+                      'request_status_label',
+                      'requestStatus',
+                      'request_status',
+                    ],
+                    transform: _requestStatusLabel,
+                  ),
+                  _entry(
+                    'Hồ sơ nháp',
+                    value,
+                    const <String>['isDraft', 'is_draft'],
+                  ),
+                  _entry(
+                    'Lý do từ chối',
+                    value,
+                    const <String>['rejectReason', 'reject_reason'],
+                  ),
                   _dateEntry(
                     'Bắt đầu lưu trú',
                     value,
@@ -566,6 +762,11 @@ class DRStudentHistorySheet extends StatelessWidget {
               return _itemContainer(
                 title: name.isEmpty ? 'Bạn cùng phòng ${item.key + 1}' : name,
                 children: _rows(<_DisplayEntry>[
+                  _entry(
+                    'Mã sinh viên',
+                    value,
+                    const <String>['studentCode', 'student_code'],
+                  ),
                   _entry(
                     'Họ và tên',
                     value,
@@ -637,15 +838,74 @@ class DRStudentHistorySheet extends StatelessWidget {
                     ],
                   ),
                   _entry(
+                    'Mã biên lai',
+                    value,
+                    const <String>['receiptCode', 'receipt_code', 'code'],
+                  ),
+                  _entry(
                     'Loại khoản thu',
                     value,
                     const <String>['kindLabel', 'kind_label', 'kind'],
+                    transform: _humanize,
+                  ),
+                  _entry(
+                    'Chiều điều chỉnh',
+                    value,
+                    const <String>['direction'],
                     transform: _humanize,
                   ),
                   _moneyEntry(
                     'Tổng tiền',
                     value,
                     const <String>['totalAmount', 'total_amount', 'amount'],
+                  ),
+                  _entry(
+                    'Tòa nhà',
+                    value,
+                    const <String>['buildingName', 'building_name'],
+                  ),
+                  _entry(
+                    'Phòng',
+                    value,
+                    const <String>['roomNumber', 'room_number'],
+                  ),
+                  _entry(
+                    'Loại phòng',
+                    value,
+                    const <String>['roomTypeName', 'room_type_name'],
+                  ),
+                  _moneyWithUnitEntry(
+                    'Mức phí phòng',
+                    value,
+                    const <String>['roomTypePrice', 'room_type_price'],
+                    const <String>['roomTypePriceUnit', 'room_type_price_unit'],
+                  ),
+                  _entry(
+                    'Năm tính phí',
+                    value,
+                    const <String>['academicYear', 'academic_year'],
+                  ),
+                  _entry(
+                    'Số lần điều chỉnh',
+                    value,
+                    const <String>['adjustedCount', 'adjusted_count'],
+                  ),
+                  _entry(
+                    'Có đổi phòng',
+                    value,
+                    const <String>['hasRoomChange', 'has_room_change'],
+                  ),
+                  _dateEntry(
+                    'Từ ngày',
+                    value,
+                    const <String>['startDate', 'start_date'],
+                    dateOnly: true,
+                  ),
+                  _dateEntry(
+                    'Đến ngày',
+                    value,
+                    const <String>['endDate', 'end_date'],
+                    dateOnly: true,
                   ),
                   _entry(
                     'Trạng thái',
@@ -747,6 +1007,28 @@ class DRStudentHistorySheet extends StatelessWidget {
                     ],
                     hideNumericOnly: true,
                   ),
+                  _entry(
+                    'Địa điểm',
+                    value,
+                    const <String>['address'],
+                  ),
+                  _entry(
+                    'Liên kết bản đồ',
+                    value,
+                    const <String>['mapUrl', 'map_url'],
+                  ),
+                  _countEntry(
+                    'Hình ảnh',
+                    value,
+                    const <String>['images'],
+                    suffix: ' ảnh',
+                  ),
+                  _countEntry(
+                    'Trao đổi',
+                    value,
+                    const <String>['comments'],
+                    suffix: ' tin nhắn',
+                  ),
                   _dateEntry(
                     'Ngày tạo',
                     value,
@@ -792,8 +1074,14 @@ class DRStudentHistorySheet extends StatelessWidget {
           ? <Widget>[_emptyText('Chưa có lịch sử thay đổi')]
           : sorted.asMap().entries.map((MapEntry<int, dynamic> item) {
               final Map<String, dynamic> value = _asMap(item.value);
-              final String action = _text(value, const <String>['action']);
-              final String type = _text(value, const <String>['type']);
+              final String action = _text(
+                value,
+                const <String>['actionLabel', 'action_label', 'action'],
+              );
+              final String type = _text(
+                value,
+                const <String>['typeLabel', 'type_label', 'type'],
+              );
               final dynamic rawData = _firstValue(value, const <String>['data']);
               final List<_DisplayEntry> eventDetails =
                   _eventDetailEntries(rawData);
@@ -815,13 +1103,13 @@ class DRStudentHistorySheet extends StatelessWidget {
                     _entry(
                       'Loại sự kiện',
                       value,
-                      const <String>['type'],
+                      const <String>['typeLabel', 'type_label', 'type'],
                       transform: _eventTypeLabel,
                     ),
                     _entry(
                       'Hành động',
                       value,
-                      const <String>['action'],
+                      const <String>['actionLabel', 'action_label', 'action'],
                       transform: _actionLabel,
                     ),
                     _entry(
@@ -1234,6 +1522,44 @@ class DRStudentHistorySheet extends StatelessWidget {
     );
   }
 
+  _DisplayEntry _moneyWithUnitEntry(
+    String label,
+    Map<String, dynamic> source,
+    List<String> valueKeys,
+    List<String> unitKeys,
+  ) {
+    final dynamic raw = _firstValue(source, valueKeys);
+    if (raw == null || raw.toString().trim().isEmpty) {
+      return _DisplayEntry(label, '');
+    }
+    final num? number = raw is num
+        ? raw
+        : num.tryParse(raw.toString().replaceAll(',', '').trim());
+    if (number == null) return _DisplayEntry(label, '');
+
+    final String amount = NumberFormat.currency(
+      locale: 'vi_VN',
+      symbol: 'đ',
+      decimalDigits: 0,
+    ).format(number);
+    final String rawUnit = _text(source, unitKeys);
+    final String unit = _priceUnitLabel(rawUnit);
+    return _DisplayEntry(label, '$amount${unit.isEmpty ? '' : ' / $unit'}');
+  }
+
+  _DisplayEntry _countEntry(
+    String label,
+    Map<String, dynamic> source,
+    List<String> keys, {
+    String suffix = '',
+  }) {
+    final dynamic raw = _firstValue(source, keys);
+    if (raw is Iterable && raw is! String) {
+      return _DisplayEntry(label, '${raw.length}$suffix');
+    }
+    return _DisplayEntry(label, '');
+  }
+
   static Map<String, dynamic> _asMap(dynamic value) {
     if (value is Map<String, dynamic>) {
       return value;
@@ -1455,6 +1781,47 @@ class DRStudentHistorySheet extends StatelessWidget {
         return 'Nữ';
       default:
         return value;
+    }
+  }
+
+  static String _studentTypeLabel(String value) {
+    switch (value.trim().toLowerCase()) {
+      case '0':
+      case 'pupil':
+      case 'hoc sinh':
+      case 'học sinh':
+        return 'Học sinh';
+      case '1':
+      case 'student':
+      case 'sinh vien':
+      case 'sinh viên':
+        return 'Sinh viên';
+      default:
+        return _humanize(value);
+    }
+  }
+
+  static String _residenceTypeLabel(String value) {
+    if (_isNumericText(value)) return value;
+    return _humanize(value);
+  }
+
+  static String _priceUnitLabel(String value) {
+    switch (value.trim().toLowerCase()) {
+      case 'month':
+      case 'monthly':
+      case 'per_month':
+        return 'tháng';
+      case 'semester':
+      case 'term':
+      case 'per_term':
+        return 'kỳ';
+      case 'day':
+      case 'daily':
+      case 'per_day':
+        return 'ngày';
+      default:
+        return _humanize(value);
     }
   }
 

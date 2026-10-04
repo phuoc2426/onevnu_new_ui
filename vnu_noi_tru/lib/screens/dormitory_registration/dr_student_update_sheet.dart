@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
 import 'package:vnu_core/widgets/field/vnu_date_picker_sheet.dart';
 import 'package:vnu_core/common/error/app_error_mapper.dart';
 import 'package:flutter/services.dart';
@@ -11,6 +12,8 @@ import 'package:intl/intl.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:vnu_core/common/app_text_styles.dart';
+import 'package:vnu_core/globals.dart';
+import 'package:vnu_core/modules/profile/views/vcore_profile_person_info_view.dart';
 import 'package:vnu_core/widgets/field/vnu_text_field.dart';
 import 'package:vnu_core/widgets/select/vnu_select.dart';
 import 'package:vnu_core/themes/app_theme.dart';
@@ -82,6 +85,7 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
   late final TextEditingController _identityNoController;
   late final TextEditingController _identityIssueDateController;
   late final TextEditingController _identityIssuePlaceController;
+  late String _initialIdentityNo;
   late final TextEditingController _ethnicityController;
   late final TextEditingController _religionController;
 
@@ -111,6 +115,7 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
   late final TextEditingController _temporaryWardCodeController;
 
   late final TextEditingController _reasonStayController;
+  late final TextEditingController _noteController;
 
   String? _gender;
   String _identityType = 'CCCD';
@@ -229,6 +234,7 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
             ], (dynamic object) => object.cccd)
           : widget.identityNo,
     );
+    _initialIdentityNo = _identityNoController.text.trim();
 
     _identityIssueDateController = TextEditingController(
       text: _readDateText(
@@ -403,6 +409,8 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
       ], (dynamic object) => object.reasonStay),
     );
 
+    _noteController = TextEditingController();
+
     final dynamic rawStudentType = _readValue(
       widget.student,
       const <String>['student_type', 'studentType'],
@@ -422,6 +430,7 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
     _initialFamilySnapshot = _familyMembersSnapshot();
     _unsupportedInitialValues = _unsupportedFieldValues();
     _loadAddressOptions();
+    _loadPriorityObjects();
   }
 
   Future<void> _loadAddressOptions() async {
@@ -576,6 +585,7 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
     _temporaryProvinceCodeController.dispose();
     _temporaryWardCodeController.dispose();
     _reasonStayController.dispose();
+    _noteController.dispose();
 
     for (final _StudentFamilyMemberForm form in _familyForms) {
       form.dispose();
@@ -621,6 +631,8 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
                           _buildIdentityCard(),
                           const SizedBox(height: 12),
                           _buildAcademicCard(),
+                          const SizedBox(height: 12),
+                          _buildExtendedProfileCard(),
                           const SizedBox(height: 12),
                           _buildContactPriorityCard(),
                           const SizedBox(height: 12),
@@ -987,10 +999,30 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
         ]),
         const SizedBox(height: 10),
         Row(children: <Widget>[
-          Expanded(child: _field(controller: _identityNoController, label: 'Số CCCD/giấy tờ *', maxLength: 50, validator: _requiredValidator)),
+          Expanded(
+            child: _field(
+              controller: _identityNoController,
+              label: 'Số CCCD/giấy tờ *',
+              maxLength: 50,
+              keyboardType: TextInputType.number,
+              readOnly: true,
+              validator: _identityNoValidator,
+            ),
+          ),
           const SizedBox(width: 10),
           Expanded(child: _dateField(controller: _identityIssueDateController, label: 'Ngày cấp')),
         ]),
+        const SizedBox(height: 8),
+        _buildIdentityNoWarning(),
+        const SizedBox(height: 8),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: OutlinedButton.icon(
+            onPressed: _submitting ? null : _openPersonalInfoCccd,
+            icon: const Icon(Icons.manage_accounts_outlined),
+            label: const Text('Cập nhật CCCD trong Thông tin cá nhân'),
+          ),
+        ),
         const SizedBox(height: 10),
         VnuSingleSelect<DormitoryCountryOption>(
           label: 'Quốc gia / quốc tịch', value: _selectedCountry,
@@ -1035,6 +1067,101 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
         ),
         const SizedBox(height: 10),
         _field(controller: _reasonStayController, label: 'Lý do lưu trú', maxLength: 100),
+      ],
+    );
+  }
+
+  Widget _buildExtendedProfileCard() {
+    return _sectionCard(
+      icon: Icons.fact_check_outlined,
+      title: 'Thông tin bổ sung',
+      children: <Widget>[
+        _field(
+          controller: _identityIssuePlaceController,
+          label: 'Nơi cấp giấy tờ',
+          maxLength: 255,
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: <Widget>[
+            Expanded(
+              child: _field(
+                controller: _ethnicityController,
+                label: 'Dân tộc',
+                maxLength: 50,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _field(
+                controller: _religionController,
+                label: 'Tôn giáo',
+                maxLength: 50,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        _field(
+          controller: _contactAddressController,
+          label: 'Địa chỉ liên hệ / quê quán',
+          maxLines: 2,
+        ),
+        const SizedBox(height: 10),
+        _field(
+          controller: _vneidPermanentAddressController,
+          label: 'Địa chỉ thường trú VNeID',
+          maxLength: 500,
+          maxLines: 2,
+        ),
+        const SizedBox(height: 10),
+        _field(
+          controller: _vneidTemporaryAddressController,
+          label: 'Địa chỉ tạm trú VNeID',
+          maxLength: 500,
+          maxLines: 2,
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: <Widget>[
+            Expanded(
+              child: _field(
+                controller: _facultyController,
+                label: 'Khoa / đơn vị',
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _field(
+                controller: _systemController,
+                label: 'Hệ đào tạo',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        _field(
+          controller: _levelController,
+          label: 'Bậc đào tạo',
+        ),
+        const SizedBox(height: 12),
+        const Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            'Đối tượng ưu tiên',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
+
+        const SizedBox(height: 8),
+        _buildPriorityObjectSelector(),
+        const SizedBox(height: 12),
+        _field(
+          controller: _noteController,
+          label: 'Lý do cập nhật / ghi chú',
+          maxLength: 500,
+          maxLines: 3,
+        ),
       ],
     );
   }
@@ -2051,11 +2178,20 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
       return;
     }
 
-    final String originalIdentityNo = widget.identityNo.trim();
+    final String originalIdentityNo = _initialIdentityNo.trim();
     final String updatedIdentityNo = _identityNoController.text.trim();
 
     if (originalIdentityNo.isEmpty) {
       _showError('Không tìm thấy CCCD hoặc mã sinh viên để cập nhật');
+      return;
+    }
+
+    final bool identityNoChanged =
+        updatedIdentityNo.isNotEmpty && updatedIdentityNo != _initialIdentityNo;
+    if (identityNoChanged) {
+      _showError(
+        'CCCD chỉ được cập nhật trong mục Thông tin cá nhân bằng cách quét QR trên thẻ căn cước.',
+      );
       return;
     }
 
@@ -2074,20 +2210,37 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
         'identity_issue_date': _dateToApiOrNull(
           _identityIssueDateController.text,
         ),
+        'identity_issue_place': _textOrNull(_identityIssuePlaceController),
         'country': _textOrNull(_countryController),
         'country_code': _textOrNull(_countryCodeController),
         'national': _textOrNull(_nationalController),
         'permanent_address': _textOrNull(_permanentAddressController),
+        'vneid_permanent_address': _textOrNull(
+          _vneidPermanentAddressController,
+        ),
         'permanent_province_code': _textOrNull(
           _permanentProvinceCodeController,
         ),
         'permanent_ward_code': _textOrNull(_permanentWardCodeController),
         'temporary_address': _textOrNull(_temporaryAddressController),
+        'vneid_temporary_address': _textOrNull(
+          _vneidTemporaryAddressController,
+        ),
         'temporary_province_code': _textOrNull(
           _temporaryProvinceCodeController,
         ),
         'temporary_ward_code': _textOrNull(_temporaryWardCodeController),
+        'contact_address': _textOrNull(_contactAddressController),
+        'ethnicity': _textOrNull(_ethnicityController),
+        'religion': _textOrNull(_religionController),
+        if (_selectedPriorityObjects.isNotEmpty &&
+            _selectedPriorityObjects.first.id != null)
+          'priority_object_id': _selectedPriorityObjects.first.id,
+        'faculty': _textOrNull(_facultyController),
+        'system': _textOrNull(_systemController),
+        'level': _textOrNull(_levelController),
         'reason_stay': _textOrNull(_reasonStayController),
+        'note': _textOrNull(_noteController),
         'student_type': _studentType,
       };
 
@@ -2144,6 +2297,11 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
       );
     } catch (error) {
       if (!mounted) return;
+      if (_isIdentityNoOwnershipConflict(error)) {
+        setState(() => _submitting = false);
+        await _showIdentityNoOwnershipSupportDialog();
+        return;
+      }
       _showError(
         AppErrorMapper.map(
           error,
@@ -2173,7 +2331,7 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
       countryCode: _textOrNull(_countryCodeController),
       national: _textOrNull(_nationalController),
       permanentAddress: _permanentAddressController.text.trim(),
-      vneidPermanentAddress: null,
+      vneidPermanentAddress: _textOrNull(_vneidPermanentAddressController),
       permanentProvinceCode: _textOrNull(_permanentProvinceCodeController),
       permanentWardCode: _textOrNull(_permanentWardCodeController),
       contactAddress: _textOrNull(_contactAddressController),
@@ -2186,7 +2344,7 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
       universityName: _universityController.text.trim(),
       priorityObjectName: null,
       temporaryAddress: _temporaryAddressController.text.trim(),
-      vneidTemporaryAddress: null,
+      vneidTemporaryAddress: _textOrNull(_vneidTemporaryAddressController),
       temporaryProvinceCode: _textOrNull(_temporaryProvinceCodeController),
       temporaryWardCode: _textOrNull(_temporaryWardCodeController),
       reasonStay: _textOrNull(_reasonStayController),
@@ -2268,9 +2426,11 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
 
     setState(() {
       if (index >= 0) {
-        _selectedPriorityObjects.removeAt(index);
+        _selectedPriorityObjects.clear();
       } else {
-        _selectedPriorityObjects.add(item);
+        _selectedPriorityObjects
+          ..clear()
+          ..add(item);
       }
     });
   }
@@ -2358,6 +2518,137 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
       },
     );
     return result == true;
+  }
+
+  Future<void> _openPersonalInfoCccd() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => const VcoreProfilePersonInfoView(
+          scrollToCccd: true,
+          verifyCccdForKtx: true,
+        ),
+      ),
+    );
+    if (!mounted) return;
+
+    await Globals().refreshStudentInfo();
+    if (!mounted) return;
+
+    final String refreshedCccd =
+        Globals().thongTinSinhVienModel.value?.soCmtCccd?.trim() ?? '';
+    setState(() {
+      _identityNoController.text = refreshedCccd;
+      _initialIdentityNo = refreshedCccd;
+    });
+  }
+
+  Widget _buildIdentityNoWarning() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.amber.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.amber.shade700.withOpacity(0.45)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Icon(Icons.warning_amber_rounded, color: Colors.amber.shade800, size: 20),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              'CCCD không chỉnh sửa trực tiếp trong hồ sơ KTX. '
+              'Muốn thay đổi CCCD, hãy mở Thông tin cá nhân và quét QR trên thẻ căn cước. '
+              'Khi bấm Cập nhật tại Thông tin cá nhân, OneVNU mới đối chiếu mã sinh viên, họ tên và ngày sinh.',
+              style: TextStyle(fontSize: 12.5, height: 1.35),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String? _identityNoValidator(String? value) {
+    final String text = value?.trim() ?? '';
+    if (text.isEmpty) return 'Không được để trống';
+    if (_identityType == 'CCCD' && !RegExp(r'^\d{12}$').hasMatch(text)) {
+      return 'CCCD phải gồm đúng 12 chữ số';
+    }
+    return null;
+  }
+
+  bool _isIdentityNoOwnershipConflict(Object error) {
+    int? statusCode;
+    final List<String> parts = <String>[error.toString()];
+
+    void collect(dynamic value) {
+      if (value == null) return;
+      if (value is Map) {
+        for (final MapEntry<dynamic, dynamic> entry in value.entries) {
+          parts.add(entry.key.toString());
+          collect(entry.value);
+        }
+        return;
+      }
+      if (value is Iterable && value is! String) {
+        for (final dynamic item in value) collect(item);
+        return;
+      }
+      parts.add(value.toString());
+    }
+
+    if (error is DioException) {
+      statusCode = error.response?.statusCode;
+      collect(error.response?.data);
+      collect(error.message);
+    }
+
+    final String text = parts.join(' ').toLowerCase();
+    final bool mentionsIdentity =
+        text.contains('cccd') ||
+        text.contains('identity_no') ||
+        text.contains('identity no') ||
+        text.contains('căn cước') ||
+        text.contains('can cuoc');
+    final bool mentionsOwnership =
+        text.contains('đã có') ||
+        text.contains('da co') ||
+        text.contains('đã tồn tại') ||
+        text.contains('da ton tai') ||
+        text.contains('đã được sử dụng') ||
+        text.contains('da duoc su dung') ||
+        text.contains('đã có người sở hữu') ||
+        text.contains('duplicate') ||
+        text.contains('unique') ||
+        text.contains('already') ||
+        text.contains('taken') ||
+        text.contains('owned');
+
+    return mentionsIdentity &&
+        mentionsOwnership &&
+        (statusCode == null || statusCode == 409 || statusCode == 422);
+  }
+
+  Future<void> _showIdentityNoOwnershipSupportDialog() async {
+    await showDialog<void>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('CCCD đã có người sở hữu'),
+          content: const Text(
+            'Số CCCD này đang được gắn với một hồ sơ khác. Vui lòng không thử thay bằng số khác nếu đó không phải CCCD của bạn.\n\n'
+            'Nếu đây đúng là CCCD của bạn, hãy gửi ticket hỗ trợ tại it.vnu.edu.vn để được kiểm tra và gỡ liên kết cũ.',
+          ),
+          actions: <Widget>[
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Đã hiểu'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   String? _requiredValidator(String? value) {

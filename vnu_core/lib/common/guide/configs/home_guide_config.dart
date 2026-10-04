@@ -529,9 +529,9 @@ class HomeGuideConfig implements AppGuideModuleConfig {
     _homeFunction(
       id: 'home.function.paht',
       title: 'Phản ánh',
-      description: 'Gửi và theo dõi phản ánh hiện trường.',
+      description: 'Gửi và theo dõi phản ánh, góp ý.',
       icon: Icons.rate_review_rounded,
-      keywords: ['phản ánh', 'phản ánh hiện trường', 'góp ý'],
+      keywords: ['phản ánh', 'phản ánh, góp ý', 'góp ý'],
       openAction: () async {
         Get.to(() => const VcorePahtViewV2());
       },

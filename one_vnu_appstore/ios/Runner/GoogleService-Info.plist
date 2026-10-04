@@ -3,17 +3,17 @@
 <plist version="1.0">
 <dict>
 	<key>API_KEY</key>
-	<string>AIzaSyBJZk_Ory9ng9gAyhWozklHA7xN1KtgBtk</string>
+	<string>AIzaSyD7UCzz3ffIa_m2kmf2R6x3WUk4bwFLrsA</string>
 	<key>GCM_SENDER_ID</key>
-	<string>41333039396</string>
+	<string>143823151965</string>
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
 	<string>com.vnu.students</string>
 	<key>PROJECT_ID</key>
-	<string>one-vnu</string>
+	<string>onevnu-fcm</string>
 	<key>STORAGE_BUCKET</key>
-	<string>one-vnu.appspot.com</string>
+	<string>onevnu-fcm.firebasestorage.app</string>
 	<key>IS_ADS_ENABLED</key>
 	<false></false>
 	<key>IS_ANALYTICS_ENABLED</key>
@@ -25,6 +25,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:41333039396:ios:5030131881bf4c7a0153b1</string>
+	<string>1:143823151965:ios:63fc8d96e02b70b4e1beb4</string>
 </dict>
 </plist>

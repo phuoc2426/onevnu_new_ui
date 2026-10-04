@@ -1,11 +1,15 @@
+import 'dart:convert';
+
 import 'package:vnu_core/common/error/app_feedback.dart';
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:get/get.dart';
 import 'package:vnu_core/common/log.dart';
 import 'package:vnu_core/common/utils.dart';
 import 'package:vnu_core/globals.dart';
 import 'package:vnu_core/repository/app_repository.dart';
+import 'package:vnu_core/widgets/vcore_action_dialog.dart';
 
 import '../../../models/model.dart';
 
@@ -30,6 +34,64 @@ class VcoreProfilePersonInfoController extends GetxController {
   RxList<QuanHuyenModel> listQuanHuyenDiaChiTamTru = RxList([]);
   bool configValueOk = false;
 
+  /// CCCD mới chỉ được chấp nhận sau khi QR thẻ căn cước đã được quét và
+  /// họ tên trên QR khớp với hồ sơ sinh viên hiện tại. Không lưu QR raw.
+  final RxString verifiedQrCccd = ''.obs;
+  final RxString verifiedQrFullName = ''.obs;
+  final Rxn<DateTime> verifiedQrDob = Rxn<DateTime>();
+
+  /// Bat mui ten noi khi form co bat ky thay doi nao chua luu.
+  final RxBool hasUnsavedChanges = false.obs;
+  final RxBool requireCccdVerificationForKtx = false.obs;
+  final RxBool hasPendingQrVerification = false.obs;
+  String _initialFormSnapshot = '';
+  Worker? _dirtyWorker;
+
+  void applyVerifiedCccdFromQr({
+    required String cccd,
+    required String fullName,
+    required DateTime dateOfBirth,
+  }) {
+    final String normalized = cccd.trim();
+    verifiedQrCccd.value = normalized;
+    verifiedQrFullName.value = fullName.trim();
+    verifiedQrDob.value = dateOfBirth;
+    hasPendingQrVerification.value = true;
+    hasUnsavedChanges.value = true;
+    sinhvienEdit.update((StudentInfoModel? item) {
+      item?.soCmtCccd = normalized;
+    });
+  }
+
+  void clearCccdVerificationContext() {
+    requireCccdVerificationForKtx.value = false;
+    hasPendingQrVerification.value = false;
+    verifiedQrCccd.value = '';
+    verifiedQrFullName.value = '';
+    verifiedQrDob.value = null;
+  }
+
+  bool get hasPendingVerifiedCccdChange {
+    final String oldCccd =
+        Globals().thongTinSinhVienModel.value?.soCmtCccd?.trim() ?? '';
+    final String newCccd = sinhvienEdit.value.soCmtCccd?.trim() ?? '';
+    return newCccd.isNotEmpty &&
+        newCccd != oldCccd &&
+        verifiedQrCccd.value == newCccd;
+  }
+
+  String _formSnapshot(StudentInfoModel value) => jsonEncode(value.toJson());
+
+  void _recomputeDirtyState() {
+    if (_initialFormSnapshot.isEmpty) {
+      hasUnsavedChanges.value = false;
+      return;
+    }
+    hasUnsavedChanges.value =
+        _formSnapshot(sinhvienEdit.value) != _initialFormSnapshot ||
+        hasPendingQrVerification.value;
+  }
+
   @override
   void onInit() {
     super.onInit();
@@ -39,8 +101,27 @@ class VcoreProfilePersonInfoController extends GetxController {
     if (Globals().thongTinSinhVienModel.value != null) {
       configValueOk = true;
       configWithSinhVienModel(Globals().thongTinSinhVienModel.value!);
-      refreshQuanHuyenDiaChiTamTru();
+      _prepareDirtyTracking();
     }
+  }
+
+  Future<void> _prepareDirtyTracking() async {
+    // Hoan thanh cac buoc hydrate tu dong truoc khi chup snapshot ban dau de
+    // mui ten khong tu bat chi vi controller dang nap du lieu nen.
+    await refreshQuanHuyenDiaChiTamTru();
+    _initialFormSnapshot = _formSnapshot(sinhvienEdit.value);
+    hasUnsavedChanges.value = hasPendingQrVerification.value;
+    _dirtyWorker?.dispose();
+    _dirtyWorker = ever<StudentInfoModel>(
+      sinhvienEdit,
+      (StudentInfoModel _) => _recomputeDirtyState(),
+    );
+  }
+
+  @override
+  void onClose() {
+    _dirtyWorker?.dispose();
+    super.onClose();
   }
 
   configWithSinhVienModel(StudentInfoModel sinhvien) {
@@ -62,9 +143,9 @@ class VcoreProfilePersonInfoController extends GetxController {
       canNang: sinhvien.canNang,
       chieuCao: sinhvien.chieuCao,
 
-      // soCmtCccd: sinhvien.soCmtCccd,
-      // ngayCapCmtCccd: sinhvien.ngayCapCmtCccd,
-      // idNoiCapCmtCccdTinhThanhPho: sinhvien.idNoiCapCmtCccdTinhThanhPho,
+      soCmtCccd: sinhvien.soCmtCccd,
+      ngayCapCmtCccd: sinhvien.ngayCapCmtCccd,
+      idNoiCapCmtCccdTinhThanhPho: sinhvien.idNoiCapCmtCccdTinhThanhPho,
       idDoiTuongUuTien: sinhvien.idDoiTuongUuTien,
 
       nangKhieu: sinhvien.nangKhieu,
@@ -394,10 +475,59 @@ class VcoreProfilePersonInfoController extends GetxController {
       return;
     }
 
+    final String oldCccd =
+        Globals().thongTinSinhVienModel.value?.soCmtCccd?.trim() ?? '';
+    final String newCccd = sinhvienEdit.value.soCmtCccd?.trim() ?? '';
+    final bool cccdChanged = newCccd != oldCccd;
+    final bool mustVerifyCccd =
+        cccdChanged ||
+        requireCccdVerificationForKtx.value ||
+        hasPendingQrVerification.value;
+
+    if (mustVerifyCccd) {
+      final String studentCode =
+          Globals().thongTinSinhVienModel.value?.maSinhVien?.trim() ?? '';
+      if (studentCode.isEmpty) {
+        snackBarWarning('Không xác định được mã sinh viên để đối chiếu CCCD.');
+        return;
+      }
+      if (!RegExp(r'^\d{12}$').hasMatch(newCccd)) {
+        snackBarWarning('CCCD mới phải gồm đúng 12 chữ số.');
+        return;
+      }
+      if (verifiedQrCccd.value != newCccd ||
+          verifiedQrFullName.value.trim().isEmpty ||
+          verifiedQrDob.value == null) {
+        snackBarWarning(
+          'CCCD chỉ được cập nhật bằng cách quét QR trên thẻ căn cước.',
+        );
+        return;
+      }
+      if (cccdChanged) {
+        final bool confirmed = await _confirmCccdChange(
+          oldValue: oldCccd,
+          newValue: newCccd,
+        );
+        if (!confirmed) return;
+      }
+    }
+
     Utils.showProgress(context);
 
     try {
-      // 1. Cập nhật thông tin cá nhân như cũ
+      if (mustVerifyCccd) {
+        // Backend xác minh lại họ tên/ngày sinh từ dữ liệu đào tạo, gọi KTX
+        // /students/sync-student-code bằng MSSV lấy từ principal, rồi mới ghi
+        // CCCD vào dữ liệu đào tạo. Không tin studentCode do client cung cấp.
+        await ApiRepository().verifyCccdAndLink(
+          identityNo: newCccd,
+          fullName: verifiedQrFullName.value,
+          dateOfBirth: verifiedQrDob.value!,
+        );
+      }
+
+      // 1. Cập nhật các thông tin cá nhân còn lại. CCCD đã được backend
+      // verify/link trước nên lần ghi này là idempotent với cùng số CCCD.
       await ApiRepository().updateSinhVienInfo(sinhvienEdit.value);
 
       // 2. Cập nhật địa chỉ tạm trú vào API mới
@@ -411,8 +541,146 @@ class VcoreProfilePersonInfoController extends GetxController {
       snackBarSuccess('Cập nhật thông tin thành công.');
     } catch (e) {
       Utils.dismissProgress(context);
+      if (_isCccdOwnershipConflict(e)) {
+        await _showCccdSupportDialog();
+        return;
+      }
+      if (mustVerifyCccd && _showCccdVerificationError(e)) {
+        return;
+      }
       AppFeedback.showError(e);
     }
+  }
+
+  Future<bool> _confirmCccdChange({
+    required String oldValue,
+    required String newValue,
+  }) async {
+    final BuildContext? dialogContext = context;
+    if (dialogContext == null) return false;
+
+    final bool? result = await showVcoreActionDialog<bool>(
+      context: dialogContext,
+      title: 'Xác nhận thay đổi CCCD',
+      content:
+          'CCCD là định danh duy nhất của sinh viên trên hệ thống.\n\n'
+          'CCCD hiện tại: ${oldValue.isEmpty ? '(chưa có)' : oldValue}\n'
+          'CCCD mới: $newValue\n\n'
+          'Hãy kiểm tra thật kỹ trước khi cập nhật. Nếu hệ thống báo CCCD đã có người sở hữu, '
+          'hãy gửi ticket tại it.vnu.edu.vn để được hỗ trợ.',
+      leadingIcon: Icons.warning_amber_rounded,
+      barrierDismissible: false,
+      actions: const <VcoreDialogAction<bool>>[
+        VcoreDialogAction<bool>(
+          label: 'Kiểm tra lại',
+          value: false,
+          tone: VcoreDialogActionTone.secondary,
+        ),
+        VcoreDialogAction<bool>(
+          label: 'Tôi xác nhận',
+          value: true,
+          icon: Icons.check_rounded,
+          tone: VcoreDialogActionTone.primary,
+        ),
+      ],
+    );
+    return result == true;
+  }
+
+  bool _showCccdVerificationError(Object error) {
+    if (error is! DioException) return false;
+    final dynamic data = error.response?.data;
+    if (data is! Map) return false;
+
+    final String code = data['code']?.toString().trim() ?? '';
+    final String message = data['message']?.toString().trim() ?? '';
+    const Set<String> verificationCodes = <String>{
+      'TRAINING_IDENTITY_INCOMPLETE',
+      'STUDENT_CODE_MISMATCH',
+      'CCCD_NAME_MISMATCH',
+      'CCCD_DOB_INVALID',
+      'CCCD_DOB_MISMATCH',
+      'CCCD_OWNED_BY_OTHER_STUDENT',
+      'KTX_LINK_CONFLICT',
+      'KTX_LINK_REJECTED',
+      'KTX_LINK_FAILED',
+      'KTX_UNAVAILABLE',
+    };
+    if (!verificationCodes.contains(code) || message.isEmpty) return false;
+    snackBarWarning(message);
+    return true;
+  }
+
+  bool _isCccdOwnershipConflict(Object error) {
+    int? statusCode;
+    final List<String> parts = <String>[error.toString()];
+
+    void collect(dynamic value) {
+      if (value == null) return;
+      if (value is Map) {
+        for (final MapEntry<dynamic, dynamic> entry in value.entries) {
+          parts.add(entry.key.toString());
+          collect(entry.value);
+        }
+        return;
+      }
+      if (value is Iterable && value is! String) {
+        for (final dynamic item in value) collect(item);
+        return;
+      }
+      parts.add(value.toString());
+    }
+
+    if (error is DioException) {
+      statusCode = error.response?.statusCode;
+      collect(error.response?.data);
+      collect(error.message);
+    }
+
+    final String text = parts.join(' ').toLowerCase();
+    final bool mentionsCccd =
+        text.contains('cccd') ||
+        text.contains('căn cước') ||
+        text.contains('can cuoc') ||
+        text.contains('std_idcard');
+    final bool mentionsConflict =
+        text.contains('đã có người sở hữu') ||
+        text.contains('đã tồn tại') ||
+        text.contains('da ton tai') ||
+        text.contains('duplicate') ||
+        text.contains('unique') ||
+        text.contains('conflict');
+
+    return mentionsCccd &&
+        mentionsConflict &&
+        (statusCode == null || statusCode == 409 || statusCode == 422);
+  }
+
+  Future<void> _showCccdSupportDialog() async {
+    final BuildContext? dialogContext = context;
+    if (dialogContext == null) {
+      snackBarWarning(
+        'CCCD này đang được gắn với một sinh viên khác. Vui lòng gửi ticket tại it.vnu.edu.vn để được hỗ trợ.',
+      );
+      return;
+    }
+
+    await showVcoreActionDialog<bool>(
+      context: dialogContext,
+      title: 'CCCD đã có người sở hữu',
+      content:
+          'Số CCCD này đang được gắn với một sinh viên khác. Vui lòng kiểm tra lại số đã quét.\n\n'
+          'Nếu đây đúng là CCCD của bạn, hãy gửi ticket hỗ trợ tại it.vnu.edu.vn để được kiểm tra và gỡ liên kết cũ.',
+      leadingIcon: Icons.report_problem_outlined,
+      actions: const <VcoreDialogAction<bool>>[
+        VcoreDialogAction<bool>(
+          label: 'Đã hiểu',
+          value: true,
+          icon: Icons.check_rounded,
+          tone: VcoreDialogActionTone.primary,
+        ),
+      ],
+    );
   }
 
   updateDiaChiTamTru() async {
@@ -437,4 +705,3 @@ class VcoreProfilePersonInfoController extends GetxController {
     }
   }
 }
-

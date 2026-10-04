@@ -10,7 +10,7 @@ import 'package:vnu_core/repository/data_repository.dart';
 import 'package:vnu_core/services/app_config_service.dart';
 import 'package:vnu_core/services/services_url.dart';
 
-/// API client cho subsystem Phản ánh hiện trường KTX.
+/// API client cho subsystem Phản ánh, góp ý KTX.
 ///
 /// Production contract đã kiểm chứng bằng curl ngày 30/08/2026:
 /// - Tất cả API Issue vẫn gửi Authorization: Bearer <ONEVNU_ACCESS_TOKEN>.
@@ -280,7 +280,13 @@ class KtxIssueRepository {
     _addField(formData, 'description', description.trim());
     _addField(formData, 'type', type);
     _addField(formData, 'priority', priority);
-    _addField(formData, 'room_id', effectiveRoomId);
+    _addField(
+      formData,
+      'dormitory_id',
+      context.dormitoryId != null && context.dormitoryId! > 0
+          ? context.dormitoryId
+          : null,
+    );    _addField(formData, 'room_id', effectiveRoomId);
     _addField(formData, 'latitude', latitude);
     _addField(formData, 'longitude', longitude);
     _addField(formData, 'address', address?.trim());

@@ -3,25 +3,48 @@ class LoginRuntimeConfig {
     required this.idpLogin,
     required this.idpStartUrl,
     required this.idpWebUrl,
+    required this.studentCodeLoginEnabled,
+    required this.cccdLoginEnabled,
+    required this.applicantLoginEnabled,
     required this.passwordFallbackEnabled,
     required this.qrEnabled,
   });
 
+  /// Fail closed for every optional login method. IDP is selected by the
+  /// login screen as the primary method, but it is still considered available
+  /// only after /api/config returns a usable start URL.
   static const LoginRuntimeConfig defaults = LoginRuntimeConfig(
     idpLogin: false,
     idpStartUrl: '',
     idpWebUrl: '',
-    passwordFallbackEnabled: true,
+    studentCodeLoginEnabled: false,
+    cccdLoginEnabled: false,
+    applicantLoginEnabled: false,
+    passwordFallbackEnabled: false,
     qrEnabled: false,
   );
 
   final bool idpLogin;
   final String idpStartUrl;
   final String idpWebUrl;
+
+  /// Optional login methods controlled by /api/config. They must never become
+  /// visible just because config loading failed.
+  final bool studentCodeLoginEnabled;
+  final bool cccdLoginEnabled;
+  final bool applicantLoginEnabled;
+
+  /// Kept for backward compatibility with older servers/config consumers.
+  /// The V4 login screen no longer automatically falls back from IDP to the
+  /// student-code/password form.
   final bool passwordFallbackEnabled;
   final bool qrEnabled;
 
-  bool get isIdpOnly => idpLogin;
+  bool get isIdpOnly =>
+      idpLogin &&
+      !studentCodeLoginEnabled &&
+      !cccdLoginEnabled &&
+      !applicantLoginEnabled;
 
   factory LoginRuntimeConfig.fromAppConfig(Map<String, dynamic> config) {
     final Map<String, dynamic> root = _unwrapConfig(config);
@@ -103,7 +126,7 @@ class LoginRuntimeConfig {
         'idpQrEnabled',
         'idp_qr_enabled',
       ],
-      fallback: true,
+      fallback: false,
     );
 
     return LoginRuntimeConfig(
@@ -116,13 +139,38 @@ class LoginRuntimeConfig {
           'idp_web_url',
         ],
       ),
+      studentCodeLoginEnabled: readBool(
+        const <String>[
+          'studentCodeLoginEnabled',
+          'student_code_login_enabled',
+          'login_student_code_enabled',
+        ],
+        fallback: false,
+      ),
+      cccdLoginEnabled: readBool(
+        const <String>[
+          'cccdLoginEnabled',
+          'cccd_login_enabled',
+          'login_cccd_enabled',
+        ],
+        fallback: false,
+      ),
+      applicantLoginEnabled: readBool(
+        const <String>[
+          'applicantLoginEnabled',
+          'applicant_login_enabled',
+          'login_applicant_enabled',
+          'newStudentLoginEnabled',
+        ],
+        fallback: false,
+      ),
       passwordFallbackEnabled: readBool(
         const <String>[
           'passwordFallbackEnabled',
           'idpPasswordFallbackEnabled',
           'idp_password_fallback_enabled',
         ],
-        fallback: true,
+        fallback: false,
       ),
       qrEnabled: effectiveIdpLogin && requestedQrEnabled,
     );

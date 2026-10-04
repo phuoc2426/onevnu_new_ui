@@ -2103,11 +2103,21 @@ class _DRInvoicesScreenState extends State<DRInvoicesScreen> {
       details.add(_buildRoomChangeInfo(Icons.bed_rounded, 'Loại phòng', invoice.roomTypeName!));
     }
     if (invoice.roomTypePrice != null && invoice.roomTypePrice! > 0) {
+      final String unit = invoice.roomTypePriceUnitLabel;
       details.add(
         _buildRoomChangeInfo(
           Icons.payments_outlined,
           'Mức phí phòng',
-          '${_formatMoney(invoice.roomTypePrice!)} đ',
+          '${_formatMoney(invoice.roomTypePrice!)} đ${unit.isEmpty ? '' : ' / $unit'}',
+        ),
+      );
+    }
+    if (invoice.academicYear != null) {
+      details.add(
+        _buildRoomChangeInfo(
+          Icons.calendar_today_outlined,
+          'Năm tính phí',
+          invoice.academicYear.toString(),
         ),
       );
     }

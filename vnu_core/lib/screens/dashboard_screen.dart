@@ -3,7 +3,6 @@ import 'package:vnu_core/widgets/vnu_module_app_bar.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:get/get.dart';
-import 'package:vnu_core/screens/cccd_registration_screen.dart'; // placeholder import if needed
 import 'package:vnu_noi_tru/screens/dormitory_registration/dr_my_registration_screen.dart';
 
 /// Post‑login dashboard for an applicant.
@@ -36,4 +35,3 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 }
-

@@ -6,12 +6,18 @@ import 'package:vnu_core/globals.dart';
 import 'package:vnu_core/modules/profile/views/widget/vcore_profile_dropdownfield_widget.dart';
 import 'package:vnu_core/modules/profile/views/widget/vcore_profile_info_header_widget.dart';
 import 'package:vnu_core/modules/profile/views/widget/vcore_profile_textfield_widget.dart';
+import 'package:vnu_core/modules/profile/views/vcore_cccd_qr_scanner_view.dart';
 
 import '../../controllers/vcore_profile_person_info_controller.dart';
 import 'vcore_profile_datefield_widget.dart';
 
 class VcoreProfilePersonBasicWidget extends StatelessWidget {
-  const VcoreProfilePersonBasicWidget({super.key});
+  const VcoreProfilePersonBasicWidget({
+    super.key,
+    this.cccdSectionKey,
+  });
+
+  final Key? cccdSectionKey;
 
   @override
   Widget build(BuildContext context) {
@@ -199,15 +205,88 @@ class VcoreProfilePersonBasicWidget extends StatelessWidget {
                   spaceHeight(itemSpace),
                   // --
 
-                  VcoreProfileTextFieldWidget(
-                    title: 'Số chứng minh thư / Căn cước công dân',
-                    hintText: 'Nhập số CMT/CCCD',
-                    keyboardType: TextInputType.number,
-                    value:
-                        Globals().thongTinSinhVienModel.value?.soCmtCccd ?? '',
-                    isDisable: true,
-                    onChange: (text) {},
-                    onSubmitted: (text) {},
+                  KeyedSubtree(
+                    key: cccdSectionKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: <Widget>[
+                        VcoreProfileTextFieldWidget(
+                          title: 'Số căn cước công dân (CCCD)',
+                          hintText: 'Quét QR thẻ CCCD để cập nhật',
+                          value: controller.sinhvienEdit.value.soCmtCccd ?? '',
+                          isDisable: true,
+                          onSubmitted: (text) {},
+                        ),
+                        const SizedBox(height: 10),
+                        OutlinedButton.icon(
+                          onPressed: () async {
+                            final CccdQrScanResult? result =
+                                await Navigator.of(context)
+                                    .push<CccdQrScanResult>(
+                              MaterialPageRoute<CccdQrScanResult>(
+                                builder: (_) => VcoreCccdQrScannerView(
+                                  trainingStudentCode: Globals()
+                                          .thongTinSinhVienModel
+                                          .value
+                                          ?.maSinhVien
+                                          ?.trim() ??
+                                      '',
+                                  trainingFullName: Globals()
+                                          .thongTinSinhVienModel
+                                          .value
+                                          ?.hoVaTen
+                                          ?.trim() ??
+                                      '',
+                                  trainingDateOfBirth: Globals()
+                                      .thongTinSinhVienModel
+                                      .value
+                                      ?.ngaySinh,
+                                ),
+                              ),
+                            );
+                            if (result == null) return;
+                            controller.applyVerifiedCccdFromQr(
+                              cccd: result.cccd,
+                              fullName: result.fullName,
+                              dateOfBirth: result.dateOfBirth,
+                            );
+                          },
+                          icon: const Icon(Icons.qr_code_scanner_rounded),
+                          label: const Text('Quét QR thẻ CCCD'),
+                        ),
+                        const SizedBox(height: 10),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.withOpacity(0.10),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: Colors.amber.shade700.withOpacity(0.45),
+                            ),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Icon(
+                                Icons.info_outline_rounded,
+                                color: Colors.amber.shade800,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              const Expanded(
+                                child: Text(
+                                  'Không nhập CCCD bằng bàn phím. Hãy quét QR trên thẻ căn cước. '
+                                  'Sau khi quét, dữ liệu chỉ ở trạng thái chờ xác nhận. '
+                                  'Chỉ khi bạn bấm Cập nhật, hệ thống mới đối chiếu mã sinh viên, CCCD, họ tên và ngày sinh với dữ liệu đào tạo.',
+                                  style: TextStyle(fontSize: 12.5, height: 1.35),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                   spaceHeight(itemSpace),
                   //Ngay cap - Noi cap
@@ -217,11 +296,12 @@ class VcoreProfilePersonBasicWidget extends StatelessWidget {
                       child: VcoreProfileDatefieldWidget(
                         title: 'Ngày cấp',
                         hintText: 'Chọn ngày cấp',
-                        isDisable: true,
-                        value: Globals()
-                            .thongTinSinhVienModel
-                            .value
-                            ?.ngayCapCmtCccd,
+                        value: controller.sinhvienEdit.value.ngayCapCmtCccd,
+                        onChangeDate: (DateTime? value) {
+                          controller.sinhvienEdit.update((item) {
+                            item?.ngayCapCmtCccd = value;
+                          });
+                        },
                       ),
                     ),
                     spaceWidth(10),
@@ -232,15 +312,19 @@ class VcoreProfilePersonBasicWidget extends StatelessWidget {
                       value:
                           controller.listTinhThanhPho.firstWhereOrNull((item) {
                         return item.id ==
-                            Globals()
-                                .thongTinSinhVienModel
-                                .value
-                                ?.idNoiCapCmtCccdTinhThanhPho;
+                            controller
+                                .sinhvienEdit.value.idNoiCapCmtCccdTinhThanhPho;
                       })?.ten,
                       items: controller.listTinhThanhPho.map((e) {
                         return e.ten ?? '';
                       }).toList(),
-                      onSelected: (value) {},
+                      onSelected: (value) {
+                        final obj = controller.listTinhThanhPho
+                            .firstWhereOrNull((item) => item.ten == value);
+                        controller.sinhvienEdit.update((item) {
+                          item?.idNoiCapCmtCccdTinhThanhPho = obj?.id;
+                        });
+                      },
                     )),
                   ]),
                   spaceHeight(itemSpace),

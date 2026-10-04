@@ -1011,19 +1011,45 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
     String? identityNo,
   }) async {
     try {
-      final code =
-          studentCode ??
-          Globals().thongTinSinhVienModel.value?.maSinhVien ??
-          '';
-      final effectiveIdentityNo =
-          identityNo ??
-          (code.isEmpty
-              ? (await SharedPreferences.getInstance()).getString(
-                  'applicant_cccd',
-                )
-              : null);
-      if (code.isEmpty &&
-          (effectiveIdentityNo == null || effectiveIdentityNo.isEmpty)) {
+      final String code =
+          (studentCode ??
+                  Globals().thongTinSinhVienModel.value?.maSinhVien ??
+                  '')
+              .trim();
+
+      // Normal USER sessions already carry CCCD in the Personal Information
+      // model. Always pass both identities to the repository so a KTX record
+      // created before MSSV assignment can still be found by CCCD.
+      String effectiveIdentityNo = identityNo?.trim() ?? '';
+      if (effectiveIdentityNo.isEmpty) {
+        effectiveIdentityNo =
+            Globals().thongTinSinhVienModel.value?.soCmtCccd?.trim() ?? '';
+      }
+
+      // Với sinh viên chính thức đã có hồ sơ OneVNU/MSSV, CCCD là khóa đối
+      // chiếu bắt buộc với KTX. Nếu STUDENT.STD_IDCARD còn trống thì không tra
+      // bằng MSSV để tránh hiển thị/ghi nhầm một hồ sơ KTX legacy; UI sẽ hướng
+      // người dùng sang quét QR CCCD rồi tải lại.
+      final bool isOfficialStudent =
+          Globals().thongTinSinhVienModel.value != null && code.isNotEmpty;
+      if (isOfficialStudent && effectiveIdentityNo.isEmpty) {
+        emit(DormitoryRegistrationDismissHub());
+        _emitEmptyMyRegistrations();
+        return;
+      }
+
+      // Applicant mode has no MSSV/profile model yet; only in that case may we
+      // use the Applicant CCCD persisted by its own login flow. Never use this
+      // key to override a normal USER identity because it could be stale.
+      if (effectiveIdentityNo.isEmpty && code.isEmpty) {
+        effectiveIdentityNo =
+            (await SharedPreferences.getInstance())
+                    .getString('applicant_cccd')
+                    ?.trim() ??
+                '';
+      }
+
+      if (code.isEmpty && effectiveIdentityNo.isEmpty) {
         emit(DormitoryRegistrationDismissHub());
         _emitEmptyMyRegistrations();
         return;
@@ -1031,7 +1057,7 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
 
       final res = await _repository.getMyRegistrations(
         studentCode: code.isNotEmpty ? code : null,
-        identityNo: effectiveIdentityNo,
+        identityNo: effectiveIdentityNo.isNotEmpty ? effectiveIdentityNo : null,
       );
       emit(DormitoryRegistrationDismissHub());
 

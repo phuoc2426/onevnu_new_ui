@@ -6,9 +6,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vnu_core/common/app_text_styles.dart';
 import 'package:vnu_core/common/utils.dart';
 import 'package:vnu_core/globals.dart';
+import 'package:vnu_core/modules/profile/views/vcore_profile_person_info_view.dart';
 import 'package:vnu_core/themes/app_theme.dart';
 import 'package:vnu_core/widgets/progress_hub_widget.dart';
 import 'package:vnu_core/widgets/vcore_module_scaffold.dart';
+import 'package:vnu_core/widgets/vcore_action_dialog.dart';
 import 'package:vnu_noi_tru/cubit/dormitory_registration_cubit.dart';
 import 'package:vnu_noi_tru/models/dormitory_payment/dormitory_invoice_model.dart';
 import 'package:vnu_noi_tru/models/dormitory_registration/accommodation_status_model.dart';
@@ -46,12 +48,14 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
   List<DormitoryAccommodationStatusModel> _statusCatalog =
       <DormitoryAccommodationStatusModel>[];
   Map<String, dynamic>? _fullStudentProfile;
+  Map<String, dynamic>? _fullStudentData;
 
   late BuildContext _hubContext;
 
   bool _hasOpenRegistrationPeriod = false;
   bool _isCheckingOpenRegistrationPeriod = true;
   bool _isSubmittingAccommodationRequest = false;
+  bool _hasShownMissingRegistrationCccdPrompt = false;
 
   String? _registrationPeriodMessage;
 
@@ -63,7 +67,49 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _bootstrap();
+  }
+
+  Future<void> _bootstrap() async {
+    await _loadData();
+  }
+
+  Future<void> _maybePromptCccdWhenNoRegistration(dynamic data) async {
+    if (_hasShownMissingRegistrationCccdPrompt || !mounted) return;
+
+    final List<dynamic> accommodations = _readAccommodations(data);
+    if (accommodations.isNotEmpty) return;
+
+    _hasShownMissingRegistrationCccdPrompt = true;
+    await Future<void>.delayed(Duration.zero);
+    if (!mounted) return;
+
+    final bool? openPersonalInfo = await showVcoreActionDialog<bool>(
+      context: context,
+      title: 'Chưa tìm thấy đơn đăng ký KTX',
+      content:
+          'OneVNU chưa tìm thấy đơn nội trú gắn với tài khoản hiện tại. '
+          'Nếu bạn đã từng đăng ký KTX bằng CCCD, hãy kiểm tra/cập nhật CCCD trong Thông tin cá nhân để đồng bộ hồ sơ.\n\n'
+          'CCCD không thể nhập tay, chỉ cập nhật bằng QR trên thẻ căn cước.',
+      leadingIcon: Icons.badge_outlined,
+      actions: const <VcoreDialogAction<bool>>[
+        VcoreDialogAction<bool>(
+          label: 'Tiếp tục',
+          value: false,
+          tone: VcoreDialogActionTone.secondary,
+        ),
+        VcoreDialogAction<bool>(
+          label: 'Cập nhật CCCD',
+          value: true,
+          icon: Icons.manage_accounts_outlined,
+          tone: VcoreDialogActionTone.primary,
+        ),
+      ],
+    );
+
+    if (openPersonalInfo == true && mounted) {
+      await _openCccdUpdateFromKtx();
+    }
   }
 
   @override
@@ -95,9 +141,16 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
     }
 
     await _cubit.getMyRegistrations();
+    final registrationState = _cubit.state;
+    final dynamic registrationData =
+        registrationState is DormitoryRegistrationMyRegistrationsLoaded
+            ? registrationState.data
+            : null;
+
     await _loadFullStudentProfileFromCurrentState();
     await _loadLatestPendingApprovalDaysFromCurrentState();
     await _loadLatestReceiptFromCurrentState();
+    await _maybePromptCccdWhenNoRegistration(registrationData);
   }
 
   Future<void> _refreshData() async {
@@ -142,31 +195,49 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
     final String studentCode = _studentCodeText(student).trim();
     String identityNo = _studentIdentityNo(student).trim();
     if (identityNo.isEmpty) {
+      identityNo =
+          Globals().thongTinSinhVienModel.value?.soCmtCccd?.trim() ?? '';
+    }
+    if (identityNo.isEmpty && studentCode.isEmpty) {
       final SharedPreferences preferences = await SharedPreferences.getInstance();
       identityNo = preferences.getString('applicant_cccd')?.trim() ?? '';
     }
 
     if (studentCode.isEmpty && identityNo.isEmpty) {
-      if (mounted && _fullStudentProfile != null) {
-        setState(() => _fullStudentProfile = null);
+      if (mounted && (_fullStudentProfile != null || _fullStudentData != null)) {
+        setState(() {
+          _fullStudentProfile = null;
+          _fullStudentData = null;
+        });
       } else {
         _fullStudentProfile = null;
+        _fullStudentData = null;
       }
       return;
     }
 
     try {
-      final Map<String, dynamic>? profile = await _repository.getStudentProfile(
+      final Map<String, dynamic>? fullData =
+          await _repository.getStudentFullProfile(
         studentCode: studentCode,
         identityNo: identityNo,
       );
+      final dynamic rawStudent = fullData?['student'];
+      final Map<String, dynamic>? profile = rawStudent is Map
+          ? Map<String, dynamic>.from(rawStudent)
+          : null;
+
       if (!mounted) {
+        _fullStudentData = fullData;
         _fullStudentProfile = profile;
         return;
       }
-      setState(() => _fullStudentProfile = profile);
+      setState(() {
+        _fullStudentData = fullData;
+        _fullStudentProfile = profile;
+      });
     } catch (_) {
-      // /dormitory/me vẫn là nguồn chính; profile đầy đủ chỉ bổ sung familyMembers.
+      // /dormitory/me vẫn là nguồn chính; student.show chỉ bổ sung dữ liệu đầy đủ.
     }
   }
 
@@ -451,6 +522,19 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
     String key, {
     List<String> aliases = const <String>[],
   }) {
+    // student.show chứa roommates/receipts/issues và thường có
+    // accommodations/histories đầy đủ hơn /dormitory/me. Ưu tiên collection
+    // không rỗng từ full data, rồi mới fallback dữ liệu màn hình chính.
+    final Map<String, dynamic>? fullData = _fullStudentData;
+    if (fullData != null) {
+      dynamic fullValue = fullData[key];
+      for (final String alias in aliases) {
+        fullValue ??= fullData[alias];
+      }
+      final List<dynamic> fullList = _asList(fullValue);
+      if (fullList.isNotEmpty) return fullList;
+    }
+
     if (data == null) return <dynamic>[];
 
     if (data is Map) {
@@ -481,16 +565,55 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
     return <dynamic>[];
   }
 
+  Map<String, dynamic> _mergedStudentHistoryData(dynamic data) {
+    final Map<String, dynamic> merged = data is Map
+        ? Map<String, dynamic>.from(data)
+        : <String, dynamic>{};
+
+    final Map<String, dynamic>? fullData = _fullStudentData;
+    if (fullData != null) {
+      for (final String key in const <String>[
+        'pendingChanges',
+        'pending_changes',
+        'accommodations',
+        'roommates',
+        'receipts',
+        'issues',
+        'histories',
+      ]) {
+        final dynamic value = fullData[key];
+        if (value is Iterable) {
+          if (value.isNotEmpty) merged[key] = value;
+        } else if (value != null) {
+          merged[key] = value;
+        }
+      }
+    }
+
+    final dynamic student = _readStudent(data);
+    if (student != null) merged['student'] = student;
+    return merged;
+  }
+
   Future<void> _showStudentHistory(dynamic data) async {
     if (data == null || !mounted) return;
 
+    final Map<String, dynamic> mergedData = _mergedStudentHistoryData(data);
+    Map<String, dynamic> displayData = mergedData;
+    try {
+      displayData = await _repository.enrichStudentDataForDisplay(mergedData);
+    } catch (_) {
+      // Progressive enrichment only. Raw student.show data is still usable.
+    }
+
+    if (!mounted) return;
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (BuildContext context) {
-        return DRStudentHistorySheet(data: data);
+        return DRStudentHistorySheet(data: displayData);
       },
     );
   }
@@ -914,12 +1037,18 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
   List<dynamic> _readAccommodations(dynamic data) {
     if (data == null) return <dynamic>[];
 
-    // /dormitory/me only guarantees a compact accommodations[] response
-    // (roomTypeName + assignedRoom) plus histories[]. student.show returns a
-    // richer accommodations[] response containing dormitory/building as well.
+    // /dormitory/me normally returns compact accommodations[] plus histories[].
+    // Some deployments expose the same current applications as registrations[].
+    // student.show may return richer accommodation metadata.
     // Merge every available source and finally recover missing room metadata
     // from the matching StudentHistory row by accommodation_id/period_id.
-    final List<dynamic> summaryItems = _readTopLevelList(data, 'accommodations');
+    List<dynamic> summaryItems = _readTopLevelList(data, 'accommodations');
+    if (summaryItems.isEmpty) {
+      // Some KTX deployments expose the same current-application collection
+      // as registrations. Treat it as an alias instead of showing an empty
+      // dashboard while a real application exists.
+      summaryItems = _readTopLevelList(data, 'registrations');
+    }
     final List<dynamic> histories = _readTopLevelList(data, 'histories');
 
     dynamic student;
@@ -936,11 +1065,21 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
     List<dynamic> detailItems = <dynamic>[];
     if (student is Map) {
       detailItems = _asList(student['accommodations']);
+      if (detailItems.isEmpty) {
+        detailItems = _asList(student['registrations']);
+      }
     } else if (student != null) {
       try {
         detailItems = _asList(student.accommodations);
       } catch (_) {
         detailItems = <dynamic>[];
+      }
+      if (detailItems.isEmpty) {
+        try {
+          detailItems = _asList(student.registrations);
+        } catch (_) {
+          // Older typed student models do not expose registrations.
+        }
       }
     }
 
@@ -1296,6 +1435,93 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
     );
   }
 
+  String _studentCountryName(dynamic student) {
+    return _readString(
+      student,
+      'countryName',
+      (dynamic object) => object.countryName,
+      aliases: const <String>[
+        'country_name',
+        'national',
+        'country',
+      ],
+    );
+  }
+
+  String _studentContactAddress(dynamic student) {
+    return _readString(
+      student,
+      'contact_address',
+      (dynamic object) => object.contactAddress,
+      aliases: const <String>['contactAddress'],
+    );
+  }
+
+  String _studentVneidPermanentAddress(dynamic student) {
+    return _readString(
+      student,
+      'vneid_permanent_address',
+      (dynamic object) => object.vneidPermanentAddress,
+      aliases: const <String>['vneidPermanentAddress'],
+    );
+  }
+
+  String _studentVneidTemporaryAddress(dynamic student) {
+    return _readString(
+      student,
+      'vneid_temporary_address',
+      (dynamic object) => object.vneidTemporaryAddress,
+      aliases: const <String>['vneidTemporaryAddress'],
+    );
+  }
+
+  String _studentReasonStay(dynamic student) {
+    return _readString(
+      student,
+      'reason_stay',
+      (dynamic object) => object.reasonStay,
+      aliases: const <String>['reasonStay'],
+    );
+  }
+
+  String _studentTypeText(dynamic student) {
+    final String explicit = _readString(
+      student,
+      'studentTypeLabel',
+      (dynamic object) => object.studentTypeLabel,
+      aliases: const <String>['student_type_label'],
+    ).trim();
+    if (explicit.isNotEmpty) return explicit;
+
+    final dynamic raw = _readNested(
+      student,
+      'student_type',
+      (dynamic object) => object.studentType,
+      aliases: const <String>['studentType'],
+    );
+    final String value = raw?.toString().trim() ?? '';
+    if (value == '0') return 'Học sinh';
+    if (value == '1') return 'Sinh viên';
+    return value;
+  }
+
+  String _studentResidenceTypeText(dynamic student) {
+    final String explicit = _readString(
+      student,
+      'residenceTypeLabel',
+      (dynamic object) => object.residenceTypeLabel,
+      aliases: const <String>['residence_type_label'],
+    ).trim();
+    if (explicit.isNotEmpty) return explicit;
+
+    return _readString(
+      student,
+      'residence_type',
+      (dynamic object) => object.residenceType,
+      aliases: const <String>['residenceType'],
+    );
+  }
+
   String _studentAvatarUrl(dynamic student) {
     return _readString(
       student,
@@ -1403,36 +1629,29 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
     dynamic student,
     dynamic latestAccommodation,
   ) async {
-    String identityNo = _studentIdentityNo(student).trim();
-    final SharedPreferences preferences = await SharedPreferences.getInstance();
+    // The full profile is already loaded in the background when this dashboard
+    // opens. Re-fetching it here blocks the modal transition and makes the
+    // Update action feel frozen on a slow KTX connection.
+    final dynamic editableStudent = _fullStudentProfile ?? student;
+
+    String identityNo = _studentIdentityNo(editableStudent).trim();
     if (identityNo.isEmpty) {
+      identityNo = _studentIdentityNo(student).trim();
+    }
+    if (identityNo.isEmpty) {
+      identityNo =
+          Globals().thongTinSinhVienModel.value?.soCmtCccd?.trim() ?? '';
+    }
+
+    SharedPreferences? preferences;
+    if (identityNo.isEmpty) {
+      preferences = await SharedPreferences.getInstance();
       identityNo = preferences.getString('applicant_cccd')?.trim() ?? '';
     }
-    if (identityNo.isEmpty) {
-      identityNo = _studentCodeText(student).trim();
-    }
 
     if (identityNo.isEmpty) {
-      snackBarError('Không tìm thấy CCCD hoặc mã sinh viên để cập nhật');
+      snackBarError('Không tìm thấy CCCD để cập nhật hồ sơ KTX');
       return;
-    }
-
-    dynamic editableStudent = student;
-    try {
-      final Map<String, dynamic>? fullProfile =
-          await _repository.getStudentProfile(
-        studentCode: _studentCodeText(student),
-        identityNo: identityNo,
-      );
-      if (fullProfile != null) {
-        editableStudent = fullProfile;
-        final String profileIdentityNo = _studentIdentityNo(fullProfile).trim();
-        if (profileIdentityNo.isNotEmpty) {
-          identityNo = profileIdentityNo;
-        }
-      }
-    } catch (_) {
-      // Giữ dữ liệu /me làm fallback; không chặn người dùng mở màn cập nhật.
     }
 
     if (!mounted) return;
@@ -1457,11 +1676,17 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
 
     if (result == null || !mounted) return;
 
-    final String? applicantIdentityNo = preferences.getString('applicant_cccd');
+    final SharedPreferences resolvedPreferences =
+        preferences ?? await SharedPreferences.getInstance();
+    final String? applicantIdentityNo =
+        resolvedPreferences.getString('applicant_cccd');
     if (applicantIdentityNo != null &&
         applicantIdentityNo.trim().isNotEmpty &&
         applicantIdentityNo.trim() != result.identityNo.trim()) {
-      await preferences.setString('applicant_cccd', result.identityNo.trim());
+      await resolvedPreferences.setString(
+        'applicant_cccd',
+        result.identityNo.trim(),
+      );
     }
 
     if (!mounted) return;
@@ -2658,10 +2883,16 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
                         padding: const EdgeInsets.all(16),
                         children: <Widget>[
                           _buildDashboardStudentHeader(student, null),
+                          if (_hasPendingStudentChanges(data)) ...<Widget>[
+                            const SizedBox(height: 14),
+                            _buildPendingStudentChangesCard(data),
+                          ],
                           const SizedBox(height: 14),
                           _buildDashboardInvoiceOverview(student, null),
                           const SizedBox(height: 14),
-                          _buildEmptyRegistrationDashboardCard(),
+                          _currentCccd().isEmpty
+                              ? _buildMissingCccdRecoveryCard()
+                              : _buildEmptyRegistrationDashboardCard(),
                           const SizedBox(height: 14),
                           _buildDashboardQuickActions(
                             data: data,
@@ -2685,6 +2916,10 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
                           student,
                           accommodations.first,
                         ),
+                        if (_hasPendingStudentChanges(data)) ...<Widget>[
+                          const SizedBox(height: 14),
+                          _buildPendingStudentChangesCard(data),
+                        ],
                         const SizedBox(height: 14),
                         _buildDashboardInvoiceOverview(
                           student,
@@ -2830,6 +3065,113 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
             color: const Color(0xFF078B3E),
           ),
         ],
+      ),
+    );
+  }
+
+  dynamic _pendingStudentChanges(dynamic data) {
+    final Map<String, dynamic>? fullData = _fullStudentData;
+    if (fullData != null) {
+      final dynamic value =
+          fullData['pendingChanges'] ?? fullData['pending_changes'];
+      if (value is Map && value.isNotEmpty) return value;
+      if (value is Iterable && value is! String && value.isNotEmpty) {
+        return value.first;
+      }
+    }
+
+    if (data is Map) {
+      final dynamic value = data['pendingChanges'] ?? data['pending_changes'];
+      if (value is Map && value.isNotEmpty) return value;
+      if (value is Iterable && value is! String && value.isNotEmpty) {
+        return value.first;
+      }
+    }
+    return null;
+  }
+
+  bool _hasPendingStudentChanges(dynamic data) {
+    return _pendingStudentChanges(data) != null;
+  }
+
+  Widget _buildPendingStudentChangesCard(dynamic data) {
+    final dynamic raw = _pendingStudentChanges(data);
+    final Map<String, dynamic> pending = raw is Map
+        ? Map<String, dynamic>.from(raw)
+        : <String, dynamic>{};
+    final String status =
+        (pending['statusLabel'] ?? pending['status_label'] ?? pending['status'])
+                ?.toString()
+                .trim() ??
+            '';
+    final dynamic submittedRaw =
+        pending['submittedAt'] ?? pending['submitted_at'];
+    final DateTime? submittedAt = submittedRaw == null
+        ? null
+        : DateTime.tryParse(submittedRaw.toString());
+    final dynamic rawChanges = pending['changes'];
+    final List<dynamic> changes = rawChanges is Iterable && rawChanges is! String
+        ? List<dynamic>.from(rawChanges)
+        : <dynamic>[];
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _showStudentHistory(data),
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFF8E7),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFF0D18A)),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              const Icon(
+                Icons.pending_actions_rounded,
+                color: Color(0xFFB76E00),
+                size: 22,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    const Text(
+                      'Yêu cầu cập nhật hồ sơ',
+                      style: TextStyle(
+                        fontSize: AppFontSizes.font11,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF6B4300),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      <String>[
+                        if (status.isNotEmpty) status,
+                        if (changes.isNotEmpty) '${changes.length} trường thay đổi',
+                        if (submittedAt != null)
+                          'Gửi ${DateFormat('dd/MM/yyyy HH:mm').format(submittedAt.toLocal())}',
+                      ].join(' · '),
+                      style: const TextStyle(
+                        fontSize: AppFontSizes.extraSmall,
+                        color: Color(0xFF795B20),
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: Color(0xFFB76E00),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -3210,6 +3552,93 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  String _currentCccd() {
+    return Globals().thongTinSinhVienModel.value?.soCmtCccd?.trim() ?? '';
+  }
+
+  Future<void> _openCccdUpdateFromKtx({bool refreshKtx = true}) async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => const VcoreProfilePersonInfoView(
+          scrollToCccd: true,
+          verifyCccdForKtx: true,
+        ),
+      ),
+    );
+
+    if (!mounted) return;
+    // Refresh the OneVNU profile first so the KTX request receives the newly
+    // persisted STUDENT.STD_IDCARD as identity_no.
+    await Globals().refreshStudentInfo();
+    if (!mounted) return;
+    if (refreshKtx) {
+      await _refreshData();
+    }
+  }
+
+  Widget _buildMissingCccdRecoveryCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(17),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFBEB),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFF5C451)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Icon(
+                Icons.badge_outlined,
+                color: Color(0xFF9A6700),
+                size: 25,
+              ),
+              SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      'Có đơn KTX nhưng chưa thấy hồ sơ?',
+                      style: TextStyle(
+                        fontSize: AppFontSizes.mediumSmall,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF5F4300),
+                      ),
+                    ),
+                    SizedBox(height: 5),
+                    Text(
+                      'OneVNU chưa có số CCCD để đối chiếu hồ sơ KTX. '
+                      'Hồ sơ nội trú được tra ưu tiên theo CCCD. Hãy quét QR '
+                      'trên thẻ căn cước để cập nhật, sau đó hệ thống sẽ tự tải lại hồ sơ.',
+                      style: TextStyle(
+                        fontSize: AppFontSizes.extraSmall,
+                        color: Color(0xFF725B20),
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: _openCccdUpdateFromKtx,
+              icon: const Icon(Icons.qr_code_scanner_rounded),
+              label: const Text('Cập nhật CCCD bằng QR'),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -3732,8 +4161,17 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
     final String academicYear = _studentAcademicYear(student);
     final String level = _studentLevel(student);
     final String permanentAddress = _studentPermanentAddress(student);
+    final String vneidPermanentAddress =
+        _studentVneidPermanentAddress(student);
+    final String contactAddress = _studentContactAddress(student);
     final String temporaryAddress = _studentTemporaryAddress(student);
+    final String vneidTemporaryAddress =
+        _studentVneidTemporaryAddress(student);
     final String priorityObject = _studentPriorityObjectName(student);
+    final String countryName = _studentCountryName(student);
+    final String studentType = _studentTypeText(student);
+    final String residenceType = _studentResidenceTypeText(student);
+    final String reasonStay = _studentReasonStay(student);
     final String avatarUrl = _studentAvatarUrl(student);
     final List<dynamic> familyMembers = _studentFamilyMembers(student);
     // Tạm ẩn trạng thái khóa trên giao diện.
@@ -3854,6 +4292,10 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
                 DateFormat('dd/MM/yyyy').format(dob.toLocal()),
               ),
             if (gender.isNotEmpty) _buildInfoRow('Giới tính:', gender),
+            if (studentType.isNotEmpty)
+              _buildInfoRow('Đối tượng:', studentType),
+            if (residenceType.isNotEmpty)
+              _buildInfoRow('Loại cư trú:', residenceType),
             if (_studentClass(student).isNotEmpty)
               _buildInfoRow('Lớp:', _studentClass(student)),
             if (_studentMajor(student).isNotEmpty)
@@ -3867,12 +4309,22 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
               _buildInfoRow('Email:', _studentEmail(student)),
             if (_studentUniversity(student).isNotEmpty)
               _buildInfoRow('Trường:', _studentUniversity(student)),
+            if (countryName.isNotEmpty)
+              _buildInfoRow('Quốc tịch:', countryName),
             if (priorityObject.isNotEmpty)
               _buildInfoRow('Đối tượng ưu tiên:', priorityObject),
             if (permanentAddress.isNotEmpty)
               _buildInfoRow('Thường trú:', permanentAddress),
+            if (vneidPermanentAddress.isNotEmpty)
+              _buildInfoRow('Thường trú theo VNeID:', vneidPermanentAddress),
+            if (contactAddress.isNotEmpty)
+              _buildInfoRow('Địa chỉ liên hệ:', contactAddress),
             if (temporaryAddress.isNotEmpty)
               _buildInfoRow('Tạm trú:', temporaryAddress),
+            if (vneidTemporaryAddress.isNotEmpty)
+              _buildInfoRow('Tạm trú theo VNeID:', vneidTemporaryAddress),
+            if (reasonStay.isNotEmpty)
+              _buildInfoRow('Lý do lưu trú:', reasonStay),
             if (familyMembers.isNotEmpty) ...<Widget>[
               const Divider(height: 24),
               const Row(
@@ -4754,6 +5206,19 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
   }
 
   Future<void> _goToRegisterFlow() async {
+    if (_currentCccd().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text(
+            'Vui lòng cập nhật CCCD bằng QR trước khi đăng ký nội trú.',
+          ),
+        ),
+      );
+      await _openCccdUpdateFromKtx();
+      return;
+    }
+
     if (!_hasOpenRegistrationPeriod) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

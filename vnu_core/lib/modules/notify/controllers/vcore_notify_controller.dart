@@ -244,7 +244,7 @@ class VcoreNotifyController extends GetxController {
       }
 
       if (guidItem.isEmpty) {
-        snackBarWarning('Không tồn tại phản ánh hiện trường với guid.');
+        snackBarWarning('Không tồn tại phản ánh, góp ý với guid.');
       } else {
         SmartDialog.showLoading();
         try {

@@ -3,6 +3,7 @@
     package="com.vnu.students">
 
     <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 
     <!-- Permissions options for the `location` group -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
@@ -21,6 +22,9 @@
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="https" />
+        </intent>
+        <intent>
+            <action android:name="android.support.customtabs.action.CustomTabsService" />
         </intent>
     </queries>
     <application
@@ -72,6 +76,15 @@
                     android:host="onevnu-admin.vnu.edu.vn"
                     android:pathPrefix="/idp/callback" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="onevnu"
+                    android:host="idp"
+                    android:pathPrefix="/callback" />
+            </intent-filter>
 
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
@@ -96,7 +109,7 @@
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
-        <meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="VNUStudents"/>
+        <meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="OneVNU_HeadsUp_v2"/>
         <!-- <meta-data android:name="com.google.android.geo.API_KEY" android:value="AIzaSyBe6xAnvolDgwd5icTDcsTH3ITMOz384F4"/> -->
         <provider
             android:name="com.vnu.students.GmailFileProvider"

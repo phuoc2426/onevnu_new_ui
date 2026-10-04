@@ -145,6 +145,7 @@ class AppConfigService {
         'domainDownload',
       );
       final String ktxUrl = _readOptionalHttpUrlSafely(config, 'ktxApiUrl');
+      final String pahtUrl = _readOptionalHttpUrlSafely(config, 'pahtApiUrl');
       final String vneidUrl = _readOptionalHttpUrlSafely(
         config,
         'vneidApiUrl',
@@ -157,6 +158,7 @@ class AppConfigService {
 
       ServicesUrl().baseUrlFileDownload = downloadDomain;
       ServicesUrl().ktxApiUrl = ktxUrl;
+      ServicesUrl().pahtApiUrl = pahtUrl;
       ServicesUrl().vneidApiUrl = vneidUrl;
       ServicesUrl().cccdConfigApiUrl = cccdConfigUrl;
       ServicesUrl().zaloGroupUrl = zaloUrl;
@@ -189,6 +191,7 @@ class AppConfigService {
       logInfo(
         'App config loaded from ${ServicesUrl.defaultBaseUrl}/api/config: '
         'ktxApiUrl=${ServicesUrl().effectiveKtxApiUrl}, '
+        'pahtApiUrl=${ServicesUrl().effectivePahtApiUrl}, '
         'vneidApiUrl=${ServicesUrl().effectiveVneidApiUrl}, '
         'cccdConfigApiUrl=${cccdConfigUrl.isEmpty ? "<not-configured>" : cccdConfigUrl}, '
         'domainDownload=${downloadDomain.isEmpty ? "<mobile-api>" : downloadDomain}, '
@@ -303,6 +306,7 @@ class AppConfigService {
   bool _looksLikeAppConfig(Map<String, dynamic> map) {
     return map.containsKey('login') ||
         map.containsKey('ktxApiUrl') ||
+        map.containsKey('pahtApiUrl') ||
         map.containsKey('vneidApiUrl') ||
         map.containsKey('appUpdate') ||
         map.containsKey('domainDownload') ||
@@ -370,3 +374,4 @@ class AppConfigService {
     }
   }
 }
+

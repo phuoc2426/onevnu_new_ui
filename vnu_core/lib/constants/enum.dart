@@ -88,7 +88,7 @@ extension HomeServiceExtension on HomeService {
       case HomeService.HuongDanSuDung:
         return 'Hướng dẫn sử dụng';
       case HomeService.PhanAnhHienTruong:
-        return 'Phản ánh hiện trường';
+        return 'Phản ánh, góp ý';
       case HomeService.TheSinhVien:
         return 'Thẻ sinh viên';
       case HomeService.DongBo:

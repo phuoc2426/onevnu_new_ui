@@ -1,4 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
+
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vnu_core/common/log.dart';
@@ -7,6 +11,7 @@ import 'package:vnu_core/models/model.dart';
 import 'package:vnu_core/modules/auth_mode/auth_entry_mode_service.dart';
 import 'package:vnu_core/repository/app_repository.dart';
 import 'package:vnu_core/repository/data_repository.dart';
+import 'package:vnu_core/vnu_core.dart';
 
 /// Nhận token ONEVNU sau khi redeem IdP ticket và gắn vào session hiện tại.
 ///
@@ -68,6 +73,10 @@ class IdpOneVnuSessionService {
     }
 
     await AuthEntryModeService().markIdp();
+
+    // IDP authentication is complete before FCM is touched. This also repairs
+    // sessions that reuse the same cached FCM token after a fresh IDP login.
+    unawaited(_syncFcmAfterIdpLogin());
   }
 
   Future<void> _loadStudentProfileAfterIdp() async {
@@ -102,6 +111,11 @@ class IdpOneVnuSessionService {
   }
 
   Future<void> _clearApplicantLocalData() async {
+    await Future.wait<void>(<Future<void>>[
+      DataRepository().deleteSecureKey(kApplicantAccessToken),
+      DataRepository().deleteSecureKey(kApplicantRefreshToken),
+    ]);
+
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     const List<String> applicantKeys = <String>[
       'applicant_id',
@@ -116,6 +130,34 @@ class IdpOneVnuSessionService {
 
     for (final String key in applicantKeys) {
       await prefs.remove(key);
+    }
+  }
+
+
+  Future<void> _syncFcmAfterIdpLogin() async {
+    try {
+      final FirebaseMessaging messaging = FirebaseMessaging.instance;
+      await messaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+
+      if (Platform.isIOS) {
+        for (int attempt = 0; attempt < 8; attempt++) {
+          final String? apnsToken = await messaging.getAPNSToken();
+          if (apnsToken != null && apnsToken.trim().isNotEmpty) break;
+          await Future<void>.delayed(const Duration(milliseconds: 250));
+        }
+      }
+
+      final String? firebaseToken = await messaging.getToken();
+      await VnuCore().addFirebaseToken(firebaseToken);
+    } catch (error, stackTrace) {
+      logError(
+        '[FCM][IDP_LOGIN] post-login binding failed: '
+        '$error\n$stackTrace',
+      );
     }
   }
 

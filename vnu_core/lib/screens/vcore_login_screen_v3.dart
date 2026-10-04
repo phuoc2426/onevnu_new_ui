@@ -114,22 +114,17 @@ class _VCoreLoginScreenV3State extends State<VCoreLoginScreenV3> {
 
     _checkBio();
 
-    // TEMP TEST: nếu IdpAuthConfig có test URL thì ép Student login sang IDP
-    // và KHÔNG đọc /api/config. Comment đúng dòng idp-test trong
-    // IdpAuthConfig để quay về cơ chế server-driven ban đầu.
-    final String testIdpUrl =
-        IdpAuthConfig.temporaryTestStartUrl?.trim() ?? '';
-    if (testIdpUrl.isNotEmpty) {
-      _loginRuntimeConfig = LoginRuntimeConfig(
-        idpLogin: true,
-        idpStartUrl: testIdpUrl,
-        idpWebUrl: testIdpUrl,
-        passwordFallbackEnabled: false,
-        qrEnabled: false,
-      );
+    // STATIC IDP: bỏ comment USE_STATIC_IDP_CONFIG trong IdpAuthConfig
+    // để dùng hoàn toàn cấu hình login tĩnh phía Flutter. Comment lại dòng đó
+    // thì màn login quay về cơ chế server-driven hiện tại qua /api/config.
+    if (IdpAuthConfig.useStaticConfig) {
+      _loginRuntimeConfig = IdpAuthConfig.staticLoginRuntimeConfig;
       _loginConfigLoading = false;
       _loginConfigError = null;
-      logWarning('[LOGIN_IDP_TEST] force IDP UI: $testIdpUrl');
+      logWarning(
+        '[LOGIN_STATIC_IDP] enabled=true '
+        'startHost=${Uri.parse(IdpAuthConfig.staticIdpStartUrl).host}',
+      );
     } else {
       _loadLoginRuntimeConfig(showLoading: true, reason: 'initial');
     }
@@ -272,9 +267,9 @@ class _VCoreLoginScreenV3State extends State<VCoreLoginScreenV3> {
   Future<bool> _verifyLoginMethodBeforeSubmit({
     required bool expectedIdpLogin,
   }) async {
-    // TEMP TEST không đọc /api/config ở màn login. Chỉ IDP flow được phép chạy.
-    if (IdpAuthConfig.temporaryTestEnabled) {
-      return expectedIdpLogin;
+    // Static mode không kiểm tra lại login method từ /api/config.
+    if (IdpAuthConfig.useStaticConfig) {
+      return expectedIdpLogin == IdpAuthConfig.staticIdpLogin;
     }
 
     if (_loginConfigRefreshRunning) {

@@ -1,3 +1,5 @@
+import 'package:vnu_noi_tru/domain/registration/dormitory_date_codec.dart';
+
 class RegistrationPayloadModel {
   final int registrationPeriodId;
   final List<int> priorityObjectIds;
@@ -315,11 +317,11 @@ class RegistrationStudentPayload {
     final Map<String, dynamic> json = <String, dynamic>{
       'student_code': studentCode.isEmpty ? null : studentCode,
       'full_name': fullName,
-      'dob': dob,
+      'dob': DormitoryDateCodec.normalize(dob),
       'identity_no': cccd,
       'identity_type': identityType,
       'identity_name': identityName,
-      'identity_issue_date': cccdIssueDate.isEmpty ? null : cccdIssueDate,
+      'identity_issue_date': DormitoryDateCodec.normalizeNullable(cccdIssueDate),
       'identity_issue_place': identityIssuePlace,
       'country': country,
       'country_code': countryCode,
@@ -365,10 +367,10 @@ class RegistrationStudentPayload {
     final Map<String, dynamic> json = <String, dynamic>{
       'student_code': studentCode.isEmpty ? null : studentCode,
       'full_name': fullName,
-      'dob': dob,
+      'dob': DormitoryDateCodec.normalize(dob),
       'identity_no': cccd,
       'country_code': countryCode,
-      'identity_issue_date': cccdIssueDate.isEmpty ? null : cccdIssueDate,
+      'identity_issue_date': DormitoryDateCodec.normalizeNullable(cccdIssueDate),
       'identity_issue_place': identityIssuePlace,
       'permanent_address': permanentAddress,
       'permanent_province_code': permanentProvinceCode,
@@ -428,9 +430,9 @@ class RegistrationStudentPayload {
     final Map<String, dynamic> json = <String, dynamic>{
       'student_code': studentCode.isEmpty ? null : studentCode,
       'full_name': fullName,
-      'dob': dob,
+      'dob': DormitoryDateCodec.normalize(dob),
       'identity_no': cccd,
-      'identity_issue_date': cccdIssueDate.isEmpty ? null : cccdIssueDate,
+      'identity_issue_date': DormitoryDateCodec.normalizeNullable(cccdIssueDate),
       'permanent_address': permanentAddress,
       'class': className,
       'major': major,

@@ -64,6 +64,12 @@ class MyRegistrationModel {
   final String? studentCode;
   final String? studentName;
   final String? assignedRoom;
+  final String? roomTypeName;
+  final String? buildingName;
+  final String? dormitoryName;
+  final String? rejectReason;
+  final String? requestStatus;
+  final String? requestStatusLabel;
   final bool? isDraft;
   final String? startDate;
   final String? endDate;
@@ -92,6 +98,12 @@ class MyRegistrationModel {
     this.studentCode,
     this.studentName,
     this.assignedRoom,
+    this.roomTypeName,
+    this.buildingName,
+    this.dormitoryName,
+    this.rejectReason,
+    this.requestStatus,
+    this.requestStatusLabel,
     this.isDraft,
     this.startDate,
     this.endDate,
@@ -184,6 +196,22 @@ class MyRegistrationModel {
       return raw.toString();
     }
 
+    String? displayName(dynamic raw) {
+      if (raw == null) return null;
+      if (raw is Map) {
+        final dynamic value = raw['name'] ??
+            raw['label'] ??
+            raw['title'] ??
+            raw['room_number'] ??
+            raw['roomNumber'] ??
+            raw['code'];
+        final String text = value?.toString().trim() ?? '';
+        return text.isEmpty ? null : text;
+      }
+      final String text = raw.toString().trim();
+      return text.isEmpty ? null : text;
+    }
+
     final dynamic rawDocuments =
         json['documents'] ??
         json['attachments'] ??
@@ -207,10 +235,12 @@ class MyRegistrationModel {
       ),
       priorityObjectId: singlePriorityId,
       priorityObjectIds: priorityIds,
-      priorityObjectName: (json['priority_object_name'] ??
-              json['priorityObjectName'] ??
-              json['priorityObject'])
-          ?.toString(),
+      priorityObjectName: displayName(
+        json['priority_object_name'] ??
+            json['priorityObjectName'] ??
+            json['priorityObject'] ??
+            json['priority_object'],
+      ),
       dormitoryId: _parseInt(
         json['dormitory_id'] ??
             json['dormitoryId'] ??
@@ -219,24 +249,47 @@ class MyRegistrationModel {
       ),
       roomTypeId: _parseInt(json['room_type_id'] ?? json['roomTypeId']),
       roomId: roomId,
-      status: json['status'] as String?,
-      statusLabel: (json['status_label'] ?? json['statusLabel']) as String?,
+      status: json['status']?.toString(),
+      statusLabel: (json['status_label'] ?? json['statusLabel'])?.toString(),
       registrationPeriodName:
           (json['registration_period_name'] ?? json['registrationPeriodName'])
-              as String?,
-      studentCode: (json['student_code'] ?? json['studentCode']) as String?,
-      studentName: (json['student_name'] ?? json['studentName']) as String?,
+              ?.toString(),
+      studentCode: (json['student_code'] ?? json['studentCode'])?.toString(),
+      studentName: (json['student_name'] ?? json['studentName'])?.toString(),
       assignedRoom: assignedRoomText(
         json['assigned_room'] ?? json['assignedRoom'] ?? json['room'],
       ),
+      roomTypeName: displayName(
+        json['room_type_name'] ??
+            json['roomTypeName'] ??
+            json['room_type'] ??
+            json['roomType'],
+      ),
+      buildingName: displayName(
+        json['building_name'] ??
+            json['buildingName'] ??
+            json['building'],
+      ),
+      dormitoryName: displayName(
+        json['dormitory_name'] ??
+            json['dormitoryName'] ??
+            json['dormitory'],
+      ),
+      rejectReason:
+          (json['reject_reason'] ?? json['rejectReason'])?.toString(),
+      requestStatus:
+          (json['request_status'] ?? json['requestStatus'])?.toString(),
+      requestStatusLabel:
+          (json['request_status_label'] ?? json['requestStatusLabel'])
+              ?.toString(),
       isDraft: json['is_draft'] as bool? ?? json['isDraft'] as bool?,
-      startDate: (json['start_date'] ?? json['startDate']) as String?,
-      endDate: (json['end_date'] ?? json['endDate']) as String?,
-      approvedAt: (json['approved_at'] ?? json['approvedAt']) as String?,
-      assignedAt: (json['assigned_at'] ?? json['assignedAt']) as String?,
-      checkinAt: (json['checkin_at'] ?? json['checkinAt']) as String?,
-      checkoutAt: (json['checkout_at'] ?? json['checkoutAt']) as String?,
-      note: (json['note'] ?? json['reason']) as String?,
+      startDate: (json['start_date'] ?? json['startDate'])?.toString(),
+      endDate: (json['end_date'] ?? json['endDate'])?.toString(),
+      approvedAt: (json['approved_at'] ?? json['approvedAt'])?.toString(),
+      assignedAt: (json['assigned_at'] ?? json['assignedAt'])?.toString(),
+      checkinAt: (json['checkin_at'] ?? json['checkinAt'])?.toString(),
+      checkoutAt: (json['checkout_at'] ?? json['checkoutAt'])?.toString(),
+      note: (json['note'] ?? json['reason'])?.toString(),
       createdAt: (json['created_at'] ?? json['createdAt']) != null
           ? DateTime.tryParse(
               (json['created_at'] ?? json['createdAt']).toString(),
@@ -247,9 +300,9 @@ class MyRegistrationModel {
               (json['updated_at'] ?? json['updatedAt']).toString(),
             )
           : null,
-      student: json['student'] != null
+      student: json['student'] is Map
           ? RegistrationStudentPayload.fromJson(
-              json['student'] as Map<String, dynamic>,
+              Map<String, dynamic>.from(json['student'] as Map),
             )
           : null,
       documents: documents,
@@ -271,6 +324,12 @@ class MyRegistrationModel {
     'student_code': studentCode,
     'student_name': studentName,
     'assigned_room': assignedRoom,
+    'room_type_name': roomTypeName,
+    'building_name': buildingName,
+    'dormitory_name': dormitoryName,
+    'reject_reason': rejectReason,
+    'request_status': requestStatus,
+    'request_status_label': requestStatusLabel,
     'is_draft': isDraft,
     'start_date': startDate,
     'end_date': endDate,

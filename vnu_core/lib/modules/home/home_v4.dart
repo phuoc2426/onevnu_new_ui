@@ -33,7 +33,7 @@ import 'package:vnu_core/modules/news/views/vcore_jobs_view_v2.dart';
 import 'package:vnu_core/modules/notify/views/vcore_notify_detail_view_v3.dart';
 import 'package:vnu_core/modules/notify/views/vcore_notify_view_v3.dart';
 import 'package:vnu_core/modules/one_door/views/vcore_one_door_view.dart';
-import 'package:vnu_core/modules/paht/views/vcore_paht_view.dart';
+import 'package:vnu_core/modules/paht_v2/views/vcore_paht_view_v2.dart';
 import 'package:vnu_core/modules/sync/views/vcore_sync_view.dart';
 import 'package:vnu_core/services/services_url.dart';
 import 'package:vnu_core/widgets/progress_hub_widget.dart';
@@ -341,7 +341,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
         Get.to(() => const VcoreCoursePointsView());
         break;
       case 'Phản ánh':
-        Get.to(() => const VcorePahtView());
+        Get.to(() => const VcorePahtViewV2());
         break;
       case 'Nội trú':
         // snackBarWarning('Chức năng đang hoàn thiện');
@@ -2809,3 +2809,4 @@ class _RadialPinOverlayState extends State<_RadialPinOverlay>
     );
   }
 }
+

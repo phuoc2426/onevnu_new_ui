@@ -7,8 +7,10 @@ class PriorityObjectListResponse {
   factory PriorityObjectListResponse.fromJson(Map<String, dynamic> json) {
     return PriorityObjectListResponse(
       success: json['success'] as bool?,
-      data: json['data'] != null
-          ? PriorityObjectListData.fromJson(json['data'])
+      data: json['data'] is Map
+          ? PriorityObjectListData.fromJson(
+              Map<String, dynamic>.from(json['data'] as Map),
+            )
           : null,
     );
   }
@@ -16,19 +18,37 @@ class PriorityObjectListResponse {
 
 class PriorityObjectListData {
   final List<PriorityObjectModel>? items;
+  final int? page;
+  final int? size;
+  final int? totalElements;
+  final int? totalPages;
 
-  PriorityObjectListData({this.items});
+  PriorityObjectListData({
+    this.items,
+    this.page,
+    this.size,
+    this.totalElements,
+    this.totalPages,
+  });
 
   factory PriorityObjectListData.fromJson(Map<String, dynamic> json) {
     return PriorityObjectListData(
-      items: json['items'] != null
+      items: json['items'] is List
           ? (json['items'] as List)
-                .map(
-                  (e) =>
-                      PriorityObjectModel.fromJson(e as Map<String, dynamic>),
-                )
-                .toList()
-          : null,
+              .whereType<Map>()
+              .map(
+                (Map<dynamic, dynamic> item) => PriorityObjectModel.fromJson(
+                  Map<String, dynamic>.from(item),
+                ),
+              )
+              .toList()
+          : <PriorityObjectModel>[],
+      page: _parseInt(json['page']),
+      size: _parseInt(json['size']),
+      totalElements: _parseInt(
+        json['totalElements'] ?? json['total_elements'],
+      ),
+      totalPages: _parseInt(json['totalPages'] ?? json['total_pages']),
     );
   }
 }
@@ -37,27 +57,47 @@ class PriorityObjectModel {
   final int? id;
   final String? name;
   final String? description;
+  final int? priorityScore;
+  final DateTime? deletedAt;
 
-  PriorityObjectModel({this.id, this.name, this.description});
+  const PriorityObjectModel({
+    this.id,
+    this.name,
+    this.description,
+    this.priorityScore,
+    this.deletedAt,
+  });
 
   factory PriorityObjectModel.fromJson(Map<String, dynamic> json) {
-    int? _parseInt(dynamic v) {
-      if (v == null) return null;
-      if (v is int) return v;
-      if (v is String) return int.tryParse(v);
-      return null;
-    }
-
     return PriorityObjectModel(
       id: _parseInt(json['id']),
       name: json['name']?.toString(),
       description: json['description']?.toString(),
+      priorityScore: _parseInt(
+        json['priority_score'] ?? json['priorityScore'],
+      ),
+      deletedAt: _parseDateTime(json['deleted_at'] ?? json['deletedAt']),
     );
   }
 
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'name': name,
-    'description': description,
-  };
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'id': id,
+        'name': name,
+        'description': description,
+        'priority_score': priorityScore,
+        'deleted_at': deletedAt?.toIso8601String(),
+      };
+}
+
+int? _parseInt(dynamic value) {
+  if (value == null) return null;
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  return int.tryParse(value.toString().trim());
+}
+
+DateTime? _parseDateTime(dynamic value) {
+  if (value == null) return null;
+  if (value is DateTime) return value;
+  return DateTime.tryParse(value.toString());
 }

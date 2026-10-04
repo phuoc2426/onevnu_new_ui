@@ -36,20 +36,35 @@ class IdpAuthRepository {
     final String traceId = const Uuid().v4();
     final Stopwatch stopwatch = Stopwatch()..start();
 
-    final Map<String, dynamic> clientHeaders =
-        await IdpClientMetadataService().headers(
-      requestId: traceId,
-      flowId: flowId,
-    );
-
     _trace(
-      'INIT_REQUEST',
-      'flowId=${flowId ?? "none"} rid=$traceId endpoint=$endpoint forceLogin=$forceLogin '
-      'deviceIdLength=${deviceId.length} '
+      'INIT_PREPARE',
+      'flowId=${flowId ?? "none"} rid=$traceId endpoint=$endpoint '
+      'forceLogin=$forceLogin deviceIdLength=${deviceId.length} '
       'bindingChallengeLength=${bindingChallenge.length}',
     );
 
     try {
+      _trace(
+        'INIT_METADATA_BEGIN',
+        'flowId=${flowId ?? "none"} rid=$traceId',
+      );
+      final Map<String, dynamic> clientHeaders =
+          await IdpClientMetadataService().headers(
+        requestId: traceId,
+        flowId: flowId,
+      );
+      _trace(
+        'INIT_METADATA_DONE',
+        'rid=$traceId elapsedMs=${stopwatch.elapsedMilliseconds} '
+        'headerCount=${clientHeaders.length}',
+      );
+
+      _trace(
+        'INIT_REQUEST',
+        'flowId=${flowId ?? "none"} rid=$traceId endpoint=$endpoint '
+        'forceLogin=$forceLogin',
+      );
+
       final Response<Map<String, dynamic>> response =
           await _dio.post<Map<String, dynamic>>(
         endpoint,
@@ -58,9 +73,7 @@ class IdpAuthRepository {
           'bindingChallenge': bindingChallenge,
           'forceLogin': forceLogin,
         },
-        options: Options(
-          headers: clientHeaders,
-        ),
+        options: Options(headers: clientHeaders),
       );
 
       final String backendRid = _requestId(response, traceId);
@@ -81,7 +94,12 @@ class IdpAuthRepository {
       }
       return uri;
     } on DioException catch (error, stackTrace) {
-      _traceDioError('INIT_ERROR', error, traceId, stopwatch.elapsedMilliseconds);
+      _traceDioError(
+        'INIT_ERROR',
+        error,
+        traceId,
+        stopwatch.elapsedMilliseconds,
+      );
       _traceStack(stackTrace);
       rethrow;
     } catch (error, stackTrace) {
@@ -116,8 +134,7 @@ class IdpAuthRepository {
       'REDEEM_REQUEST',
       'flowId=${flowId ?? "none"} rid=$traceId endpoint=/api/auth/idp/redeem '
       'ticketLength=${ticket.length} bindingSecretLength=${bindingSecret.length} '
-      'deviceIdLength=${deviceId.length} '
-      'deviceTokenPresent=${(ServicesUrl().firebaseToken ?? "").trim().isNotEmpty}',
+      'deviceIdLength=${deviceId.length} fcmInAuth=false',
     );
 
     try {
@@ -128,8 +145,8 @@ class IdpAuthRepository {
           'ticket': ticket,
           'bindingSecret': bindingSecret,
           'deviceId': deviceId,
-          if ((ServicesUrl().firebaseToken ?? '').trim().isNotEmpty)
-            'deviceToken': ServicesUrl().firebaseToken!.trim(),
+          // FCM is intentionally excluded from IDP authentication. The token
+          // is synchronized only after the ONEVNU session has been persisted.
           'deviceInfo': Platform.isAndroid
               ? 'Android'
               : Platform.isIOS
@@ -250,10 +267,22 @@ class IdpAuthRepository {
     int elapsedMs,
   ) {
     final String rid = _requestId(error.response, fallbackRid);
+    final Object? nativeError =
+        error is AppDioException ? error.nativeError : error.error;
+    final String nativeText = nativeError == null
+        ? '<none>'
+        : sanitizeLogMessage(nativeError.toString())
+            .replaceAll(RegExp(r'\s+'), ' ');
+    final String clippedNative = nativeText.length <= 280
+        ? nativeText
+        : '${nativeText.substring(0, 280)}...[truncated]';
+
     _trace(
       event,
       'rid=$rid status=${error.response?.statusCode} dioType=${error.type} '
-      'elapsedMs=$elapsedMs shape=${_bodyShape(error.response?.data)} '
+      'nativeType=${nativeError?.runtimeType ?? "none"} '
+      'native=$clippedNative elapsedMs=$elapsedMs '
+      'shape=${_bodyShape(error.response?.data)} '
       'body=${_safeBody(error.response?.data)}',
     );
   }

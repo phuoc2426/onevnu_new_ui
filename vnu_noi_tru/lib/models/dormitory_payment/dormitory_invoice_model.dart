@@ -62,6 +62,7 @@ class DormitoryInvoiceModel {
   final String? kindLabel;
   final String? direction;
   final String? billingPeriodName;
+  final int? billingPeriodId;
   final double totalAmount;
   final double paidAmount;
   final double remainingAmount;
@@ -70,6 +71,8 @@ class DormitoryInvoiceModel {
   final DateTime? dueDate;
   final DateTime? paidAt;
   final DateTime? createdAt;
+  final DateTime? updatedAt;
+  final DateTime? deletedAt;
 
   final Object? accommodationId;
   final int? dormitoryId;
@@ -80,6 +83,8 @@ class DormitoryInvoiceModel {
   final String? buildingName;
   final String? studentName;
   final String? studentIdentityNo;
+  final int? academicYear;
+  final String? roomTypePriceUnit;
 
   /// API mới dùng một biên lai cho cả phần điều chỉnh khi đổi phòng/loại phòng.
   final int adjustedCount;
@@ -100,6 +105,7 @@ class DormitoryInvoiceModel {
     this.kindLabel,
     this.direction,
     this.billingPeriodName,
+    this.billingPeriodId,
     this.totalAmount = 0,
     this.paidAmount = 0,
     this.remainingAmount = 0,
@@ -108,6 +114,8 @@ class DormitoryInvoiceModel {
     this.dueDate,
     this.paidAt,
     this.createdAt,
+    this.updatedAt,
+    this.deletedAt,
     this.accommodationId,
     this.dormitoryId,
     this.roomTypeId,
@@ -117,6 +125,8 @@ class DormitoryInvoiceModel {
     this.buildingName,
     this.studentName,
     this.studentIdentityNo,
+    this.academicYear,
+    this.roomTypePriceUnit,
     this.adjustedCount = 0,
     this.hasRoomChange = false,
     this.periodStartDate,
@@ -184,6 +194,9 @@ class DormitoryInvoiceModel {
       billingPeriodName:
           json['billing_period_name']?.toString() ??
           json['billingPeriodName']?.toString(),
+      billingPeriodId: _toInt(
+        json['billing_period_id'] ?? json['billingPeriodId'],
+      ),
       totalAmount: totalAmount,
       paidAmount: paidAmount,
       remainingAmount: remainingAmount,
@@ -193,6 +206,8 @@ class DormitoryInvoiceModel {
       dueDate: _toDateTime(json['due_date'] ?? json['dueDate']),
       paidAt: _toDateTime(json['paid_at'] ?? json['paidAt']),
       createdAt: _toDateTime(json['created_at'] ?? json['createdAt']),
+      updatedAt: _toDateTime(json['updated_at'] ?? json['updatedAt']),
+      deletedAt: _toDateTime(json['deleted_at'] ?? json['deletedAt']),
       accommodationId: json['accommodation_id'] ?? json['accommodationId'],
       dormitoryId: _toInt(json['dormitory_id'] ?? json['dormitoryId']),
       roomTypeId: _toInt(json['room_type_id'] ?? json['roomTypeId']),
@@ -210,6 +225,10 @@ class DormitoryInvoiceModel {
       studentIdentityNo:
           json['student_identity_no']?.toString() ??
           json['studentIdentityNo']?.toString(),
+      academicYear: _toInt(json['academic_year'] ?? json['academicYear']),
+      roomTypePriceUnit:
+          json['room_type_price_unit']?.toString() ??
+          json['roomTypePriceUnit']?.toString(),
       adjustedCount: _toInt(json['adjusted_count'] ?? json['adjustedCount']) ?? 0,
       hasRoomChange: _toBool(
             json['has_room_change'] ?? json['hasRoomChange'],
@@ -285,6 +304,27 @@ class DormitoryInvoiceModel {
   bool get canUploadProof => !isPaid;
 
   int get proofCount => latestPayment?.allProofImages.length ?? 0;
+
+  String get roomTypePriceUnitLabel {
+    final String value = roomTypePriceUnit?.trim() ?? '';
+    if (value.isEmpty) return '';
+    switch (value.toLowerCase()) {
+      case 'month':
+      case 'monthly':
+      case 'per_month':
+        return 'tháng';
+      case 'semester':
+      case 'term':
+      case 'per_term':
+        return 'kỳ';
+      case 'day':
+      case 'daily':
+      case 'per_day':
+        return 'ngày';
+      default:
+        return value.replaceAll('_', ' ');
+    }
+  }
 
   String get displayTitle {
     if (hasRoomChange || adjustedCount > 0) {

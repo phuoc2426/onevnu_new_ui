@@ -29,6 +29,12 @@ import 'dart:io' show Platform;
 /// would split guide state between the root tabbar and pushed routes.
 Widget _buildMainScreen() => const VcoreTabbarView();
 
+// Android notification-channel importance is immutable after a channel is
+// created. Use a new id so installs that already had the legacy OneVNU
+// channel at a lower user/system importance can receive heads-up alerts.
+const String _oneVnuHeadsUpChannelId = 'OneVNU_HeadsUp_v2';
+const String _oneVnuHeadsUpChannelName = 'OneVNU - Thông báo nổi';
+
 Future<void> main() async {
   // Use the platform/default TLS trust behavior. Do not install a global
   // bad-certificate override: Android/iOS decide certificate trust normally.
@@ -63,6 +69,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
   StreamSubscription<Uri>? _appLinksSubscription;
   StreamSubscription<String>? _fcmTokenRefreshSubscription;
+  StreamSubscription<RemoteMessage>? _fcmForegroundSubscription;
+  StreamSubscription<RemoteMessage>? _fcmOpenedAppSubscription;
 
   bool _isOpeningVneidSyncView = false;
 
@@ -115,6 +123,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     AppUpdateCoordinator.instance.stop();
     _appLinksSubscription?.cancel();
     _fcmTokenRefreshSubscription?.cancel();
+    _fcmForegroundSubscription?.cancel();
+    _fcmOpenedAppSubscription?.cancel();
     super.dispose();
   }
 
@@ -243,11 +253,13 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
     if (Platform.isAndroid) {
       const channel = AndroidNotificationChannel(
-        'OneVNU',
-        'OneVNU',
-        description: 'OneVNU Notification',
-        importance: Importance.high,
+        _oneVnuHeadsUpChannelId,
+        _oneVnuHeadsUpChannelName,
+        description: 'Thông báo quan trọng của OneVNU',
+        importance: Importance.max,
         playSound: true,
+        enableVibration: true,
+        showBadge: true,
       );
 
       unawaited(
@@ -283,6 +295,22 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         );
       }
 
+      // Cache/synchronize the current token immediately. onTokenRefresh only
+      // fires when Firebase rotates the token, so relying on it alone can miss
+      // an already-issued token after app reinstall/session restore.
+      try {
+        final String currentToken =
+            (await FirebaseMessaging.instance.getToken())?.trim() ?? '';
+        if (currentToken.isNotEmpty) {
+          await VnuCore().addFirebaseToken(currentToken);
+          logInfo('[FCM] current device token synchronized');
+        }
+      } catch (error) {
+        // On iOS APNs can still be negotiating at this point. Login/session
+        // synchronization and onTokenRefresh remain secondary binding paths.
+        logWarning('[FCM] current token not ready yet: $error');
+      }
+
       await _fcmTokenRefreshSubscription?.cancel();
       _fcmTokenRefreshSubscription =
           FirebaseMessaging.instance.onTokenRefresh.listen((token) async {
@@ -299,11 +327,14 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         }
       });
 
-      FirebaseMessaging.onMessage.listen((event) {
+      await _fcmForegroundSubscription?.cancel();
+      _fcmForegroundSubscription = FirebaseMessaging.onMessage.listen((event) {
         _showLocalPushNotification(event);
       });
 
-      FirebaseMessaging.onMessageOpenedApp.listen((event) {
+      await _fcmOpenedAppSubscription?.cancel();
+      _fcmOpenedAppSubscription =
+          FirebaseMessaging.onMessageOpenedApp.listen((event) {
         _handleNotificationTapped(context, event.data);
       });
     } catch (e) {
@@ -351,12 +382,15 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
     const AndroidNotificationDetails androidPlatformChannelSpecifics =
         AndroidNotificationDetails(
-      'OneVNU',
-      'OneVNU',
-      channelDescription: 'OneVNU Notification',
-      importance: Importance.high,
-      priority: Priority.high,
+      _oneVnuHeadsUpChannelId,
+      _oneVnuHeadsUpChannelName,
+      channelDescription: 'Thông báo quan trọng của OneVNU',
+      importance: Importance.max,
+      priority: Priority.max,
       playSound: true,
+      enableVibration: true,
+      visibility: NotificationVisibility.public,
+      category: AndroidNotificationCategory.message,
     );
 
     const DarwinNotificationDetails iOSPlatformChannelSpecifics =
@@ -408,4 +442,3 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     );
   }
 }
-

@@ -8,10 +8,13 @@ class ServicesUrl {
   // static const String defaultBaseUrl = 'http://112.137.132.211:8082';
   static const String defaultZaloGroupUrl =
       'https://zalo.me/g/3cu4aftrlhlomcnjm8vx';
+  static const String defaultPahtApiUrl =
+      'https://onevnu-admin.vnu.edu.vn/api/paht/uat/';
 
   static const String _legacyDomainKey = 'domain';
   static const String _downloadDomainKey = 'domainFileDownload';
   static const String _ktxApiUrlKey = 'ktx_api_url';
+  static const String _pahtApiUrlKey = 'paht_api_url';
   static const String _vneidApiUrlKey = 'vneid_api_url';
   static const String _cccdConfigApiUrlKey = 'cccd_config_api_url';
   static const String _zaloGroupUrlKey = 'zalo_group_url';
@@ -90,6 +93,8 @@ class ServicesUrl {
 
   String get ktxApiUrl => _getPrefString(_ktxApiUrlKey);
 
+  String get pahtApiUrl => _getPrefString(_pahtApiUrlKey);
+
   String get vneidApiUrl => _getPrefString(_vneidApiUrlKey);
 
   String get cccdConfigApiUrl => _getPrefString(_cccdConfigApiUrlKey);
@@ -104,6 +109,12 @@ class ServicesUrl {
   set zaloGroupUrl(String url) {
     if (!_initialized) return;
     _prefs.setString(_zaloGroupUrlKey, url.trim());
+  }
+
+  String get effectivePahtApiUrl {
+    final String configured = pahtApiUrl.trim();
+    final String url = configured.isNotEmpty ? configured : defaultPahtApiUrl;
+    return url.endsWith('/') ? url : '$url/';
   }
 
   String get effectiveKtxApiUrl {
@@ -157,6 +168,11 @@ class ServicesUrl {
     _prefs.remove(_legacyDomainKey);
   }
 
+  set pahtApiUrl(String url) {
+    if (!_initialized) return;
+    _prefs.setString(_pahtApiUrlKey, url.trim());
+  }
+
   set ktxApiUrl(String url) {
     if (!_initialized) return;
     _prefs.setString(_ktxApiUrlKey, url.trim());
@@ -179,6 +195,7 @@ class ServicesUrl {
 
     _prefs.remove(_downloadDomainKey);
     _prefs.setString(_ktxApiUrlKey, '');
+    _prefs.setString(_pahtApiUrlKey, '');
     _prefs.setString(_vneidApiUrlKey, '');
     _prefs.setString(_cccdConfigApiUrlKey, '');
     _prefs.setString(_zaloGroupUrlKey, '');
@@ -206,3 +223,4 @@ class ServicesUrl {
 
   final String authenticate = 'api/auth/signin';
 }
+

@@ -13,6 +13,7 @@ import 'package:vnu_core/repository/app_repository.dart';
 import 'package:vnu_core/repository/applicant_session_repository.dart';
 import 'package:vnu_core/services/dio_options.dart';
 import 'package:vnu_core/services/services_url.dart';
+import 'package:vnu_core/vnu_core.dart';
 
 class ApplicantAuthController extends GetxController {
   BuildContext? context;
@@ -503,8 +504,6 @@ class ApplicantAuthController extends GetxController {
   }
 
   Future<void> _syncFcmAfterLogin() async {
-    final String oldDeviceToken = ServicesUrl().firebaseToken?.trim() ?? '';
-
     try {
       _showUiTrace(
         'FCM - BƯỚC 1',
@@ -532,13 +531,9 @@ class ApplicantAuthController extends GetxController {
         'Không hiển thị token thật trên giao diện.',
       );
 
-      await ApiRepository().deviceToken(
-        oldDeviceToken,
-        newDeviceToken,
-        _deviceInfo,
-      );
-
-      ServicesUrl().firebaseToken = newDeviceToken;
+      // Bind only after Applicant accessToken is active. VnuCore also keeps
+      // the latest local FCM token and always rebinds it to the current session.
+      await VnuCore().addFirebaseToken(newDeviceToken);
 
       _showUiTrace(
         'FCM THÀNH CÔNG',
