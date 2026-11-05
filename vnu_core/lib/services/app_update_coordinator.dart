@@ -97,6 +97,18 @@ class AppUpdateCoordinator {
     // Splash, even if this singleton survived a widget-tree rebuild.
     notifier.value = const AppUpdateGateSnapshot.initial();
 
+    // Browser builds have no Android/iOS store version to enforce.
+    // Allow the app immediately; keep loading general remote config below.
+    if (kIsWeb) {
+      notifier.value = notifier.value.copyWith(
+        mode: AppUpdateGateMode.allowed,
+        clearEvaluation: true,
+        reason: 'web_skip_native_app_update',
+      );
+      unawaited(refresh(reason: 'web_cold_start', forceRefresh: true));
+      return;
+    }
+
     // A cached force decision can already be prepared during Splash. The UI
     // remains hidden until markPostSplashReady() is called by Splash.
     await _evaluateCachedPolicy(reason: 'cold_start_cache');
@@ -141,6 +153,22 @@ class AppUpdateCoordinator {
     required String reason,
     bool forceRefresh = true,
   }) async {
+    if (kIsWeb) {
+      // Web is not subject to Android/iOS version policy. Never block its UI.
+      notifier.value = notifier.value.copyWith(
+        mode: AppUpdateGateMode.allowed,
+        clearEvaluation: true,
+        reason: '${reason}_web_skip_native_app_update',
+      );
+      // /api/config still supplies other app settings used on Web.
+      try {
+        await AppConfigService().ensureLoaded(forceRefresh: forceRefresh);
+      } catch (error) {
+        logWarning('[APP_UPDATE] web config unavailable: $error');
+      }
+      return;
+    }
+
     final existing = _inFlight;
     if (existing != null) {
       await existing;

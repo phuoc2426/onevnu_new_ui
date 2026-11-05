@@ -14,6 +14,7 @@ import 'package:vnu_core/modules/auth_mode/auth_entry_mode_service.dart';
 import 'package:vnu_core/repository/app_repository.dart';
 import 'package:vnu_core/repository/data_repository.dart';
 import 'package:vnu_core/services/services_url.dart';
+import 'package:vnu_core/modules/tuition/data/tuition_gateway_session_cache.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -105,6 +106,9 @@ logError(e.toString());
   /// the background without keeping the logout screen blocked.
   List<String> clearSessionMemory({bool deleteUserLogin = false}) {
     final List<String> topicSnapshot = List<String>.from(ServicesUrl().topics);
+
+    // Payment Bearer is RAM-only and must disappear at logout immediately.
+    TuitionGatewaySessionCache.instance.clear();
 
     token = '';
     refreshToken = '';
@@ -225,4 +229,3 @@ logError(e.toString());
     return {'Authorization': 'Bearer $token'};
   }
 }
-

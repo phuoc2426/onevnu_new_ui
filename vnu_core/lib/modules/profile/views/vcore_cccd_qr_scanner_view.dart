@@ -42,6 +42,10 @@ class _VcoreCccdQrScannerViewState extends State<VcoreCccdQrScannerView> {
   );
 
   bool _processing = false;
+  bool _torchOn = false;
+  int _emptyDetections = 0;
+  DateTime? _lastEmptyFeedback;
+  String? _scanTip;
   String? _error;
   CccdQrScanResult? _previewResult;
 
@@ -56,25 +60,43 @@ class _VcoreCccdQrScannerViewState extends State<VcoreCccdQrScannerView> {
 
     String raw = '';
     for (final Barcode barcode in capture.barcodes) {
-      final String value = barcode.rawValue?.trim() ?? '';
+      final String value = (barcode.rawValue ?? barcode.displayValue ?? '').trim();
       if (value.isNotEmpty) {
         raw = value;
         break;
       }
     }
-    if (raw.isEmpty) return;
+    if (raw.isEmpty) {
+      // Phat hien QR nhung plugin khong tra payload. Camera phai tiep tuc chay.
+      final now = DateTime.now();
+      final last = _lastEmptyFeedback;
+      if (last == null || now.difference(last) > const Duration(seconds: 2)) {
+        _lastEmptyFeedback = now;
+        _emptyDetections++;
+        if (mounted && _emptyDetections >= 2) {
+          setState(() => _scanTip = 'Đã thấy mã QR nhưng camera chưa đọc được. '
+            'Thử đưa thẻ lại gần, tránh phản sáng hoặc bật đèn.');
+        }
+      }
+      return;
+    }
 
     _processing = true;
-    await _controller.stop();
+    try {
+      await _controller.stop();
+    } catch (_) {
+      // Controller co the da dung khi chuyen sang background.
+    }
 
     final CccdQrScanResult? result = _parseCccdQr(raw);
     if (!mounted) return;
 
     setState(() {
       _previewResult = result;
+      _scanTip = null;
       _error = result == null
-          ? 'Không đọc được đầy đủ CCCD, họ tên và ngày sinh từ mã QR. '
-              'Vui lòng đưa đúng mã QR trên thẻ căn cước vào khung hình.'
+          ? 'Mã QR đã được giải mã nhưng chưa đủ thông tin căn cước '
+              '(số CCCD, họ tên hoặc ngày sinh). Vui lòng thử quét lại.'
           : null;
     });
   }
@@ -85,11 +107,24 @@ class _VcoreCccdQrScannerViewState extends State<VcoreCccdQrScannerView> {
       _previewResult = null;
       _error = null;
       _processing = false;
+      _scanTip = null;
+      _emptyDetections = 0;
     });
     try {
       await _controller.start();
     } catch (_) {
       // Camera lifecycle có thể đang khởi động lại.
+    }
+  }
+
+  Future<void> _toggleTorch() async {
+    try {
+      await _controller.toggleTorch();
+      if (mounted) setState(() => _torchOn = !_torchOn);
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(content: Text('Thiết bị không hỗ trợ bật đèn quét QR.')),
+      );
     }
   }
 
@@ -193,6 +228,13 @@ class _VcoreCccdQrScannerViewState extends State<VcoreCccdQrScannerView> {
         title: const Text('Quét QR căn cước công dân'),
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            tooltip: _torchOn ? 'Tắt đèn' : 'Bật đèn',
+            onPressed: _toggleTorch,
+            icon: Icon(_torchOn ? Icons.flash_on_rounded : Icons.flash_off_rounded),
+          ),
+        ],
       ),
       body: Stack(
         fit: StackFit.expand,
@@ -222,21 +264,26 @@ class _VcoreCccdQrScannerViewState extends State<VcoreCccdQrScannerView> {
             color: Colors.black.withOpacity(0.78),
             borderRadius: BorderRadius.circular(16),
           ),
-          child: const Column(
+          child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Icon(
+              const Icon(
                 Icons.qr_code_scanner_rounded,
                 color: Colors.white,
                 size: 34,
               ),
-              SizedBox(height: 10),
-              Text(
+              const SizedBox(height: 10),
+              const Text(
                 'Đưa mã QR trên thẻ căn cước vào khung hình. '
                 'Sau khi quét, hãy đối chiếu họ tên và ngày sinh trước khi sử dụng dữ liệu.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.white, height: 1.35),
               ),
+              if (_scanTip != null) ...<Widget>[
+                const SizedBox(height: 10),
+                Text(_scanTip!, textAlign: TextAlign.center,
+                  style: const TextStyle(color: Color(0xFFFFDF91), fontSize: 12)),
+              ],
             ],
           ),
         ),
@@ -482,3 +529,4 @@ String formatCccdDate(DateTime value) {
   String two(int number) => number.toString().padLeft(2, '0');
   return '${two(value.day)}/${two(value.month)}/${value.year.toString().padLeft(4, '0')}';
 }
+

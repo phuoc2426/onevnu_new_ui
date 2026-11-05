@@ -14,13 +14,11 @@ class PahtForumFollowingView extends StatefulWidget {
 
 class _PahtForumFollowingViewState extends State<PahtForumFollowingView> {
   final PahtForumRepository _repository = PahtForumRepository();
-  final Map<String, PahtForumDetail> _detailCache = <String, PahtForumDetail>{};
   final Map<String, int> _careCounts = <String, int>{};
   final Set<String> _interestBusy = <String>{};
 
   List<PahtForumItem> _items = <PahtForumItem>[];
-  String? _expandedGuid;
-  String? _loadingDetailGuid;
+  String? _openingDetailGuid;
   int _total = 0;
   int _page = 0;
   bool _loading = true;
@@ -107,8 +105,6 @@ class _PahtForumFollowingViewState extends State<PahtForumFollowingView> {
         if (!result.interested) {
           _items = _items.where((PahtForumItem e) => e.guid != item.guid).toList(growable: false);
           _total = result.followingCount;
-          _detailCache.remove(item.guid);
-          if (_expandedGuid == item.guid) _expandedGuid = null;
         }
       });
     } catch (error) {
@@ -122,41 +118,15 @@ class _PahtForumFollowingViewState extends State<PahtForumFollowingView> {
     }
   }
 
-  Future<void> _handleCardTap(PahtForumItem item) async {
-    if (_expandedGuid == item.guid) {
-      setState(() => _expandedGuid = null);
-      return;
-    }
-    setState(() {
-      _expandedGuid = item.guid;
-      if (!_detailCache.containsKey(item.guid)) _loadingDetailGuid = item.guid;
-    });
-    try {
-      PahtForumDetail detail = await _repository.getPublicDetail(item.guid);
-      if (item.hasOfficialAnswer && detail.responses.isEmpty) {
-        await Future<void>.delayed(const Duration(milliseconds: 240));
-        detail = await _repository.getPublicDetail(item.guid);
-      }
-      if (!mounted || _expandedGuid != item.guid) return;
-      setState(() {
-        _detailCache[item.guid] = detail;
-        _careCounts[item.guid] = detail.item.careCount;
-      });
-    } catch (error) {
-      if (!mounted || _expandedGuid != item.guid) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.toString())),
-      );
-    } finally {
-      if (mounted && _loadingDetailGuid == item.guid) {
-        setState(() => _loadingDetailGuid = null);
-      }
-    }
-  }
-
   Future<void> _openDetail(PahtForumItem item) async {
-    await Get.to(() => PahtForumDetailView(guid: item.guid, publicOnly: true));
-    await _load();
+    if (_openingDetailGuid != null) return;
+    _openingDetailGuid = item.guid;
+    try {
+      await Get.to(() => PahtForumDetailView(guid: item.guid, publicOnly: true));
+      if (mounted) await _load();
+    } finally {
+      _openingDetailGuid = null;
+    }
   }
 
   @override
@@ -240,11 +210,8 @@ class _PahtForumFollowingViewState extends State<PahtForumFollowingView> {
                   interested: true,
                   careCountOverride: _careCounts[item.guid] ?? item.careCount,
                   interestBusy: _interestBusy.contains(item.guid),
-                  expanded: _expandedGuid == item.guid,
-                  detail: _detailCache[item.guid],
-                  responseLoading: _loadingDetailGuid == item.guid,
                   onInterestTap: () => _toggleInterest(item),
-                  onTap: () => _handleCardTap(item),
+                  onTap: () => _openDetail(item),
                   onDetailTap: () => _openDetail(item),
                 ),
               ),

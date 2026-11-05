@@ -5,6 +5,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class ServicesUrl {
   static const String defaultBaseUrl = 'https://onevnu-mobile-api.vnu.edu.vn';
+
+  /// Override only the KTX API base URL for controlled test builds.
+  /// Example: flutter run --dart-define=KTX_API_BASE_URL=https://testktx.sohatech.vn/api/
+  /// An empty value uses the URL received from ONEVNU /api/config.
+  static const String _ktxApiBaseUrlOverride = String.fromEnvironment(
+    'KTX_API_BASE_URL',
+    defaultValue: '',
+  );
   // static const String defaultBaseUrl = 'http://112.137.132.211:8082';
   static const String defaultZaloGroupUrl =
       'https://zalo.me/g/3cu4aftrlhlomcnjm8vx';
@@ -118,7 +126,10 @@ class ServicesUrl {
   }
 
   String get effectiveKtxApiUrl {
-    final String url = ktxApiUrl.trim();
+    // Do not persist the override: remote /api/config may refresh at any time.
+    // This getter is shared by student, dormitory and KTX issue requests.
+    final String overrideUrl = _ktxApiBaseUrlOverride.trim();
+    final String url = overrideUrl.isNotEmpty ? overrideUrl : ktxApiUrl.trim();
     return url.isNotEmpty ? (url.endsWith('/') ? url : '$url/') : '';
   }
 
@@ -129,7 +140,8 @@ class ServicesUrl {
   }
 
   String get effectiveKtxHostUrl {
-    final String url = ktxApiUrl.trim();
+    // KTX attachments / images must use the same environment as the API.
+    final String url = effectiveKtxApiUrl;
     if (url.isEmpty) return '';
 
     final Uri? uri = Uri.tryParse(url);
@@ -223,4 +235,3 @@ class ServicesUrl {
 
   final String authenticate = 'api/auth/signin';
 }
-

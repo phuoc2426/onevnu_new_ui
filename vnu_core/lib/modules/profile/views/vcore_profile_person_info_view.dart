@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:vnu_core/globals.dart';
+import 'package:vnu_core/repository/data_repository.dart';
 import 'package:vnu_core/common/space_widget.dart';
 import 'package:vnu_core/modules/profile/controllers/vcore_profile_person_info_controller.dart';
 import 'package:vnu_core/modules/profile/views/widget/vcore_profile_person_basic_widget.dart';
@@ -39,6 +41,7 @@ class VcoreProfilePersonInfoView extends StatefulWidget {
 
 class _VcoreProfilePersonInfoViewState
     extends State<VcoreProfilePersonInfoView> {
+  late final Future<String?> _principalFuture;
   final GlobalKey _temporaryAddressSectionKey = GlobalKey();
   final GlobalKey _cccdSectionKey = GlobalKey();
   final GlobalKey _updateButtonKey = GlobalKey();
@@ -46,6 +49,7 @@ class _VcoreProfilePersonInfoViewState
   @override
   void initState() {
     super.initState();
+    _principalFuture = DataRepository().getSecureSaveKey(kSessionPrincipalType);
 
     if (widget.scrollToTemporaryAddress) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -137,6 +141,40 @@ class _VcoreProfilePersonInfoViewState
 
   @override
   Widget build(BuildContext context) {
+    return FutureBuilder<String?>(
+      future: _principalFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+        final principal = snapshot.data;
+        final allowed = !snapshot.hasError &&
+            (principal == kPrincipalTypeUser ||
+              (principal == null && Globals().token.trim().isNotEmpty));
+        if (!allowed) {
+          return Scaffold(
+            appBar: AppBar(title: const Text('Thông tin cá nhân')),
+            body: Center(child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                const Icon(Icons.lock_outline, size: 42),
+                const SizedBox(height: 14),
+                const Text('Tài khoản CCCD không có hồ sơ cá nhân trên '
+                    'hệ thống đào tạo. Vui lòng chỉnh sửa thông tin trong '
+                    'mục Nội trú KTX.', textAlign: TextAlign.center),
+                const SizedBox(height: 12),
+                TextButton(onPressed: () => Navigator.of(context).maybePop(),
+                  child: const Text('Quay lại')),
+              ]),
+            )),
+          );
+        }
+        return _buildTrainingProfile(context);
+      },
+    );
+  }
+
+  Widget _buildTrainingProfile(BuildContext context) {
     final VcoreProfilePersonInfoController controller =
         Get.put(VcoreProfilePersonInfoController());
     controller.requireCccdVerificationForKtx.value =

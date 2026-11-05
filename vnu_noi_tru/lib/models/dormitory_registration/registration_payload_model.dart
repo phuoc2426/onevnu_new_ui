@@ -172,6 +172,7 @@ class RegistrationStudentPayload {
   final String gender;
   final String? ethnicity;
   final String? religion;
+  final String? healthStatus;
   final String phone;
   final String email;
   final List<FamilyMemberPayload> familyMembers;
@@ -212,6 +213,7 @@ class RegistrationStudentPayload {
     required this.gender,
     this.ethnicity,
     this.religion,
+    this.healthStatus,
     required this.phone,
     required this.email,
     this.familyMembers = const <FamilyMemberPayload>[],
@@ -296,6 +298,7 @@ class RegistrationStudentPayload {
       gender: json['gender']?.toString() ?? '',
       ethnicity: json['ethnicity']?.toString(),
       religion: json['religion']?.toString(),
+      healthStatus: (json['health_status'] ?? json['healthStatus'])?.toString(),
       phone: (json['phone_number'] ?? json['phoneNumber'] ?? json['phone'])
               ?.toString() ??
           '',
@@ -347,6 +350,7 @@ class RegistrationStudentPayload {
       'gender': gender,
       'ethnicity': ethnicity,
       'religion': religion,
+      'health_status': healthStatus,
       'phone_number': phone,
       'email': email,
       'family_members':
@@ -392,6 +396,7 @@ class RegistrationStudentPayload {
       'gender': gender,
       'ethnicity': ethnicity,
       'religion': religion,
+      'health_status': healthStatus,
       'phone_number': phone,
       'email': email,
       'family_members':

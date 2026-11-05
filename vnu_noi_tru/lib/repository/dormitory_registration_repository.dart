@@ -39,6 +39,7 @@ class DormitoryRegistrationRepository {
     'contact_address',
     'ethnicity',
     'religion',
+    'health_status',
     'priority_object_id',
     'faculty',
     'system',
@@ -60,6 +61,9 @@ class DormitoryRegistrationRepository {
 
   Dio? _dio;
   Dio? _studentDio;
+  // Only KTX requests are switched to Applicant auth; other modules keep
+  // their original USER authentication and global interceptor behavior.
+  bool _applicantClientMode = false;
   String _dormitoryBaseUrl = '';
   String _studentBaseUrl = '';
 
@@ -930,7 +934,7 @@ class DormitoryRegistrationRepository {
       'Accept': 'application/json',
     };
 
-    final String token = Globals().token;
+    final String token = _applicantClientMode ? '' : Globals().token;
     if (token.isNotEmpty) {
       headers['Authorization'] = 'Bearer $token';
     }
@@ -946,7 +950,7 @@ class DormitoryRegistrationRepository {
       'Accept': 'application/json',
       'Content-Type': 'application/json',
     };
-    final token = Globals().token;
+    final token = _applicantClientMode ? '' : Globals().token;
     logInfo(
       '[DORMITORY_AUTH] tokenPresent=${token.isNotEmpty}',
     );
@@ -954,6 +958,52 @@ class DormitoryRegistrationRepository {
       headers['Authorization'] = 'Bearer $token';
     }
     return Options(headers: headers);
+  }
+
+  Dio _createKtxClient(String baseUrl, {required bool applicant}) {
+    // Preserve the existing DioOptions configuration for every USER request.
+    final client = DioOptions().createDio(baseUrl);
+    if (!applicant) return client;
+
+    // ApiInterceptor uses Globals().token (USER) and broadcasts a global
+    // TokenExpiredEvent on 401. Neither is correct for Applicant sessions.
+    // Replace it ONLY on the KTX clients, not on app-wide Dio instances.
+    client.interceptors.removeWhere(
+        (Interceptor interceptor) => interceptor is ApiInterceptor);
+    client.interceptors.insert(0, InterceptorsWrapper(
+      onRequest: (RequestOptions options,
+          RequestInterceptorHandler handler) async {
+        try {
+          final String? currentPrincipal = await DataRepository()
+              .getSecureSaveKey(kSessionPrincipalType);
+          if (currentPrincipal != kPrincipalTypeApplicant) {
+            handler.reject(DioException(
+              requestOptions: options,
+              message: 'Phiên tân sinh viên không còn hợp lệ. '
+                  'Vui lòng đăng nhập lại.',
+            ));
+            return;
+          }
+          final String token = (await DataRepository()
+                  .getSecureSaveKey(kApplicantAccessToken))?.trim() ?? '';
+          if (token.isEmpty) {
+            handler.reject(DioException(
+              requestOptions: options,
+              message: 'Thiếu phiên đăng nhập tân sinh viên. '
+                  'Vui lòng đăng nhập lại.',
+            ));
+            return;
+          }
+          // Override any stale USER header provided by request options.
+          options.headers['Authorization'] = 'Bearer $token';
+          handler.next(options);
+        } catch (error) {
+          handler.reject(DioException(requestOptions: options,
+            error: error, message: 'Không đọc được phiên đăng nhập KTX.'));
+        }
+      },
+    ));
+    return client;
   }
 
   Future<void> _ensureApiClients() async {
@@ -965,28 +1015,51 @@ class DormitoryRegistrationRepository {
     if (studentBaseUrl.isEmpty || dormitoryBaseUrl.isEmpty) {
       throw StateError(
         'KTX API URL is unavailable. Check /api/config on '
-            '${ServicesUrl.defaultBaseUrl}.',
+        '${ServicesUrl.defaultBaseUrl}.',
       );
     }
 
-    if (_studentDio == null || _studentBaseUrl != studentBaseUrl) {
+    final bool isApplicant =
+        await DataRepository().getSecureSaveKey(kSessionPrincipalType) ==
+            kPrincipalTypeApplicant;
+    final bool authModeChanged = _applicantClientMode != isApplicant;
+
+    if (_studentDio == null || _studentBaseUrl != studentBaseUrl ||
+        authModeChanged) {
       _studentDio?.close(force: true);
-      _studentDio = DioOptions().createDio(studentBaseUrl);
+      _studentDio = _createKtxClient(studentBaseUrl,
+          applicant: isApplicant);
       _studentBaseUrl = studentBaseUrl;
       debugPrint('Dormitory student API from config: $studentBaseUrl');
     }
 
-    if (_dio == null || _dormitoryBaseUrl != dormitoryBaseUrl) {
+    if (_dio == null || _dormitoryBaseUrl != dormitoryBaseUrl ||
+        authModeChanged) {
       _dio?.close(force: true);
-      _dio = DioOptions().createDio(dormitoryBaseUrl);
+      _dio = _createKtxClient(dormitoryBaseUrl,
+          applicant: isApplicant);
       _dormitoryBaseUrl = dormitoryBaseUrl;
       debugPrint('Dormitory API from config: $dormitoryBaseUrl');
     }
+    _applicantClientMode = isApplicant;
   }
 
   Future<void> _loadTokenIfNeeded() async {
     await _ensureApiClients();
 
+    if (_applicantClientMode) {
+      // Applicant access token is attached by the local KTX interceptor.
+      // Never copy it to Globals().token or ApiRepository() (USER session).
+      final String token = (await DataRepository()
+              .getSecureSaveKey(kApplicantAccessToken))?.trim() ?? '';
+      if (token.isEmpty) {
+        throw StateError('Phiên tân sinh viên hết hiệu lực. '
+            'Vui lòng đăng nhập lại.');
+      }
+      return;
+    }
+
+    // Original USER token flow, intentionally unchanged.
     if (Globals().token.isEmpty) {
       final stored = await DataRepository().getSecureSaveKey(kLoginToken);
       if (stored != null && stored.isNotEmpty) {

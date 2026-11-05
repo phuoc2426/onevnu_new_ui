@@ -32,7 +32,10 @@ class AppGuideSearchButton extends StatelessWidget {
             AppGuideRegistryScope.maybeOf(pageContext) ?? globalAppGuideRegistry;
 
         final searchService = AppGuideSearchService(
-          items: registry.items,
+          // UI-only hide for the retired Sync entry; do not remove the module.
+          items: registry.items.where((item) =>
+            item.id != 'home.function.sync' &&
+            item.title.trim().toLowerCase() != 'đồng bộ').toList(),
           predictor: const AppGuideLightAiPredictor(),
         );
 

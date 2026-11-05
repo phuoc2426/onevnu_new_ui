@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import 'package:vnu_core/common/log.dart';
 import 'package:vnu_core/models/model.dart';
 import 'package:vnu_core/modules/idp_auth/services/idp_client_metadata_service.dart';
+import 'package:vnu_core/modules/idp_auth/services/idp_visible_debug_service.dart';
 import 'package:vnu_core/services/dio_options.dart';
 import 'package:vnu_core/services/services_url.dart';
 
@@ -89,6 +90,19 @@ class IdpAuthRepository {
         'authorizationPath=${uri?.path ?? "invalid"}',
       );
 
+      IdpVisibleDebugService().record(
+        'INIT RESPONSE',
+        <String, dynamic>{
+          'flowId': flowId ?? 'none',
+          'requestId': backendRid,
+          'statusCode': response.statusCode,
+          'rawBody': response.data,
+        },
+      );
+      if (uri != null) {
+        IdpVisibleDebugService().recordAuthorizationUri(uri);
+      }
+
       if (uri == null || uri.scheme != 'https' || uri.host.isEmpty) {
         throw StateError('Backend không trả authorization URL VNU IDP hợp lệ.');
       }
@@ -165,6 +179,12 @@ class IdpAuthRepository {
       final String backendRid = _requestId(response, traceId);
       final Map<String, dynamic> body =
           response.data ?? <String, dynamic>{};
+      IdpVisibleDebugService().recordRedeemResponse(
+        statusCode: response.statusCode,
+        body: body,
+        requestId: backendRid,
+      );
+
       final SigninResponse result = SigninResponse.fromJson(body);
       final bool hasAccess = (result.accessToken ?? '').trim().isNotEmpty;
       final bool hasRefresh = (result.refreshToken ?? '').trim().isNotEmpty;
@@ -284,6 +304,13 @@ class IdpAuthRepository {
       'native=$clippedNative elapsedMs=$elapsedMs '
       'shape=${_bodyShape(error.response?.data)} '
       'body=${_safeBody(error.response?.data)}',
+    );
+
+    IdpVisibleDebugService().recordError(
+      event,
+      error,
+      responseBody: error.response?.data,
+      statusCode: error.response?.statusCode,
     );
   }
 

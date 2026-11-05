@@ -42,6 +42,7 @@ class DormitoryStudentDraft {
     this.reasonStay,
     this.ethnicity,
     this.religion,
+    this.healthStatus,
     this.phone = '',
     this.email = '',
     this.familyMembers = const <FamilyMemberPayload>[],
@@ -82,6 +83,7 @@ class DormitoryStudentDraft {
   final String? reasonStay;
   final String? ethnicity;
   final String? religion;
+  final String? healthStatus;
   final String phone;
   final String email;
   final List<FamilyMemberPayload> familyMembers;
@@ -123,6 +125,7 @@ class DormitoryStudentDraft {
       reasonStay: value.reasonStay,
       ethnicity: value.ethnicity,
       religion: value.religion,
+      healthStatus: value.healthStatus,
       phone: value.phone,
       email: value.email,
       familyMembers: List<FamilyMemberPayload>.unmodifiable(value.familyMembers),
@@ -173,6 +176,7 @@ class DormitoryStudentDraft {
       gender: gender?.trim() ?? '',
       ethnicity: _trimOrNull(ethnicity),
       religion: _trimOrNull(religion),
+      healthStatus: _trimOrNull(healthStatus),
       phone: phone.trim(),
       email: email.trim(),
       familyMembers: List<FamilyMemberPayload>.unmodifiable(familyMembers),
@@ -230,6 +234,7 @@ class DormitoryStudentDraft {
     String? reasonStay,
     String? ethnicity,
     String? religion,
+    String? healthStatus,
     String? phone,
     String? email,
     List<FamilyMemberPayload>? familyMembers,
@@ -275,6 +280,7 @@ class DormitoryStudentDraft {
       reasonStay: reasonStay ?? this.reasonStay,
       ethnicity: ethnicity ?? this.ethnicity,
       religion: religion ?? this.religion,
+      healthStatus: healthStatus ?? this.healthStatus,
       phone: phone ?? this.phone,
       email: email ?? this.email,
       familyMembers: familyMembers ?? this.familyMembers,

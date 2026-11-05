@@ -91,7 +91,9 @@ class _ShapeshifterMyFeaturesState extends State<ShapeshifterMyFeatures> {
         merged.putIfAbsent(feature.code, () => feature);
       }
 
-      final List<ShapeshifterFeature> features = merged.values.toList();
+      final List<ShapeshifterFeature> features = merged.values
+          .where((feature) => !_isAcademicProfileLinkForApplicant(feature))
+          .toList();
       debugPrint(
         '[SHAPE_MY] admitted MY=${myFeatures.length} HOME=${homeFeatures.length} ' +
             'merged=${features.length} ' +
@@ -103,6 +105,28 @@ class _ShapeshifterMyFeaturesState extends State<ShapeshifterMyFeatures> {
       debugPrintStack(label: '[SHAPE_MY] stack', stackTrace: stackTrace);
       rethrow;
     }
+  }
+
+  /// Keep applicant/admitted-student MY free of USER-only academic profile
+  /// links, even if a legacy Admin registry item had the wrong audience flag.
+  /// KTX personal details still use their native KTX API screen.
+  bool _isAcademicProfileLinkForApplicant(ShapeshifterFeature feature) {
+    final label = feature.label.trim().toLowerCase();
+    final code = feature.code.trim().toLowerCase();
+    final url = feature.webUrl.trim().toLowerCase();
+    return const <String>{
+      'thông tin cá nhân',
+      'cập nhật cccd',
+      'liên kết mã sinh viên',
+    }.contains(label) ||
+      const <String>{
+        'profile', 'student_profile', 'personal_info',
+        'student_personal_info', 'update_cccd', 'link_student_code',
+      }.contains(code) ||
+      url.contains('/profile/person') ||
+      url.contains('/profile-person') ||
+      url.contains('/thong-tin-ca-nhan') ||
+      url.contains('/ho-so-dao-tao');
   }
 
   void _reload() {

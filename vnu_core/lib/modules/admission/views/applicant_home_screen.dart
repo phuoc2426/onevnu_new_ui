@@ -7,6 +7,7 @@ import 'package:video_player/video_player.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
 import 'your_space_screen.dart';
+import 'package:vnu_core/widgets/app_update_floating_badge.dart';
 
 class ApplicantHomeScreen extends StatefulWidget {
   final String fullName;
@@ -234,6 +235,8 @@ class _ApplicantHomeScreenState
               ],
             ),
           ),
+          // APPLICANT landing: top-right overlay, never a Column child.
+          const AppUpdateFloatingBadge(topOffset: 12, rightOffset: 14),
           Positioned(
             right: 10,
             bottom: 10,

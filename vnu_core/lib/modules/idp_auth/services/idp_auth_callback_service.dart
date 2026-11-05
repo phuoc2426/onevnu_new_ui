@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:vnu_core/common/log.dart';
 import 'package:vnu_core/modules/idp_auth/config/idp_auth_config.dart';
+import 'package:vnu_core/modules/idp_auth/services/idp_visible_debug_service.dart';
 
 class IdpAuthCallbackResult {
   const IdpAuthCallbackResult._({this.ticket, this.error});
@@ -71,15 +72,19 @@ class IdpAuthCallbackService {
   bool handleUri(Uri uri) {
     if (!IdpAuthConfig.isAppCallback(uri)) return false;
 
+    IdpVisibleDebugService().recordCallback(uri);
+
     final String ticket = uri.queryParameters['ticket']?.trim() ?? '';
     final String error = uri.queryParameters['error']?.trim() ?? '';
     final String friendlyError = switch (error) {
       'idp_account_mismatch' =>
         'Tài khoản VNU IDP vừa đăng nhập không khớp với tài khoản ONEVNU hiện tại.',
       'idp_provider_error' => 'VNU IDP đã từ chối hoặc hủy yêu cầu đăng nhập.',
+      'idp_login_failed' =>
+        'VNU SSO đã xác thực nhưng ONEVNU không hoàn tất được bước xử lý/mapping tài khoản.',
       'missing_code' || 'missing_state' =>
         'Phản hồi đăng nhập VNU IDP không hợp lệ.',
-      _ => 'Đăng nhập VNU IDP không thành công.',
+      _ => 'Đăng nhập VNU IDP không thành công. Mã lỗi: ${error.isEmpty ? "unknown" : error}',
     };
 
     final IdpAuthCallbackResult result = ticket.isNotEmpty

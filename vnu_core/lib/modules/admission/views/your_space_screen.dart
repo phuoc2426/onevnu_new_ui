@@ -11,6 +11,7 @@ import 'package:vnu_core/repository/app_repository.dart';
 import 'package:vnu_core/repository/applicant_session_repository.dart';
 import 'package:vnu_core/screens/vcore_admission_view.dart';
 import 'package:vnu_core/widgets/zalo_chat_bubble.dart';
+import 'package:vnu_core/widgets/app_update_floating_badge.dart';
 import 'package:vnu_noi_tru/screens/dormitory_registration/dr_my_registration_screen.dart';
 
 class YourSpaceScreen extends StatefulWidget {
@@ -664,6 +665,9 @@ class _YourSpaceScreenState extends State<YourSpaceScreen>
               const ZaloChatBubble(
                 edgeInsets: EdgeInsets.fromLTRB(12, 12, 16, 24),
               ),
+              // Under the header action row, so notification/menu stay tappable.
+              // Overlay is outside ScrollView and reserves zero vertical space.
+              const AppUpdateFloatingBadge(topOffset: 28, rightOffset: 14),
             ],
           ),
         ),

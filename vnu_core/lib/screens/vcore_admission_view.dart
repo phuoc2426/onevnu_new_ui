@@ -13,6 +13,8 @@ import 'package:vnu_core/screens/vcore_login_screen_v4.dart';
 import 'package:vnu_core/services/app_config_service.dart';
 import 'package:vnu_core/services/services_url.dart';
 import 'package:vnu_core/widgets/zalo_chat_bubble.dart';
+import 'package:vnu_core/widgets/app_update_floating_badge.dart';
+import 'package:vnu_core/widgets/onevnu_login_notice_marquee.dart';
 
 class VcoreAdmissionView extends StatefulWidget {
   const VcoreAdmissionView({super.key});
@@ -205,7 +207,13 @@ class _VcoreAdmissionViewState extends State<VcoreAdmissionView> {
                   parent: BouncingScrollPhysics(),
                 ),
                 slivers: <Widget>[
-                  SliverToBoxAdapter(child: _buildHero()),
+                  // Marquee is overlaid INSIDE the hero, so it scrolls with
+                  // the welcome section and never covers the unit cards.
+                  SliverToBoxAdapter(child: Stack(children: <Widget>[
+                    _buildHero(),
+                    const Positioned(top: 119, left: 0, right: 0,
+                      child: OneVnuLoginNoticeMarquee()),
+                  ])),
                   SliverToBoxAdapter(child: _buildAdmissionUnits()),
                   SliverToBoxAdapter(child: _buildUtilities()),
                   SliverToBoxAdapter(
@@ -240,6 +248,8 @@ class _VcoreAdmissionViewState extends State<VcoreAdmissionView> {
             ),
           ),
           const ZaloChatBubble(edgeInsets: EdgeInsets.fromLTRB(12, 12, 16, 24)),
+          // Independent top-right overlay: public landing hero stays 290dp.
+          const AppUpdateFloatingBadge(topOffset: 12, rightOffset: 14),
         ],
       ),
     );
@@ -248,7 +258,9 @@ class _VcoreAdmissionViewState extends State<VcoreAdmissionView> {
   Widget _buildHero() {
     return Container(
       width: double.infinity,
-      height: 270,
+      // Keep the hero compact regardless of the update overlay. On large
+      // accessibility text scales leave room for extra text lines.
+      height: MediaQuery.textScalerOf(context).scale(252).clamp(252.0, 340.0).toDouble(),
       decoration: const BoxDecoration(
         image: DecorationImage(
           image: AssetImage('assets/images/admission_bg.png'),
@@ -257,7 +269,7 @@ class _VcoreAdmissionViewState extends State<VcoreAdmissionView> {
         ),
       ),
       child: Container(
-        padding: const EdgeInsets.fromLTRB(20, 28, 20, 18),
+        padding: const EdgeInsets.fromLTRB(20, 22, 20, 32),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: <Color>[
@@ -299,8 +311,8 @@ class _VcoreAdmissionViewState extends State<VcoreAdmissionView> {
                   Row(
                     children: <Widget>[
                       SizedBox(
-                        width: 150,
-                        height: 92,
+                        width: 148,
+                        height: 68,
                         child: _buildActionCard(
                           icon: Icons.school_rounded,
                           title: 'Đăng nhập',
@@ -338,8 +350,8 @@ class _VcoreAdmissionViewState extends State<VcoreAdmissionView> {
         onTap: onTap,
         borderRadius: BorderRadius.circular(14),
         child: Ink(
-          height: 82,
-          padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 8),
+          height: 68,
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 11),
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: gradientColors,
@@ -355,31 +367,35 @@ class _VcoreAdmissionViewState extends State<VcoreAdmissionView> {
               ),
             ],
           ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+          // Row layout avoids 3px bottom overflow on Android text metrics.
+          // No fixed-height Column with icon/title/subtitle stacked vertically.
+          child: Row(
             children: <Widget>[
               Icon(icon, size: 22, color: Colors.white),
-              const SizedBox(height: 5),
-              Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13.5,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 9.5,
-                  fontWeight: FontWeight.w500,
+              const SizedBox(width: 7),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: <Widget>[
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Colors.white,
+                        fontWeight: FontWeight.bold, fontSize: 13.2),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Colors.white70,
+                        fontSize: 9.3, fontWeight: FontWeight.w500,
+                        height: 1.13),
+                    ),
+                  ],
                 ),
               ),
             ],

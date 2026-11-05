@@ -8,6 +8,7 @@ import 'package:vnu_noi_tru/models/model.dart';
 import 'package:vnu_noi_tru/repository/dormitory_registration_repository.dart';
 import 'package:dio/dio.dart';
 import 'package:vnu_core/repository/app_repository.dart';
+import 'package:vnu_core/repository/data_repository.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vnu_noi_tru/domain/registration/dormitory_date_codec.dart';
 import 'package:vnu_noi_tru/domain/registration/dormitory_student_draft.dart';
@@ -87,6 +88,7 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
   String? tempGender;
   String? tempEthnicity;
   String? tempReligion;
+  String? tempHealthStatus;
   String? tempContactAddress;
   String? tempIdentityIssuePlace;
   String? tempFaculty;
@@ -454,8 +456,11 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
   }
 
   Future<void> _ensureStudentCache() async {
-    // Nếu đã có thông tin sinh viên (Google login) thì không cần làm gì
+    // Preserve the original fast return for USER profiles.
     if (Globals().thongTinSinhVienModel.value != null) return;
+    // Applicant login has no ONEVNU USER student profile. Do not trigger 401.
+    if (await DataRepository().getSecureSaveKey(kSessionPrincipalType) ==
+        kPrincipalTypeApplicant) return;
 
     // Kiểm tra nếu là thí sinh (có cache applicant_cccd) thì không gọi API
     final prefs = await SharedPreferences.getInstance();
@@ -483,12 +488,14 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
     final cachedClassInfo = Globals().lopDaoTaoModel.value;
     final cachedAcademicYear = Globals().nienKhoaDaoTaoModel.value;
     // ONEVNU_STALE_STUDENT_FIX_20260725_APPLICANT
-    final String currentStudentCode = student?.maSinhVien?.trim() ?? '';
-    final bool hasRegularStudent = currentStudentCode.isNotEmpty;
-    final bool isApplicant =
-        !hasRegularStudent &&
-        applicantCccd != null &&
-        applicantCccd.trim().isNotEmpty;
+    final bool isApplicantSession =
+        await DataRepository().getSecureSaveKey(kSessionPrincipalType) ==
+            kPrincipalTypeApplicant;
+    // The cached USER profile must never override an authenticated Applicant.
+    final String currentStudentCode = isApplicantSession
+        ? '' : (student?.maSinhVien?.trim() ?? '');
+    final bool isApplicant = isApplicantSession &&
+        applicantCccd != null && applicantCccd.trim().isNotEmpty;
     if (isApplicant) {
       final fullName =
           tempFullName ?? prefs.getString('applicant_fullname') ?? '';
@@ -543,6 +550,7 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
         gender: tempGender ?? '',
         ethnicity: tempEthnicity,
         religion: tempReligion,
+        healthStatus: tempHealthStatus,
         phone: phone,
         email: email,
         familyMembers: List<FamilyMemberPayload>.unmodifiable(familyMembers),
@@ -729,6 +737,7 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
       gender: tempGender ?? _mapGender(student.gioiTinh) ?? '',
       ethnicity: tempEthnicity,
       religion: tempReligion,
+      healthStatus: tempHealthStatus,
       phone: tempPhone ?? student.mobile ?? student.tel ?? '',
       email: tempEmail ?? student.email ?? student.emailKhac ?? '',
       familyMembers: List<FamilyMemberPayload>.unmodifiable(familyMembers),
@@ -805,6 +814,7 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
     tempGender = draft.gender;
     tempEthnicity = draft.ethnicity;
     tempReligion = draft.religion;
+    tempHealthStatus = draft.healthStatus;
     tempContactAddress = draft.contactAddress;
     tempIdentityIssuePlace = draft.identityIssuePlace;
     tempFaculty = draft.faculty;
@@ -897,6 +907,7 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
     tempGender = null;
     tempEthnicity = null;
     tempReligion = null;
+    tempHealthStatus = null;
     tempContactAddress = null;
     tempIdentityIssuePlace = null;
     tempFaculty = null;
@@ -1010,12 +1021,16 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
     String? studentCode,
     String? identityNo,
   }) async {
+    bool isApplicantSession = false;
     try {
-      final String code =
-          (studentCode ??
+      isApplicantSession =
+          await DataRepository().getSecureSaveKey(kSessionPrincipalType) ==
+              kPrincipalTypeApplicant;
+      final String code = isApplicantSession
+          ? ''
+          : (studentCode ??
                   Globals().thongTinSinhVienModel.value?.maSinhVien ??
-                  '')
-              .trim();
+                  '').trim();
 
       // Normal USER sessions already carry CCCD in the Personal Information
       // model. Always pass both identities to the repository so a KTX record
@@ -1026,11 +1041,8 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
             Globals().thongTinSinhVienModel.value?.soCmtCccd?.trim() ?? '';
       }
 
-      // Với sinh viên chính thức đã có hồ sơ OneVNU/MSSV, CCCD là khóa đối
-      // chiếu bắt buộc với KTX. Nếu STUDENT.STD_IDCARD còn trống thì không tra
-      // bằng MSSV để tránh hiển thị/ghi nhầm một hồ sơ KTX legacy; UI sẽ hướng
-      // người dùng sang quét QR CCCD rồi tải lại.
-      final bool isOfficialStudent =
+      // Preserve the original USER rule; Applicant is handled separately.
+      final bool isOfficialStudent = !isApplicantSession &&
           Globals().thongTinSinhVienModel.value != null && code.isNotEmpty;
       if (isOfficialStudent && effectiveIdentityNo.isEmpty) {
         emit(DormitoryRegistrationDismissHub());
@@ -1038,20 +1050,21 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
         return;
       }
 
-      // Applicant mode has no MSSV/profile model yet; only in that case may we
-      // use the Applicant CCCD persisted by its own login flow. Never use this
-      // key to override a normal USER identity because it could be stale.
-      if (effectiveIdentityNo.isEmpty && code.isEmpty) {
-        effectiveIdentityNo =
-            (await SharedPreferences.getInstance())
-                    .getString('applicant_cccd')
-                    ?.trim() ??
-                '';
+      // Only the active Applicant principal may use its persisted login CCCD.
+      // USER follows the original CCCD-first KTX lookup unchanged.
+      if (isApplicantSession) {
+        effectiveIdentityNo = (await SharedPreferences.getInstance())
+                .getString('applicant_cccd')?.trim() ?? '';
       }
 
       if (code.isEmpty && effectiveIdentityNo.isEmpty) {
         emit(DormitoryRegistrationDismissHub());
-        _emitEmptyMyRegistrations();
+        if (isApplicantSession) {
+          emit(DormitoryRegistrationError(
+              'Phiên tân sinh viên thiếu CCCD. Vui lòng đăng nhập lại.'));
+        } else {
+          _emitEmptyMyRegistrations();
+        }
         return;
       }
 
@@ -1068,6 +1081,12 @@ class DormitoryRegistrationCubit extends Cubit<DormitoryRegistrationState> {
       );
     } catch (e) {
       emit(DormitoryRegistrationDismissHub());
+      // An Applicant's 401/403/5xx is not proof of an empty KTX record.
+      if (isApplicantSession && e is DioException &&
+          e.response?.statusCode != 404 && e.response?.statusCode != 422) {
+        emit(DormitoryRegistrationError(AppErrorMapper.map(e).userMessage));
+        return;
+      }
 
       if (_isStudentRegistrationNotFound(e)) {
         _emitEmptyMyRegistrations();

@@ -145,4 +145,3 @@ class AppColors {
   static const homeSeparator = Color(0xFFE5E7EB);
   static const homeTimelineLine = Color(0xFFD1D5DB);
 }
-

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:vnu_core/common/log.dart';
 import 'package:vnu_core/modules/idp_auth/config/idp_auth_config.dart';
+import 'package:vnu_core/modules/idp_auth/services/idp_visible_debug_service.dart';
 import 'package:vnu_core/widgets/vcore_floating_back_bubble.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -178,6 +179,8 @@ class _IdpLoginWebViewState extends State<IdpLoginWebView> {
     }
 
     _finished = true;
+
+    IdpVisibleDebugService().recordCallback(uri);
 
     final String ticket = uri.queryParameters['ticket']?.trim() ?? '';
     if (ticket.isNotEmpty) {

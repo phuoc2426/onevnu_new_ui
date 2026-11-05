@@ -199,7 +199,6 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
     _FunctionItem('Điểm', Color.fromRGBO(175, 82, 222, 1)),              // Tím
     _FunctionItem('Đăng ký môn', Color.fromRGBO(255, 149, 0, 1)),        // Cam
     _FunctionItem('Việc làm', Color.fromRGBO(48, 209, 88, 1)),           // Xanh lá
-    _FunctionItem('Đồng bộ', Color.fromRGBO(90, 200, 250, 1)),           // Xanh ngọc
     _FunctionItem('Học phí', Color.fromRGBO(255, 45, 85, 1)),            // Hồng đỏ
     _FunctionItem('Tài liệu', Color.fromRGBO(94, 92, 230, 1)),           // Indigo
     _FunctionItem('Điểm danh', Color.fromRGBO(52, 199, 89, 1)),          // Emerald

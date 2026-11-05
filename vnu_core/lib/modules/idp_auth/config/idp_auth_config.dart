@@ -1,4 +1,5 @@
 import 'package:vnu_core/modules/auth_mode/login_runtime_config.dart';
+import 'package:flutter/foundation.dart';
 
 /// ONEVNU IDP client-side configuration.
 ///
@@ -21,6 +22,25 @@ class IdpAuthConfig {
 
   // Compatibility alias for older call sites/patches.
   static const bool useStaticConfig = useStaticLoginConfig;
+
+  /// Visible only in a debug Flutter build; ignored in profile/release.
+  /// This changes UI availability, not backend login permission.
+  static const bool devShowAllLoginMethods = bool.fromEnvironment(
+    'ONEVNU_DEV_SHOW_ALL_LOGIN', defaultValue: true,
+  );
+  static bool get showAllLoginInDebug => kDebugMode && devShowAllLoginMethods;
+
+  static const LoginRuntimeConfig debugAllLoginRuntimeConfig = LoginRuntimeConfig(
+    idpLogin: true,
+    idpStartUrl: staticIdpStartUrl,
+    idpWebUrl: staticIdpWebUrl,
+    studentCodeLoginEnabled: true,
+    cccdLoginEnabled: true,
+    applicantLoginEnabled: true,
+    passwordFallbackEnabled: true,
+    qrEnabled: true,
+  );
+
 
   /// Compatibility flag retained for older call sites. V4 no longer uses it
   /// to expose or automatically select password login.
@@ -55,7 +75,7 @@ class IdpAuthConfig {
   static const bool showBrowserModeSelector = false;
 
   static String get loginConfigSourceLabel =>
-      useStaticLoginConfig ? 'STATIC' : 'API';
+      showAllLoginInDebug ? 'DEBUG_ALL' : (useStaticLoginConfig ? 'STATIC' : 'API');
 
   // OAuth redirect remains backend-owned. These values are only for the final
   // backend -> app callback handling.
@@ -100,3 +120,4 @@ class IdpAuthConfig {
     return customSchemeCallback || verifiedHttpsCallback;
   }
 }
+

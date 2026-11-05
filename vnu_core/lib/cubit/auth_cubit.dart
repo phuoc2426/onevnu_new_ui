@@ -11,6 +11,7 @@ import 'package:vnu_core/constants/constant.dart';
 import 'package:vnu_core/globals.dart';
 import 'package:vnu_core/models/login_reponse_model.dart';
 import 'package:vnu_core/modules/auth_mode/auth_entry_mode_service.dart';
+import 'package:vnu_core/modules/auth_mode/student_training_access_guard.dart';
 import 'package:vnu_core/repository/app_repository.dart';
 import 'package:vnu_core/repository/data_repository.dart';
 import 'package:vnu_core/services/services_url.dart';
@@ -135,16 +136,21 @@ class AuthCubit extends Cubit<AuthState> {
         await Globals().refreshStudentInfo();
 
         if (Globals().thongTinSinhVienModel.value == null) {
-          await Globals().clearSession();
-
-          emit(AuthDismissHub());
-          emit(
-            AuthError(
-              'Không tải được thông tin sinh viên '
-              'của tài khoản vừa đăng nhập.',
-            ),
-          );
-          return;
+          // refreshStudentInfo() swallows transport exceptions. Re-query once
+          // to distinguish authoritative absence from a network outage.
+          String? message;
+          try {
+            final student = await ApiRepository().getSinhVienInfo();
+            Globals().thongTinSinhVienModel.value = student;
+          } catch (error) {
+            message = StudentTrainingAccessGuard.describe(error);
+          }
+          if (Globals().thongTinSinhVienModel.value == null) {
+            await Globals().clearSession();
+            emit(AuthDismissHub());
+            emit(AuthError(message ?? StudentTrainingAccessGuard.notLoaded));
+            return;
+          }
         }
 
         await AuthEntryModeService().markPassword();
@@ -239,3 +245,4 @@ class AuthCubit extends Cubit<AuthState> {
     // }
   }
 }
+

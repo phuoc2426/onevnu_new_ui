@@ -13,6 +13,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:vnu_core/common/app_text_styles.dart';
 import 'package:vnu_core/globals.dart';
+import 'package:vnu_core/repository/data_repository.dart';
 import 'package:vnu_core/modules/profile/views/vcore_profile_person_info_view.dart';
 import 'package:vnu_core/widgets/field/vnu_text_field.dart';
 import 'package:vnu_core/widgets/select/vnu_select.dart';
@@ -88,6 +89,8 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
   late String _initialIdentityNo;
   late final TextEditingController _ethnicityController;
   late final TextEditingController _religionController;
+  late final TextEditingController _healthStatusController;
+  late String _initialHealthStatus;
 
   late final TextEditingController _classNameController;
   late final TextEditingController _facultyController;
@@ -121,6 +124,9 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
   String _identityType = 'CCCD';
   int? _studentType;
   bool _submitting = false;
+  // Never offer USER/education profile links until the principal is known.
+  bool _principalResolved = false;
+  bool _isApplicantSession = false;
 
   List<DormitoryCountryOption> _countries = <DormitoryCountryOption>[];
   List<DormitoryProvinceOption> _provinces = <DormitoryProvinceOption>[];
@@ -141,6 +147,7 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
   @override
   void initState() {
     super.initState();
+    _resolvePrincipalType();
 
     _existingPriorityDocuments = _readExistingPriorityDocuments(
       widget.accommodation,
@@ -262,6 +269,12 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
         'religion',
       ], (dynamic object) => object.religion),
     );
+    _healthStatusController = TextEditingController(
+      text: _readText(widget.student, const <String>[
+        'health_status', 'healthStatus',
+      ], (dynamic object) => object.healthStatus),
+    );
+    _initialHealthStatus = _healthStatusController.text.trim();
 
     _classNameController = TextEditingController(
       text: _readText(widget.student, const <String>[
@@ -550,6 +563,21 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
     });
   }
 
+  Future<void> _resolvePrincipalType() async {
+    try {
+      final type = await DataRepository().getSecureSaveKey(kSessionPrincipalType);
+      if (!mounted) return;
+      setState(() {
+        _isApplicantSession = type == kPrincipalTypeApplicant;
+        _principalResolved = true;
+      });
+    } catch (_) {
+      // Fail closed: don't expose student-profile update route on failure.
+      if (!mounted) return;
+      setState(() { _principalResolved = false; });
+    }
+  }
+
   @override
   void dispose() {
     _studentCodeController.dispose();
@@ -563,6 +591,7 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
     _identityIssuePlaceController.dispose();
     _ethnicityController.dispose();
     _religionController.dispose();
+    _healthStatusController.dispose();
     _classNameController.dispose();
     _facultyController.dispose();
     _majorController.dispose();
@@ -1013,16 +1042,30 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
           Expanded(child: _dateField(controller: _identityIssueDateController, label: 'Ngày cấp')),
         ]),
         const SizedBox(height: 8),
-        _buildIdentityNoWarning(),
-        const SizedBox(height: 8),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: OutlinedButton.icon(
-            onPressed: _submitting ? null : _openPersonalInfoCccd,
-            icon: const Icon(Icons.manage_accounts_outlined),
-            label: const Text('Cập nhật CCCD trong Thông tin cá nhân'),
+        if (_isApplicantSession)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Text(
+              'Tân sinh viên đăng nhập bằng CCCD: chỉ cập nhật thông tin hồ sơ '
+              'qua API nội trú KTX tại màn hình này. Không cần liên kết mã '
+              'sinh viên hay truy cập Thông tin cá nhân của hệ đào tạo. '
+              'CCCD đăng nhập được giữ nguyên để tránh mất liên kết hồ sơ.',
+              style: TextStyle(fontSize: 12.5, height: 1.4,
+                color: Color(0xFF725B20)),
+            ),
           ),
-        ),
+        if (_principalResolved && !_isApplicantSession) ...<Widget>[
+          _buildIdentityNoWarning(),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              onPressed: _submitting ? null : _openPersonalInfoCccd,
+              icon: const Icon(Icons.manage_accounts_outlined),
+              label: const Text('Cập nhật CCCD trong Thông tin cá nhân'),
+            ),
+          ),
+        ],
         const SizedBox(height: 10),
         VnuSingleSelect<DormitoryCountryOption>(
           label: 'Quốc gia / quốc tịch', value: _selectedCountry,
@@ -1100,6 +1143,13 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
               ),
             ),
           ],
+        ),
+        const SizedBox(height: 10),
+        _field(
+          controller: _healthStatusController,
+          label: 'Tình trạng sức khỏe (không bắt buộc)',
+          maxLength: 255,
+          maxLines: 2,
         ),
         const SizedBox(height: 10),
         _field(
@@ -2233,6 +2283,8 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
         'contact_address': _textOrNull(_contactAddressController),
         'ethnicity': _textOrNull(_ethnicityController),
         'religion': _textOrNull(_religionController),
+        if (_healthStatusController.text.trim() != _initialHealthStatus)
+          'health_status': _healthStatusController.text.trim(),
         if (_selectedPriorityObjects.isNotEmpty &&
             _selectedPriorityObjects.first.id != null)
           'priority_object_id': _selectedPriorityObjects.first.id,
@@ -2352,6 +2404,7 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
       gender: _gender ?? '',
       ethnicity: _textOrNull(_ethnicityController),
       religion: _textOrNull(_religionController),
+      healthStatus: _textOrNull(_healthStatusController),
       phone: _phoneController.text.trim(),
       email: _emailController.text.trim(),
       familyMembers: _familyForms
@@ -2521,6 +2574,7 @@ class _DRStudentUpdateSheetState extends State<DRStudentUpdateSheet> {
   }
 
   Future<void> _openPersonalInfoCccd() async {
+    if (!_principalResolved || _isApplicantSession) return;
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (_) => const VcoreProfilePersonInfoView(

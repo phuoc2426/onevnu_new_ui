@@ -86,6 +86,7 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
   late TextEditingController _temporaryWardCodeController;
   late TextEditingController _ethnicityController;
   late TextEditingController _religionController;
+  late TextEditingController _healthStatusController;
   late TextEditingController _phoneController;
   late TextEditingController _emailController;
   late TextEditingController _reasonController;
@@ -130,6 +131,7 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
     _temporaryWardCodeController = TextEditingController();
     _ethnicityController = TextEditingController();
     _religionController = TextEditingController();
+    _healthStatusController = TextEditingController();
     _phoneController = TextEditingController();
     _emailController = TextEditingController();
     _reasonController = TextEditingController();
@@ -184,6 +186,7 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
       _temporaryWardCodeController.text = draft.temporaryWardCode ?? '';
       _ethnicityController.text = draft.ethnicity ?? '';
       _religionController.text = draft.religion ?? '';
+      _healthStatusController.text = draft.healthStatus ?? '';
       _phoneController.text = draft.phone;
       _emailController.text = draft.email;
       _reasonController.text = draft.reasonStay ?? '';
@@ -432,6 +435,7 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
     _temporaryWardCodeController.dispose();
     _ethnicityController.dispose();
     _religionController.dispose();
+    _healthStatusController.dispose();
     _phoneController.dispose();
     _emailController.dispose();
     _reasonController.dispose();
@@ -586,6 +590,7 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
       temporaryWardCode: _temporaryWardCodeController.text.trim(),
       ethnicity: _ethnicityController.text.trim(),
       religion: _religionController.text.trim(),
+      healthStatus: _healthStatusController.text.trim(),
       phone: _phoneController.text.trim(),
       email: _emailController.text.trim(),
       reasonStay: _reasonController.text.trim(),
@@ -969,6 +974,9 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
                           Expanded(child: _buildField('Tôn giáo', _religionController)),
                         ],
                       ),
+                      const SizedBox(height: 8),
+                      _buildField('Tình trạng sức khỏe (không bắt buộc)',
+                        _healthStatusController, maxLines: 2, maxLength: 255),
                       const SizedBox(height: 8),
                       NtCustomDropdown<DormitoryProvinceOption>(
                         label: 'Tỉnh/Thành phố thường trú',
@@ -1613,6 +1621,8 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
     IconData? icon,
     VoidCallback? onTap,
     TextInputType? keyboardType,
+    int? maxLength,
+    int maxLines = 1,
     String? Function(String?)? validator,
   }) {
     final bool requiredField = label.trim().endsWith('*');
@@ -1626,6 +1636,9 @@ class DRStep3InfoScreenState extends State<DRStep3InfoScreen> {
       readOnly: readOnly,
       onTap: onTap,
       keyboardType: keyboardType,
+      maxLength: maxLength,
+      maxLines: maxLines,
+      minLines: maxLines > 1 ? maxLines : null,
       validator: validator,
       trailing: icon == null
           ? null

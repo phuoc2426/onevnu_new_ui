@@ -16,6 +16,9 @@ class LoginConfigResolver {
   factory LoginConfigResolver() => _instance;
 
   Future<LoginRuntimeConfig> resolve({bool forceRefresh = true}) async {
+    if (IdpAuthConfig.showAllLoginInDebug) {
+      return IdpAuthConfig.debugAllLoginRuntimeConfig;
+    }
     if (IdpAuthConfig.useStaticLoginConfig) {
       const LoginRuntimeConfig config = IdpAuthConfig.staticLoginRuntimeConfig;
       logInfo(
@@ -47,6 +50,9 @@ class LoginConfigResolver {
   /// Static diagnostic mode deliberately bypasses /api/config. API-driven mode
   /// performs the original last-second server check.
   Future<LoginRuntimeConfig> verifyBeforeSubmit() async {
+    if (IdpAuthConfig.showAllLoginInDebug) {
+      return IdpAuthConfig.debugAllLoginRuntimeConfig;
+    }
     if (IdpAuthConfig.useStaticLoginConfig) {
       const LoginRuntimeConfig config = IdpAuthConfig.staticLoginRuntimeConfig;
       logInfo(
@@ -64,3 +70,4 @@ class LoginConfigResolver {
     return config;
   }
 }
+

@@ -107,9 +107,11 @@ class _VnuReadOnlyFieldState extends State<VnuReadOnlyField> {
               isEmpty: !effectiveHasValue,
               decoration: VnuFieldDecoration.build(
                 label: widget.label,
-                // Placeholder and label are usually the same semantic concept.
-                // Do not render a second hint while the label rests inside.
-                hintText: _focusNode.hasFocus && !effectiveHasValue
+                // If there is no floating label, show the hint immediately.
+                // Keep the prior floating-label behavior when a label exists.
+                hintText: !effectiveHasValue &&
+                    (_focusNode.hasFocus ||
+                     (widget.label?.trim().isNotEmpty != true))
                     ? widget.placeholder
                     : null,
                 requiredField: widget.requiredField,

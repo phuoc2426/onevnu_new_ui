@@ -10,6 +10,7 @@ import 'package:vnu_core/modules/idp_auth/repository/idp_auth_repository.dart';
 import 'package:vnu_core/modules/idp_auth/services/idp_auth_callback_service.dart';
 import 'package:vnu_core/modules/idp_auth/services/idp_device_binding_service.dart';
 import 'package:vnu_core/modules/idp_auth/services/idp_onevnu_session_service.dart';
+import 'package:vnu_core/modules/idp_auth/services/idp_visible_debug_service.dart';
 import 'package:vnu_core/modules/idp_auth/views/idp_login_webview.dart';
 
 enum IdpBrowserMode {
@@ -54,6 +55,12 @@ class IdpAuthFlow {
             ? flowId.trim()
             : const Uuid().v4();
     final Stopwatch total = Stopwatch()..start();
+    final IdpVisibleDebugService visibleDebug = IdpVisibleDebugService();
+    visibleDebug.start(
+      flowId: effectiveFlowId,
+      forceLogin: forceLogin,
+      browserMode: browserMode.name,
+    );
     _trace(
       'FLOW_BEGIN',
       'flowId=$effectiveFlowId forceLogin=$forceLogin browserMode=${browserMode.name}',
@@ -125,10 +132,30 @@ class IdpAuthFlow {
         return false;
       }
       if (!callback.isSuccess) {
+        visibleDebug.record(
+          'CALLBACK OUTCOME',
+          <String, dynamic>{
+            'success': false,
+            'error': callback.error ?? 'unknown',
+          },
+        );
+        await visibleDebug.show(
+          context,
+          title: 'SSO DEBUG - Callback lỗi',
+        );
         throw StateError(
           callback.error ?? 'Đăng nhập VNU IDP không thành công.',
         );
       }
+
+      visibleDebug.record(
+        'CALLBACK OUTCOME',
+        <String, dynamic>{
+          'success': true,
+          'ticketPresent': (callback.ticket ?? '').isNotEmpty,
+          'ticket': callback.ticket,
+        },
+      );
 
       _sessionTrace(
         'CALLBACK_OK',
@@ -156,6 +183,17 @@ class IdpAuthFlow {
         _sessionTrace(
           'REAUTH_REDEEM_OK',
           'flowId=$effectiveFlowId elapsedMs=${redeemWatch.elapsedMilliseconds}',
+        );
+        visibleDebug.record(
+          'REAUTH RESULT',
+          <String, dynamic>{
+            'success': true,
+            'elapsedMs': redeemWatch.elapsedMilliseconds,
+          },
+        );
+        await visibleDebug.show(
+          context,
+          title: 'SSO DEBUG - Re-auth thành công',
         );
         return true;
       }
@@ -186,6 +224,18 @@ class IdpAuthFlow {
         'ONEVNU_SESSION_READY',
         'flowId=$effectiveFlowId totalMs=${total.elapsedMilliseconds}',
       );
+      visibleDebug.record(
+        'FLOW RESULT',
+        <String, dynamic>{
+          'success': true,
+          'sessionApplied': true,
+          'totalMs': total.elapsedMilliseconds,
+        },
+      );
+      await visibleDebug.show(
+        context,
+        title: 'SSO DEBUG - Đăng nhập thành công',
+      );
       return true;
     } catch (error, stackTrace) {
       _trace(
@@ -195,6 +245,15 @@ class IdpAuthFlow {
         'totalMs=${total.elapsedMilliseconds}',
       );
       _traceStack(stackTrace);
+      visibleDebug.recordError(
+        'IDP FLOW',
+        error,
+        stackTrace: stackTrace,
+      );
+      await visibleDebug.show(
+        context,
+        title: 'SSO DEBUG - Đăng nhập lỗi',
+      );
       rethrow;
     }
   }

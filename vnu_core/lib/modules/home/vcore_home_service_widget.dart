@@ -91,7 +91,8 @@ class _VcoreHomeServiceWidgetState extends State<VcoreHomeServiceWidget> {
             }
             if (model != null) {
               if (model.loaiBoxDichVuEnum?.mapTypeBoxService() !=
-                  HomeService.XemLichThi) {
+                  HomeService.XemLichThi &&
+                  model.loaiBoxDichVuEnum?.mapTypeBoxService() != HomeService.DongBo) {
                 listObj.add(model);
               }
             }
@@ -120,7 +121,8 @@ class _VcoreHomeServiceWidgetState extends State<VcoreHomeServiceWidget> {
           .where(
             (element) =>
                 element.loaiBoxDichVuEnum?.mapTypeBoxService() !=
-                HomeService.XemLichThi,
+                HomeService.XemLichThi &&
+                element.loaiBoxDichVuEnum?.mapTypeBoxService() != HomeService.DongBo,
           )
           .toList();
       print("DEBUG: Loaded ${response.length} services");

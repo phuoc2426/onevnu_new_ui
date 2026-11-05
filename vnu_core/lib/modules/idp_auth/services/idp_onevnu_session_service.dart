@@ -9,6 +9,7 @@ import 'package:vnu_core/common/log.dart';
 import 'package:vnu_core/globals.dart';
 import 'package:vnu_core/models/model.dart';
 import 'package:vnu_core/modules/auth_mode/auth_entry_mode_service.dart';
+import 'package:vnu_core/modules/auth_mode/student_training_access_guard.dart';
 import 'package:vnu_core/repository/app_repository.dart';
 import 'package:vnu_core/repository/data_repository.dart';
 import 'package:vnu_core/vnu_core.dart';
@@ -91,6 +92,12 @@ class IdpOneVnuSessionService {
         Globals().thongTinSinhVienModel.value = student;
         return;
       } catch (error, stackTrace) {
+        if (StudentTrainingAccessGuard.isAuthoritativeMissing(error)) {
+          Error.throwWithStackTrace(
+            StateError(StudentTrainingAccessGuard.noTrainingRecord),
+            stackTrace,
+          );
+        }
         lastError = error;
         lastStackTrace = stackTrace;
 
@@ -107,6 +114,7 @@ class IdpOneVnuSessionService {
       }
     }
 
+    // A timeout / 500 must never be presented as a missing enrollment.
     Error.throwWithStackTrace(lastError!, lastStackTrace!);
   }
 
@@ -180,3 +188,4 @@ class IdpOneVnuSessionService {
     }
   }
 }
+

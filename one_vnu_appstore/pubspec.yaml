@@ -7,7 +7,7 @@ description: A new Flutter project.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 
 #version: 1.1.0+1038
-version: 2.0.16+1065
+version: 2.0.17+1066
 
 environment:
   sdk: ">=3.8.0 <4.0.0"
@@ -70,6 +70,7 @@ dependencies:
   showcaseview: ^5.1.0
   google_sign_in: ^6.2.1
   visibility_detector: ^0.4.0+2
+  lottie: ^3.6.1
 #  liquid_glass_easy: ^1.1.1
 #  glass: ^2.0.0
   # #API

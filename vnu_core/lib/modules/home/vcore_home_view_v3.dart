@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:math';
 import 'dart:ui';
 import 'package:vnu_hoc_bong/vnu_hoc_bong.dart';
@@ -7,12 +6,10 @@ import 'package:vnu_hoc_bong/vnu_hoc_bong.dart';
 import 'package:vnu_noi_tru/vnu_noi_tru.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:timezone/data/latest.dart' as tz_data;
-import 'package:timezone/timezone.dart' as tz;
 
 import 'package:vnu_core/common/app_colors.dart';
 import 'package:vnu_core/common/utils.dart';
@@ -35,15 +32,20 @@ import 'package:vnu_core/modules/qr/views/vcore_qr_scanner_view.dart';
 // import 'package:vnu_core/modules/paht/views/vcore_paht_view.dart';
 import 'package:vnu_core/modules/paht_v2/views/vcore_paht_view_v2.dart';
 import 'package:vnu_core/modules/profile/views/vcore_profile_person_info_view.dart';
-import 'package:vnu_core/modules/sync/views/vcore_sync_view.dart';
 import 'package:vnu_core/services/services_url.dart';
+import 'package:vnu_core/repository/app_repository.dart';
+import 'package:vnu_core/modules/tuition/views/vcore_tuition_view.dart';
+import 'package:vnu_core/modules/tuition/data/tuition_api_diagnostics.dart';
+import 'package:vnu_core/modules/mobile_menu/mobile_menu_preview_policy.dart';
+import 'package:vnu_core/widgets/app_update_floating_badge.dart';
+import 'package:vnu_core/widgets/native_function_icon.dart';
+import 'package:vnu_core/widgets/vnu_auto_marquee.dart';
+import 'package:vnu_core/widgets/vnu_press_motion.dart';
 import 'package:vnu_core/widgets/progress_hub_widget.dart';
 import 'package:vnu_core/widgets/responsive/responsive.dart';
-import 'package:table_calendar/table_calendar.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:vnu_core/common/app_text_styles.dart';
 import 'package:vnu_core/widgets/zalo_chat_bubble.dart';
-import 'package:vnu_core/modules/question/views/vcore_question_view.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:vnu_core/modules/shapeshifter/models/shapeshifter_feature.dart';
 import 'package:vnu_core/modules/shapeshifter/repository/shapeshifter_repository.dart';
@@ -51,101 +53,6 @@ import 'package:vnu_core/modules/shapeshifter/services/shapeshifter_launcher.dar
 
 import 'package:vnu_core/common/guide/guide.dart';
 import 'package:vnu_core/common/guide/configs/home_guide_config.dart';
-import 'package:vnu_core/widgets/field/vnu_text_field.dart';
-/* -------------------------------------------------------------------------- */
-/*                       LOCAL NOTIFICATION SERVICE                           */
-/* -------------------------------------------------------------------------- */
-
-class _LocalNotificationService {
-  static final FlutterLocalNotificationsPlugin _plugin =
-      FlutterLocalNotificationsPlugin();
-
-  static bool _initialized = false;
-
-  static const String _channelId = 'vnu_calendar_reminder_channel';
-  static const String _channelName = 'Nhắc lịch cá nhân';
-  static const String _channelDescription =
-      'Thông báo nhắc lịch theo ngày giờ sinh viên tự tạo';
-
-  static Future<void> init() async {
-    if (_initialized) return;
-
-    tz_data.initializeTimeZones();
-    tz.setLocalLocation(tz.getLocation('Asia/Ho_Chi_Minh'));
-
-    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
-
-    const darwinInit = DarwinInitializationSettings(
-      requestAlertPermission: true,
-      requestBadgePermission: true,
-      requestSoundPermission: true,
-    );
-
-    const initSettings = InitializationSettings(
-      android: androidInit,
-      iOS: darwinInit,
-      macOS: darwinInit,
-    );
-
-    await _plugin.initialize(
-      settings: initSettings,
-      onDidReceiveNotificationResponse: (NotificationResponse response) {
-        // Có thể điều hướng tới màn danh sách lời nhắc ở đây nếu sau này cần.
-      },
-    );
-
-    await _plugin
-        .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >()
-        ?.requestNotificationsPermission();
-
-    _initialized = true;
-  }
-
-  static Future<void> scheduleReminder({
-    required int id,
-    required String title,
-    required String body,
-    required DateTime scheduledTime,
-    String? payload,
-  }) async {
-    await init();
-
-    final scheduledDate = tz.TZDateTime.from(scheduledTime, tz.local);
-
-    await _plugin.zonedSchedule(
-      id: id,
-      title: title,
-      body: body,
-      scheduledDate: scheduledDate,
-      notificationDetails: const NotificationDetails(
-        android: AndroidNotificationDetails(
-          _channelId,
-          _channelName,
-          channelDescription: _channelDescription,
-          importance: Importance.max,
-          priority: Priority.high,
-          category: AndroidNotificationCategory.reminder,
-          visibility: NotificationVisibility.public,
-        ),
-        iOS: DarwinNotificationDetails(
-          presentAlert: true,
-          presentBadge: true,
-          presentSound: true,
-        ),
-        macOS: DarwinNotificationDetails(
-          presentAlert: true,
-          presentBadge: true,
-          presentSound: true,
-        ),
-      ),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      payload: payload,
-    );
-  }
-}
-
 class VcoreHomeViewV3 extends StatelessWidget {
   const VcoreHomeViewV3({super.key, this.isActive = true});
 
@@ -172,6 +79,8 @@ class VcoreHomeViewV3 extends StatelessWidget {
     );
   }
 }
+
+enum _QuickAccessDisplay { grid, list }
 
 class _HomeWireframeBody extends StatefulWidget {
   final VcoreHomeController controller;
@@ -215,27 +124,62 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
       'kPinnedFunctions_v3_stable_key_v1';
   static const String _seenShapeFeaturesKey =
       'kShapeshifterSeenFeatures_v1';
+  static const String _v5AutoPinsKey = 'kPinnedFunctions_v5_curated_default';
+  static const String _v7UnfinishedPinCleanupKey =
+      'kPinnedFunctions_v7_hide_legacy_auto_unfinished';
+  // These exist in source but show 'Chức năng đang hoàn thiện'.
+  // Keep them in the pin selector; do NOT auto-pin them.
+  static const Set<String> _unfinishedNativeKeys = <String>{
+    'native:Đăng ký môn', 'native:Tài liệu',
+    'native:Điểm danh', 'native:Thư viện',
+  };
+  static const String _hiddenTuitionKey = 'native:Học phí';
+  static const String _hiddenSyncKey = 'native:Đồng bộ';
+  static List<String> get _curatedDefaultPins => _nativeFunctions
+      .where((item) => !_unfinishedNativeKeys.contains(item.key) &&
+          item.key != _hiddenTuitionKey && item.key != _hiddenSyncKey)
+      .map((item) => item.key).toList();
 
-  List<String> _pinnedFunctionKeys = [
-    'native:Lịch học & thi',
-    'native:Điểm',
-    'native:Đăng ký môn',
-    'native:Việc làm',
-    'native:Đồng bộ',
-    'native:Học phí',
-    'native:Tài liệu',
-    'native:Điểm danh',
-    'native:Học bổng',
-    'native:Phản ánh',
-    'native:Nội trú',
-    'native:$_temporaryAddressFunctionLabel',
-    'native:Phòng trọ',
-    'native:Thủ tục',
-    'native:Thư viện',
-    'native:Bản đồ',
-    'native:Hỏi đáp',
-    'native:Cẩm nang',
-  ];
+  static const String _quickAccessDisplayKey = 'kQuickAccessDisplay_v1';
+  _QuickAccessDisplay _quickAccessDisplay = _QuickAccessDisplay.grid;
+  bool _quickAccessModeTouched = false;
+
+  Future<void> _loadQuickAccessDisplay() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (!mounted || _quickAccessModeTouched) return;
+      setState(() => _quickAccessDisplay =
+          prefs.getString(_quickAccessDisplayKey) == 'list'
+              ? _QuickAccessDisplay.list : _QuickAccessDisplay.grid);
+    } catch (_) {
+      // Layout mac dinh 3 cot van hoat dong khi prefs khong kha dung.
+    }
+  }
+
+  Future<void> _setQuickAccessDisplay(_QuickAccessDisplay display) async {
+    if (_quickAccessDisplay == display) return;
+    _quickAccessModeTouched = true;
+    setState(() => _quickAccessDisplay = display);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_quickAccessDisplayKey, display.name);
+    } catch (_) {
+      // Giao dien hien tai van phan hoi du khong luu duoc preferences.
+    }
+  }
+
+  List<String> _pinnedFunctionKeys = _curatedDefaultPins;
+
+  // Client preview gate only. Live payment backend MUST verify univ_id=4.
+  int? _currentUniversityId;
+  // Regular native function entry in the grid. The debug build may render
+  // the same tile for UI inspection without weakening production permissions.
+  // A live backend must always enforce universityId == 4.
+  List<_FunctionItem> get _availableNativeFunctions => _nativeFunctions
+      .where((item) => item.key != _hiddenTuitionKey &&
+          item.key != _hiddenSyncKey && MobileMenuPreviewPolicy.isVisible(
+            item.key, universityId: _currentUniversityId))
+      .toList();
 
   List<ShapeshifterFeature> _dynamicFeatures = const <ShapeshifterFeature>[];
   bool _reloadingFunctionRegistry = false;
@@ -249,11 +193,11 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
     _FunctionItem('Đăng ký môn', Color.fromRGBO(255, 149, 0, 1)), // Cam
     _FunctionItem('Việc làm', Color.fromRGBO(48, 209, 88, 1)), // Xanh lá
     _FunctionItem('Đồng bộ', Color.fromRGBO(90, 200, 250, 1)), // Xanh ngọc
-    _FunctionItem('Học phí', Color.fromRGBO(255, 45, 85, 1)), // Hồng đỏ
+    _FunctionItem('Thanh toán học phí', Color.fromRGBO(255, 45, 85, 1), key: 'native:Học phí'),
     _FunctionItem('Tài liệu', Color.fromRGBO(94, 92, 230, 1)), // Indigo
     _FunctionItem('Điểm danh', Color.fromRGBO(52, 199, 89, 1)), // Emerald
     _FunctionItem('Học bổng', Color.fromRGBO(255, 55, 95, 1)), // Rose
-    _FunctionItem('Phản ánh', Color.fromRGBO(255, 204, 0, 1)), // Vàng
+    _FunctionItem('Phản ánh, góp ý', Color.fromRGBO(255, 204, 0, 1), key: 'native:Phản ánh'), // Giu ma ghim cu
     _FunctionItem('Nội trú', Color.fromRGBO(191, 90, 242, 1)), // Lavender
     _FunctionItem(
       _temporaryAddressFunctionLabel,
@@ -263,13 +207,19 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
     _FunctionItem('Thủ tục', Color.fromRGBO(118, 214, 78, 1)), // Lime
     _FunctionItem('Thư viện', Color.fromRGBO(255, 159, 10, 1)), // Gold
     _FunctionItem('Bản đồ', Color.fromRGBO(50, 173, 230, 1)), // Ocean
-    _FunctionItem('Hỏi đáp', Color.fromRGBO(255, 55, 145, 1)), // Magenta
     _FunctionItem('Cẩm nang', Color.fromRGBO(142, 142, 147, 1)), // Gray
   ];
 
   List<_FunctionItem> get _allAvailableFunctions => <_FunctionItem>[
-        ..._nativeFunctions,
-        ..._dynamicFeatures.map(_FunctionItem.fromShapeshifter),
+        ..._availableNativeFunctions,
+        ..._dynamicFeatures
+          .where((feature) {
+            final label = feature.label.trim().toLowerCase();
+            final code = feature.code.trim().toLowerCase();
+            return label != 'hỏi đáp' && label != 'đồng bộ' &&
+                code != 'dongbo' && code != 'dong_bo' && code != 'sync';
+          })
+          .map(_FunctionItem.fromShapeshifter),
       ];
 
   Map<String, List<_FunctionItem>> get _groupedFunctions {
@@ -303,14 +253,13 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
       }.contains(item.label)) {
         group = 'Học tập';
       } else if (<String>{
-        'Học phí',
+        'Thanh toán học phí',
         'Học bổng',
         'Thủ tục',
         'Nội trú',
         _temporaryAddressFunctionLabel,
-        'Phản ánh',
+        'Phản ánh, góp ý',
         'Đồng bộ',
-        'Hỏi đáp',
       }.contains(item.label)) {
         group = 'Dịch vụ';
       } else {
@@ -324,9 +273,10 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
   @override
   void initState() {
     super.initState();
+    unawaited(_loadQuickAccessDisplay());
     unawaited(_initializeFunctionRegistry());
+    unawaited(_resolveTuitionUniversity());
     _startNewsAutoScroll();
-    _LocalNotificationService.init();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _runHomeInitialGuide();
@@ -604,7 +554,9 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
     final registry = AppGuideRegistryScope.of(pageContext);
 
     final searchService = AppGuideSearchService(
-      items: registry.items,
+      items: registry.items.where((item) =>
+        item.id != 'home.function.sync' &&
+        item.title.trim().toLowerCase() != 'đồng bộ').toList(),
       predictor: const AppGuideLightAiPredictor(),
     );
 
@@ -644,8 +596,6 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
         return 'home.overview.upcoming_exams';
       case 2:
         return 'home.overview.unread_notifications';
-      case 3:
-        return 'home.overview.manual_reminder';
       default:
         return 'home.overview';
     }
@@ -663,7 +613,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
         return 'home.function.jobs';
       case 'Đồng bộ':
         return 'home.function.sync';
-      case 'Học phí':
+      case 'Thanh toán học phí':
         return 'home.function.tuition';
       case 'Tài liệu':
         return 'home.function.documents';
@@ -671,6 +621,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
         return 'home.function.attendance';
       case 'Học bổng':
         return 'home.function.scholarship';
+      case 'Phản ánh, góp ý':
       case 'Phản ánh':
         return 'home.function.paht';
       case 'Nội trú':
@@ -685,8 +636,6 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
         return 'home.function.library';
       case 'Bản đồ':
         return 'home.function.map';
-      case 'Hỏi đáp':
-        return 'home.function.question';
       case 'Cẩm nang':
         return 'home.function.handbook';
       default:
@@ -710,6 +659,36 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
         curve: Curves.easeInOutCubic,
       );
     });
+  }
+
+  /// Infer university from the existing student unit API, walking parent units
+  /// if needed. A missing/failed lookup always hides tuition from Home.
+  Future<void> _resolveTuitionUniversity() async {
+    String? unitGuid = Globals().thongTinSinhVienModel.value?.guidDonVi
+        ?? Globals().currentUserModel.value?.guidDonVi;
+    if (unitGuid == null || unitGuid.trim().isEmpty) {
+      await Future<void>.delayed(const Duration(milliseconds: 800));
+      if (!mounted) return;
+      unitGuid = Globals().thongTinSinhVienModel.value?.guidDonVi
+          ?? Globals().currentUserModel.value?.guidDonVi;
+    }
+    if (unitGuid == null || unitGuid.trim().isEmpty) return;
+    try {
+      final visited = <String>{};
+      int? id;
+      for (var i = 0; i < 5 && unitGuid != null && unitGuid.isNotEmpty; i++) {
+        if (!visited.add(unitGuid)) break;
+        final unit = await ApiRepository().getDonVi(unitGuid);
+        id = unit.idHeThongDaoTao;
+        if (id != null) break;
+        unitGuid = unit.guidDonViCha;
+      }
+      if (!mounted) return;
+      setState(() => _currentUniversityId = id);
+    } catch (error) {
+      debugPrint('[ONEVNU_UI] university lookup unavailable: $error');
+      if (mounted) setState(() => _currentUniversityId = null);
+    }
   }
 
   Future<void> _initializeFunctionRegistry() async {
@@ -775,12 +754,25 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
           prefs.getBool(_stablePinMigrationKey) ?? false;
 
       List<String> loaded;
-      if (!allFunctionsDefaultApplied || saved == null) {
-        loaded = _nativeFunctions.map((item) => item.key).toList();
+      // Persisted pins belong to the user. Never discard a custom list just
+      // because a previous migration flag was not saved successfully.
+      if (saved == null) {
+        loaded = _curatedDefaultPins;
       } else {
         loaded = List<String>.from(saved);
       }
 
+      // Older versions automatically pinned ALL native functions. When the
+      // saved value exactly equals that untouched legacy default, migrate it
+      // once to curated defaults. A customized pin list is never removed.
+      final bool curatedApplied = prefs.getBool(_v5AutoPinsKey) ?? false;
+      if (!curatedApplied && saved != null) {
+        final legacy = _nativeFunctions.map((item) => item.key).toList();
+        if (loaded.length == legacy.length &&
+            loaded.toSet().containsAll(legacy)) {
+          loaded = _curatedDefaultPins;
+        }
+      }
       // Migrate legacy label values such as "Điểm" -> "native:Điểm".
       // Also accepts a dynamic label once, but from now on shape:<code> is used.
       final List<String> migrated = <String>[];
@@ -788,7 +780,10 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
         final value = raw.trim();
         if (value.isEmpty) continue;
         String? key;
-        if (value.startsWith('native:') || value.startsWith('shape:')) {
+        // Older builds stored this shortcut as a label instead of a stable key.
+        if (value == 'Học phí') {
+          key = 'native:Học phí';
+        } else if (value.startsWith('native:') || value.startsWith('shape:')) {
           key = value;
         } else {
           final native = _nativeFunctions.where((item) => item.label == value);
@@ -802,6 +797,15 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
         if (key != null && !migrated.contains(key)) migrated.add(key);
       }
 
+      // Pre-V7 had no record of which unfinished shortcut was manually pinned.
+      // Hide legacy inherited auto-pins ONCE; users can re-pin any of these
+      // features explicitly afterward, and all other custom pins are preserved.
+      final bool unfinishedPinsCleaned =
+          prefs.getBool(_v7UnfinishedPinCleanupKey) ?? false;
+      if (!unfinishedPinsCleaned) {
+        migrated.removeWhere(_unfinishedNativeKeys.contains);
+      }
+
       // Feature động có defaultPinned=true chỉ được tự ghim đúng lần đầu nó
       // xuất hiện trong registry của tài khoản. Sau đó tôn trọng thao tác bỏ ghim.
       final seenCodes = (prefs.getStringList(_seenShapeFeaturesKey) ?? const <String>[])
@@ -809,7 +813,9 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
       bool seenChanged = false;
       for (final feature in _dynamicFeatures) {
         if (!seenCodes.contains(feature.code)) {
-          if (feature.defaultPinned && !migrated.contains(feature.stableKey)) {
+          if (feature.defaultPinned &&
+              feature.label.trim().toLowerCase() != 'đồng bộ' &&
+              !migrated.contains(feature.stableKey)) {
             migrated.add(feature.stableKey);
           }
           seenCodes.add(feature.code);
@@ -827,6 +833,8 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
       }
 
       await prefs.setStringList('kPinnedFunctions_v3', normalized);
+      await prefs.setBool(_v5AutoPinsKey, true);
+      await prefs.setBool(_v7UnfinishedPinCleanupKey, true);
       if (!allFunctionsDefaultApplied) {
         await prefs.setBool(_allFunctionsPinnedMigrationKey, true);
       }
@@ -880,6 +888,14 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
     );
   }
 
+  // Payment login and all API calls happen in the tuition route so the
+  // student can see connectivity failures and retry. GetX navigation alone
+  // must never be counted as a successful payment API connection.
+  void _openLiveTuition() {
+    TuitionApiDiagnostics.instance.record('ENTRY', 'LIVE_SCREEN');
+    Get.to(() => const VcoreTuitionView(universityId: 4));
+  }
+
   void _handleFunctionTap(_FunctionItem item) {
     final shape = item.shapeshifterFeature;
     if (shape != null) {
@@ -897,6 +913,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
       case 'Điểm':
         Get.to(() => const VcoreCoursePointsView());
         break;
+      case 'Phản ánh, góp ý':
       case 'Phản ánh':
         Get.to(() => const VcorePahtViewV2());
         break;
@@ -917,6 +934,22 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
       case 'Thủ tục':
         Get.to(() => const VcoreOneDoorView());
         break;
+      case 'Thanh toán học phí':
+        // Debug defaults to the REAL endpoint even if local university lookup
+        // is incomplete. Server must still reject non-ULIS students with 403.
+        // Mock UI requires an explicit dart-define and is never used by Release.
+        const mockRequested = bool.fromEnvironment('ONEVNU_TUITION_MOCK',
+          defaultValue: false);
+        if (kDebugMode && mockRequested) {
+          TuitionApiDiagnostics.instance.record('ENTRY', 'MOCK_EXPLICIT');
+          Get.to(() => const VcoreTuitionView(
+              universityId: -1, developerPreview: true));
+        } else if (_currentUniversityId == 4 || kDebugMode) {
+          _openLiveTuition();
+        } else {
+          snackBarWarning('Thanh toán học phí chỉ áp dụng cho sinh viên ULIS.');
+        }
+        break;
       case 'Bản đồ':
         Get.to(() => const VcoreImmapView());
         break;
@@ -930,11 +963,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
         Get.to(() => const VcoreJobsViewV2());
         break;
       case 'Đồng bộ':
-        // snackBarWarning('Chức năng đang hoàn thiện');
-        Get.to(() => VcoreSyncView());
-        break;
-      case 'Hỏi đáp':
-        Get.to(() => VcoreQuestionView());
+        // Hidden in V7. Keep the underlying module for later reactivation.
         break;
       default:
         snackBarWarning('Chức năng đang hoàn thiện');
@@ -954,7 +983,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
         return Icons.work_outline_rounded;
       case 'Đồng bộ':
         return Icons.sync_rounded;
-      case 'Học phí':
+      case 'Thanh toán học phí':
         return Icons.account_balance_wallet_rounded;
       case 'Tài liệu':
         return Icons.folder_open_rounded;
@@ -962,6 +991,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
         return Icons.how_to_reg_rounded;
       case 'Học bổng':
         return Icons.card_membership_rounded;
+      case 'Phản ánh, góp ý':
       case 'Phản ánh':
         return Icons.rate_review_rounded;
       case 'Nội trú':
@@ -979,424 +1009,6 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
       default:
         return Icons.widgets_rounded;
     }
-  }
-
-  void _showCreateCalendarReminderSheet() {
-    DateTime focusedDay = DateTime.now();
-    DateTime selectedDate = DateTime.now();
-    TimeOfDay selectedTime = TimeOfDay.now();
-    CalendarFormat calendarFormat = CalendarFormat.month;
-
-    final noteController = TextEditingController();
-
-    Get.bottomSheet(
-      StatefulBuilder(
-        builder: (context, setModalState) {
-          final selectedTimeText =
-              '${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}';
-
-          final selectedDateText = DateFormat(
-            'dd/MM/yyyy',
-          ).format(selectedDate);
-
-          return Container(
-            padding: EdgeInsets.only(
-              left: 16,
-              right: 16,
-              top: 14,
-              bottom: MediaQuery.of(context).viewInsets.bottom + 18,
-            ),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-            ),
-            child: SafeArea(
-              top: false,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 42,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade300,
-                          borderRadius: BorderRadius.circular(99),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 14),
-
-                    Row(
-                      children: [
-                        Container(
-                          width: 42,
-                          height: 42,
-                          decoration: BoxDecoration(
-                            color: AppColors.brandGreen.withOpacity(0.10),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: const Icon(
-                            Icons.edit_calendar_rounded,
-                            color: AppColors.brandGreen,
-                            size: 22,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        const Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Tạo lời nhắc',
-                                style: TextStyle(
-                                  fontSize: AppFontSizes.extraLarge,
-                                  fontWeight: FontWeight.w900,
-                                  color: AppColors.homeTextTitle,
-                                ),
-                              ),
-                              SizedBox(height: 3),
-                              Text(
-                                'Chọn ngày trên lịch, chọn giờ và nhập nội dung.',
-                                style: TextStyle(
-                                  fontSize: AppFontSizes.font12_5,
-                                  color: AppColors.homeTextSub,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 14),
-
-                    Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.homeCardBg,
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: AppColors.homeCardBorder),
-                      ),
-                      child: TableCalendar(
-                        locale: 'vi_VN',
-                        firstDay: DateTime.now(),
-                        lastDay: DateTime.now().add(
-                          const Duration(days: 365 * 2),
-                        ),
-                        focusedDay: focusedDay,
-                        calendarFormat: calendarFormat,
-                        startingDayOfWeek: StartingDayOfWeek.monday,
-                        selectedDayPredicate: (day) {
-                          return isSameDay(selectedDate, day);
-                        },
-                        onDaySelected: (selectedDay, newFocusedDay) {
-                          setModalState(() {
-                            selectedDate = selectedDay;
-                            focusedDay = newFocusedDay;
-                          });
-                        },
-                        onFormatChanged: (format) {
-                          setModalState(() {
-                            calendarFormat = format;
-                          });
-                        },
-                        onPageChanged: (newFocusedDay) {
-                          focusedDay = newFocusedDay;
-                        },
-                        headerStyle: const HeaderStyle(
-                          formatButtonVisible: false,
-                          titleCentered: true,
-                          titleTextStyle: TextStyle(
-                            fontSize: AppFontSizes.mediumLarge,
-                            fontWeight: FontWeight.w900,
-                            color: AppColors.homeTextTitle,
-                          ),
-                          leftChevronIcon: Icon(
-                            Icons.chevron_left_rounded,
-                            color: AppColors.brandGreen,
-                          ),
-                          rightChevronIcon: Icon(
-                            Icons.chevron_right_rounded,
-                            color: AppColors.brandGreen,
-                          ),
-                        ),
-                        daysOfWeekStyle: const DaysOfWeekStyle(
-                          weekdayStyle: TextStyle(
-                            fontSize: AppFontSizes.font11,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.homeTextSub,
-                          ),
-                          weekendStyle: TextStyle(
-                            fontSize: AppFontSizes.font11,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.homeRedWeekend,
-                          ),
-                        ),
-                        calendarStyle: CalendarStyle(
-                          outsideDaysVisible: false,
-                          todayDecoration: BoxDecoration(
-                            color: AppColors.brandGreen.withOpacity(0.14),
-                            shape: BoxShape.circle,
-                          ),
-                          todayTextStyle: const TextStyle(
-                            color: AppColors.brandGreen,
-                            fontWeight: FontWeight.w900,
-                          ),
-                          selectedDecoration: const BoxDecoration(
-                            color: AppColors.brandGreen,
-                            shape: BoxShape.circle,
-                          ),
-                          selectedTextStyle: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w900,
-                          ),
-                          weekendTextStyle: const TextStyle(
-                            color: AppColors.homeRedWeekend,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          defaultTextStyle: const TextStyle(
-                            color: AppColors.homeTextTitle,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _reminderPickerTile(
-                            icon: Icons.calendar_today_rounded,
-                            title: 'Ngày đã chọn',
-                            value: selectedDateText,
-                            onTap: () {},
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _reminderPickerTile(
-                            icon: Icons.access_time_rounded,
-                            title: 'Giờ',
-                            value: selectedTimeText,
-                            onTap: () {
-                              _showPrettyTimePicker(
-                                initialTime: selectedTime,
-                                onTimeSelected: (pickedTime) {
-                                  setModalState(() {
-                                    selectedTime = pickedTime;
-                                  });
-                                },
-                              );
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    VnuFloatingTextFieldAdapter(
-                      controller: noteController,
-                      maxLines: 2,
-                      textInputAction: TextInputAction.done,
-                      decoration: InputDecoration(
-                        hintText: 'Ví dụ: Nộp bài tập, chuẩn bị tài liệu...',
-                        labelText: 'Nội dung nhắc',
-                        filled: true,
-                        fillColor: AppColors.homeCardBg,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: BorderSide.none,
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(
-                            color: AppColors.brandGreen,
-                            width: 1,
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    SizedBox(
-                      width: double.infinity,
-                      height: 46,
-                      child: ElevatedButton(
-                        onPressed: () async {
-                          final note = noteController.text.trim();
-
-                          if (note.isEmpty) {
-                            snackBarWarning('Vui lòng nhập nội dung nhắc');
-                            return;
-                          }
-
-                          final scheduledTime = DateTime(
-                            selectedDate.year,
-                            selectedDate.month,
-                            selectedDate.day,
-                            selectedTime.hour,
-                            selectedTime.minute,
-                          );
-
-                          if (!scheduledTime.isAfter(DateTime.now())) {
-                            snackBarWarning(
-                              'Thời gian nhắc phải lớn hơn thời gian hiện tại',
-                            );
-                            return;
-                          }
-
-                          Get.back();
-
-                          await _createManualCalendarReminder(
-                            note: note,
-                            scheduledTime: scheduledTime,
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.brandGreen,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                        ),
-                        child: const Text(
-                          'Tạo lời nhắc',
-                          style: TextStyle(fontWeight: FontWeight.w800),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-    ).whenComplete(() {
-      noteController.dispose();
-    });
-  }
-
-  Widget _reminderPickerTile({
-    required IconData icon,
-    required String title,
-    required String value,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: AppColors.homeCardBg,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.homeCardBorder),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 34,
-              height: 34,
-              decoration: BoxDecoration(
-                color: AppColors.brandGreen.withOpacity(0.10),
-                borderRadius: BorderRadius.circular(11),
-              ),
-              child: Icon(icon, color: AppColors.brandGreen, size: 18),
-            ),
-            const SizedBox(width: 9),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: AppFontSizes.font11,
-                      color: AppColors.homeTextSub,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    value,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: AppFontSizes.font12_5,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.homeTextTitle,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _createManualCalendarReminder({
-    required String note,
-    required DateTime scheduledTime,
-  }) async {
-    final id = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-    final timeText = DateFormat('HH:mm dd/MM/yyyy').format(scheduledTime);
-
-    try {
-      await _LocalNotificationService.scheduleReminder(
-        id: id,
-        title: 'Lời nhắc lịch',
-        body: note,
-        scheduledTime: scheduledTime,
-        payload: jsonEncode({
-          'id': id,
-          'note': note,
-          'scheduledTime': scheduledTime.toIso8601String(),
-        }),
-      );
-
-      await _saveManualReminderToLocal(
-        id: id,
-        note: note,
-        scheduledTime: scheduledTime,
-      );
-
-      snackBarSuccess('Đã tạo lời nhắc lúc $timeText');
-    } catch (e) {
-      snackBarWarning(
-        'Không thể tạo lời nhắc. Vui lòng kiểm tra quyền thông báo',
-      );
-    }
-  }
-
-  Future<void> _saveManualReminderToLocal({
-    required int id,
-    required String note,
-    required DateTime scheduledTime,
-  }) async {
-    final prefs = await SharedPreferences.getInstance();
-    final currentList = prefs.getStringList('kManualCalendarReminders') ?? [];
-
-    currentList.add(
-      jsonEncode({
-        'id': id,
-        'note': note,
-        'scheduledTime': scheduledTime.toIso8601String(),
-        'createdAt': DateTime.now().toIso8601String(),
-      }),
-    );
-
-    await prefs.setStringList('kManualCalendarReminders', currentList);
   }
 
   @override
@@ -1426,7 +1038,10 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                   const SizedBox(height: 14),
                   AppGuideAnchor(
                     id: 'home.quick_access',
-                    child: _buildQuickAccess(),
+                    child: TickerMode(
+                      enabled: widget.isActive,
+                      child: _buildQuickAccess(),
+                    ),
                   ),
                   const SizedBox(height: 14),
                   AppGuideAnchor(
@@ -1439,6 +1054,11 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
               ),
             ),
           ),
+          // Overlay is outside the scroll layout; it NEVER reserves vertical
+          // space under the QR or pushes Home cards down. Lower than header
+          // controls so the search/notification/QR targets remain tappable.
+          AppUpdateFloatingBadge(topOffset: 28, rightOffset: 12,
+            active: widget.isActive),
         ],
       ),
     );
@@ -1473,6 +1093,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
     }
 
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
           child: Column(
@@ -1552,9 +1173,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
         AppGuideAnchor(
           id: 'home.qr',
           child: GestureDetector(
-            onTap: () {
-              Get.to(() => const VcoreQrScannerView());
-            },
+            onTap: () => Get.to(() => const VcoreQrScannerView()),
             child: _headerButton(Icons.qr_code_2_rounded),
           ),
         ),
@@ -1606,7 +1225,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
   }
 
   Widget _headerButton(IconData icon, {String? badge}) {
-    return Stack(
+    return VnuPressMotion(child: Stack(
       children: [
         Container(
           width: 42,
@@ -1627,7 +1246,11 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
               ),
             ],
           ),
-          child: Icon(icon, color: AppColors.brandGreen, size: 22),
+          child: Icon(
+            icon,
+            color: AppColors.brandGreen,
+            size: 22,
+          ),
         ),
         if (badge != null)
           Positioned(
@@ -1652,7 +1275,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
             ),
           ),
       ],
-    );
+    ));
   }
 
   void _openScheduleView({DateTime? initialDate}) {
@@ -1685,14 +1308,6 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                   widget.controller.unreadTrainingCount.value)
               .toString();
 
-      String getVietnameseWeekday() {
-        final weekday = DateTime.now().weekday;
-        if (weekday == 7) return 'C.Nhật';
-        return 'Thứ ${weekday + 1}';
-      }
-
-      final dateStr = DateFormat('dd/MM').format(DateTime.now());
-
       final items = [
         _OverviewItem(
           Icons.menu_book_rounded,
@@ -1711,12 +1326,6 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
           notifyCount,
           'Thông báo\nmới',
           AppColors.overviewBlue,
-        ),
-        _OverviewItem(
-          Icons.calendar_month_rounded,
-          getVietnameseWeekday(),
-          '$dateStr\nTạo nhắc',
-          AppColors.overviewPurple,
         ),
       ];
 
@@ -1764,8 +1373,6 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                         Get.to(() => const VcoreNotifyViewV3())?.then((_) {
                           widget.controller.updateUnreadCounts();
                         });
-                      } else if (index == 3) {
-                        _showCreateCalendarReminderSheet();
                       }
                     },
                     behavior: HitTestBehavior.opaque,
@@ -1779,13 +1386,13 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                               width: 28,
                               height: 28,
                               decoration: BoxDecoration(
-                                color: item.color.withOpacity(0.10),
+                                color: const Color(0xFFF3F6F5),
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: Icon(
                                 item.icon,
                                 color: item.color,
-                                size: 16,
+                                size: 19,
                               ),
                             ),
                             const SizedBox(width: 5),
@@ -2096,136 +1703,191 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
     );
   }
 
+  /// Mot nut duy nhat thay icon: grid -> list -> grid. Khong su dung ripple.
+  Widget _quickAccessToggleButton() {
+    final isGrid = _quickAccessDisplay == _QuickAccessDisplay.grid;
+    return Tooltip(
+      message: isGrid ? 'Chuyển sang danh sách' : 'Chuyển sang lưới 3 cột',
+      child: VnuPressMotion(
+        onTap: () => unawaited(_setQuickAccessDisplay(
+          isGrid ? _QuickAccessDisplay.list : _QuickAccessDisplay.grid,
+        )),
+        child: SizedBox(
+          width: 35, height: 38,
+          child: Center(child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 210),
+            transitionBuilder: (child, animation) => FadeTransition(
+              opacity: animation,
+              child: ScaleTransition(scale: animation, child: child),
+            ),
+            child: Icon(isGrid ? Icons.grid_view_rounded : Icons.view_list_rounded,
+              key: ValueKey(isGrid), size: 21, color: AppColors.brandGreen),
+          )),
+        ),
+      ),
+    );
+  }
+
+  Widget _quickAccessActions() => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Tooltip(
+        message: 'Ghim các chức năng',
+        child: VnuPressMotion(
+          onTap: _showPinDialog,
+          child: const SizedBox(width: 35, height: 38,
+            child: Center(child: Icon(Icons.push_pin_rounded,
+              size: 21, color: AppColors.brandGreen))),
+        ),
+      ),
+      Tooltip(
+        message: 'Tải lại chức năng',
+        child: VnuPressMotion(
+          enabled: !_reloadingFunctionRegistry,
+          onTap: _reloadingFunctionRegistry
+              ? null : () => unawaited(_reloadFunctionRegistry()),
+          child: SizedBox(width: 35, height: 38,
+            child: Center(child: _reloadingFunctionRegistry
+                ? const SizedBox(width: 16, height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2,
+                      color: AppColors.brandGreen))
+                : const Icon(Icons.refresh_rounded,
+                    size: 21, color: AppColors.brandGreen))),
+        ),
+      ),
+      _quickAccessToggleButton(),
+    ],
+  );
+
+  Widget _quickAccessHeader() => AppGuideAnchor(
+    id: 'home.quick_access.pin',
+    child: Row(children: [
+      const Expanded(child: Text('TRUY CẬP NHANH',
+        maxLines: 1, overflow: TextOverflow.ellipsis,
+        style: TextStyle(color: AppColors.brandGreen,
+          fontSize: AppFontSizes.mediumSmall,
+          fontWeight: FontWeight.w900))),
+      const SizedBox(width: 3),
+      _quickAccessActions(),
+    ]),
+  );
+
+  Widget _quickFunctionRow(_FunctionItem item) {
+    return AppGuideAnchor(
+      id: item.shapeshifterFeature == null
+          ? _homeFunctionGuideId(item.label)
+          : 'home.shapeshifter.${item.shapeshifterFeature!.code}',
+      child: VnuPressMotion(
+        onTap: () => _handleFunctionTap(item),
+        child: Container(
+          height: 65,
+          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 7),
+          decoration: const BoxDecoration(border: Border(
+            bottom: BorderSide(color: Color(0xFFE9ECEA)))),
+          child: Row(children: [
+            Container(
+              height: 43,
+              width: 43,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF3F6F5),
+                borderRadius: BorderRadius.circular(11),
+              ),
+              child: Center(child: _functionIcon(item, size: 25)),
+            ),
+            const SizedBox(width: 13),
+            Expanded(child: SizedBox(height: 23,
+              child: VnuAutoMarquee(
+                key: ValueKey('list-label:${item.key}'),
+                text: item.label,
+                edgePadding: 8,
+                alignment: Alignment.centerLeft,
+                style: const TextStyle(
+                  color: AppColors.darkNavy,
+                  fontSize: AppFontSizes.mediumSmall,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            )),
+            const SizedBox(width: 5),
+            const Icon(Icons.chevron_right_rounded,
+                color: Colors.black54, size: 18),
+          ]),
+        ),
+      ),
+    );
+  }
+
   Widget _buildQuickAccess() {
     final pinnedItems = _allAvailableFunctions
         .where((item) => _pinnedFunctionKeys.contains(item.key))
         .toList();
-
     final orderedPinned = <_FunctionItem>[];
-
     for (final key in _pinnedFunctionKeys) {
       final matches = pinnedItems.where((item) => item.key == key);
-      if (matches.isNotEmpty) {
-        orderedPinned.add(matches.first);
-      }
+      if (matches.isNotEmpty) orderedPinned.add(matches.first);
     }
 
     return _whiteBox(
       radius: 18,
       variant: _BoxVariant.card,
       padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          AppGuideAnchor(
-            id: 'home.quick_access.pin',
-            child: Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'TRUY CẬP NHANH',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: AppColors.brandGreen,
-                      fontSize: AppFontSizes.mediumSmall,
-                      fontWeight: FontWeight.w900,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _quickAccessHeader(),
+        const SizedBox(height: 14),
+        AppGuideAnchor(
+          id: 'home.quick_access.list',
+          child: orderedPinned.isEmpty
+            ? const Center(child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 20),
+                child: Text('Chưa có chức năng nào được ghim.\nNhấn biểu tượng ghim để thêm.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey,
+                    fontSize: AppFontSizes.mediumSmall))))
+            : AnimatedSize(
+                duration: const Duration(milliseconds: 280),
+                curve: Curves.easeOutCubic,
+                alignment: Alignment.topCenter,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 230),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  transitionBuilder: (child, animation) => FadeTransition(
+                    opacity: animation,
+                    child: SlideTransition(
+                      position: Tween<Offset>(
+                        begin: const Offset(0, 0.015), end: Offset.zero,
+                      ).animate(animation),
+                      child: child,
                     ),
                   ),
-                ),
-                Tooltip(
-                  message: 'Tải lại chức năng mới nhất',
-                  child: SizedBox(
-                    width: 34,
-                    height: 34,
-                    child: IconButton(
-                      padding: EdgeInsets.zero,
-                      splashRadius: 18,
-                      onPressed: _reloadingFunctionRegistry
-                          ? null
-                          : () => unawaited(_reloadFunctionRegistry()),
-                      icon: _reloadingFunctionRegistry
-                          ? const SizedBox(
-                              width: 15,
-                              height: 15,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: AppColors.brandGreen,
-                              ),
-                            )
-                          : const Icon(
-                              Icons.refresh_rounded,
-                              size: 20,
-                              color: AppColors.brandGreen,
-                            ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 4),
-                GestureDetector(
-                  onTap: _showPinDialog,
-                  behavior: HitTestBehavior.opaque,
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 6),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'Ghim',
-                          style: TextStyle(
-                            color: AppColors.brandGreen,
-                            fontSize: AppFontSizes.font11,
-                            fontWeight: FontWeight.w700,
-                          ),
+                  child: _quickAccessDisplay == _QuickAccessDisplay.grid
+                    ? GridView.builder(
+                        key: const ValueKey('quick-grid'),
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        padding: EdgeInsets.zero,
+                        gridDelegate:  SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 3,
+                          crossAxisSpacing: 12,
+                          mainAxisSpacing: 13,
+                          mainAxisExtent: max(104.0,
+                          76.0 + MediaQuery.textScalerOf(context).scale(24.0)),
                         ),
-                        Icon(
-                          Icons.chevron_right,
-                          size: 16,
-                          color: AppColors.brandGreen,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-          AppGuideAnchor(
-            id: 'home.quick_access.list',
-            child: orderedPinned.isEmpty
-                ? const Center(
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(vertical: 20),
-                      child: Text(
-                        'Chưa có chức năng nào được ghim.\nNhấn "Ghim" để thêm.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.grey,
-                          fontSize: AppFontSizes.mediumSmall,
-                        ),
+                        itemCount: orderedPinned.length,
+                        itemBuilder: (_, index) => _functionItem(orderedPinned[index]),
+                      )
+                    : ListView.builder(
+                        key: const ValueKey('quick-list'),
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        padding: EdgeInsets.zero,
+                        itemCount: orderedPinned.length,
+                        itemBuilder: (_, index) => _quickFunctionRow(orderedPinned[index]),
                       ),
-                    ),
-                  )
-                : GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    padding: EdgeInsets.zero,
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 4,
-                      crossAxisSpacing: 8,
-                      mainAxisSpacing: 14,
-                      mainAxisExtent: 108,
-                    ),
-                    itemCount: orderedPinned.length,
-                    itemBuilder: (BuildContext context, int index) {
-                      return _functionItem(orderedPinned[index]);
-                    },
-                  ),
-          ),
-        ],
-      ),
+                ),
+              ),
+        ),
+      ]),
     );
   }
 
@@ -2449,7 +2111,7 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
     required bool active,
     required VoidCallback onTap,
   }) {
-    return GestureDetector(
+    return VnuPressMotion(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
@@ -2775,47 +2437,26 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
           : 'home.shapeshifter.${item.shapeshifterFeature!.code}',
       child: SizedBox(
         width: double.infinity,
-        child: GestureDetector(
+        child: VnuPressMotion(
           onTap: () => _handleFunctionTap(item),
-          behavior: HitTestBehavior.opaque,
-          child: Column(
-            children: [
-              Container(
-                width: 58,
-                height: 58,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(18),
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      item.color.withOpacity(0.08),
-                      item.color.withOpacity(0.18),
-                    ],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.white.withOpacity(0.8),
-                      blurRadius: 6,
-                      offset: const Offset(-2, -2),
-                    ),
-                    BoxShadow(
-                      color: item.color.withOpacity(0.18),
-                      blurRadius: 12,
-                      offset: const Offset(3, 5),
-                    ),
-                  ],
-                ),
-                child: Center(
-                  child: _functionIcon(item, size: 26),
-                ),
+          child: Column(children: [
+            Container(
+              width: 58,
+              height: 58,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(18),
+                color: const Color(0xFFF3F6F5),
               ),
-              const SizedBox(height: 8),
-              Text(
-                item.label,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+              child: Center(child: _functionIcon(item, size: 26)),
+            ),
+            const SizedBox(height: 9),
+            SizedBox(
+              width: double.infinity,
+              height: MediaQuery.textScalerOf(context).scale(21.0),
+              child: VnuAutoMarquee(
+                key: ValueKey('grid-label:${item.key}'),
+                text: item.label,
+                edgePadding: 8,
                 style: const TextStyle(
                   color: AppColors.darkNavy,
                   fontSize: AppFontSizes.font11_5,
@@ -2823,8 +2464,8 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
                   height: 1.25,
                 ),
               ),
-            ],
-          ),
+            ),
+          ]),
         ),
       ),
     );
@@ -2832,14 +2473,11 @@ class _HomeWireframeBodyState extends State<_HomeWireframeBody> {
 
   Widget _functionIcon(_FunctionItem item, {double size = 26}) {
     final iconUrl = item.shapeshifterFeature?.iconUrl?.trim() ?? '';
+    if (item.shapeshifterFeature == null) {
+      return NativeFunctionIcon(label: item.label, size: size + 7);
+    }
     if (iconUrl.isEmpty) {
-      return Icon(
-        item.shapeshifterFeature == null
-            ? _getIconForLabel(item.label)
-            : Icons.language_rounded,
-        size: size,
-        color: item.color,
-      );
+      return Icon(Icons.language_rounded, size: size, color: item.color);
     }
 
     if (iconUrl.toLowerCase().split('?').first.endsWith('.svg')) {
@@ -3578,16 +3216,11 @@ class _RadialPinOverlayState extends State<_RadialPinOverlay>
                                                       : [],
                                                 ),
                                                 child: Center(
-                                                  child: Icon(
-                                                    widget.getIconForLabel(
-                                                      item.label,
-                                                    ),
-                                                    color: isPinned
-                                                        ? item.color
-                                                        : Colors.white
-                                                              .withOpacity(0.9),
-                                                    size: 24,
-                                                  ),
+                                                  child: item.shapeshifterFeature == null
+                                                      ? NativeFunctionIcon(label: item.label, size: 31)
+                                                      : Icon(widget.getIconForLabel(item.label),
+                                                          color: isPinned ? item.color : Colors.white.withOpacity(.9),
+                                                          size: 24),
                                                 ),
                                               ),
                                               if (isPinned)

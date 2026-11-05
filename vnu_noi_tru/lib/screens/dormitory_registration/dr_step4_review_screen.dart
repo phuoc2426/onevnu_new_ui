@@ -186,6 +186,8 @@ class DRStep4ReviewScreenState extends State<DRStep4ReviewScreen> {
                     _buildSummaryRow('Dân tộc', draft.ethnicity!),
                   if ((draft.religion ?? '').trim().isNotEmpty)
                     _buildSummaryRow('Tôn giáo', draft.religion!),
+                  if ((draft.healthStatus ?? '').trim().isNotEmpty)
+                    _buildSummaryRow('Tình trạng sức khỏe', draft.healthStatus!),
                   _buildSummaryRow(
                     'Lớp',
                     draft.className.trim().isEmpty ? '-' : draft.className,

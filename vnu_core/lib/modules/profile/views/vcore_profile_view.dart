@@ -11,6 +11,8 @@ import 'package:vnu_core/common/utils.dart';
 import 'package:vnu_core/common/guide/guide.dart';
 import 'package:vnu_core/constants/constant.dart';
 import 'package:vnu_core/globals.dart';
+import 'package:vnu_core/repository/data_repository.dart';
+import 'package:vnu_noi_tru/screens/dormitory_registration/dr_my_registration_screen.dart';
 import 'package:vnu_core/repository/app_repository.dart';
 import 'package:vnu_core/screens/vcore_admission_view.dart';
 import 'package:vnu_core/modules/bookmark/views/vcore_bookmark_view.dart';
@@ -20,14 +22,29 @@ import 'package:vnu_core/modules/profile/views/vcore_profile_family_info_view.da
 import 'package:vnu_core/modules/profile/views/vcore_profile_person_info_view.dart';
 import 'package:vnu_core/modules/profile/views/vcore_profile_setup_bio_view.dart';
 import 'package:vnu_core/modules/shapeshifter/views/shapeshifter_my_features.dart';
+import 'package:vnu_core/widgets/vnu_press_motion.dart';
+import 'vcore_learning_chart_placeholder_view.dart';
 
 import '../controllers/vcore_profile_controller.dart';
 import 'vcore_profile_change_pass_view.dart';
 // import 'vcore_profile_photos_view.dart';
 import 'package:flutter/foundation.dart';
 
-class VcoreProfileView extends GetView<VcoreProfileController> {
+class VcoreProfileView extends StatefulWidget {
   const VcoreProfileView({super.key});
+
+  @override
+  State<VcoreProfileView> createState() => _VcoreProfileViewState();
+}
+
+class _VcoreProfileViewState extends State<VcoreProfileView> {
+  late final Future<String?> _principalFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _principalFuture = DataRepository().getSecureSaveKey(kSessionPrincipalType);
+  }
 
   void _startFastLogout(BuildContext context) {
     final Stopwatch totalWatch = Stopwatch()..start();
@@ -125,6 +142,56 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
 
   @override
   Widget build(BuildContext context) {
+    return FutureBuilder<String?>(
+      future: _principalFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+        final principal = snapshot.data;
+        if (!snapshot.hasError && principal == kPrincipalTypeApplicant) {
+          return Scaffold(
+            backgroundColor: const Color(0xFFF6F8FA),
+            body: SafeArea(child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 32, 20, 24),
+              children: [
+                const Icon(Icons.home_work_outlined,
+                  size: 42, color: Color(0xFF087C50)),
+                const SizedBox(height: 16),
+                const Text('Thông tin tân sinh viên',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                const Text('Bạn đăng nhập bằng CCCD, chưa có hồ sơ cá nhân '
+                  'trên cơ sở dữ liệu đào tạo. Thông tin đăng ký và các thay '
+                  'đổi của tân sinh viên được quản lý tại KTX.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 14, height: 1.5)),
+                const SizedBox(height: 22),
+                FilledButton.icon(
+                  onPressed: () => Get.to(() => const DRMyRegistrationScreen()),
+                  icon: const Icon(Icons.edit_note_rounded),
+                  label: const Text('Xem / cập nhật hồ sơ KTX')),
+              ],
+            )),
+          );
+        }
+        final canReadTrainingProfile = !snapshot.hasError &&
+            (principal == kPrincipalTypeUser ||
+             (principal == null && Globals().token.trim().isNotEmpty));
+        if (!canReadTrainingProfile) {
+          return const Scaffold(body: Center(child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text('Không có phiên sinh viên đào tạo hợp lệ.',
+              textAlign: TextAlign.center),
+          )));
+        }
+        return _buildStudentProfile(context);
+      },
+    );
+  }
+
+  Widget _buildStudentProfile(BuildContext context) {
     return GetBuilder(
       init: VcoreProfileController(),
       tag: const Uuid().v4(),
@@ -164,6 +231,10 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
                                     ),
                                   ),
                                   const SizedBox(height: 8),
+                                  // Vị trí chart được khoá trước; sử dụng dữ liệu
+                                  // đào tạo thật sau khi tích hợp hiệu ứng chart.
+                                  // V5: Tạm ẩn mục Biểu đồ học tập.
+                                  // Giữ nguyên route và class để có thể bật lại.
                                   Row(
                                     children: [
                                       const Text(
@@ -372,7 +443,7 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
                   VcoreProfileItemWidget(
                     title: "Thông tin cá nhân",
                     guideId: 'profile.personal_info',
-                    icon: 'assets/images/ic_profile_person.svg',
+                    icon: Icons.person_outline_rounded,
                     action: () {
                       Get.to(() => const VcoreProfilePersonInfoView());
                     },
@@ -382,7 +453,7 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
                   VcoreProfileItemWidget(
                     title: "Thông tin gia đình",
                     guideId: 'profile.family_info',
-                    icon: 'assets/images/ic_profile_family.svg',
+                    icon: Icons.family_restroom_outlined,
                     action: () {
                       Get.to(() => const VcoreProfileFamilyInfoView());
                     },
@@ -398,7 +469,7 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
                   // VcoreProfileItemWidget(
                   //   title: "Quản lý ảnh cá nhân",
                   //   guideId: 'profile.photo_manager',
-                  //   icon: 'assets/images/ic_profile_photo_manager.svg',
+                  //   icon: Icons.account_circle_outlined,
                   //   action: () {
                   //     Get.to(() => const VcoreProfilePhotosView());
                   //   },
@@ -407,7 +478,7 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
                   VcoreProfileItemWidget(
                     title: "Đổi ảnh đại diện",
                     guideId: 'profile.change_avatar',
-                    icon: 'assets/images/ic_profile_photo_manager.svg',
+                    icon: Icons.account_circle_outlined,
                     action: () {
                       controller.pickAndPreviewAvatar(context);
                     },
@@ -417,7 +488,7 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
                   VcoreProfileItemWidget(
                     title: "Liên kết đánh dấu",
                     guideId: 'profile.bookmark',
-                    icon: 'assets/images/ic_profile_bookmark.svg',
+                    icon: Icons.bookmark_border_rounded,
                     action: () {
                       Get.to(() => const VcoreBookmarkView());
                     },
@@ -427,7 +498,7 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
                   VcoreProfileItemWidget(
                     title: "Cài đặt sinh trắc học",
                     guideId: 'profile.biometric',
-                    icon: 'assets/images/ic_profile_setup_bio.svg',
+                    icon: Icons.fingerprint_rounded,
                     action: () {
                       Get.to(() => const VcoreProfileSetupBioView());
                     },
@@ -437,7 +508,7 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
                   VcoreProfileItemWidget(
                     title: "Quản lý mật khẩu",
                     guideId: 'profile.password',
-                    icon: 'assets/images/ic_password.svg',
+                    icon: Icons.lock_outline_rounded,
                     action: () {
                       Get.to(() => const VcoreProfileChangePassViewV2());
                     },
@@ -450,7 +521,7 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
                       return VcoreProfileItemWidget(
                         title: "Phiên bản: ${snapshot.data ?? '1.0.0'}",
                         guideId: 'profile.version',
-                        icon: 'assets/images/logo-vnu.png',
+                        icon: Icons.info_outline_rounded,
                         action: () {
                           if (kDebugMode) {
                             controller.countVersionOpenLog(context);
@@ -464,7 +535,7 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
                   VcoreProfileItemWidget(
                     title: "Đăng xuất",
                     guideId: 'profile.logout',
-                    icon: 'assets/images/ic_profile_logout.svg',
+                    icon: Icons.logout_rounded,
                     action: () {
                       Utils.showAlertDialog(
                         context,
@@ -527,7 +598,7 @@ class VcoreProfileView extends GetView<VcoreProfileController> {
 
 class VcoreProfileItemWidget extends StatelessWidget {
   final String title;
-  final String icon;
+  final IconData icon;
   final VoidCallback action;
   final String? guideId;
 
@@ -562,9 +633,12 @@ class VcoreProfileItemWidget extends StatelessWidget {
           children: [
             Padding(
               padding: const EdgeInsets.only(left: 16, right: 16),
-              child: icon.endsWith("svg")
-                  ? svgAsset(icon, width: 22, height: 22)
-                  : imageAsset(icon, width: 22, height: 22),
+              child: Icon(
+                icon,
+                size: 26,
+                color: const Color(0xFF087C50),
+                semanticLabel: title,
+              ),
             ),
             Expanded(
               child: Text(

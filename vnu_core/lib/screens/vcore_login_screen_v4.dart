@@ -20,6 +20,7 @@ import 'package:vnu_core/modules/idp_auth/config/idp_auth_config.dart';
 import 'package:vnu_core/modules/idp_auth/services/idp_auth_flow.dart';
 import 'package:vnu_core/modules/auth_mode/login_config_resolver.dart';
 import 'package:vnu_core/modules/auth_mode/login_runtime_config.dart';
+import 'package:vnu_core/modules/auth_mode/student_training_access_guard.dart';
 import 'package:vnu_core/modules/motel/vcore_motel_webview.dart';
 import 'package:vnu_core/modules/network_diagnostic/network_diagnostic_screen.dart';
 import 'package:vnu_core/modules/profile/views/vcore_profile_domain_dialog.dart';
@@ -31,6 +32,8 @@ import 'package:vnu_core/services/services_url.dart';
 import 'package:vnu_core/vnu_core.dart';
 import 'package:vnu_core/widgets/buttons_widget.dart';
 import 'package:vnu_core/widgets/progress_hub_widget.dart';
+import 'package:vnu_core/widgets/app_update_floating_badge.dart';
+import 'package:vnu_core/widgets/onevnu_login_notice_marquee.dart';
 import 'package:vnu_core/widgets/field/vnu_text_field.dart';
 
 enum _LoginMode { student, cccd, applicant }
@@ -105,15 +108,8 @@ class _VCoreLoginScreenV4State extends State<VCoreLoginScreenV4> {
     // available as tabs only when /api/config enables them.
     _loginMode = _LoginMode.student;
 
-    if (kDebugMode) {
-      if (ServicesUrl().baseUrl.contains('rteam.vn')) {
-        _studentCodeController.text = '20032496';
-        _passwordController.text = '1';
-      } else {
-        _studentCodeController.text = '21010442';
-        _passwordController.text = 'VnuDuac@#2024';
-      }
-    }
+    // Keep SSO login as the default. Do not prefill hardcoded test credentials
+    // in distributed source packages (even for debug builds).
 
     _checkBio();
     _loadLoginRuntimeConfig(reason: 'initial');
@@ -354,7 +350,12 @@ class _VCoreLoginScreenV4State extends State<VCoreLoginScreenV4> {
         'Đăng nhập VNU SSO lỗi: $error\n$stackTrace',
       );
       if (mounted) {
-        snackBarError('Không thể hoàn tất đăng nhập VNU SSO. Vui lòng thử lại.');
+        final message = error.toString().contains(
+          StudentTrainingAccessGuard.noTrainingRecord)
+            ? StudentTrainingAccessGuard.noTrainingRecord
+            : 'Không thể hoàn tất đăng nhập VNU SSO. '
+              'Vui lòng kiểm tra kết nối và thử lại.';
+        snackBarError(message);
       }
     } finally {
       if (mounted) {
@@ -617,6 +618,16 @@ class _VCoreLoginScreenV4State extends State<VCoreLoginScreenV4> {
                           },
                     ),
                   ),
+                  // Non-interactive floating notice above the login form.
+                  // It does not change the ScrollView's cardTop or padding.
+                  Positioned(
+                    top: MediaQuery.paddingOf(context).top + 104,
+                    left: 0, right: 0,
+                    child: const OneVnuLoginNoticeMarquee(),
+                  ),
+                  // Top-right overlay; does not change the login card height.
+                  const AppUpdateFloatingBadge(topOffset: 12,
+                    rightOffset: 14),
                 ],
               );
             },
@@ -965,11 +976,11 @@ class _LoginModeTabs extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: _LoginModeTab(
-              title: 'Tân sinh viên',
+              title: 'Đăng nhập khác',
               icon: Icons.how_to_reg_outlined,
               selected: selectedMode == _LoginMode.applicant,
               onTap: () => onChanged(_LoginMode.applicant),
-              fontSize: 10,
+              fontSize: 9.5,
             ),
           ),
         ],
@@ -1550,40 +1561,24 @@ class _UtilityButtons extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: <Widget>[
-        Expanded(
-          child: _UtilityButton(
-            icon: Icons.home_work_outlined,
-            title: 'Phòng trọ',
-            onTap: openMotelWebView,
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _UtilityButton(
-            icon: Icons.map_outlined,
-            title: 'Bản đồ',
-            onTap: () {
-              Get.to(() => const VcoreImmapView());
-            },
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _UtilityButton(
-            icon: Icons.support_agent_outlined,
-            title: 'Hỗ trợ',
-            onTap: () {
-              Utils.openUrl(
-                'https://www.facebook.com/'
-                'supportdangkyhocvnu',
-              );
-            },
-          ),
-        ),
-      ],
-    );
+    // Fixed three equal utility tiles in both update/no-update states.
+    // Update is a separately positioned floating badge in the page Stack.
+    return Row(children: [
+      Expanded(child: _UtilityButton(
+        icon: Icons.home_work_outlined,
+        title: 'Phòng trọ', onTap: openMotelWebView)),
+      const SizedBox(width: 10),
+      Expanded(child: _UtilityButton(
+        icon: Icons.map_outlined,
+        title: 'Bản đồ',
+        onTap: () => Get.to(() => const VcoreImmapView()))),
+      const SizedBox(width: 10),
+      Expanded(child: _UtilityButton(
+        icon: Icons.support_agent_outlined,
+        title: 'Hỗ trợ',
+        onTap: () => Utils.openUrl(
+          'https://www.facebook.com/supportdangkyhocvnu'))),
+    ]);
   }
 }
 
@@ -1631,3 +1626,4 @@ class _UtilityButton extends StatelessWidget {
     );
   }
 }
+

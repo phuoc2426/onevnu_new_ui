@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:vnu_core/common/app_text_styles.dart';
 import 'package:vnu_core/common/space_widget.dart';
-import 'package:vnu_core/common/utils.dart';
 import 'package:vnu_core/modules/profile/controllers/vcore_profile_person_info_controller.dart';
 
 import 'vcore_profile_dropdownfield_widget.dart';
@@ -52,8 +51,7 @@ class VcoreProfilePersonNoiOHienTaiWidget extends StatelessWidget {
                       padding: const EdgeInsets.only(bottom: 20),
                       child: Row(
                         children: [
-                          svgAsset(
-                              'assets/images/ic_profile_info_location.svg'),
+                          const Icon(Icons.place_outlined, size: 20, color: Color(0xFF466FFF)),
                           spaceWidth(10),
                           Text(
                             'Lấy thông tin theo hộ khẩu',

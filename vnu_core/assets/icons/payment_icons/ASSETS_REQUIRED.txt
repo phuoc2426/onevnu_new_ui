@@ -1,0 +1,3 @@
+This file makes the optional PNG icon directory available to Flutter.
+You can place tuition_bill.png, tuition_retake.png, tuition_qr_retry.png here.
+No original user icons are replaced by the installer.

@@ -117,7 +117,9 @@ class _VcoreSidebarWidgetState extends State<VcoreSidebarWidget> {
             }
             if (model != null) {
               if (model.loaiBoxDichVuEnum?.mapTypeBoxService() !=
-                  HomeService.XemLichThi) {
+                      HomeService.XemLichThi &&
+                  model.loaiBoxDichVuEnum?.mapTypeBoxService() !=
+                      HomeService.DongBo) {
                 listObj.add(model);
               }
             }
@@ -145,7 +147,9 @@ class _VcoreSidebarWidgetState extends State<VcoreSidebarWidget> {
           .where(
             (element) =>
                 element.loaiBoxDichVuEnum?.mapTypeBoxService() !=
-                HomeService.XemLichThi,
+                    HomeService.XemLichThi &&
+                element.loaiBoxDichVuEnum?.mapTypeBoxService() !=
+                    HomeService.DongBo,
           )
           .toList();
       _sortServices(response);

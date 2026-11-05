@@ -39,11 +39,9 @@ class _PahtForumCommunityViewState extends State<PahtForumCommunityView>
   final Map<String, bool> _interested = <String, bool>{};
   final Map<String, int> _careCounts = <String, int>{};
   final Set<String> _interestBusy = <String>{};
-  final Map<String, PahtForumDetail> _detailCache = <String, PahtForumDetail>{};
   final Set<String> _newArrivalGuids = <String>{};
 
-  String? _expandedGuid;
-  String? _expandingGuid;
+  String? _openingDetailGuid;
 
   Timer? _debounce;
   Timer? _liveTimer;
@@ -232,25 +230,7 @@ class _PahtForumCommunityViewState extends State<PahtForumCommunityView>
         }
       }
 
-      final String? expandedGuid = _expandedGuid;
-      if (expandedGuid != null) {
-        try {
-          final PahtForumDetail detail = await _repository.getPublicDetail(expandedGuid);
-          if (!mounted || _expandedGuid != expandedGuid) return;
-          final PahtForumDetail? oldDetail = _detailCache[expandedGuid];
-          final bool detailChanged = oldDetail == null ||
-              _detailSignature(oldDetail) != _detailSignature(detail);
-          if (detailChanged) {
-            setState(() {
-              _detailCache[expandedGuid] = detail;
-              _interested[expandedGuid] = detail.interested;
-              _careCounts[expandedGuid] = detail.item.careCount;
-            });
-          }
-        } catch (_) {
-          // Giữ dữ liệu cũ nếu đồng bộ nền tạm lỗi; tuyệt đối không chớp loader.
-        }
-      }
+
     } catch (_) {
       // Đồng bộ nền không che dữ liệu đang có và không làm phiền người dùng.
     } finally {
@@ -307,48 +287,16 @@ class _PahtForumCommunityViewState extends State<PahtForumCommunityView>
     _debounce = Timer(const Duration(milliseconds: 420), _reloadList);
   }
 
-  Future<void> _handleCardTap(PahtForumItem item) async {
-    if (_expandedGuid == item.guid) {
-      setState(() => _expandedGuid = null);
-      return;
-    }
-
-    setState(() {
-      _expandedGuid = item.guid;
-      if (!_detailCache.containsKey(item.guid)) _expandingGuid = item.guid;
-    });
-
-    try {
-      PahtForumDetail detail = await _repository.getPublicDetail(item.guid);
-      // Nếu list vừa nhận metadata có phản hồi nhưng detail đến đúng thời điểm DB đang
-      // commit dở, thử lại một lần ngắn. Không bao giờ đánh dấu "đã trả lời" chỉ dựa
-      // vào workflow status.
-      if ((item.hasOfficialAnswer || item.responseCount > 0) &&
-          detail.responses.isEmpty) {
-        await Future<void>.delayed(const Duration(milliseconds: 240));
-        detail = await _repository.getPublicDetail(item.guid);
-      }
-      if (!mounted || _expandedGuid != item.guid) return;
-      setState(() {
-        _detailCache[item.guid] = detail;
-        _interested[item.guid] = detail.interested;
-        _careCounts[item.guid] = detail.item.careCount;
-      });
-    } catch (error) {
-      if (!mounted || _expandedGuid != item.guid) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.toString())),
-      );
-    } finally {
-      if (mounted && _expandingGuid == item.guid) {
-        setState(() => _expandingGuid = null);
-      }
-    }
-  }
-
   Future<void> _openDetail(PahtForumItem item) async {
-    await Get.to(() => PahtForumDetailView(guid: item.guid, publicOnly: true));
-    await _syncSilently();
+    if (_openingDetailGuid != null) return;
+    _openingDetailGuid = item.guid;
+    try {
+      // Navigate immediately. The detail screen loads its own response timeline.
+      await Get.to(() => PahtForumDetailView(guid: item.guid, publicOnly: true));
+      if (mounted) await _syncSilently();
+    } finally {
+      _openingDetailGuid = null;
+    }
   }
 
   Future<void> _toggleInterest(PahtForumItem item) async {
@@ -377,13 +325,7 @@ class _PahtForumCommunityViewState extends State<PahtForumCommunityView>
         _interested[item.guid] = result.interested;
         _careCounts[item.guid] = result.careCount;
         _followingCount = result.followingCount;
-        final PahtForumDetail? cached = _detailCache[item.guid];
-        if (cached != null) {
-          _detailCache[item.guid] = cached.copyWithInterest(
-            interested: result.interested,
-            careCount: result.careCount,
-          );
-        }
+
       });
     } catch (error) {
       if (!mounted) return;
@@ -602,11 +544,8 @@ class _PahtForumCommunityViewState extends State<PahtForumCommunityView>
                     interested: _interested[item.guid] ?? item.interested,
                     careCountOverride: _careCounts[item.guid] ?? item.careCount,
                     interestBusy: _interestBusy.contains(item.guid),
-                    expanded: _expandedGuid == item.guid,
-                    detail: _detailCache[item.guid],
-                    responseLoading: _expandingGuid == item.guid,
                     onInterestTap: () => _toggleInterest(item),
-                    onTap: () => _handleCardTap(item),
+                    onTap: () => _openDetail(item),
                     onDetailTap: () => _openDetail(item),
                   ),
                 ),
@@ -787,14 +726,6 @@ String _itemSignature(PahtForumItem item) {
     item.thumbnailStorageKey,
     topics,
   ].join('~');
-}
-
-String _detailSignature(PahtForumDetail detail) {
-  final String responses = detail.responses
-      .map((PahtResponseItem item) =>
-          '${item.responseType}:${item.unit}:${item.createdAt?.millisecondsSinceEpoch}:${item.content}')
-      .join('|');
-  return '${_itemSignature(detail.item)}#$responses#${detail.interested}';
 }
 
 class _IncomingFeedbackTile extends StatefulWidget {

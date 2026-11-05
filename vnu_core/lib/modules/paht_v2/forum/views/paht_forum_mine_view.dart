@@ -16,10 +16,8 @@ class PahtForumMineView extends StatefulWidget {
 
 class _PahtForumMineViewState extends State<PahtForumMineView> {
   final PahtForumRepository _repository = PahtForumRepository();
-  final Map<String, PahtForumDetail> _detailCache = <String, PahtForumDetail>{};
   List<PahtForumItem> _items = <PahtForumItem>[];
-  String? _expandedGuid;
-  String? _loadingDetailGuid;
+  String? _openingDetailGuid;
   String? _deletingGuid;
   int _total = 0;
   int _page = 0;
@@ -82,40 +80,6 @@ class _PahtForumMineViewState extends State<PahtForumMineView> {
     }
   }
 
-  Future<void> _handleCardTap(PahtForumItem item) async {
-    if (_expandedGuid == item.guid) {
-      setState(() => _expandedGuid = null);
-      return;
-    }
-    setState(() {
-      _expandedGuid = item.guid;
-      if (!_detailCache.containsKey(item.guid)) _loadingDetailGuid = item.guid;
-    });
-
-    try {
-      PahtForumDetail detail = await _repository.getDetail(item.guid);
-      if ((item.hasOfficialAnswer || item.responseCount > 0) &&
-          detail.responses.isEmpty) {
-        await Future<void>.delayed(const Duration(milliseconds: 240));
-        detail = await _repository.getDetail(item.guid);
-      }
-      if (!mounted || _expandedGuid != item.guid) return;
-      setState(() => _detailCache[item.guid] = detail);
-    } catch (error) {
-      if (!mounted || _expandedGuid != item.guid) return;
-      showVcoreNotice(
-        context: context,
-        title: 'Không tải được phản hồi',
-        message: error.toString(),
-        tone: VcoreNoticeTone.error,
-      );
-    } finally {
-      if (mounted && _loadingDetailGuid == item.guid) {
-        setState(() => _loadingDetailGuid = null);
-      }
-    }
-  }
-
   Future<void> _deleteOwnFeedback(PahtForumItem item) async {
     if (!item.canDelete || _deletingGuid != null || !mounted) return;
 
@@ -151,8 +115,6 @@ class _PahtForumMineViewState extends State<PahtForumMineView> {
       setState(() {
         _items = _items.where((PahtForumItem value) => value.guid != item.guid).toList(growable: false);
         _total = _total > 0 ? _total - 1 : 0;
-        _detailCache.remove(item.guid);
-        if (_expandedGuid == item.guid) _expandedGuid = null;
         _deletingGuid = null;
       });
       showVcoreNotice(
@@ -180,8 +142,14 @@ class _PahtForumMineViewState extends State<PahtForumMineView> {
   }
 
   Future<void> _openDetail(PahtForumItem item) async {
-    await Get.to(() => PahtForumDetailView(guid: item.guid));
-    await _load();
+    if (_openingDetailGuid != null) return;
+    _openingDetailGuid = item.guid;
+    try {
+      await Get.to(() => PahtForumDetailView(guid: item.guid));
+      if (mounted) await _load();
+    } finally {
+      _openingDetailGuid = null;
+    }
   }
 
   @override
@@ -270,10 +238,7 @@ class _PahtForumMineViewState extends State<PahtForumMineView> {
                 child: PahtForumCard(
                   item: item,
                   showVisibility: true,
-                  expanded: _expandedGuid == item.guid,
-                  detail: _detailCache[item.guid],
-                  responseLoading: _loadingDetailGuid == item.guid,
-                  onTap: () => _handleCardTap(item),
+                  onTap: () => _openDetail(item),
                   onDetailTap: () => _openDetail(item),
                   onDeleteTap: item.canDelete ? () => _deleteOwnFeedback(item) : null,
                   deleteBusy: _deletingGuid == item.guid,

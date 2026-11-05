@@ -1,0 +1,48 @@
+
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ticket dashed line</title>
+<style>
+  * { box-sizing: border-box; }
+
+  body {
+    background: #eee;
+    padding: 30px;
+    font-family: Arial, sans-serif;
+  }
+
+  .ticket {
+    position: relative;
+    width: 280px;
+    margin: auto;
+  }
+
+  .ticket img {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  .ticket-line {
+    position: absolute;
+    /* Điều chỉnh 2 giá trị này theo ảnh */
+    top: 18%;
+    left: 10%;
+    width: 80%;
+    border-top: 2px dashed red;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+
+<div class="ticket">
+  <img src="detail.png" alt="Ticket">
+  <div class="ticket-line"></div>
+</div>
+
+</body>
+</html>

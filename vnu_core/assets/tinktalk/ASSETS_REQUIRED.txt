@@ -1,0 +1,1 @@
+Files list.png and detail.png are on user PC; copy originals here. Fallback painter works without them.

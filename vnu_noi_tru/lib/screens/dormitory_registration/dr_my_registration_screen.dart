@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vnu_core/repository/data_repository.dart';
 import 'package:vnu_core/common/app_text_styles.dart';
 import 'package:vnu_core/common/utils.dart';
 import 'package:vnu_core/globals.dart';
@@ -56,6 +57,8 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
   bool _isCheckingOpenRegistrationPeriod = true;
   bool _isSubmittingAccommodationRequest = false;
   bool _hasShownMissingRegistrationCccdPrompt = false;
+  bool _isApplicantSession = false;
+  String _applicantIdentityNo = '';
 
   String? _registrationPeriodMessage;
 
@@ -71,10 +74,20 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
   }
 
   Future<void> _bootstrap() async {
+    _isApplicantSession =
+        await DataRepository().getSecureSaveKey(kSessionPrincipalType) ==
+            kPrincipalTypeApplicant;
+    if (_isApplicantSession) {
+      _applicantIdentityNo = (await SharedPreferences.getInstance())
+          .getString('applicant_cccd')?.trim() ?? '';
+    }
+    if (!mounted) return;
     await _loadData();
   }
 
   Future<void> _maybePromptCccdWhenNoRegistration(dynamic data) async {
+    // Applicant already authenticated by CCCD: no USER-only QR prompt.
+    if (_isApplicantSession || data == null) return;
     if (_hasShownMissingRegistrationCccdPrompt || !mounted) return;
 
     final List<dynamic> accommodations = _readAccommodations(data);
@@ -2821,6 +2834,19 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
               >(
                 bloc: _cubit,
                 builder: (BuildContext context, DormitoryRegistrationState state) {
+                  if (_isApplicantSession &&
+                      state is DormitoryRegistrationError) {
+                    return Center(child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(state.message, textAlign: TextAlign.center),
+                          const SizedBox(height: 12),
+                          OutlinedButton(onPressed: _refreshData,
+                            child: const Text('Thử lại')),
+                        ]),
+                    ));
+                  }
                   if (state is DormitoryRegistrationLoading) {
                     return const Center(
                       child: CircularProgressIndicator(
@@ -3557,10 +3583,16 @@ class _DRMyRegistrationScreenState extends State<DRMyRegistrationScreen> {
   }
 
   String _currentCccd() {
+    if (_isApplicantSession) return _applicantIdentityNo;
     return Globals().thongTinSinhVienModel.value?.soCmtCccd?.trim() ?? '';
   }
 
   Future<void> _openCccdUpdateFromKtx({bool refreshKtx = true}) async {
+    if (_isApplicantSession) {
+      snackBarError('CCCD tân sinh viên lấy từ phiên đăng nhập. '
+          'Vui lòng đăng nhập lại nếu định danh không chính xác.');
+      return;
+    }
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (_) => const VcoreProfilePersonInfoView(
