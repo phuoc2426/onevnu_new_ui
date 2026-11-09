@@ -108,7 +108,6 @@ class VcoreProfilePersonInfoController extends GetxController {
   Future<void> _prepareDirtyTracking() async {
     // Hoan thanh cac buoc hydrate tu dong truoc khi chup snapshot ban dau de
     // mui ten khong tu bat chi vi controller dang nap du lieu nen.
-    await refreshQuanHuyenDiaChiTamTru();
     _initialFormSnapshot = _formSnapshot(sinhvienEdit.value);
     hasUnsavedChanges.value = hasPendingQrVerification.value;
     _dirtyWorker?.dispose();
@@ -269,103 +268,8 @@ class VcoreProfilePersonInfoController extends GetxController {
       logError(e.toString());
     }
 
-    //Get quan huyen
-    try {
-      String? idTinhThanhPho =
-          Globals().thongTinSinhVienModel.value?.idQueQuanTinhThanhPho;
-      var response = await ApiRepository().getDataQuanHuyen(
-        null,
-        Globals().thongTinSinhVienModel.value?.guidDonVi,
-        idTinhThanhPho,
-      );
-      listQuanHuyenQueQuan.value = response;
-      if (idTinhThanhPho ==
-          Globals().thongTinSinhVienModel.value?.idNoiSinhTinhThanhPho) {
-        listQuanHuyenNoiSinh.value = response;
-      }
-      if (idTinhThanhPho ==
-          Globals()
-              .thongTinSinhVienModel
-              .value
-              ?.idHoKhauThuongTruTinhThanhPho) {
-        listQuanHuyenThuongTru.value = response;
-      }
-      if (idTinhThanhPho ==
-          Globals().thongTinSinhVienModel.value?.idNoiOHienNayTinhThanhPho) {
-        listQuanHuyenNoiOHienNay.value = response;
-      }
-      if (idTinhThanhPho ==
-          Globals().thongTinSinhVienModel.value?.idDiaChiLienLacTinhThanhPho) {
-        listQuanHuyenDiaChiLL.value = response;
-      }
-    } catch (e) {
-      logError(e.toString());
-    }
-
-    if (Globals().thongTinSinhVienModel.value?.idNoiSinhTinhThanhPho !=
-        Globals().thongTinSinhVienModel.value?.idQueQuanTinhThanhPho) {
-      try {
-        String? idTinhThanhPho =
-            Globals().thongTinSinhVienModel.value?.idNoiSinhTinhThanhPho;
-        var response = await ApiRepository().getDataQuanHuyen(
-          null,
-          Globals().thongTinSinhVienModel.value?.guidDonVi,
-          idTinhThanhPho,
-        );
-        listQuanHuyenNoiSinh.value = response;
-      } catch (e) {
-        logError(e.toString());
-      }
-    }
-
-    if (Globals().thongTinSinhVienModel.value?.idHoKhauThuongTruTinhThanhPho !=
-        Globals().thongTinSinhVienModel.value?.idQueQuanTinhThanhPho) {
-      try {
-        String? idTinhThanhPho = Globals()
-            .thongTinSinhVienModel
-            .value
-            ?.idHoKhauThuongTruTinhThanhPho;
-        var response = await ApiRepository().getDataQuanHuyen(
-          null,
-          Globals().thongTinSinhVienModel.value?.guidDonVi,
-          idTinhThanhPho,
-        );
-        listQuanHuyenThuongTru.value = response;
-      } catch (e) {
-        logError(e.toString());
-      }
-    }
-    if (Globals().thongTinSinhVienModel.value?.idNoiOHienNayTinhThanhPho !=
-        Globals().thongTinSinhVienModel.value?.idQueQuanTinhThanhPho) {
-      try {
-        String? idTinhThanhPho =
-            Globals().thongTinSinhVienModel.value?.idNoiOHienNayTinhThanhPho;
-        var response = await ApiRepository().getDataQuanHuyen(
-          null,
-          Globals().thongTinSinhVienModel.value?.guidDonVi,
-          idTinhThanhPho,
-        );
-        listQuanHuyenNoiOHienNay.value = response;
-      } catch (e) {
-        logError(e.toString());
-      }
-    }
-
-    if (Globals().thongTinSinhVienModel.value?.idDiaChiLienLacTinhThanhPho !=
-        Globals().thongTinSinhVienModel.value?.idQueQuanTinhThanhPho) {
-      try {
-        String? idTinhThanhPho =
-            Globals().thongTinSinhVienModel.value?.idDiaChiLienLacTinhThanhPho;
-        var response = await ApiRepository().getDataQuanHuyen(
-          null,
-          Globals().thongTinSinhVienModel.value?.guidDonVi,
-          idTinhThanhPho,
-        );
-        listQuanHuyenDiaChiLL.value = response;
-      } catch (e) {
-        logError(e.toString());
-      }
-    }
+    // Dia chi 2 cap: khong tai danh muc Quan/Huyen cho bieu mau ca nhan.
+    // De lai cac method cu trong controller de tuong thich code khac.
   }
 
   refreshQuanHuyenQueQuan() async {
@@ -705,3 +609,4 @@ class VcoreProfilePersonInfoController extends GetxController {
     }
   }
 }
+

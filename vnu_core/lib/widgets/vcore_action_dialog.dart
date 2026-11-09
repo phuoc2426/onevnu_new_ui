@@ -28,6 +28,7 @@ Future<T?> showVcoreActionDialog<T>({
   required List<VcoreDialogAction<T>> actions,
   bool barrierDismissible = false,
   IconData? leadingIcon,
+  Widget? extraContent,
 }) {
   assert(actions.isNotEmpty && actions.length <= 3);
   return showDialog<T>(
@@ -39,6 +40,7 @@ Future<T?> showVcoreActionDialog<T>({
         content: content,
         actions: actions,
         leadingIcon: leadingIcon,
+        extraContent: extraContent,
       );
     },
   );
@@ -49,6 +51,7 @@ class VcoreActionDialog<T> extends StatelessWidget {
   final String content;
   final List<VcoreDialogAction<T>> actions;
   final IconData? leadingIcon;
+  final Widget? extraContent;
 
   const VcoreActionDialog({
     super.key,
@@ -56,6 +59,7 @@ class VcoreActionDialog<T> extends StatelessWidget {
     required this.content,
     required this.actions,
     this.leadingIcon,
+    this.extraContent,
   }) : assert(actions.length > 0 && actions.length <= 3);
 
   @override
@@ -126,6 +130,10 @@ class VcoreActionDialog<T> extends StatelessWidget {
                     height: 1.45,
                   ),
                 ),
+                if (extraContent != null) ...<Widget>[
+                  const SizedBox(height: 14),
+                  extraContent!,
+                ],
                 const SizedBox(height: 20),
                 _DialogActionBar<T>(actions: actions),
               ],

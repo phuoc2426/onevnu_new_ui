@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
+import 'package:vnu_core/modules/one_door/data/one_door_api_debug.dart';
 
 /// This endpoint is NOT included in the older One Door Swagger. Its wire
 /// contract must be confirmed against the actual /auth/onevnu deployment.
@@ -20,7 +22,9 @@ class OneDoorOneVnuAuthApi {
     baseUrl: 'https://motcua-vnu.digitaledu.vn/mc-api',
     connectTimeout: const Duration(seconds: 20),
     receiveTimeout: const Duration(seconds: 20),
-  ));
+  )) {
+    OneDoorApiDebug.instance.attach(_dio, 'Auth OneVNU → Một cửa');
+  }
   final Dio _dio;
 
   Future<OneDoorSession> exchange({
@@ -65,6 +69,13 @@ class OneDoorTemplateFile {
 /// Uses ONLY the One Door token. Safe GET requests may exchange a new token
 /// once on HTTP 401. Never automatically replay a POST with file attachments.
 class OneDoorLiveApi {
+  /// V24 values are passed to POST /ho-so in a JSON-string multipart field.
+  /// This is a per-API-instance snapshot, never global application state.
+  Map<String, String> submissionFormValues = <String, String>{};
+  int? submissionReasonId;
+  String? _lastRecordId;
+  Map<String, dynamic>? _lastRecordSnapshot;
+
   OneDoorLiveApi(OneDoorSession session, {
     Dio? dio,
     Future<OneDoorSession> Function()? refreshSession,
@@ -74,7 +85,9 @@ class OneDoorLiveApi {
          baseUrl: 'https://motcua-vnu.digitaledu.vn/mc-api',
          connectTimeout: const Duration(seconds: 20),
          receiveTimeout: const Duration(seconds: 20),
-       ));
+       )) {
+    OneDoorApiDebug.instance.attach(_dio, 'Một cửa · hồ sơ');
+  }
 
   OneDoorSession _session;
   final Dio _dio;
@@ -209,8 +222,84 @@ class OneDoorLiveApi {
 
   Future<dynamic> myRecordSummary() => _get('/api/v1/ho-so/cua-toi/tong-hop');
 
-  Future<dynamic> record(String id) =>
-    _get('/api/v1/ho-so/${Uri.encodeComponent(id)}');
+  Future<dynamic> record(String id) async {
+    _lastRecordId = null;
+    _lastRecordSnapshot = null;
+    final response = await _get('/api/v1/ho-so/${Uri.encodeComponent(id)}');
+    _lastRecordId = id;
+    _lastRecordSnapshot = _oneDoorMap(response);
+    return response;
+  }
+
+  Map<String, dynamic>? recordSnapshot(String id) =>
+      id == _lastRecordId && _lastRecordSnapshot != null
+      ? Map<String, dynamic>.from(_lastRecordSnapshot!) : null;
+
+
+  /// V29.3: Download the exact attachment on a submitted record, not the
+  /// reusable blank template or a locally cached pre-submission preview.
+  /// This authenticated GET may retry once after a token refresh on HTTP 401.
+  Future<OneDoorTemplateFile> submittedPaperFile({
+    required String registrationId,
+    required String paperId,
+    String fileName = '',
+  }) async {
+    if (registrationId.trim().isEmpty || paperId.trim().isEmpty) {
+      throw ArgumentError('Missing registration or paper identifier');
+    }
+    if (_session.expiresSoon) await _refresh();
+    final path = '/api/v1/ho-so/${Uri.encodeComponent(registrationId)}'
+        '/giay-to/${Uri.encodeComponent(paperId)}/file';
+    Future<Response<List<int>>> download() => _dio.get<List<int>>(path,
+      options: Options(
+        responseType: ResponseType.bytes,
+        headers: <String, String>{
+          'Authorization': 'Bearer ${_session.accessToken}',
+        },
+      ),
+    );
+    late Response<List<int>> response;
+    try {
+      response = await download();
+    } on DioException catch (error) {
+      if (error.response?.statusCode != 401 || _refreshSession == null) rethrow;
+      await _refresh();
+      response = await download();
+    }
+    final bytes = response.data ?? const <int>[];
+    if (bytes.isEmpty || bytes.length > 20 * 1024 * 1024) {
+      throw const FormatException('Tệp không tồn tại hoặc vượt quá 20 MB.');
+    }
+    final mime = (response.headers.value('content-type') ?? '').toLowerCase();
+    if (mime.contains('application/json') || mime.contains('text/html') ||
+        mime.contains('text/plain')) {
+      throw const FormatException('Không nhận được tệp hợp lệ từ hồ sơ.');
+    }
+    final extFromName = fileName.trim().contains('.')
+        ? fileName.trim().split('.').last.toLowerCase()
+        : '';
+    final isPdf = bytes.length > 4 && bytes[0] == 0x25 &&
+        bytes[1] == 0x50 && bytes[2] == 0x44 && bytes[3] == 0x46;
+    final isPng = bytes.length > 7 && bytes[0] == 0x89 &&
+        bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47;
+    final isJpeg = bytes.length > 3 && bytes[0] == 0xFF &&
+        bytes[1] == 0xD8 && bytes[2] == 0xFF;
+    final isZip = bytes.length > 4 && bytes[0] == 0x50 &&
+        bytes[1] == 0x4B;
+    final isOle = bytes.length > 4 && bytes[0] == 0xD0 &&
+        bytes[1] == 0xCF && bytes[2] == 0x11 && bytes[3] == 0xE0;
+    final isSheet = extFromName == 'xlsx' || extFromName == 'xls' ||
+        mime.contains('spreadsheet') || mime.contains('excel');
+    final isWord = extFromName == 'docx' || extFromName == 'doc' ||
+        mime.contains('wordprocessing') || mime.contains('msword');
+    final extension = isPdf ? 'pdf' : isPng ? 'png' : isJpeg ? 'jpg' :
+        isZip ? (isSheet ? 'xlsx' : 'docx') :
+        isOle ? (isSheet ? 'xls' : isWord ? 'doc' : '') : '';
+    if (extension.isEmpty) {
+      throw const FormatException('Định dạng tệp đã nộp chưa được hỗ trợ xem.');
+    }
+    return OneDoorTemplateFile(bytes: bytes, extension: extension);
+  }
 
   Future<dynamic> lookup(String type) {
     const allowed = <String>{'doi-tuong', 'linh-vuc',
@@ -237,13 +326,29 @@ class OneDoorLiveApi {
       'SoLuongBan': quantity,
       if (reasonId != null) 'IdLyDo': reasonId,
     });
+    if (submissionFormValues.isNotEmpty) {
+      data.fields.add(MapEntry<String, String>(
+        'GiaTriBieuMau', jsonEncode(submissionFormValues)));
+    }
+    if (submissionReasonId != null && reasonId == null) {
+      data.fields.add(MapEntry<String, String>(
+        'IdLyDo', '${submissionReasonId!}'));
+    }
     await _attach(data, filesByPaperId);
     return _post('/api/v1/ho-so', body: data);
   }
 
+  /// V30: POST only the changed form values and deliberately replaced files.
+  /// The API retains all omitted existing values and previous attachments.
   Future<dynamic> supplement(String registrationId, {
-      required String note, required Map<String, String> filesByPaperId}) async {
+      required String note,
+      Map<String, String> changedValues = const <String, String>{},
+      required Map<String, String> filesByPaperId}) async {
     final data = FormData.fromMap(<String, dynamic>{'GhiChu': note});
+    if (changedValues.isNotEmpty) {
+      data.fields.add(MapEntry<String, String>(
+        'GiaTriBieuMau', jsonEncode(changedValues)));
+    }
     await _attach(data, filesByPaperId);
     return _post('/api/v1/ho-so/${Uri.encodeComponent(registrationId)}/bo-sung',
       body: data);

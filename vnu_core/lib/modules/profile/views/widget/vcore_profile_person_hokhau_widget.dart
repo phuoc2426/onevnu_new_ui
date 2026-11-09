@@ -58,48 +58,13 @@ class VcoreProfilePersonHokhauWidget extends StatelessWidget {
                                 item?.idHoKhauThuongTruTinhThanhPho = obj?.id;
                                 //reset
                                 item?.idHoKhauThuongTruQuanHuyen = "";
-
-                                controller.refreshQuanHuyenHoKhauThuongTru();
+                                item?.hoKhauThuongTruPhuongXa = "";
                               },
                             );
                           },
                         ),
                       ),
-                      spaceWidth(10),
-
-                      Expanded(
-                        child: VcoreProfileDropdownfieldWidget(
-                          title: 'Quận/Huyện',
-                          hintText: 'Chọn Quận/Huyện',
-                          value: controller.listQuanHuyenThuongTru
-                              .firstWhereOrNull((item) {
-                            return item.id ==
-                                controller.sinhvienEdit.value
-                                    .idHoKhauThuongTruQuanHuyen;
-                          })?.ten,
-                          items: controller.listQuanHuyenThuongTru.map(
-                            (e) {
-                              return e.ten ?? '';
-                            },
-                          ).toList(),
-                          onSelected: (value) {
-                            var obj = controller.listQuanHuyenThuongTru
-                                .firstWhereOrNull((item) {
-                              return item.ten == value;
-                            });
-                            if (controller.sinhvienEdit.value
-                                    .idHoKhauThuongTruQuanHuyen ==
-                                obj?.id) {
-                              return;
-                            }
-                            controller.sinhvienEdit.update(
-                              (item) {
-                                item?.idHoKhauThuongTruQuanHuyen = obj?.id;
-                              },
-                            );
-                          },
-                        ),
-                      ),
+                      
                     ],
                   ),
                   spaceHeight(itemSpace),
@@ -109,14 +74,15 @@ class VcoreProfilePersonHokhauWidget extends StatelessWidget {
                     //
                     Expanded(
                         child: VcoreProfileTextFieldWidget(
-                      title: 'Phường/Xã/Thị trấn',
-                      hintText: 'Nhập P/X/TT',
+                      title: 'Xã/Phường/Đặc khu',
+                      hintText: 'Nhập tên xã/phường/đặc khu',
                       value:
                           controller.sinhvienEdit.value.hoKhauThuongTruPhuongXa,
                       onChange: (text) {
                         controller.sinhvienEdit.update(
                           (item) {
                             item?.hoKhauThuongTruPhuongXa = text;
+                                item?.idHoKhauThuongTruQuanHuyen = '';
                           },
                         );
                       },
@@ -159,3 +125,4 @@ class VcoreProfilePersonHokhauWidget extends StatelessWidget {
     );
   }
 }
+

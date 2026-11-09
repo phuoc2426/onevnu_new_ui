@@ -1,4 +1,6 @@
-import 'dart:async';
+import 'dart:convert';
+import 'package:crypto/crypto.dart';
+import 'package:image_picker/image_picker.dart';
 import 'dart:ui' show FontFeature;
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
@@ -12,6 +14,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:vnu_core/globals.dart';
 import 'package:vnu_core/modules/one_door/data/one_door_live_api.dart';
+import 'package:vnu_core/modules/one_door/data/one_door_form_api.dart';
+import 'package:vnu_core/modules/one_door/data/one_door_api_debug.dart';
 import 'package:vnu_core/modules/one_door/data/one_door_live_repository.dart';
 import 'package:vnu_core/widgets/vnu_loading.dart';
 import 'package:intl/intl.dart';
@@ -23,6 +27,10 @@ import 'package:vnu_core/widgets/select/vnu_select.dart';
 import 'package:vnu_core/widgets/vcore_notice_toast.dart';
 import 'package:vnu_core/widgets/vnu_press_motion.dart';
 
+// V29.3 SUBMITTED ATTACHMENT PREVIEW: GET stored file by record/paper ID.
+// V29.1 LOCAL OTHER OPTION: app appends "Khác" when needed; no invented IdLyDo.
+// V29 REASON UX: only "Khac" reveals request entry; Word and POST agree.
+// V28 REASON TO DOCX PREVIEW: selected lyDos.tenLyDo fills {YeuCau}.
 /// Native One Door. Exchange ONEVNU session for a One Door token on entry.
 /// Debug may fall back to mock UI. Release never displays fabricated records.
 class VcoreOneDoorView extends StatefulWidget {
@@ -36,6 +44,9 @@ enum _DoorPage { overview, procedure, form, record, supplement }
 
 enum _DoorFormStep { request, attachments, review }
 
+// V26 custom bottom sheet sources. Existing project image_picker is reused.
+enum _DoorAttachmentSource { camera, gallery, files }
+
 /// Flattened section + row model for lazy ListView.builder rendering.
 class _OneDoorListEntry {
   const _OneDoorListEntry.section(this.title, this.count, this.group)
@@ -46,6 +57,36 @@ class _OneDoorListEntry {
   final int count;
   final OneDoorProcedureGroup? group;
   final OneDoorProcedure? procedure;
+}
+
+
+// V30: one editable supplementary field plus its previously submitted value.
+class _OneDoorSupplementField {
+  const _OneDoorSupplementField({
+    required this.key,
+    required this.label,
+    required this.type,
+    required this.hint,
+    required this.currentValue,
+  });
+  final String key;
+  final String label;
+  final String type;
+  final String hint;
+  final String currentValue;
+}
+
+class _OneDoorSupplementNotice {
+  const _OneDoorSupplementNotice({
+    required this.message,
+    required this.author,
+    required this.date,
+    required this.answered,
+  });
+  final String message;
+  final String author;
+  final String date;
+  final bool answered;
 }
 
 class _VcoreOneDoorViewState extends State<VcoreOneDoorView> {
@@ -60,6 +101,39 @@ class _VcoreOneDoorViewState extends State<VcoreOneDoorView> {
   final TextEditingController _search = TextEditingController();
   final TextEditingController _request = TextEditingController();
   final TextEditingController _supplementNote = TextEditingController();
+
+  // V30: Supplement works on the SUBMITTED record, never the draft.
+  bool _supplementLoading = false;
+  String? _supplementError;
+  bool _recordCanSupplement = false;
+  int _supplementRequestSerial = 0;
+  String _supplementSavedRequest = '';
+  // V30.1: Supplement shows the complete submitted application, not only
+  // editable Word template variables. Non-editable values are read-only
+  // because POST /bo-sung does not accept these fixed form properties.
+  String _supplementSavedReason = '';
+  String _supplementSavedDelivery = '';
+  int? _supplementSavedQuantity;
+  String _supplementCode = '';
+  String _supplementSubmittedAt = '';
+  int? _supplementPaidAmount;
+  String _supplementProcedureId = '';
+  List<_OneDoorSupplementField> _supplementFields =
+      <_OneDoorSupplementField>[];
+  final Map<String, TextEditingController> _supplementInputs =
+      <String, TextEditingController>{};
+  Map<String, String> _supplementCurrentValues = <String, String>{};
+  List<_OneDoorSupplementNotice> _supplementNotices =
+      <_OneDoorSupplementNotice>[];
+  List<OneDoorPaper> _supplementPapers = <OneDoorPaper>[];
+  final Map<String, String> _supplementCurrentFiles = <String, String>{};
+  final Set<String> _supplementMissingRequiredPapers = <String>{};
+  final Set<String> _supplementAutoPaperIds = <String>{};
+  final Map<String, String> _supplementReviewedDigests = <String, String>{};
+  final Map<String, String> _supplementGeneratedFingerprints =
+      <String, String>{};
+
+
   List<OneDoorProcedure> _procedures = const <OneDoorProcedure>[];
   List<OneDoorRecord> _records = const <OneDoorRecord>[];
   _DoorPage _page = _DoorPage.overview;
@@ -82,6 +156,10 @@ class _VcoreOneDoorViewState extends State<VcoreOneDoorView> {
   int _formStep = 0;
   OneDoorProcedure? _selectedProcedure;
   OneDoorRecord? _selectedRecord;
+  // V29.3: Load submitted attachments from the server, not from draft paths.
+  bool _recordDetailLoading = false;
+  bool _recordDetailFailed = false;
+  final Set<String> _submittedPaperBusy = <String>{};
   bool _procedureLoading = false;
   bool _procedureReady = false;
   String? _procedureError;
@@ -103,48 +181,103 @@ class _VcoreOneDoorViewState extends State<VcoreOneDoorView> {
   final Map<String, OneDoorLetterDraft> _letterDrafts = <String, OneDoorLetterDraft>{};
   final Set<String> _generatedPdfPaths = <String>{};
   final Set<String> _generatedWordPaths = <String>{};
+  final Set<String> _managedPhotoPaths = <String>{};
   final Map<String, String> _editedWordWizardContext = <String, String>{};
   final Set<String> _paperBusy = <String>{};
 
-  // Step 2 notice must stay visible for ten seconds before proceeding.
-  // The countdown starts on ENTERING the attachment step, not on page load.
-  static const int _attachmentReadDurationSeconds = 10;
-  int _attachmentSecondsRemaining = _attachmentReadDurationSeconds;
-  Timer? _attachmentReadTimer;
+  // V24: API-sourced form schema, temporary attachments, and preview receipt.
+  OneDoorLiveApi? _oneDoorApi;
+  OneDoorFormApi? _formApi;
+  OneDoorFormConfiguration _formConfig = const OneDoorFormConfiguration();
+  bool _formConfigLoading = false;
+  String? _formConfigError;
+  int? _selectedReasonId;
+  // A UI-only choice; never assign a fabricated backend IdLyDo.
+  bool _localOtherSelected = false;
+  int _formRequestSerial = 0;
+  int _generatedRequestSerial = 0;
+  final Map<String, TextEditingController> _extraInputs =
+      <String, TextEditingController>{};
+  Map<String, String> _savedFormValues = <String, String>{};
+  Map<String, String> _studentFormValues = <String, String>{};
+  final Set<String> _autoAttachedIds = <String>{};
+  final Set<String> _reviewedIds = <String>{};
+  // V26 REVIEW ONCE per exact bytes version. Hash when the student confirms,
+  // and validate the same digest before advancing/submitting.
+  final Map<String, String> _reviewedDigests = <String, String>{};
+  final Map<String, String> _generatedFingerprints = <String, String>{};
+  final Map<String, String> _failedAutoPapers = <String, String>{};
 
-  void _startAttachmentCountdown() {
-    _attachmentReadTimer?.cancel();
-    _attachmentSecondsRemaining = _attachmentReadDurationSeconds;
-    _attachmentReadTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted || _page != _DoorPage.form ||
-          _currentStep != _DoorFormStep.attachments) {
-        timer.cancel();
-        return;
+  void _invalidatePreviewReceipts() {
+    // Only app-generated documents depend on form fields. Manual files must
+    // not lose a valid review merely because the student edits delivery mode.
+    final affected = <String>{
+      ..._autoAttachedIds,
+      ..._letterDrafts.keys,
+      ..._editedWordWizardContext.keys,
+    };
+    if (affected.isEmpty) return;
+    setState(() {
+      for (final id in affected) {
+        _reviewedIds.remove(id);
+        _reviewedDigests.remove(id);
       }
-      setState(() {
-        if (_attachmentSecondsRemaining > 0) _attachmentSecondsRemaining--;
-      });
-      if (_attachmentSecondsRemaining == 0) timer.cancel();
     });
+  }
+
+  Future<String> _digestFile(String path) async {
+    final file = File(path);
+    if (!await file.exists()) throw StateError('Không tìm thấy tệp.');
+    final size = await file.length();
+    if (size < 1 || size > 10 * 1024 * 1024) {
+      throw StateError('Tệp trống hoặc vượt quá 10 MB.');
+    }
+    return (await sha256.bind(file.openRead()).first).toString();
+  }
+
+  Future<bool> _checkReviewedFileVersions() async {
+    if (_selectedProcedure == null) return false;
+    for (final entry in _files.entries.toList()) {
+      final id = entry.key;
+      final path = _filePaths[id];
+      if (path == null) {
+        if (_live) return false;
+        continue;
+      }
+      String current;
+      try {
+        current = await _digestFile(path);
+      } catch (_) {
+        if (mounted) _message('Tệp không còn hợp lệ. Vui lòng đính kèm lại.',
+          tone: VcoreNoticeTone.warning);
+        return false;
+      }
+      if (_reviewedDigests[id] != current) {
+        if (mounted) {
+          setState(() {
+            _reviewedIds.remove(id);
+            _reviewedDigests.remove(id);
+          });
+          _message('Tệp đã thay đổi sau khi xem. Hãy mở kiểm tra lại.',
+            tone: VcoreNoticeTone.warning);
+        }
+        return false;
+      }
+    }
+    return true;
   }
 
   void _previousFormStep() {
     if (_submitting || _page != _DoorPage.form || _formStep <= 0) return;
+    ++_generatedRequestSerial;
     setState(() => _formStep--);
-    if (_currentStep == _DoorFormStep.attachments) {
-      _startAttachmentCountdown();
-    } else {
-      _attachmentReadTimer?.cancel();
-    }
   }
 
   void _advanceFormStep() {
     if (_page != _DoorPage.form || _formStep + 1 >= _formSteps.length) return;
     setState(() => _formStep++);
     if (_currentStep == _DoorFormStep.attachments) {
-      _startAttachmentCountdown();
-    } else {
-      _attachmentReadTimer?.cancel();
+      _syncAutoDocuments();
     }
   }
 
@@ -166,12 +299,21 @@ class _VcoreOneDoorViewState extends State<VcoreOneDoorView> {
     File(path).delete().catchError((Object _) => File(path));
   }
 
+  void _forgetManagedPhoto(String? path) {
+    if (path == null || !_managedPhotoPaths.remove(path)) return;
+    // Delete ONLY temporary photos created by our picker, never gallery files.
+    File(path).delete().catchError((Object _) => File(path));
+  }
+
   void _clearGeneratedPdfs() {
     for (final path in _generatedPdfPaths.toList()) {
       _forgetGeneratedPdf(path);
     }
     for (final path in _generatedWordPaths.toList()) {
       _forgetGeneratedWord(path);
+    }
+    for (final path in _managedPhotoPaths.toList()) {
+      _forgetManagedPhoto(path);
     }
     _editedWordWizardContext.clear();
   }
@@ -183,6 +325,12 @@ class _VcoreOneDoorViewState extends State<VcoreOneDoorView> {
     if (!mounted || _submitting) return;
     setState(() {
       final previous = (supplement ? _supplementPaths : _filePaths)[paper.id];
+      if (!supplement) {
+        _reviewedIds.remove(paper.id);
+        _reviewedDigests.remove(paper.id);
+        _autoAttachedIds.remove(paper.id);
+        _generatedFingerprints.remove(paper.id);
+      }
       _generatedWordPaths.add(path);
       (supplement ? _supplementPaths : _filePaths)[paper.id] = path;
       (supplement ? _supplementFiles : _files)[paper.id] =
@@ -190,24 +338,33 @@ class _VcoreOneDoorViewState extends State<VcoreOneDoorView> {
       if (!supplement) {
         _letterDrafts.remove(paper.id);
         _editedWordWizardContext[paper.id] =
-          '${_quantity}::${_request.text.trim()}';
+          '${_quantity}::${_wordYeuCau}';
+      }
+      if (supplement) {
+        _supplementReviewedDigests.remove(paper.id);
+        _supplementGeneratedFingerprints.remove(paper.id);
       }
       if (previous != path) {
         _forgetGeneratedPdf(previous);
         _forgetGeneratedWord(previous);
+        _forgetManagedPhoto(previous);
       }
     });
   }
 
   @override
   void dispose() {
-    _attachmentReadTimer?.cancel();
     // Avoid deleting a file while Dio may still be uploading it.
     if (!_submitting) _clearGeneratedPdfs();
     _search.removeListener(_onSearch);
     _search.dispose();
     _request.dispose();
     _supplementNote.dispose();
+    ++_supplementRequestSerial;
+    for (final c in _supplementInputs.values) { c.dispose(); }
+    ++_formRequestSerial;
+    ++_generatedRequestSerial;
+    for (final input in _extraInputs.values) { input.dispose(); }
     super.dispose();
   }
 
@@ -236,6 +393,15 @@ class _VcoreOneDoorViewState extends State<VcoreOneDoorView> {
               });
             // Verify the new One Door session before loading private cases.
             await api.currentUser();
+            _oneDoorApi = api;
+            _formApi = OneDoorFormApi(oneDoorSession,
+              refreshSession: () async {
+                final current = Globals().token.trim();
+                if (current.isEmpty || current != token) {
+                  throw StateError('ONEVNU login session has changed');
+                }
+                return auth.exchange(oneVnuJwt: current);
+              });
             _repo=OneDoorLiveRepository(api);
             _live=true;
           } catch (_) {
@@ -293,8 +459,8 @@ class _VcoreOneDoorViewState extends State<VcoreOneDoorView> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _connectionError = 'Không lấy được phiên Một cửa hoặc dữ liệu hồ sơ thật. '
-          'Kiểm tra xác thực ONEVNU, kết nối API và thử lại.';
+        _connectionError = 'Chưa thể mở Thủ tục hành chính. '
+          'Vui lòng kiểm tra kết nối mạng rồi thử lại.';
         _authResolved=false;
       });
     }
@@ -331,9 +497,12 @@ class _VcoreOneDoorViewState extends State<VcoreOneDoorView> {
       if (_page == _DoorPage.procedure) _procedureRequestSerial++;
       if (_page == _DoorPage.form) {
         if (_submitting) return;
-        _attachmentReadTimer?.cancel();
+        ++_generatedRequestSerial;
         _page = _DoorPage.procedure;
       } else if (_page == _DoorPage.supplement) {
+        if (_submitting) return;
+        ++_supplementRequestSerial;
+        _clearSupplementDraft();
         _page = _DoorPage.record;
       } else {
         _page = _DoorPage.overview;
@@ -392,27 +561,665 @@ class _VcoreOneDoorViewState extends State<VcoreOneDoorView> {
   }
 
   Future<void> _openRecord(OneDoorRecord record) async {
+    final repository = _repo;
+    final fetchDetail = repository is OneDoorLiveRepository;
     setState(() {
       _selectedRecord = record;
       _page = _DoorPage.record;
       _myRecordsTab = true;
+      _recordDetailLoading = fetchDetail;
+      _recordDetailFailed = false;
+      _recordCanSupplement = false;
     });
-    final repository=_repo;
-    if (repository is OneDoorLiveRepository) {
-      try {
-        final detail=await repository.detailRecord(record.id,procedure:record.procedure);
-        if (mounted && _selectedRecord?.id==record.id) {
-          setState(() => _selectedRecord=detail);
-        }
-      } catch (_) {
-        if (mounted) _message('Không tải được thông tin xử lý hồ sơ.', tone: VcoreNoticeTone.error);
+    if (repository is! OneDoorLiveRepository) return;
+    try {
+      final detail = await repository.detailRecord(
+        record.id, procedure: record.procedure);
+      if (mounted && _selectedRecord?.id == record.id) {
+        final raw = _oneDoorApi?.recordSnapshot(record.id);
+        setState(() {
+          _selectedRecord = detail;
+          _recordCanSupplement = raw?['coTheBoSung'] == true;
+        });
+      }
+    } catch (_) {
+      if (mounted && _selectedRecord?.id == record.id) {
+        setState(() => _recordDetailFailed = true);
+        _message('Không tải được thông tin hồ sơ. Vui lòng thử lại.',
+          tone: VcoreNoticeTone.warning);
+      }
+    } finally {
+      if (mounted && _selectedRecord?.id == record.id) {
+        setState(() => _recordDetailLoading = false);
       }
     }
   }
 
+  // V29.3: Never use locally generated form files for submitted-record view.
+  // Always GET the stored upload for (idDangKy, idGiayTo).
+  Future<void> _openSubmittedPaper(String paperId, String fileName,
+      {bool share = false}) async {
+    final record = _selectedRecord;
+    final api = _oneDoorApi;
+    if (record == null || api == null || !_live) {
+      _message('Chưa thể mở giấy tờ này.', tone: VcoreNoticeTone.warning);
+      return;
+    }
+    final busyKey = '${record.id}|$paperId';
+    if (_submittedPaperBusy.contains(busyKey)) return;
+    setState(() => _submittedPaperBusy.add(busyKey));
+    try {
+      final submitted = await api.submittedPaperFile(
+        registrationId: record.id,
+        paperId: paperId,
+        fileName: fileName,
+      );
+      final base = await getTemporaryDirectory();
+      final folder = Directory('${base.path}/onevnu_submitted_papers');
+      if (!await folder.exists()) await folder.create(recursive: true);
+      // Keep private downloads in app cache; retire stale files after a day.
+      try {
+        await for (final entry in folder.list()) {
+          if (entry is! File) continue;
+          final lastUpdate = (await entry.stat()).modified;
+          if (DateTime.now().difference(lastUpdate) >
+              const Duration(hours: 24)) {
+            await entry.delete();
+          }
+        }
+      } catch (_) { /* Cache cleanup must not block preview. */ }
+      final stamp = DateTime.now().microsecondsSinceEpoch;
+      final path = '${folder.path}/submitted_${stamp}.${submitted.extension}';
+      await File(path).writeAsBytes(submitted.bytes, flush: true);
+      if (!mounted || _selectedRecord?.id != record.id ||
+          (_page != _DoorPage.record &&
+           _page != _DoorPage.supplement)) return;
+      if (share) {
+        await OneDoorAttachmentPreview.shareFile(context,
+          path: path, title: fileName);
+      } else {
+        await OneDoorAttachmentPreview.openForReview(context,
+          path: path,
+          title: fileName.trim().isEmpty ? 'Giấy tờ đã nộp' : fileName,
+        );
+      }
+    } catch (_) {
+      if (mounted && _selectedRecord?.id == record.id) {
+        _message('Không mở được tệp đã nộp. Vui lòng thử lại.',
+          tone: VcoreNoticeTone.error);
+      }
+    } finally {
+      if (mounted) setState(() => _submittedPaperBusy.remove(busyKey));
+    }
+  }
+
+  Widget _submittedPaperRow(String paperId, String fileName) {
+    final record = _selectedRecord;
+    final busyKey = '${record?.id ?? ''}|$paperId';
+    final busy = _submittedPaperBusy.contains(busyKey);
+    final available = _live && _oneDoorApi != null && !busy;
+    final name = fileName.trim().isNotEmpty
+        ? fileName.trim() : 'Giấy tờ đã nộp';
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 7),
+      decoration: const BoxDecoration(border: Border(
+        bottom: BorderSide(color: StudentServiceUI.line))),
+      child: Row(children: [
+        const ModuleDetailIcon(name: 'procedure_attachment', size: 27),
+        const SizedBox(width: 12),
+        Expanded(child: Text(name, maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 13.5,
+            color: StudentServiceUI.ink))),
+        const SizedBox(width: 4),
+        if (busy)
+          const SizedBox(width: 40, height: 40,
+            child: Center(child: SizedBox(width: 18, height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2))))
+        else
+          IconButton(
+            tooltip: 'Xem tệp đã nộp',
+            icon: const Icon(Icons.visibility_outlined, size: 21),
+            color: StudentServiceUI.green,
+            onPressed: available
+              ? () => _openSubmittedPaper(paperId, name)
+              : null,
+          ),
+        IconButton(
+          tooltip: 'Chia sẻ tệp đã nộp',
+          icon: const Icon(Icons.ios_share_outlined, size: 19),
+          color: StudentServiceUI.ink,
+          onPressed: available
+            ? () => _openSubmittedPaper(paperId, name, share: true)
+            : null,
+        ),
+      ]),
+    );
+  }
+
+  // V24: fields in Bước 1 come from bienCanNhaps; never fabricate a schema.
+  Future<void> _loadFormConfiguration() async {
+    final api = _formApi;
+    final procedure = _selectedProcedure;
+    if (!_live || api == null || procedure == null) return;
+    final serial = ++_formRequestSerial;
+    setState(() {
+      _formConfigLoading = true;
+      _formConfigError = null;
+    });
+    try {
+      final config = await api.load(procedure.id);
+      Map<String, String> saved = <String, String>{};
+      try { saved = await api.savedValues(); } catch (_) {
+        // Previously saved values are optional; the form schema is not.
+      }
+      Map<String, String> student = <String, String>{};
+      if (Globals().token.trim().isNotEmpty) {
+        try {
+          final data = await const OneDoorStudentPrefillService().load();
+          student = Map<String, String>.from(data.values);
+        } catch (_) { /* Manual input remains possible. */ }
+      }
+      if (!mounted || serial != _formRequestSerial ||
+          _selectedProcedure?.id != procedure.id ||
+          _page != _DoorPage.form) return;
+      for (final input in _extraInputs.values) { input.dispose(); }
+      _extraInputs.clear();
+      const predefined = <String>{'yeucau', 'soluongban',
+        'idhinhthucnhanketqua', 'idthutuc'};
+      for (final field in config.fields) {
+        if (predefined.contains(field.key.toLowerCase())) continue;
+        final value = field.previousValue.trim().isNotEmpty
+          ? field.previousValue
+          : (saved[field.key] ?? student[field.key] ?? '');
+        _extraInputs[field.key] = TextEditingController(text: value);
+      }
+      setState(() {
+        _formConfig = config;
+        _savedFormValues = saved;
+        _studentFormValues = student;
+        _formConfigLoading = false;
+      });
+      if (config.tuitionBlocked) {
+        _message('Bạn chưa đáp ứng điều kiện học phí của thủ tục.',
+          tone: VcoreNoticeTone.warning);
+      }
+    } catch (_) {
+      if (!mounted || serial != _formRequestSerial ||
+          _page != _DoorPage.form) return;
+      setState(() {
+        _formConfigLoading = false;
+        _formConfigError = 'Chưa thể chuẩn bị các thông tin cần điền. '
+            'Vui lòng thử lại.';
+      });
+    }
+  }
+
+  // The app adds "Khác" to the visible dropdown when the catalog has no
+  // equivalent option. This is UI state only, NOT an API reason ID.
+  String get _selectedReasonLabel {
+    if (_localOtherSelected) return 'Khác';
+    final selectedId = _selectedReasonId;
+    if (selectedId == null) return '';
+    for (final reason in _formConfig.reasons) {
+      if (reason.id == selectedId) return reason.label.trim();
+    }
+    return '';
+  }
+
+  bool get _hasReasonChoices => _live && _formConfig.reasons.isNotEmpty;
+
+  // Covers "Khác", "Khác (ghi rõ)", "Lý do khác", "Mục đích khác" and
+  // equivalents without accents, without falsely matching "Khác nhau".
+  static bool _isOtherReason(String label) => RegExp(
+    r'^(?:(?:lý do|li do|mục đích|muc dich)\s+)?(?:khác|khac)(?:$|\s*[:(.,/-]|\s+ghi\s+rõ(?:$|\s))',
+    caseSensitive: false,
+  ).hasMatch(label.trim());
+
+  // Avoid duplicate "Khác" if the procedure already provides one.
+  bool get _appendLocalOtherChoice => _hasReasonChoices &&
+      !_formConfig.reasons.any((reason) => _isOtherReason(reason.label));
+
+  bool get _otherReasonSelected => _hasReasonChoices &&
+      (_localOtherSelected || (_selectedReasonId != null &&
+          _isOtherReason(_selectedReasonLabel)));
+
+  // With no preset choices, the student writes the request directly.
+  // With preset choices, only "Khác" exposes an editable request field.
+  bool get _requestNeedsText => !_hasReasonChoices || _otherReasonSelected;
+
+  // A single authoritative text is used in the Word draft, Step 3 summary,
+  // GiaTriBieuMau.YeuCau, AND the fixed ho-so.YeuCau multipart field.
+  // Hidden text from an earlier "Khác" choice must never be submitted after
+  // switching to a fixed reason, nor when no reason has yet been selected.
+  String get _effectiveRequest => _requestNeedsText
+      ? _request.text.trim()
+      : (_selectedReasonId == null ? '' : _selectedReasonLabel);
+
+  String get _wordYeuCau => _effectiveRequest;
+
+  String get _requestSourceForDebug =>
+      _requestNeedsText ? 'noi_dung_de_nghi' : 'lyDos.tenLyDo';
+
+  bool _validateRequestDetails() {
+    if (_hasReasonChoices && _selectedReasonId == null &&
+        !_localOtherSelected) {
+      _message('Vui lòng chọn lý do hoặc mục đích.',
+        tone: VcoreNoticeTone.warning);
+      return false;
+    }
+    final content = _effectiveRequest;
+    if (content.isEmpty) {
+      _message(_otherReasonSelected
+          ? 'Bạn đã chọn Khác. Vui lòng ghi rõ nội dung yêu cầu.'
+          : 'Vui lòng nhập nội dung yêu cầu.',
+        tone: VcoreNoticeTone.warning);
+      return false;
+    }
+    if (content.length > 500) {
+      _message('Nội dung yêu cầu tối đa 500 ký tự.',
+        tone: VcoreNoticeTone.warning);
+      return false;
+    }
+    return true;
+  }
+
+  Map<String, String> _formVariables() {
+    final now = DateTime.now();
+    final values = <String, String>{
+      ..._studentFormValues,
+      ..._savedFormValues,
+      'TenThuTuc': _selectedProcedure?.name ?? '',
+      'TenDonVi': _selectedProcedure?.unitName ?? '',
+      'Ngay': '${now.day}', 'Thang': '${now.month}', 'Nam': '${now.year}',
+      'NgayNop': DateFormat('dd/MM/yyyy').format(now),
+    };
+    for (final entry in _extraInputs.entries) {
+      values[entry.key] = entry.value.text.trim();
+    }
+    // Never let old saved values override these fresh form values.
+    // The same effective content is sent to Word, GiaTriBieuMau.YeuCau,
+    // and the official ho-so.YeuCau field when the student submits.
+    values['YeuCau'] = _wordYeuCau;
+    values['SoLuongBan'] = '$_quantity';
+    if (_selectedReasonId != null && _selectedReasonLabel.isNotEmpty) {
+      values['IdLyDo'] = '$_selectedReasonId';
+    } else {
+      values.remove('IdLyDo');
+    }
+    return values;
+  }
+
+  String _formFingerprint() {
+    final values = _formVariables();
+    final keys = values.keys.toList()..sort();
+    return jsonEncode(<String, String>{for (final k in keys) k: values[k]!});
+  }
+
+  bool _validateDynamicFields() {
+    if (_formConfigLoading || (_live && _formConfigError != null)) {
+      _message('Thông tin hồ sơ chưa sẵn sàng. Vui lòng thử lại.',
+        tone: VcoreNoticeTone.warning);
+      return false;
+    }
+    if (_formConfig.tuitionBlocked) {
+      _message('Bạn chưa đáp ứng điều kiện nộp hồ sơ cho thủ tục này.',
+        tone: VcoreNoticeTone.warning);
+      return false;
+    }
+    for (final field in _formConfig.fields) {
+      final control = _extraInputs[field.key];
+      if (control != null && field.required && control.text.trim().isEmpty) {
+        _message('Vui lòng nhập ${field.label}.',
+          tone: VcoreNoticeTone.warning);
+        return false;
+      }
+    }
+    return true;
+  }
+
+  Widget _requestEntryWidget() => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      _formLabel('Nội dung yêu cầu *'),
+      if (_otherReasonSelected) ...[
+        const Padding(
+          padding: EdgeInsets.only(bottom: 9),
+          child: Text('Vui lòng ghi rõ lý do hoặc mục đích của bạn.',
+            style: TextStyle(color: StudentServiceUI.secondary, fontSize: 12.5)),
+        ),
+      ],
+      TextField(
+        controller: _request,
+        maxLength: 500,
+        minLines: 4,
+        maxLines: 7,
+        onChanged: (_) => _invalidatePreviewReceipts(),
+        style: const TextStyle(fontSize: 14),
+        decoration: StudentServiceUI.field(
+          _otherReasonSelected
+              ? 'Nhập lý do hoặc mục đích cụ thể'
+              : 'Trình bày nội dung bạn cần giải quyết',
+        ),
+      ),
+    ],
+  );
+
+  Widget _selectedRequestWidget() => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      _formLabel('Nội dung yêu cầu'),
+      Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFEAF5EF),
+          border: Border.all(color: const Color(0xFFC9E5D4)),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.check_circle_outline_rounded,
+              color: StudentServiceUI.green, size: 19),
+            const SizedBox(width: 10),
+            Expanded(child: Text(_selectedReasonLabel,
+              style: const TextStyle(fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: StudentServiceUI.ink, height: 1.45))),
+          ],
+        ),
+      ),
+      const Padding(
+        padding: EdgeInsets.only(top: 8),
+        child: Text('Nội dung này sẽ được ghi vào giấy tờ của bạn.',
+          style: TextStyle(color: StudentServiceUI.secondary, fontSize: 12)),
+      ),
+    ],
+  );
+
+  Widget _dynamicFieldsWidget() {
+    // Mock mode retains the regular free-text request workflow.
+    if (!_live) return _requestEntryWidget();
+    if (_formConfigLoading) return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 18),
+      child: Row(children: [
+        SizedBox(width: 18, height: 18,
+          child: CircularProgressIndicator(strokeWidth: 2)),
+        SizedBox(width: 12),
+        Expanded(child: Text('Đang chuẩn bị thông tin...')),
+      ]));
+    if (_formConfigError != null) return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(_formConfigError!, style: const TextStyle(
+          color: StudentServiceUI.caution, fontSize: 13)),
+        TextButton.icon(onPressed: _loadFormConfiguration,
+          icon: const Icon(Icons.refresh, size: 18),
+          label: const Text('Thử lại')),
+      ]));
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      if (_hasReasonChoices) ...[
+        _formLabel('Lý do / Mục đích *'),
+        // Use string-tagged values so the UI-only "Khác" cannot collide
+        // with any integer ID from the backend.
+        VnuSingleSelect<String>(
+          items: [
+            for (final reason in _formConfig.reasons)
+              VnuSelectItem<String>(
+                value: 'reason:${reason.id}', label: reason.label),
+            if (_appendLocalOtherChoice)
+              const VnuSelectItem<String>(
+                value: 'local:other', label: 'Khác'),
+          ],
+          value: _localOtherSelected ? 'local:other'
+              : (_selectedReasonId == null ? null
+                  : 'reason:$_selectedReasonId'),
+          hintText: 'Chọn lý do hoặc mục đích',
+          sheetTitle: 'Lý do / Mục đích',
+          enabled: !_submitting,
+          requiredField: true,
+          onChanged: (value) {
+            if (value == null) return;
+            final localOther = value == 'local:other';
+            final reasonId = value.startsWith('reason:')
+                ? int.tryParse(value.substring('reason:'.length))
+                : null;
+            if (_localOtherSelected == localOther &&
+                _selectedReasonId == reasonId) return;
+            setState(() {
+              _localOtherSelected = localOther;
+              _selectedReasonId = reasonId;
+            });
+            _invalidatePreviewReceipts();
+          },
+        ),
+      ],
+      if (_requestNeedsText)
+        _requestEntryWidget()
+      else if (_selectedReasonId != null)
+        _selectedRequestWidget(),
+      if (_extraInputs.isNotEmpty) ...[
+        const SizedBox(height: 16),
+        const Text('THÔNG TIN BỔ SUNG', style: TextStyle(
+          color: StudentServiceUI.green,
+          fontSize: 12, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 5),
+        const Text('Vui lòng kiểm tra và điền đầy đủ các mục có dấu *.',
+          style: TextStyle(color: StudentServiceUI.secondary, fontSize: 12)),
+      ],
+      for (final field in _formConfig.fields)
+        if (_extraInputs.containsKey(field.key)) ...[
+          _formLabel('${field.label}${field.required ? ' *' : ''}'),
+          TextField(
+            controller: _extraInputs[field.key],
+            onChanged: (_) => _invalidatePreviewReceipts(),
+            minLines: field.type.contains('textarea') ? 3 : 1,
+            maxLines: field.type.contains('textarea') ? 6 : 1,
+            keyboardType: field.type.contains('number') ||
+                field.type.contains('int') ? TextInputType.number
+                : field.type.contains('date') ? TextInputType.datetime
+                : TextInputType.text,
+            decoration: StudentServiceUI.field(
+              field.hint.isNotEmpty ? field.hint : 'Nhập ${field.label}'),
+          ),
+        ],
+    ]);
+  }
+
+  Future<void> _syncAutoDocuments() async {
+    final api = _formApi;
+    final procedure = _selectedProcedure;
+    if (!_live || api == null || procedure == null ||
+        _currentStep != _DoorFormStep.attachments) return;
+    final serial = ++_generatedRequestSerial;
+    final fingerprint = _formFingerprint();
+    final variables = _formVariables();
+    for (final paper in procedure.papers) {
+      if (serial != _generatedRequestSerial || !mounted ||
+          _page != _DoorPage.form ||
+          _currentStep != _DoorFormStep.attachments) return;
+      if (!_formConfig.autoPaperIds.contains(paper.id)) continue;
+      // A student-chosen replacement is authoritative: do not overwrite it.
+      if (_files.containsKey(paper.id) &&
+          !_autoAttachedIds.contains(paper.id)) continue;
+      if (_filePaths.containsKey(paper.id) &&
+          _generatedFingerprints[paper.id] == fingerprint) continue;
+      setState(() {
+        _paperBusy.add(paper.id);
+        _failedAutoPapers.remove(paper.id);
+        _reviewedIds.remove(paper.id);
+        _reviewedDigests.remove(paper.id);
+      });
+      try {
+        OneDoorApiDebug.instance.note('Tự điền giấy tờ ở Bước 2',
+          <String, dynamic>{
+            'idGiayTo': paper.id,
+            'YeuCau': variables['YeuCau'] ?? '',
+            'YeuCauSource': _requestSourceForDebug,
+            'SelectedReasonId': _selectedReasonId,
+            'LocalOtherSelected': _localOtherSelected,
+            'keys': variables.keys.toList()..sort(),
+            'api': 'POST /api/v1/files/giay-to-mau/{idGiayTo}/da-dien',
+          });
+        final result = await api.generate(paper.id, variables);
+        final directory = await getTemporaryDirectory();
+        final safeId = paper.id.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+        // Keep a readable filename for the student, not an internal API tag.
+        final paperLabel = paper.name
+          .replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_')
+          .replaceAll(RegExp(r'_+'), '_');
+        final shortLabel = paperLabel.length > 38
+          ? paperLabel.substring(0, 38) : paperLabel;
+        final path = '${directory.path}${Platform.pathSeparator}'
+          'Ban_da_dien_${shortLabel.isEmpty ? 'giay_to' : shortLabel}_'
+          '${DateTime.now().microsecondsSinceEpoch}.${result.extension}';
+        final file = File(path);
+        await file.writeAsBytes(result.bytes, flush: true);
+        if (!mounted || serial != _generatedRequestSerial ||
+            _page != _DoorPage.form ||
+            _currentStep != _DoorFormStep.attachments) {
+          await file.delete().catchError((Object _) => file);
+          return;
+        }
+        final previous = _filePaths[paper.id];
+        setState(() {
+          _filePaths[paper.id] = path;
+          _files[paper.id] = path.split(Platform.pathSeparator).last;
+          _autoAttachedIds.add(paper.id);
+          _generatedFingerprints[paper.id] = fingerprint;
+          _failedAutoPapers.remove(paper.id);
+          // Every regenerated document must be previewed again.
+          _reviewedIds.remove(paper.id);
+          _reviewedDigests.remove(paper.id);
+          if (result.extension == 'pdf') {
+            _generatedPdfPaths.add(path);
+          } else {
+            _generatedWordPaths.add(path);
+          }
+        });
+        if (previous != null && previous != path) {
+          _forgetGeneratedPdf(previous);
+          _forgetGeneratedWord(previous);
+          _forgetManagedPhoto(previous);
+        }
+      } catch (error) {
+        if (!mounted || serial != _generatedRequestSerial) return;
+        OneDoorApiDebug.instance.note('V28 Không xác minh được Word đã điền',
+          <String, dynamic>{'paperId': paper.id,
+            'errorType': error.runtimeType.toString()});
+        final previous = _filePaths[paper.id];
+        setState(() {
+          _filePaths.remove(paper.id);
+          _files.remove(paper.id);
+          _autoAttachedIds.remove(paper.id);
+          _generatedFingerprints.remove(paper.id);
+          _reviewedIds.remove(paper.id);
+          _reviewedDigests.remove(paper.id);
+          _failedAutoPapers[paper.id] =
+            'Không xác minh được nội dung bản Word đã điền. '
+            'Vui lòng thử tạo lại hoặc đính kèm bản hoàn chỉnh.';
+        });
+        _forgetGeneratedPdf(previous);
+        _forgetGeneratedWord(previous);
+      } finally {
+        if (mounted) setState(() => _paperBusy.remove(paper.id));
+      }
+    }
+  }
+
+  /// V26: A verified *version* is acknowledged only ONCE. Reopening the same
+  /// file never triggers another confirmation. Native Office is preferred for
+  /// DOC/DOCX because the mobile HTML renderer can reflow official templates.
+  Future<void> _previewAndConfirm(OneDoorPaper paper,
+      {bool supplement = false}) async {
+    final path = (supplement ? _supplementPaths : _filePaths)[paper.id];
+    if (path == null || path.isEmpty || !mounted) return;
+    if (supplement) {
+      await _reviewSupplementPaper(paper);
+      return;
+    }
+    final formVersion = _autoAttachedIds.contains(paper.id)
+        ? _formFingerprint() : null;
+    try {
+      final before = await _digestFile(path);
+      if (!mounted || _filePaths[paper.id] != path) return;
+      final opened = await OneDoorAttachmentPreview.openForReview(context,
+        path: path, title: paper.name);
+      if (!mounted || !opened || _filePaths[paper.id] != path) return;
+      final after = await _digestFile(path);
+      if (!mounted || before != after || _filePaths[paper.id] != path ||
+          (formVersion != null && formVersion != _formFingerprint())) {
+        _message('Nội dung tài liệu đã thay đổi. Vui lòng mở lại bản mới.',
+          tone: VcoreNoticeTone.warning);
+        return;
+      }
+      if (_reviewedIds.contains(paper.id) &&
+          _reviewedDigests[paper.id] == after) {
+        // Already acknowledged this exact file version; no second popup.
+        return;
+      }
+      final confirmed = await showVcoreActionDialog<bool>(
+        context: context,
+        title: 'Xác nhận đã kiểm tra',
+        content: 'Bạn đã xem và đối chiếu nội dung "${paper.name}" '
+          'với thông tin đăng ký? Chỉ xác nhận nếu tài liệu đã hiển thị đúng.',
+        leadingIcon: Icons.fact_check_outlined,
+        actions: const <VcoreDialogAction<bool>>[
+          VcoreDialogAction<bool>(label: 'Xem lại', value: false,
+            tone: VcoreDialogActionTone.secondary),
+          VcoreDialogAction<bool>(label: 'Đã kiểm tra', value: true,
+            tone: VcoreDialogActionTone.primary),
+        ],
+      );
+      if (confirmed != true || !mounted || _filePaths[paper.id] != path) return;
+      if (await _digestFile(path) != after) {
+        _message('Tệp đã thay đổi. Bạn cần kiểm tra bản mới.',
+          tone: VcoreNoticeTone.warning);
+        return;
+      }
+      setState(() {
+        _reviewedIds.add(paper.id);
+        _reviewedDigests[paper.id] = after;
+      });
+    } catch (_) {
+      if (mounted) _message('Không mở được bản xem trước. '
+        'Hãy thử mở bằng ứng dụng Office hoặc gắn tệp khác.',
+        tone: VcoreNoticeTone.warning);
+    }
+  }
+
+  bool _canContinueAttachments() {
+    final procedure = _selectedProcedure;
+    if (procedure == null || _paperBusy.isNotEmpty) return false;
+    if (procedure.papers.any((paper) =>
+        paper.isRequired && !_files.containsKey(paper.id))) return false;
+    for (final id in _files.keys) {
+      if (!_reviewedIds.contains(id)) return false;
+      if (_live && (_filePaths[id] ?? '').isEmpty) return false;
+      if (_autoAttachedIds.contains(id) &&
+          _generatedFingerprints[id] != _formFingerprint()) return false;
+    }
+    return true;
+  }
+
   void _startForm() {
-    _attachmentReadTimer?.cancel();
-    _attachmentSecondsRemaining = _attachmentReadDurationSeconds;
+    ++_formRequestSerial;
+    ++_generatedRequestSerial;
+    for (final input in _extraInputs.values) { input.dispose(); }
+    _extraInputs.clear();
+    _formConfig = const OneDoorFormConfiguration();
+    _formConfigError = null;
+    _formConfigLoading = _live;
+    _savedFormValues = <String, String>{};
+    _studentFormValues = <String, String>{};
+    _selectedReasonId = null;
+    _localOtherSelected = false;
+    _autoAttachedIds.clear();
+    _reviewedIds.clear();
+    _reviewedDigests.clear();
+    _generatedFingerprints.clear();
+    _failedAutoPapers.clear();
     if (!_submitting) _clearGeneratedPdfs();
     if (_procedureLoading || !_procedureReady) {
       _message('Vui lòng tải chi tiết thủ tục trước khi nộp.',
@@ -438,6 +1245,7 @@ class _VcoreOneDoorViewState extends State<VcoreOneDoorView> {
       _quantity = 1;
       _confirmedLargeQuantity = null;
     });
+    if (_live) _loadFormConfiguration();
   }
 
   Future<bool> _confirmLargeQuantity(int count) async {
@@ -466,37 +1274,38 @@ class _VcoreOneDoorViewState extends State<VcoreOneDoorView> {
     } else if (next <= 10) {
       _confirmedLargeQuantity = null;
     }
-    if (mounted) setState(() => _quantity = next);
+    if (mounted) {
+      setState(() => _quantity = next);
+      _invalidatePreviewReceipts();
+    }
   }
 
   Future<void> _editQuantity() async {
     final input = TextEditingController(text: '$_quantity');
     try {
-      final int? selected = await showDialog<int>(
+      final approved = await showVcoreActionDialog<bool>(
         context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('Nhập số lượng bản'),
-          content: TextField(
-            controller: input,
-            autofocus: true,
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            decoration: const InputDecoration(labelText: 'Số bản',
-              helperText: 'Tối thiểu 1 bản'),
-            onSubmitted: (_) => Navigator.of(dialogContext).pop(
-              int.tryParse(input.text)),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Quay lại')),
-            FilledButton(onPressed: () => Navigator.of(dialogContext).pop(
-              int.tryParse(input.text)), child: const Text('Áp dụng')),
-          ],
+        title: 'Số lượng bản',
+        content: 'Nhập số bản kết quả bạn cần nhận (tối thiểu 1).',
+        leadingIcon: Icons.copy_all_outlined,
+        extraContent: TextField(
+          controller: input,
+          autofocus: true,
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          decoration: StudentServiceUI.field('Nhập số bản'),
         ),
+        actions: const <VcoreDialogAction<bool>>[
+          VcoreDialogAction<bool>(label: 'Quay lại', value: false,
+            tone: VcoreDialogActionTone.secondary),
+          VcoreDialogAction<bool>(label: 'Áp dụng', value: true,
+            tone: VcoreDialogActionTone.primary),
+        ],
       );
-      if (selected == null) return;
-      if (selected < 1) {
-        _message('Số lượng bản phải lớn hơn hoặc bằng 1.',
+      if (approved != true || !mounted) return;
+      final selected = int.tryParse(input.text.trim());
+      if (selected == null || selected < 1) {
+        _message('Số lượng bản phải là số nguyên lớn hơn 0.',
           tone: VcoreNoticeTone.warning);
         return;
       }
@@ -534,7 +1343,7 @@ class _VcoreOneDoorViewState extends State<VcoreOneDoorView> {
         } catch (_) {
           prefill = const OneDoorStudentPrefill(
             values: <String, String>{}, usedLiveProfile: false,
-            warnings: <String>['OneVNU student API unavailable.'],
+            warnings: <String>['Chưa có đủ thông tin cá nhân; vui lòng kiểm tra và bổ sung.'],
           );
         }
       }
@@ -546,7 +1355,7 @@ class _VcoreOneDoorViewState extends State<VcoreOneDoorView> {
         // confuse that field with the One Door idDangKy returned after POST.
         'MaHoSo': prefill.values['MaHoSo'] ?? '',
         'TenThuTuc': procedure.name,
-        'YeuCau': _request.text.trim(),
+        'YeuCau': _wordYeuCau,
         'SoLuongBan': '$_quantity',
         // This is the planned submission date on the current device, not
         // the backend's eventual receivedAt value.
@@ -568,7 +1377,7 @@ class _VcoreOneDoorViewState extends State<VcoreOneDoorView> {
         }
       }
       merged['TenThuTuc'] = procedure.name;
-      merged['YeuCau'] = _request.text.trim();
+      merged['YeuCau'] = _wordYeuCau;
       merged['SoLuongBan'] = '$_quantity';
       final missingFields = OneDoorLetterDraft.requiredFields
         .where((key) => (merged[key] ?? '').trim().isEmpty).toList();
@@ -584,11 +1393,11 @@ class _VcoreOneDoorViewState extends State<VcoreOneDoorView> {
           documentName: paper.name, initialDraft: draft,
           initialPrefillStatus: saved != null
             ? '$summary Đang giữ bản bạn đã soạn; chọn Dữ liệu → '
-              'Đồng bộ tờ đơn nếu muốn tạo lại từ API.'
-            : prefill.usedLiveProfile ? '$summary Dữ liệu từ Thông tin cá nhân OneVNU.'
+              'Cập nhật tờ đơn nếu muốn tạo lại với thông tin mới.'
+            : prefill.usedLiveProfile ? '$summary Vui lòng kiểm tra thông tin của bạn.'
               : (prefill.values['MaSV'] ?? '').trim().isNotEmpty
-                ? '$summary Dữ liệu lưu trong phiên Thông tin cá nhân; có thể tải lại.'
-                : '$summary Không có hồ sơ sinh viên; hãy kiểm tra dữ liệu.',
+                ? '$summary Bạn có thể kiểm tra và cập nhật thông tin.'
+                : '$summary Một số thông tin còn thiếu; vui lòng bổ sung.',
           onReloadFromOneVnu: Globals().token.trim().isNotEmpty
             ? () => const OneDoorStudentPrefillService().load() : null,
         )),
@@ -597,6 +1406,8 @@ class _VcoreOneDoorViewState extends State<VcoreOneDoorView> {
       setState(() {
         final previous = _filePaths[paper.id];
         _letterDrafts[paper.id] = result.draft;
+        _reviewedIds.remove(paper.id);
+        _reviewedDigests.remove(paper.id);
         _files[paper.id] = result.path.split(Platform.pathSeparator).last;
         _filePaths[paper.id] = result.path;
         _generatedPdfPaths.add(result.path);
@@ -617,14 +1428,38 @@ class _VcoreOneDoorViewState extends State<VcoreOneDoorView> {
     setState(() { _paperBusy.add(paper.id); });
     try {
       final repo = _repo as OneDoorLiveRepository;
-      final response = prefilled
-          ? await repo.downloadPrefilledPaper(paper.id)
-          : await repo.downloadPaperTemplate(paper.id);
+      // A GET /da-dien does not include the student's current form values.
+      // For a filled preview, POST the exact draft values used in Step 1.
+      final List<int> documentBytes;
+      final String documentExtension;
+      if (prefilled) {
+        final formApi = _formApi;
+        if (formApi == null) throw StateError(
+          'Chưa thể tạo tài liệu lúc này. Vui lòng thử lại.');
+        final values = _formVariables();
+        OneDoorApiDebug.instance.note('Kiểm tra dữ liệu điền Word',
+          <String, dynamic>{
+            'idGiayTo': paper.id,
+            'YeuCau': values['YeuCau'] ?? '',
+            'YeuCauSource': _requestSourceForDebug,
+            'SelectedReasonId': _selectedReasonId,
+            'LocalOtherSelected': _localOtherSelected,
+            'keys': values.keys.toList()..sort(),
+            'api': 'POST /api/v1/files/giay-to-mau/{idGiayTo}/da-dien',
+          });
+        final generated = await formApi.generate(paper.id, values);
+        documentBytes = generated.bytes;
+        documentExtension = generated.extension;
+      } else {
+        final original = await repo.downloadPaperTemplate(paper.id);
+        documentBytes = original.bytes;
+        documentExtension = original.extension;
+      }
       final directory = await getTemporaryDirectory();
       final safeId = paper.id.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
       final file = File('${directory.path}${Platform.pathSeparator}'
-          'onevnu_${prefilled ? 'da_dien' : 'mau'}_${safeId}_${DateTime.now().microsecondsSinceEpoch}.${response.extension}');
-      await file.writeAsBytes(response.bytes, flush: true);
+          'Ban_${prefilled ? 'da_dien' : 'mau'}_${safeId}_${DateTime.now().microsecondsSinceEpoch}.${documentExtension}');
+      await file.writeAsBytes(documentBytes, flush: true);
       if (!mounted) return;
       if (saveCopy) {
         // Must not delete the temp copy immediately: the native share target
@@ -634,9 +1469,9 @@ class _VcoreOneDoorViewState extends State<VcoreOneDoorView> {
       } else {
         // Reliable read-only preview first; full Word edits belong in Office.
         await OneDoorAttachmentPreview.open(context, path: file.path,
-          title: '${prefilled ? 'Bản API đã điền' : 'Mẫu'}: ${paper.name}',
+          title: '${prefilled ? 'Bản đã điền' : 'Mẫu'}: ${paper.name}',
           allowDocxEditing: false);
-        if (!<String>{'doc', 'xls'}.contains(response.extension)) {
+        if (!<String>{'doc', 'xls'}.contains(documentExtension)) {
           try { await file.delete(); } catch (_) {}
         }
       }
@@ -666,6 +1501,155 @@ class _VcoreOneDoorViewState extends State<VcoreOneDoorView> {
       _rememberEditedWord(paper, edited, supplement: supplement);
       _message('Đã thay bản Word đã chỉnh sửa trong giấy tờ đính kèm.',
         tone: VcoreNoticeTone.success);
+    }
+  }
+
+  /// V26 attachment source sheet, styled like the other ONEVNU sheets.
+  Future<void> _chooseAttachmentSource(String paperId,
+      {bool supplement = false}) async {
+    if (!mounted || _submitting) return;
+    final choice = await showModalBottomSheet<_DoorAttachmentSource>(
+      context: context,
+      backgroundColor: Colors.white,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+      builder: (sheetContext) => Padding(
+        padding: const EdgeInsets.fromLTRB(18, 14, 18, 24),
+        child: Column(mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Center(child: Container(width: 38, height: 4,
+            decoration: BoxDecoration(color: StudentServiceUI.line,
+              borderRadius: BorderRadius.circular(3)))),
+          const SizedBox(height: 18),
+          const Text('Đính kèm giấy tờ', style: TextStyle(
+            fontSize: 18, fontWeight: FontWeight.w700,
+            color: StudentServiceUI.ink)),
+          const SizedBox(height: 5),
+          const Text('Chụp ảnh, chọn ảnh có sẵn hoặc chọn tệp hoàn chỉnh.',
+            style: TextStyle(fontSize: 13,
+              color: StudentServiceUI.secondary)),
+          const SizedBox(height: 14),
+          for (final entry in <(_DoorAttachmentSource, IconData, String)>[
+            (_DoorAttachmentSource.camera, Icons.camera_alt_outlined,
+              'Chụp ảnh giấy tờ'),
+            (_DoorAttachmentSource.gallery, Icons.photo_library_outlined,
+              'Chọn ảnh từ thư viện'),
+            (_DoorAttachmentSource.files, Icons.folder_open_rounded,
+              'Chọn PDF / Word / Excel / ảnh'),
+          ])
+            Padding(padding: const EdgeInsets.only(bottom: 7),
+              child: Material(color: const Color(0xFFF3F8F5),
+                borderRadius: BorderRadius.circular(12),
+                child: InkWell(borderRadius: BorderRadius.circular(12),
+                  onTap: () => Navigator.pop(sheetContext, entry.$1),
+                  child: Padding(padding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 14),
+                    child: Row(children: [
+                      Icon(entry.$2, color: StudentServiceUI.green, size: 23),
+                      const SizedBox(width: 13),
+                      Expanded(child: Text(entry.$3,
+                        style: const TextStyle(fontSize: 14,
+                          color: StudentServiceUI.ink,
+                          fontWeight: FontWeight.w600))),
+                      const Icon(Icons.chevron_right_rounded,
+                        color: StudentServiceUI.secondary),
+                    ])),
+                ),
+              ),
+            ),
+        ]),
+      ),
+    );
+    if (!mounted) return;
+    switch (choice) {
+      case _DoorAttachmentSource.camera:
+        await _pickPhoto(paperId, ImageSource.camera, supplement: supplement);
+        break;
+      case _DoorAttachmentSource.gallery:
+        await _pickPhoto(paperId, ImageSource.gallery, supplement: supplement);
+        break;
+      case _DoorAttachmentSource.files:
+        await _pickFile(paperId, supplement: supplement);
+        break;
+      case null:
+        break;
+    }
+  }
+
+  Future<void> _pickPhoto(String paperId, ImageSource source,
+      {bool supplement = false}) async {
+    if (_submitting || _paperBusy.contains(paperId)) return;
+    try {
+      final photo = await ImagePicker().pickImage(
+        source: source,
+        imageQuality: 92,
+        requestFullMetadata: false,
+      );
+      if (!mounted || photo == null) return;
+      final file = File(photo.path);
+      if (!await file.exists()) throw StateError('Không tìm thấy ảnh.');
+      final size = await file.length();
+      if (size < 1 || size > 10 * 1024 * 1024) {
+        _message('Ảnh trống hoặc vượt quá 10 MB. Chọn ảnh nhỏ hơn.',
+          tone: VcoreNoticeTone.warning);
+        return;
+      }
+      // Detect actual content, do not falsely label a HEIC photo as JPEG.
+      final reader = await file.open();
+      late final List<int> signature;
+      try {
+        signature = await reader.read(12);
+      } finally {
+        await reader.close();
+      }
+      final jpeg = signature.length >= 3 && signature[0] == 0xff &&
+          signature[1] == 0xd8 && signature[2] == 0xff;
+      final png = signature.length >= 8 && signature[0] == 0x89 &&
+          signature[1] == 0x50 && signature[2] == 0x4e &&
+          signature[3] == 0x47;
+      if (!jpeg && !png) {
+        _message('Định dạng ảnh chưa hỗ trợ. Hãy chọn JPG/PNG hoặc tệp PDF.',
+          tone: VcoreNoticeTone.warning);
+        return;
+      }
+      final directory = await getTemporaryDirectory();
+      final safeId = paperId.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+      final name = 'onevnu_anh_${safeId}_'
+          '${DateTime.now().microsecondsSinceEpoch}.${jpeg ? 'jpg' : 'png'}';
+      final staged = File('${directory.path}${Platform.pathSeparator}$name');
+      await file.copy(staged.path);
+      if (!mounted) {
+        await staged.delete().catchError((Object _) => staged);
+        return;
+      }
+      final oldPath = (supplement ? _supplementPaths : _filePaths)[paperId];
+      setState(() {
+        if (!supplement) {
+          _reviewedIds.remove(paperId);
+          _reviewedDigests.remove(paperId);
+          _autoAttachedIds.remove(paperId);
+          _generatedFingerprints.remove(paperId);
+          _failedAutoPapers.remove(paperId);
+          _letterDrafts.remove(paperId);
+          _editedWordWizardContext.remove(paperId);
+        }
+        _managedPhotoPaths.add(staged.path);
+        if (supplement) {
+          _supplementReviewedDigests.remove(paperId);
+          _supplementGeneratedFingerprints.remove(paperId);
+        }
+        (supplement ? _supplementFiles : _files)[paperId] = name;
+        (supplement ? _supplementPaths : _filePaths)[paperId] = staged.path;
+      });
+      if (oldPath != staged.path) {
+        _forgetGeneratedPdf(oldPath);
+        _forgetGeneratedWord(oldPath);
+        _forgetManagedPhoto(oldPath);
+      }
+    } catch (_) {
+      if (mounted) _message('Không thể gắn ảnh. Kiểm tra quyền Camera/Ảnh '
+        'trong cài đặt thiết bị rồi thử lại.', tone: VcoreNoticeTone.warning);
     }
   }
 
@@ -716,11 +1700,21 @@ class _VcoreOneDoorViewState extends State<VcoreOneDoorView> {
         return;
       }
       if (!supplement) {
+        _reviewedIds.remove(paperId);
+        _reviewedDigests.remove(paperId);
+        _autoAttachedIds.remove(paperId);
+        _generatedFingerprints.remove(paperId);
+        _failedAutoPapers.remove(paperId);
         _forgetGeneratedPdf(_filePaths[paperId]);
         _forgetGeneratedWord(_filePaths[paperId]);
+        _forgetManagedPhoto(_filePaths[paperId]);
         _editedWordWizardContext.remove(paperId);
       }
       setState(() {
+        if (supplement) {
+          _supplementReviewedDigests.remove(paperId);
+          _supplementGeneratedFingerprints.remove(paperId);
+        }
         (supplement ? _supplementFiles : _files)[paperId] = file.name;
         if (path != null && path.isNotEmpty) {
           (supplement ? _supplementPaths : _filePaths)[paperId]=path;
@@ -735,110 +1729,48 @@ class _VcoreOneDoorViewState extends State<VcoreOneDoorView> {
     }
   }
 
-  /// Step 2 is a deliberate hand-off: user must review each actual local file
-  /// and explicitly confirm the attachment set before seeing final review.
+  /// No artificial timer or second confirmation sheet. Preview/acknowledgement
+  /// happens on each file row and is invalidated whenever the file changes.
   Future<void> _confirmAttachmentStep() async {
-    if (_submitting || _paperBusy.isNotEmpty ||
-        _currentStep != _DoorFormStep.attachments) return;
-    if (_attachmentSecondsRemaining > 0) {
-      _message('Vui lòng đọc lưu ý tại bước 2 trong '
-        '${_attachmentSecondsRemaining} giây trước khi tiếp tục.',
-        tone: VcoreNoticeTone.warning);
+    if (_submitting || _currentStep != _DoorFormStep.attachments) return;
+    if (!_canContinueAttachments()) {
+      _message('Hãy đính kèm đủ giấy tờ và xem trước, xác nhận từng tệp '
+        'trước khi tiếp tục.', tone: VcoreNoticeTone.warning);
       return;
     }
-    final procedure = _selectedProcedure;
-    if (procedure == null) return;
-    final missing = procedure.papers.where(
-      (paper) => paper.isRequired && !_files.containsKey(paper.id));
-    if (missing.isNotEmpty) {
-      _message('Vui lòng đính kèm đủ giấy tờ bắt buộc.',
-        tone: VcoreNoticeTone.warning);
-      return;
-    }
-    final staleWord = _editedWordWizardContext.entries.any((entry) =>
-      _filePaths.containsKey(entry.key) &&
-      entry.value != '${_quantity}::${_request.text.trim()}');
-    final staleLetter = _letterDrafts.entries.any((entry) =>
-      _filePaths.containsKey(entry.key) &&
-      (entry.value.values['SoLuongBan'] != '$_quantity' ||
-       entry.value.values['YeuCau'] != _request.text.trim() ||
-       entry.value.values['NgayNop'] !=
-         DateFormat('dd/MM/yyyy').format(DateTime.now())));
-    if (staleWord || staleLetter) {
-      _message('Bạn đã thay đổi yêu cầu, số lượng bản hoặc ngày làm đơn. '
-        'Hãy mở lại tài liệu và lưu bản mới trước khi tiếp tục.',
-        tone: VcoreNoticeTone.warning);
-      return;
-    }
-    final List<OneDoorReviewFile> reviewFiles = <OneDoorReviewFile>[];
-    for (final paper in procedure.papers) {
-      if (!_files.containsKey(paper.id)) continue;
+    for (final paper in _selectedProcedure!.papers) {
       final path = _filePaths[paper.id];
-      if (path == null || path.isEmpty) {
-        _message('Tệp ${paper.name} chưa có đường dẫn hợp lệ. '
-          'Vui lòng chọn lại tệp.', tone: VcoreNoticeTone.warning);
-        return;
-      }
+      if (!_files.containsKey(paper.id)) continue;
+      if (_live && (path == null || path.isEmpty)) return;
+      if (path == null) continue; // Mock entries use their display name.
       try {
         final file = File(path);
-        if (!await file.exists()) throw StateError('missing');
         final bytes = await file.length();
         if (bytes < 1 || bytes > 10 * 1024 * 1024) {
-          throw StateError('invalid size');
+          throw StateError('size');
         }
-        reviewFiles.add(OneDoorReviewFile(
-          id: paper.id, paperName: paper.name,
-          fileName: _files[paper.id]!, path: path,
-          bytes: bytes, isRequired: paper.isRequired));
       } catch (_) {
-        if (mounted) _message('Không đọc được tệp ${paper.name} hoặc '
-          'tệp rỗng/quá 10 MB. Hãy chọn lại tệp từ thiết bị.',
+        _message('Không đọc được tệp ${paper.name}. Hãy chọn lại.',
           tone: VcoreNoticeTone.warning);
         return;
       }
     }
-    if (!mounted) return;
-    final snapshotFiles = Map<String, String>.of(_files);
-    final snapshotPaths = Map<String, String>.of(_filePaths);
-    final confirmed = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => FractionallySizedBox(
-        heightFactor: 0.89,
-        child: OneDoorAttachmentReviewSheet(
-          files: reviewFiles,
-          onPreview: (entry) async {
-            await OneDoorAttachmentPreview.open(context,
-              path: entry.path, title: entry.paperName,
-              allowDocxEditing: false);
-          },
-          onOpenOffice: (entry) =>
-            OneDoorAttachmentPreview.openInOffice(context, entry.path),
-          onShare: (entry) => OneDoorAttachmentPreview.shareFile(context,
-            path: entry.path, title: entry.paperName),
-        ),
-      ),
-    );
-    if (!mounted || confirmed != true || _submitting) return;
-    if (_currentStep != _DoorFormStep.attachments ||
-        !mapEquals(snapshotFiles, _files) ||
-        !mapEquals(snapshotPaths, _filePaths)) {
-      _message('Danh sách tài liệu đã thay đổi. Hãy kiểm tra lại.',
-        tone: VcoreNoticeTone.warning);
-      return;
-    }
-    _advanceFormStep();
+    if (!mounted || !_canContinueAttachments()) return;
+    if (!await _checkReviewedFileVersions()) return;
+    if (mounted && _canContinueAttachments()) _advanceFormStep();
   }
 
   Future<void> _submit() async {
     if (_submitting || _selectedProcedure == null) return;
     final p = _selectedProcedure!;
-    if (_request.text.trim().isEmpty) { _message('Vui lòng nhập nội dung yêu cầu.', tone: VcoreNoticeTone.warning); return; }
-    if (_request.text.trim().length > 500) { _message('Nội dung yêu cầu tối đa 500 ký tự.', tone: VcoreNoticeTone.warning); return; }
+    if (!_validateDynamicFields()) return;
+    if (p.papers.isNotEmpty && !_canContinueAttachments()) {
+      _message('Vui lòng xem trước và xác nhận tất cả tệp đã đính kèm.',
+        tone: VcoreNoticeTone.warning);
+      return;
+    }
+    if (_files.isNotEmpty && !await _checkReviewedFileVersions()) return;
+    if (!_validateRequestDetails()) return;
     final missing = p.papers.where((f) => f.isRequired && !_files.containsKey(f.id));
     if (missing.isNotEmpty) { _message('Vui lòng đính kèm đủ giấy tờ bắt buộc.', tone: VcoreNoticeTone.warning); return; }
     if (_live && p.deliveryMethods[_delivery] == null) {
@@ -855,7 +1787,7 @@ class _VcoreOneDoorViewState extends State<VcoreOneDoorView> {
     // student changed step one AFTER generating the PDF in step two.
     final staleWord = _editedWordWizardContext.entries.any((entry) =>
       _filePaths.containsKey(entry.key) &&
-      entry.value != '${_quantity}::${_request.text.trim()}');
+      entry.value != '${_quantity}::${_wordYeuCau}');
     if (staleWord) {
       _message('Yêu cầu hoặc số lượng đã thay đổi sau khi sửa file Word. '
         'Hãy mở lại Word và lưu bản cập nhật trước khi nộp.',
@@ -865,7 +1797,7 @@ class _VcoreOneDoorViewState extends State<VcoreOneDoorView> {
     final staleLetter = _letterDrafts.entries.any((entry) =>
       _filePaths.containsKey(entry.key) &&
       (entry.value.values['SoLuongBan'] != '$_quantity' ||
-       entry.value.values['YeuCau'] != _request.text.trim() ||
+       entry.value.values['YeuCau'] != _wordYeuCau ||
        entry.value.values['NgayNop'] !=
            DateFormat('dd/MM/yyyy').format(DateTime.now())));
     if (staleLetter) {
@@ -876,8 +1808,13 @@ class _VcoreOneDoorViewState extends State<VcoreOneDoorView> {
     }
     setState(() => _submitting = true);
     try {
+      if (_live) {
+        // API submit reads this snapshot when building multipart FormData.
+        _oneDoorApi?.submissionFormValues = _formVariables();
+        _oneDoorApi?.submissionReasonId = _selectedReasonId;
+      }
       final record = await _repo.submit(
-        procedure: p, requestText: _request.text.trim(), deliveryMethod: _delivery,
+        procedure: p, requestText: _effectiveRequest, deliveryMethod: _delivery,
         quantity: _quantity, papers: _live ? _filePaths : _files,
       );
       List<OneDoorRecord> list;
@@ -907,6 +1844,9 @@ class _VcoreOneDoorViewState extends State<VcoreOneDoorView> {
     } catch (_) {
       if (mounted) setState(() => _submitting = false);
       _message(_live ? 'Không thể nộp hồ sơ. Vui lòng kiểm tra thông tin và thử lại.' : 'Không thể lưu hồ sơ.', tone: VcoreNoticeTone.error);
+    } finally {
+      _oneDoorApi?.submissionFormValues = <String, String>{};
+      _oneDoorApi?.submissionReasonId = null;
     }
   }
 
@@ -942,25 +1882,430 @@ class _VcoreOneDoorViewState extends State<VcoreOneDoorView> {
     }
   }
 
-  Future<void> _sendSupplement() async {
+
+  // The form API returns a wrapped JSON object. Validate its shape instead
+  // of assuming a particular client-side cache or training DB model.
+  Map<String, dynamic> _supplementObject(dynamic raw) {
+    if (raw is! Map) throw const FormatException('Invalid record detail');
+    var value = Map<String, dynamic>.from(raw);
+    for (var i = 0; i < 2; i++) {
+      final next = value['data'] ?? value['result'];
+      if (next is! Map) break;
+      value = Map<String, dynamic>.from(next);
+    }
+    return value;
+  }
+
+  List<Map<String, dynamic>> _supplementList(dynamic raw) {
+    if (raw is! List) return <Map<String, dynamic>>[];
+    return raw.whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item)).toList();
+  }
+
+  void _clearSupplementDraft() {
+    for (final control in _supplementInputs.values) {
+      control.dispose();
+    }
+    _supplementInputs.clear();
+    for (final path in _supplementPaths.values) {
+      _forgetGeneratedPdf(path);
+      _forgetGeneratedWord(path);
+      _forgetManagedPhoto(path);
+    }
+    _supplementPaths.clear();
+    _supplementFiles.clear();
+    _supplementReviewedDigests.clear();
+    _supplementGeneratedFingerprints.clear();
+    _supplementMissingRequiredPapers.clear();
+    _supplementCurrentFiles.clear();
+    _supplementAutoPaperIds.clear();
+    _supplementFields = <_OneDoorSupplementField>[];
+    _supplementCurrentValues = <String, String>{};
+    _supplementPapers = <OneDoorPaper>[];
+    _supplementNotices = <_OneDoorSupplementNotice>[];
+    _supplementSavedRequest = '';
+    _supplementSavedReason = '';
+    _supplementSavedDelivery = '';
+    _supplementSavedQuantity = null;
+    _supplementCode = '';
+    _supplementSubmittedAt = '';
+    _supplementPaidAmount = null;
+    _supplementProcedureId = '';
+    _supplementNote.clear();
+  }
+
+  // Do not send unchanged/empty fields: the backend preserves submitted
+  // values for fields not present in GiaTriBieuMau on /bo-sung.
+  Map<String, String> _supplementChangedValues() {
+    final changed = <String, String>{};
+    for (final field in _supplementFields) {
+      final replacement = _supplementInputs[field.key]?.text.trim() ?? '';
+      if (replacement.isNotEmpty && replacement != field.currentValue.trim()) {
+        changed[field.key] = replacement;
+      }
+    }
+    return changed;
+  }
+
+  Future<void> _openSupplement() async {
     final record = _selectedRecord;
-    if (record == null) return;
-    if (_supplementNote.text.trim().isEmpty && _supplementFiles.isEmpty) {
-      _message('Vui lòng nhập ghi chú hoặc chọn tệp bổ sung.', tone: VcoreNoticeTone.warning);
+    if (record == null || _submitting) return;
+    final serial = ++_supplementRequestSerial;
+    _clearSupplementDraft();
+    setState(() {
+      _page = _DoorPage.supplement;
+      _supplementLoading = _live;
+      _supplementError = null;
+    });
+    if (!_live) {
+      setState(() {
+        _supplementPapers = record.procedure.papers;
+        _supplementSavedRequest = record.requestText;
+        _supplementSavedDelivery = record.deliveryMethod;
+        _supplementSavedQuantity = record.quantity;
+        _supplementCode = record.id;
+        _supplementSubmittedAt = _date(record.createdAt);
+        _supplementLoading = false;
+      });
       return;
     }
-    if (_live && _supplementFiles.keys.any((id)=>!_supplementPaths.containsKey(id))) {
-      _message('Vui lòng chọn lại tệp bổ sung.', tone: VcoreNoticeTone.warning); return;
+    final api = _oneDoorApi;
+    if (api == null) {
+      setState(() {
+        _supplementLoading = false;
+        _supplementError = 'Kh\u00f4ng m\u1edf \u0111\u01b0\u1ee3c h\u1ed3 s\u01a1. Vui l\u00f2ng th\u1eed l\u1ea1i.';
+      });
+      return;
     }
     try {
-      await _repo.supplement(record,_supplementNote.text.trim(),
-        _live ? _supplementPaths : _supplementFiles);
-      if (!mounted) return;
-      setState(() { _page=_DoorPage.record; _supplementFiles.clear();
-        _supplementPaths.clear(); _supplementNote.clear(); });
-      _message(_live ? 'Đã gửi bổ sung hồ sơ.' : 'Đã lưu nội dung bổ sung.', tone: VcoreNoticeTone.success);
+      // Get the CURRENT submitted values and pending requests, not the draft
+      // or global /bien-bieu-mau/cua-toi values of another procedure.
+      final data = _supplementObject(await api.record(record.id));
+      if (data['coTheBoSung'] != true) {
+        throw StateError('NOT_ALLOWED');
+      }
+      final procedureId = (data['idThuTuc'] ?? record.procedure.id)
+          .toString().trim();
+      OneDoorFormConfiguration? config;
+      if (_formApi != null && procedureId.isNotEmpty) {
+        try {
+          config = await _formApi!.load(procedureId);
+        } catch (_) {
+          // Submitted values in the record remain authoritative. No guessed
+          // input schema or other procedure's cached values are substituted.
+        }
+      }
+      if (!mounted || serial != _supplementRequestSerial ||
+          _selectedRecord?.id != record.id ||
+          _page != _DoorPage.supplement) return;
+
+      const reserved = <String>{'yeucau', 'idhinhthucnhanketqua',
+        'idthutuc', 'soluongban', 'idlydo'};
+      final submitted = <String, String>{};
+      final fieldInfo = <String, _OneDoorSupplementField>{};
+      for (final entry in _supplementList(data['giaTriBieuMaus'])) {
+        final key = (entry['key'] ?? '').toString().trim();
+        if (key.isEmpty || reserved.contains(key.toLowerCase())) continue;
+        final value = (entry['giaTri'] ?? '').toString();
+        submitted[key] = value;
+        fieldInfo[key.toLowerCase()] = _OneDoorSupplementField(
+          key: key,
+          label: (entry['nhan'] ?? key).toString().trim().isEmpty
+              ? key : (entry['nhan'] ?? key).toString().trim(),
+          type: (entry['loai'] ?? 'text').toString().toLowerCase(),
+          hint: '',
+          currentValue: value,
+        );
+      }
+      for (final field in config?.fields ?? const <OneDoorDynamicField>[]) {
+        final id = field.key.toLowerCase();
+        if (field.key.isEmpty || reserved.contains(id)) continue;
+        final saved = fieldInfo[id];
+        final key = saved?.key ?? field.key;
+        fieldInfo[id] = _OneDoorSupplementField(
+          key: key,
+          label: field.label.isNotEmpty ? field.label
+              : saved?.label ?? key,
+          type: field.type.isNotEmpty ? field.type
+              : saved?.type ?? 'text',
+          hint: field.hint,
+          currentValue: saved?.currentValue ?? '',
+        );
+      }
+      final papers = <OneDoorPaper>[];
+      final existingFiles = <String, String>{};
+      final requiredMissing = <String>{};
+      final docxPapers = <String>{...?(config?.autoPaperIds)};
+      for (final paper in _supplementList(data['giayToNops'])) {
+        final id = (paper['idGiayTo'] ?? '').toString().trim();
+        if (id.isEmpty) continue;
+        final title = (paper['tenGiayTo'] ?? '').toString().trim();
+        final required = paper['batBuoc'] == true;
+        final uploaded = paper['daNop'] == true;
+        final fileName = (paper['tenFile'] ?? '').toString().trim();
+        papers.add(OneDoorPaper(id, title.isEmpty ? 'Gi\u1ea5y t\u1edd' : title,
+          isRequired: required));
+        if (uploaded && fileName.isNotEmpty) existingFiles[id] = fileName;
+        if (required && !uploaded) requiredMissing.add(id);
+        if (paper['tuDienBieuMau'] == true) docxPapers.add(id);
+      }
+      final notices = <_OneDoorSupplementNotice>[];
+      for (final entry in _supplementList(data['yeuCauBoSungs'])) {
+        final message = (entry['noiDung'] ?? '').toString().trim();
+        if (message.isEmpty) continue;
+        notices.add(_OneDoorSupplementNotice(
+          message: message,
+          author: (entry['nguoiYeuCau'] ?? '').toString().trim(),
+          date: (entry['ngayYeuCau'] ?? '').toString().trim(),
+          answered: (entry['ngayBoSung'] ?? '').toString().trim().isNotEmpty,
+        ));
+      }
+      for (final field in fieldInfo.values) {
+        _supplementInputs[field.key] = TextEditingController();
+      }
+      setState(() {
+        _supplementCurrentValues = submitted;
+        _supplementFields = fieldInfo.values.toList();
+        _supplementPapers = papers;
+        _supplementCurrentFiles.addAll(existingFiles);
+        _supplementMissingRequiredPapers.addAll(requiredMissing);
+        _supplementAutoPaperIds.addAll(docxPapers);
+        _supplementNotices = notices.reversed.toList();
+        _supplementSavedRequest =
+            (data['yeuCau'] ?? record.requestText).toString().trim();
+        _supplementSavedReason = (data['lyDo'] ?? '').toString().trim();
+        final submittedDelivery =
+            (data['hinhThucNhanKetQua'] ?? '').toString().trim();
+        _supplementSavedDelivery = submittedDelivery.isNotEmpty
+            ? submittedDelivery : record.deliveryMethod;
+        final quantityRaw = data['soLuongBan'];
+        _supplementSavedQuantity = quantityRaw is num
+            ? quantityRaw.toInt()
+            : int.tryParse('${quantityRaw ?? ''}') ?? record.quantity;
+        _supplementCode = (data['maDangKy'] ?? '').toString().trim();
+        final submittedDate = (data['ngayDangKy'] ?? '').toString().trim();
+        _supplementSubmittedAt = submittedDate.isNotEmpty
+            ? _supplementDate(submittedDate) : _date(record.createdAt);
+        final amountRaw = data['thanhTien'];
+        _supplementPaidAmount = amountRaw is num
+            ? amountRaw.toInt() : int.tryParse('${amountRaw ?? ''}');
+        _supplementProcedureId = procedureId;
+        _supplementLoading = false;
+        _supplementError = null;
+      });
+    } catch (error) {
+      if (!mounted || serial != _supplementRequestSerial ||
+          _selectedRecord?.id != record.id ||
+          _page != _DoorPage.supplement) return;
+      setState(() {
+        _supplementLoading = false;
+        _supplementError = error is StateError && error.message == 'NOT_ALLOWED'
+            ? 'H\u1ed3 s\u01a1 hi\u1ec7n kh\u00f4ng \u0111\u01b0\u1ee3c ph\u00e9p b\u1ed5 sung.'
+            : 'Kh\u00f4ng t\u1ea3i \u0111\u01b0\u1ee3c th\u00f4ng tin b\u1ed5 sung. Vui l\u00f2ng th\u1eed l\u1ea1i.';
+      });
+    }
+  }
+
+  Future<void> _reviewSupplementPaper(OneDoorPaper paper) async {
+    final path = _supplementPaths[paper.id];
+    if (path == null || path.isEmpty || _submitting) return;
+    try {
+      final before = await _digestFile(path);
+      if (!mounted || _supplementPaths[paper.id] != path) return;
+      final viewed = await OneDoorAttachmentPreview.openForReview(context,
+        path: path, title: paper.name);
+      if (!mounted || !viewed || _supplementPaths[paper.id] != path) return;
+      final after = await _digestFile(path);
+      if (before != after) {
+        _message('T\u1ec7p \u0111\u00e3 thay \u0111\u1ed5i. H\u00e3y m\u1edf xem l\u1ea1i.',
+          tone: VcoreNoticeTone.warning);
+        return;
+      }
+      if (_supplementReviewedDigests[paper.id] == after) return;
+      final confirmed = await showVcoreActionDialog<bool>(
+        context: context,
+        title: 'X\u00e1c nh\u1eadn \u0111\u00e3 ki\u1ec3m tra',
+        content: 'B\u1ea1n \u0111\u00e3 ki\u1ec3m tra n\u1ed9i dung t\u1ec7p m\u1edbi \u0111\u00ednh k\u00e8m?',
+        leadingIcon: Icons.fact_check_outlined,
+        actions: const <VcoreDialogAction<bool>>[
+          VcoreDialogAction<bool>(label: 'Xem l\u1ea1i', value: false,
+            tone: VcoreDialogActionTone.secondary),
+          VcoreDialogAction<bool>(label: '\u0110\u00e3 ki\u1ec3m tra', value: true,
+            tone: VcoreDialogActionTone.primary),
+        ],
+      );
+      if (confirmed != true || !mounted ||
+          _supplementPaths[paper.id] != path) return;
+      if (await _digestFile(path) != after) return;
+      setState(() => _supplementReviewedDigests[paper.id] = after);
     } catch (_) {
-      if (mounted) _message('Không thể bổ sung hồ sơ. Vui lòng thử lại.', tone: VcoreNoticeTone.error);
+      if (mounted) _message('Kh\u00f4ng m\u1edf \u0111\u01b0\u1ee3c t\u1ec7p. Vui l\u00f2ng ch\u1ecdn l\u1ea1i.',
+        tone: VcoreNoticeTone.warning);
+    }
+  }
+
+  // Optional: only an explicit tap creates a new document. Changing values
+  // NEVER silently replaces the officially submitted attachment.
+  Future<void> _regenerateSupplementWord(OneDoorPaper paper) async {
+    final record = _selectedRecord;
+    final formApi = _formApi;
+    if (record == null || formApi == null || _submitting ||
+        _paperBusy.contains(paper.id)) return;
+    final serial = _supplementRequestSerial;
+    final changedFingerprint = jsonEncode(_supplementChangedValues());
+    setState(() => _paperBusy.add(paper.id));
+    try {
+      final values = <String, String>{};
+      try {
+        final profile = await const OneDoorStudentPrefillService().load();
+        values.addAll(profile.values);
+      } catch (_) { /* The submitted values remain authoritative. */ }
+      values.addAll(_supplementCurrentValues);
+      values.addAll(_supplementChangedValues());
+      // Provider rule: when a reason is selected, it fills {YeuCau} in Word.
+      // Keep the originally submitted request separately in the application.
+      values['YeuCau'] = _supplementSavedReason.isNotEmpty &&
+          !_isOtherReason(_supplementSavedReason)
+          ? _supplementSavedReason : _supplementSavedRequest;
+      values['SoLuongBan'] =
+          '${_supplementSavedQuantity ?? record.quantity}';
+      values['TenThuTuc'] = record.procedure.name;
+      if (record.procedure.unitName.trim().isNotEmpty) {
+        values['TenDonVi'] = record.procedure.unitName;
+      }
+      if (_supplementProcedureId.isEmpty) {
+        throw const FormatException('Missing procedure ID');
+      }
+      final result = await formApi.generate(paper.id, values);
+      if (!mounted || serial != _supplementRequestSerial ||
+          _page != _DoorPage.supplement ||
+          _selectedRecord?.id != record.id) return;
+      final root = await getTemporaryDirectory();
+      final safeId = paper.id.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+      final target = File('${root.path}${Platform.pathSeparator}'
+        'onevnu_bo_sung_${safeId}_${DateTime.now().microsecondsSinceEpoch}'
+        '.${result.extension}');
+      await target.writeAsBytes(result.bytes, flush: true);
+      if (!mounted || serial != _supplementRequestSerial ||
+          _page != _DoorPage.supplement) {
+        await target.delete();
+        return;
+      }
+      final previous = _supplementPaths[paper.id];
+      setState(() {
+        _supplementPaths[paper.id] = target.path;
+        _supplementFiles[paper.id] = target.path.split(Platform.pathSeparator).last;
+        _supplementReviewedDigests.remove(paper.id);
+        _supplementGeneratedFingerprints[paper.id] = changedFingerprint;
+        if (result.extension == 'pdf') {
+          _generatedPdfPaths.add(target.path);
+        } else {
+          _generatedWordPaths.add(target.path);
+        }
+      });
+      _forgetGeneratedWord(previous);
+      _forgetGeneratedPdf(previous);
+      _forgetManagedPhoto(previous);
+      await _reviewSupplementPaper(paper);
+    } catch (_) {
+      if (mounted && serial == _supplementRequestSerial) {
+        _message('Ch\u01b0a th\u1ec3 t\u1ea1o l\u1ea1i gi\u1ea5y t\u1edd. Vui l\u00f2ng ch\u1ecdn t\u1ec7p kh\u00e1c.',
+          tone: VcoreNoticeTone.warning);
+      }
+    } finally {
+      if (mounted) setState(() => _paperBusy.remove(paper.id));
+    }
+  }
+
+  Future<void> _sendSupplement() async {
+    final record = _selectedRecord;
+    if (record == null || _submitting || _supplementLoading ||
+        _supplementError != null) return;
+    final note = _supplementNote.text.trim();
+    final changes = _supplementChangedValues();
+    if (note.isEmpty && changes.isEmpty && _supplementPaths.isEmpty) {
+      _message('H\u00e3y c\u1eadp nh\u1eadt th\u00f4ng tin, ch\u1ecdn t\u1ec7p ho\u1eb7c nh\u1eadp ghi ch\u00fa.',
+        tone: VcoreNoticeTone.warning);
+      return;
+    }
+    if (note.length > 1000 || jsonEncode(changes).length > 100000) {
+      _message('N\u1ed9i dung b\u1ed5 sung qu\u00e1 d\u00e0i.',
+        tone: VcoreNoticeTone.warning);
+      return;
+    }
+    for (final paperId in _supplementMissingRequiredPapers) {
+      if (!_supplementPaths.containsKey(paperId)) {
+        _message('Vui l\u00f2ng g\u1eafn gi\u1ea5y t\u1edd b\u1eaft bu\u1ed9c c\u00f2n thi\u1ebfu.',
+          tone: VcoreNoticeTone.warning);
+        return;
+      }
+    }
+    if (_live && _supplementFiles.keys.any((id) =>
+        !_supplementPaths.containsKey(id))) {
+      _message('Vui l\u00f2ng ch\u1ecdn l\u1ea1i t\u1ec7p b\u1ed5 sung.',
+        tone: VcoreNoticeTone.warning);
+      return;
+    }
+    final changedSignature = jsonEncode(changes);
+    for (final entry in _supplementGeneratedFingerprints.entries) {
+      if (_supplementPaths.containsKey(entry.key) &&
+          entry.value != changedSignature) {
+        _message('Th\u00f4ng tin \u0111\u00e3 thay \u0111\u1ed5i. H\u00e3y t\u1ea1o l\u1ea1i Word m\u1edbi.',
+          tone: VcoreNoticeTone.warning);
+        return;
+      }
+    }
+    for (final entry in _supplementPaths.entries) {
+      try {
+        final digest = await _digestFile(entry.value);
+        if (_supplementReviewedDigests[entry.key] != digest) {
+          _message('H\u00e3y xem v\u00e0 x\u00e1c nh\u1eadn t\u1ec7p m\u1edbi tr\u01b0\u1edbc khi g\u1eedi.',
+            tone: VcoreNoticeTone.warning);
+          return;
+        }
+      } catch (_) {
+        _message('T\u1ec7p b\u1ed5 sung kh\u00f4ng c\u00f2n h\u1ee3p l\u1ec7.',
+          tone: VcoreNoticeTone.warning);
+        return;
+      }
+    }
+    setState(() => _submitting = true);
+    var accepted = false;
+    try {
+      if (_live) {
+        final api = _oneDoorApi;
+        if (api == null) throw StateError('Missing One Door session');
+        // Only changed form fields + newly selected files. Unchanged old
+        // attachments remain stored on the server and are NOT re-uploaded.
+        await api.supplement(record.id,
+          note: note,
+          changedValues: changes,
+          filesByPaperId: Map<String, String>.from(_supplementPaths));
+      } else {
+        await _repo.supplement(record, note, _supplementFiles);
+      }
+      accepted = true;
+    } catch (_) {
+      if (mounted) {
+        _message('Kh\u00f4ng th\u1ec3 g\u1eedi b\u1ed5 sung. Vui l\u00f2ng th\u1eed l\u1ea1i.',
+          tone: VcoreNoticeTone.error);
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+    if (!accepted || !mounted) return;
+    ++_supplementRequestSerial;
+    _clearSupplementDraft();
+    setState(() => _page = _DoorPage.record);
+    _message('\u0110\u00e3 g\u1eedi th\u00f4ng tin b\u1ed5 sung.', tone: VcoreNoticeTone.success);
+    // A successful POST is final even if this GET or list refresh fails.
+    // Never retry the write automatically and risk duplicate submissions.
+    try {
+      final refreshed = await _repo.myRecords();
+      if (mounted) setState(() => _records = refreshed);
+    } catch (_) { /* Keep the accepted state. */ }
+    if (mounted && _selectedRecord?.id == record.id) {
+      await _openRecord(record);
     }
   }
 
@@ -997,7 +2342,7 @@ class _VcoreOneDoorViewState extends State<VcoreOneDoorView> {
         Color(0xFFD4AF37), // 61% rgba(212,175,55,1)
         Color(0xFFD5AD6D), // 100% rgba(213,173,109,1)
       ],
-      stops: <double>[0.0, 0.26, 0.35, 0.45, 0.61, 1.0],
+stops: <double>[0.0, 0.26, 0.35, 0.45, 0.61, 1.0],
     ).createShader(const Rect.fromLTWH(0, 0, 1, 19)),
     shadows: const <Shadow>[
       Shadow(color: Color(0x80D4AF37), blurRadius: 20),
@@ -1037,6 +2382,83 @@ class _VcoreOneDoorViewState extends State<VcoreOneDoorView> {
     OneDoorRecordStatus.cancelled => StudentServiceUI.secondary,
   };
 
+  // V29.2 MAX WIDTH NAVBAR: do not modify the shared headers of other modules.
+  PreferredSizeWidget _oneDoorFullTitleBar(String title) {
+    const double height = 68;
+    const double reserve = 56;
+    return AppBar(
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      foregroundColor: Colors.black,
+      elevation: 0.5,
+      shadowColor: StudentServiceUI.line,
+      toolbarHeight: height,
+      automaticallyImplyLeading: false,
+      titleSpacing: 0,
+      centerTitle: false,
+      title: SizedBox(
+        height: height,
+        width: double.infinity,
+        child: Stack(
+          alignment: Alignment.center,
+          children: <Widget>[
+            Positioned.fill(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: reserve),
+                child: Center(
+                  child: Semantics(
+                    header: true,
+                    label: title,
+                    excludeSemantics: true,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.center,
+                      child: Text(
+                        title,
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        softWrap: false,
+                        style: const TextStyle(
+                          color: Colors.black,
+                          fontSize: 21,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              left: 0, top: 0, bottom: 0, width: reserve,
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: VnuPressMotion(
+                  child: BackButton(color: Colors.black, onPressed: _back),
+                ),
+              ),
+            ),
+            if (_page == _DoorPage.overview)
+              Positioned(
+                right: 4, top: 0, bottom: 0, width: reserve - 4,
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: VnuPressMotion(
+                    child: IconButton(
+                      onPressed: _load,
+                      tooltip: 'Tải lại',
+                      icon: const Icon(Icons.refresh,
+                        color: Colors.black, size: 23),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final pageTitle = switch (_page) {
@@ -1053,14 +2475,10 @@ class _VcoreOneDoorViewState extends State<VcoreOneDoorView> {
       },
       child: Scaffold(
         backgroundColor: StudentServiceUI.background,
-        appBar: StudentServiceUI.appBar(title: pageTitle, onBack: _back,
-          actions: _page == _DoorPage.overview ? <Widget>[
-            VnuPressMotion(child: IconButton(
-              onPressed: _load, tooltip: 'Tải lại',
-              icon: const Icon(Icons.refresh, color: Colors.black, size: 23),
-            )),
-            const SizedBox(width: 8),
-          ] : const <Widget>[]),
+        // V29.2: true-centred, maximum safe title width, with no debug action.
+        // A FittedBox shows the whole module title on compact phones instead
+        // of letting the action reserve clip "Thủ tục hành chính".
+        appBar: _oneDoorFullTitleBar(pageTitle),
         body: _loading
           ? Center(child: VnuLoading.inline(size: 28))
           : _connectionError != null
@@ -1183,7 +2601,7 @@ class _VcoreOneDoorViewState extends State<VcoreOneDoorView> {
               if (catalog == null || _mySchoolId == null) ...[
                 const SizedBox(height: 8),
                 Text(catalog == null
-                    ? 'Chưa tải được phân cấp đơn vị từ API. '
+                    ? 'Chưa thể hiển thị đầy đủ danh sách đơn vị. '
                         'Kéo xuống để thử lại.'
                     : 'Không xác định được trường từ ngành đang chọn. '
                         'Không hiển thị thủ tục của trường khác.',
@@ -1717,7 +3135,7 @@ class _VcoreOneDoorViewState extends State<VcoreOneDoorView> {
           ),
           if (_live && _deliveryFromLookup && deliveryNames.isNotEmpty)
             const Padding(padding: EdgeInsets.only(top: 5),
-              child: Text('Hình thức nhận lấy từ danh mục chung của hệ thống.',
+              child: Text('Các hình thức nhận kết quả đang áp dụng cho thủ tục này.',
                 style: TextStyle(fontSize: 12,
                   color: StudentServiceUI.secondary))),
           if (_live && deliveryNames.isEmpty)
@@ -1725,7 +3143,7 @@ class _VcoreOneDoorViewState extends State<VcoreOneDoorView> {
               child: Row(children: [
                 Expanded(child: Text(
                   _deliveryWarning ?? 'Chưa có hình thức nhận kết quả hợp lệ. '
-                  'Hãy thử tải lại hoặc kiểm tra danh mục từ hệ thống.',
+                  'Vui lòng thử tải lại.',
                   style: const TextStyle(fontSize: 12.5,
                     color: StudentServiceUI.caution))),
                 VnuPressMotion(pressedScale: 0.965,
@@ -1789,12 +3207,16 @@ class _VcoreOneDoorViewState extends State<VcoreOneDoorView> {
       fontSize: 14, fontWeight: FontWeight.w600)),
   );
 
+  // V25: Preserve the original four-part student guidance above the new
+  // preview requirement. Old action names are updated to the compact row.
   Widget _documentEditingAdvice() => Container(
     width: double.infinity,
     padding: const EdgeInsets.all(14),
-    decoration: BoxDecoration(color: const Color(0xFFFFF8E9),
+    decoration: BoxDecoration(
+      color: const Color(0xFFFFF8E9),
       border: Border.all(color: const Color(0xFFE8C77D)),
-      borderRadius: BorderRadius.circular(12)),
+      borderRadius: BorderRadius.circular(12),
+    ),
     child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const Icon(Icons.warning_amber_rounded,
         color: Color(0xFF9B6713), size: 23),
@@ -1805,22 +3227,20 @@ class _VcoreOneDoorViewState extends State<VcoreOneDoorView> {
             style: TextStyle(fontWeight: FontWeight.w700,
               fontSize: 14, color: Color(0xFF795215))),
           SizedBox(height: 8),
-          Text('1. Tự điền và kiểm tra: Ở bước này, OneVNU hỗ trợ '
-            'điền thông tin cá nhân đã có trong cơ sở dữ liệu đào tạo '
-            'vào các biểu mẫu tương thích. Bạn cần đối chiếu họ tên, '
-            'mã sinh viên, ngày sinh, CCCD, lớp, khoa, ngành, email, '
-            'số điện thoại và tự bổ sung hoặc sửa mọi thông tin chưa đúng.',
+          Text('1. Kiểm tra thông tin: Một số thông tin có thể đã được '
+            'điền sẵn trên giấy tờ. Bạn cần đối chiếu '
+            'họ tên, mã sinh viên, ngày sinh, CCCD, lớp, khoa, ngành, '
+            'email và số điện thoại; bổ sung hoặc sửa ngay thông tin '
+            'còn thiếu hoặc chưa chính xác.',
             style: TextStyle(fontSize: 12.7, height: 1.5,
               color: Color(0xFF795215))),
           SizedBox(height: 9),
-          Text('2. Sửa và chia sẻ: Các biểu mẫu Word/Excel có bảng, '
-            'hình ảnh thường khó chỉnh sửa trên điện thoại. Hãy chọn '
-            '“Chia sẻ bản đã điền” để gửi qua Zalo hoặc ứng dụng nhắn '
-            'tin cho chính mình, rồi tải về máy tính để chỉnh sửa trong '
-            'Word/Excel. Bạn cũng có thể chọn “Mở Word/Excel” trên điện '
-            'thoại. Sau khi sửa xong, quay lại OneVNU và chọn “Đính kèm” '
-            'hoặc “Thay tệp” để tải BẢN HOÀN CHỈNH lên. Tệp đã chia sẻ '
-            'không tự được đính kèm vào hồ sơ.',
+          Text('2. Sửa và chia sẻ: Tài liệu Word/Excel có thể khó chỉnh sửa '
+            'trên điện thoại, nhất là biểu mẫu có bảng. Bạn có thể sử dụng '
+            'biểu tượng Chia sẻ ngay cạnh tệp để gửi qua Zalo hoặc máy tính, '
+            'mở bằng phần mềm Office để sửa. Sau đó dùng biểu tượng kẹp giấy '
+            'trên cùng hàng để gắn lại BẢN HOÀN CHỈNH. Việc chia sẻ không '
+            'tự thay thế tệp đang đính kèm trong OneVNU.',
             style: TextStyle(fontSize: 12.7, height: 1.5,
               color: Color(0xFF795215))),
           SizedBox(height: 9),
@@ -1840,112 +3260,187 @@ class _VcoreOneDoorViewState extends State<VcoreOneDoorView> {
     ]),
   );
 
+  // The second, short warning stays BELOW the original warning (not replacing it).
+  Widget _mandatoryPreviewWarning() => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
+    decoration: BoxDecoration(
+      color: const Color(0xFFFFF9E7),
+      border: Border.all(color: const Color(0xFFF5D68B)),
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: const Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Icon(Icons.info_outline_rounded,
+        size: 21, color: Color(0xFF9B6713)),
+      SizedBox(width: 9),
+      Expanded(child: Text(
+        'Bạn cần mở tệp đã gắn ít nhất một lần và xác nhận nội dung '
+        'trước khi tiếp tục.',
+        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
+          height: 1.42, color: Color(0xFF795215)),
+      )),
+    ]),
+  );
+
+  /// V26 COMPACT FILE ROW + photo/camera/gallery source sheet.
+  /// V25 COMPACT FILE ROW: one file line, four adjacent actions, one status.
+  /// The same widget is also used by the supplement flow (without gating it).
   Widget _paperPicker(OneDoorPaper paper, Map<String, String> selected,
       VoidCallback pick) {
     final isMainForm = identical(selected, _files);
     final hasFile = selected.containsKey(paper.id);
     final loading = _paperBusy.contains(paper.id);
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 13),
-      decoration: const BoxDecoration(border: Border(bottom:
-        BorderSide(color: StudentServiceUI.line))),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          const ModuleDetailIcon(name: 'procedure_attachment', size: 28),
-          const SizedBox(width: 10),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(paper.name, style: const TextStyle(fontSize: 13.5,
-                fontWeight: FontWeight.w600, color: StudentServiceUI.ink)),
-              const SizedBox(height: 4),
-              Text(selected[paper.id] ??
-                (paper.isRequired ? 'Giấy tờ bắt buộc' : 'Giấy tờ không bắt buộc'),
-                maxLines: 3, style: const TextStyle(
-                  color: StudentServiceUI.secondary, fontSize: 12)),
-            ])),
-          if (hasFile)
-            IconButton(tooltip: 'Bỏ tệp', icon: const Icon(Icons.close, size: 19),
-              onPressed: _submitting ? null : () {
-                setState(() {
-                  selected.remove(paper.id);
-                  if (isMainForm) {
-                    _forgetGeneratedPdf(_filePaths[paper.id]);
-                    _forgetGeneratedWord(_filePaths[paper.id]);
-                    _filePaths.remove(paper.id);
-                    _letterDrafts.remove(paper.id);
-                    _editedWordWizardContext.remove(paper.id);
-                  } else {
-                    _supplementPaths.remove(paper.id);
-                  }
-                });
-              }),
-        ]),
-        const SizedBox(height: 6),
-        Wrap(spacing: 2, runSpacing: 0, children: [
-          if (isMainForm && paper.hasTemplate && _live)
-            TextButton.icon(
-              onPressed: loading || _submitting ? null :
-                () => _openPaperTemplate(paper),
-              icon: loading
-                ? const SizedBox(width: 16, height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2))
-                : const Icon(Icons.description_outlined, size: 17),
-              label: const Text('Xem mẫu', style: TextStyle(fontSize: 12.5)),
-            ),
-          if (isMainForm && paper.hasTemplate && _live)
-            TextButton.icon(
-              onPressed: loading || _submitting ? null :
-                () => _openPaperTemplate(paper, prefilled: true),
-              icon: const Icon(Icons.auto_awesome_outlined, size: 17),
-              label: const Text('Xem bản đã điền',
-                style: TextStyle(fontSize: 12.5)),
-            ),
-          if (isMainForm && paper.hasTemplate && _live)
-            TextButton.icon(
-              onPressed: loading || _submitting ? null :
-                () => _openPaperTemplate(paper,
-                  prefilled: true, saveCopy: true),
-              icon: const Icon(Icons.ios_share_outlined, size: 17),
-              label: const Text('Chia sẻ bản đã điền',
-                style: TextStyle(fontSize: 12.5)),
-            ),
-          if (isMainForm && _supportsLetterEditor(paper))
-            TextButton.icon(
-              onPressed: loading || _submitting ? null :
-                () => _openLetterEditor(paper),
-              icon: loading ? const SizedBox(width: 16, height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2)) :
-                const Icon(Icons.edit_note_rounded, size: 19),
-              label: Text(_letterDrafts.containsKey(paper.id)
-                ? 'Sửa đơn' : 'Soạn đơn',
-                style: const TextStyle(fontSize: 12.5)),
-            ),
-          if (hasFile)
-            TextButton.icon(
-              onPressed: _submitting ? null :
-                () => _openSelectedPaper(paper, supplement: !isMainForm),
-              icon: const Icon(Icons.visibility_outlined, size: 17),
-              label: const Text('Xem tệp', style: TextStyle(fontSize: 12.5)),
-            ),
-          if (hasFile && isMainForm && _filePaths[paper.id] != null)
-            TextButton.icon(
-              onPressed: _submitting ? null : () =>
-                OneDoorAttachmentPreview.shareFile(context,
-                  path: _filePaths[paper.id]!, title: paper.name),
-              icon: const Icon(Icons.ios_share_outlined, size: 17),
-              label: Text(_letterDrafts.containsKey(paper.id)
-                ? 'Chia sẻ đơn đã điền (Zalo)'
-                : 'Chia sẻ tệp (Zalo / máy tính)',
-                style: const TextStyle(fontSize: 12.5)),
-            ),
-          TextButton.icon(
-            onPressed: _submitting ? null : pick,
-            icon: const Icon(Icons.attach_file_rounded, size: 17),
-            label: Text(hasFile ? 'Thay tệp' : 'Đính kèm',
-              style: const TextStyle(fontSize: 12.5)),
+    final path = (isMainForm ? _filePaths : _supplementPaths)[paper.id];
+    final reviewed = isMainForm && _reviewedIds.contains(paper.id);
+    final canEdit = !_submitting && !loading;
+    final fallback = isMainForm ? _failedAutoPapers[paper.id] : null;
+    final attached = hasFile && path != null && path.isNotEmpty;
+
+    void removeFile() {
+      if (!canEdit) return;
+      setState(() {
+        selected.remove(paper.id);
+        if (isMainForm) {
+          _forgetGeneratedPdf(_filePaths[paper.id]);
+          _forgetGeneratedWord(_filePaths[paper.id]);
+          _forgetManagedPhoto(_filePaths[paper.id]);
+          _filePaths.remove(paper.id);
+          _autoAttachedIds.remove(paper.id);
+          _generatedFingerprints.remove(paper.id);
+          _reviewedIds.remove(paper.id);
+          _reviewedDigests.remove(paper.id);
+          _failedAutoPapers.remove(paper.id);
+          _letterDrafts.remove(paper.id);
+          _editedWordWizardContext.remove(paper.id);
+        } else {
+          _forgetManagedPhoto(_supplementPaths[paper.id]);
+          _supplementPaths.remove(paper.id);
+          _supplementReviewedDigests.remove(paper.id);
+          _supplementGeneratedFingerprints.remove(paper.id);
+        }
+      });
+    }
+
+    Widget actionIcon(IconData icon, String tooltip,
+        VoidCallback? onPressed, {Color? color}) => SizedBox(
+      width: 37,
+      height: 43,
+      child: IconButton(
+        tooltip: tooltip,
+        onPressed: onPressed,
+        icon: Icon(icon, size: 19),
+        color: color ?? StudentServiceUI.green,
+        disabledColor: StudentServiceUI.secondary,
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 37, minHeight: 43),
+        visualDensity: VisualDensity.compact,
+      ),
+    );
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 10, bottom: 8),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 12, 10, 11),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border.all(color: StudentServiceUI.line),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+            const Icon(Icons.attach_file_rounded,
+              color: StudentServiceUI.green, size: 20),
+            const SizedBox(width: 6),
+            Expanded(child: Text(paper.name,
+              maxLines: 2, overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 13.5,
+                fontWeight: FontWeight.w700,
+                color: StudentServiceUI.ink))),
+            const SizedBox(width: 6),
+            Text(paper.isRequired ? 'Bắt buộc' : 'Không bắt buộc',
+              style: const TextStyle(fontSize: 10.5,
+                color: StudentServiceUI.secondary)),
+          ]),
+          const SizedBox(height: 9),
+          Material(
+            color: const Color(0xFFF4F8F6),
+            borderRadius: BorderRadius.circular(10),
+            child: Row(children: [
+              Expanded(child: InkWell(
+                borderRadius: BorderRadius.circular(10),
+                onTap: canEdit ? (hasFile
+                  ? () => _previewAndConfirm(paper, supplement: !isMainForm)
+                  : pick) : null,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10, vertical: 12),
+                  child: Row(children: [
+                    Icon(hasFile ? Icons.description_outlined
+                        : Icons.add_circle_outline_rounded,
+                      size: 18, color: StudentServiceUI.green),
+                    const SizedBox(width: 7),
+                    Expanded(child: Text(
+                      loading ? 'Đang chuẩn bị tệp...'
+                        : hasFile ? selected[paper.id]!
+                        : 'Chụp ảnh / chọn ảnh / chọn tệp',
+                      maxLines: 1, overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 11.8,
+                        color: hasFile ? StudentServiceUI.ink
+                          : StudentServiceUI.secondary,
+                        fontWeight: hasFile ? FontWeight.w500
+                          : FontWeight.w400),
+                    )),
+                  ]),
+                ),
+              )),
+              if (loading)
+                const Padding(padding: EdgeInsets.symmetric(horizontal: 9),
+                  child: SizedBox(width: 17, height: 17,
+                    child: CircularProgressIndicator(strokeWidth: 2)))
+              else if (hasFile) ...[
+                actionIcon(Icons.visibility_outlined, 'Xem trước tệp',
+                  canEdit && attached
+                    ? () => _previewAndConfirm(paper, supplement: !isMainForm)
+                    : null),
+                actionIcon(Icons.attach_file_rounded, 'Thay ảnh / gắn lại tệp',
+                  canEdit ? pick : null),
+                actionIcon(Icons.ios_share_outlined, 'Chia sẻ tệp',
+                  canEdit && attached
+                    ? () => OneDoorAttachmentPreview.shareFile(context,
+                        path: path!, title: paper.name)
+                    : null),
+                actionIcon(Icons.close_rounded, 'Bỏ tệp',
+                  canEdit ? removeFile : null,
+                  color: StudentServiceUI.danger),
+              ],
+              const SizedBox(width: 3),
+            ]),
           ),
+          if (isMainForm && hasFile) ...[
+            const SizedBox(height: 8),
+            Row(children: [
+              Icon(reviewed ? Icons.check_circle_rounded
+                  : Icons.info_outline_rounded,
+                color: reviewed ? StudentServiceUI.green
+                  : const Color(0xFF9B6713), size: 15),
+              const SizedBox(width: 5),
+              Expanded(child: Text(reviewed
+                  ? 'Đã xem trước và xác nhận'
+                  : 'Chưa xem · Chạm tên tệp hoặc biểu tượng mắt để xem trước',
+                maxLines: 2, overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 11.2,
+                  fontWeight: reviewed ? FontWeight.w600 : FontWeight.w400,
+                  color: reviewed ? StudentServiceUI.green
+                    : StudentServiceUI.secondary))),
+            ]),
+          ] else if (!hasFile && fallback != null) ...[
+            const SizedBox(height: 6),
+            Text(fallback, maxLines: 2, overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 11.3,
+                color: StudentServiceUI.caution)),
+          ],
         ]),
-      ]),
+      ),
     );
   }
 
@@ -1959,14 +3454,11 @@ class _VcoreOneDoorViewState extends State<VcoreOneDoorView> {
         children: [
           _detailHeading(switch (_currentStep) {
               _DoorFormStep.request => 'Thông tin yêu cầu',
-              _DoorFormStep.attachments => 'Tài liệu đính kèm',
+              _DoorFormStep.attachments => 'Kiểm tra giấy tờ',
               _DoorFormStep.review => 'Kiểm tra thông tin',
             }, p.name),
           if (_currentStep == _DoorFormStep.request) ...[
-            _formLabel('Nội dung đề nghị *'),
-            TextField(controller: _request, maxLength: 500, minLines: 4,
-              maxLines: 7, style: const TextStyle(fontSize: 14),
-              decoration: StudentServiceUI.field('Trình bày nội dung cần giải quyết')),
+            _dynamicFieldsWidget(),
             _formLabel('Hình thức nhận kết quả'),
             if (deliveryOptions.length == 1)
               Container(width: double.infinity,
@@ -1993,13 +3485,15 @@ class _VcoreOneDoorViewState extends State<VcoreOneDoorView> {
                 requiredField: true,
                 searchable: deliveryOptions.length > 5,
                 onChanged: (value) {
-                  if (value != null) setState(() => _delivery = value);
+                  if (value != null) setState(() {
+                    _delivery = value;
+                  });
                 },
               )
-            else
+else
               const Padding(padding: EdgeInsets.symmetric(vertical: 12),
                 child: Text('Theo hướng dẫn của đơn vị. Chưa có lựa chọn '
-                  'hình thức nhận hợp lệ từ hệ thống Một cửa.',
+                  'hình thức nhận kết quả cho thủ tục này.',
                   style: TextStyle(fontSize: 13,
                     color: StudentServiceUI.caution))),
             _formLabel('Số lượng bản'),
@@ -2013,21 +3507,28 @@ class _VcoreOneDoorViewState extends State<VcoreOneDoorView> {
           ] else if (_currentStep == _DoorFormStep.attachments) ...[
             _documentEditingAdvice(),
             const SizedBox(height: 12),
-            const Text('Để gửi qua Zalo, chọn “Chia sẻ bản đã điền” '
-              'rồi chọn Zalo trong bảng chia sẻ của điện thoại. '
-              'Mỗi tệp PDF, Word, Excel hoặc ảnh được chọn tối đa 10 MB. '
-              'Bạn phải xem và xác nhận từng file trước bước 3.',
-              style: TextStyle(fontSize: 12.7,
-                height: 1.45, color: StudentServiceUI.secondary)),
-            const SizedBox(height: 8),
+            _mandatoryPreviewWarning(),
+            const SizedBox(height: 20),
+            const Text('Tài liệu cần kiểm tra',
+              style: TextStyle(color: StudentServiceUI.ink,
+                fontWeight: FontWeight.w700, fontSize: 15)),
+            const SizedBox(height: 5),
             ...p.papers.map((paper) => _paperPicker(paper, _files,
-                () => _pickFile(paper.id))),
+                () => _chooseAttachmentSource(paper.id))),
           ] else ...[
             StudentInfoLine(label: 'Thủ tục', value: p.name),
-            StudentInfoLine(label: 'Nội dung', value: _request.text.trim()),
+            if (_hasReasonChoices &&
+                (_selectedReasonId != null || _localOtherSelected))
+              StudentInfoLine(label: 'Lý do / Mục đích',
+                value: _selectedReasonLabel),
+            StudentInfoLine(label: 'Nội dung yêu cầu',
+              value: _effectiveRequest),
             StudentInfoLine(label: 'Nhận kết quả', value: _delivery),
             StudentInfoLine(label: 'Số lượng', value: '$_quantity bản'),
             StudentInfoLine(label: 'Tệp đính kèm', value: '${_files.length} tệp'),
+            ..._formConfig.fields.where((f) => _extraInputs.containsKey(f.key))
+              .map((f) => StudentInfoLine(label: f.label,
+                value: _extraInputs[f.key]!.text.trim())),
             _highlightInfoLine(label: 'Tạm tính theo số bản',
               value: p.hasFee ? _money(p.fee * _quantity) : 'Chưa công bố lệ phí',
               fee: p.hasFee, borders: false),
@@ -2062,8 +3563,8 @@ class _VcoreOneDoorViewState extends State<VcoreOneDoorView> {
             const SizedBox(width: 12),
           ],
           Expanded(child: VnuPressMotion(
-            enabled: !_submitting && !(_currentStep == _DoorFormStep.attachments &&
-              _attachmentSecondsRemaining > 0),
+            enabled: !_submitting && (_currentStep != _DoorFormStep.attachments ||
+              _canContinueAttachments()),
             pressedScale: 0.962,
             child: SizedBox(height: 52, child: FilledButton(
             style: FilledButton.styleFrom(
@@ -2073,13 +3574,10 @@ class _VcoreOneDoorViewState extends State<VcoreOneDoorView> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
             onPressed: _submitting ||
                 (_currentStep == _DoorFormStep.attachments &&
-                  _attachmentSecondsRemaining > 0) ? null : () {
+                  !_canContinueAttachments()) ? null : () {
               if (_currentStep == _DoorFormStep.request) {
-                if (_request.text.trim().isEmpty) {
-                  _message('Vui lòng nhập nội dung đề nghị.',
-                    tone: VcoreNoticeTone.warning);
-                  return;
-                }
+                if (!_validateDynamicFields()) return;
+                if (!_validateRequestDetails()) return;
                 if (_live && p.deliveryMethods[_delivery] == null) {
                   _message('Chưa có hình thức nhận kết quả hợp lệ.',
                     tone: VcoreNoticeTone.warning);
@@ -2103,11 +3601,7 @@ class _VcoreOneDoorViewState extends State<VcoreOneDoorView> {
             },
             child: _submitting ? VnuLoading.inline(color: Colors.white, size: 17)
               : Text(_currentStep == _DoorFormStep.review
-                ? 'Nộp hồ sơ'
-                : _currentStep == _DoorFormStep.attachments &&
-                    _attachmentSecondsRemaining > 0
-                  ? 'Tiếp tục (${_attachmentSecondsRemaining}s)'
-                  : 'Tiếp tục',
+                ? 'Nộp hồ sơ' : 'Tiếp tục',
                 style: const TextStyle(fontSize: 15,
                   fontWeight: FontWeight.w600)),
           )))),
@@ -2118,6 +3612,12 @@ class _VcoreOneDoorViewState extends State<VcoreOneDoorView> {
 
   Widget _recordDetail() {
     final r = _selectedRecord!;
+    final snapshot = _oneDoorApi?.recordSnapshot(r.id);
+    final recordedReason = (snapshot?['lyDo'] ?? '').toString().trim();
+    final recordedQuantity = snapshot?['soLuongBan'];
+    final quantity = recordedQuantity is num
+        ? recordedQuantity.toInt()
+        : int.tryParse('${recordedQuantity ?? ''}') ?? r.quantity;
     return ListView(padding: const EdgeInsets.fromLTRB(20, 14, 20, 36),
       children: [
         _detailHeading(r.procedure.name, 'Ngày nộp: ${_date(r.createdAt)}', iconName: 'procedure_folder'),
@@ -2143,28 +3643,47 @@ class _VcoreOneDoorViewState extends State<VcoreOneDoorView> {
             'Thông tin được cập nhật khi hồ sơ được xử lý', last: true),
         const StudentSection('Thông tin hồ sơ'),
         StudentInfoLine(label: 'Ngày nộp', value: _date(r.createdAt)),
-        StudentInfoLine(label: 'Nội dung đề nghị', value: r.requestText),
-        StudentInfoLine(label: 'Nhận kết quả', value: r.deliveryMethod),
+        StudentInfoLine(label: 'Nội dung yêu cầu', value: r.requestText),
+        if (recordedReason.isNotEmpty)
+          StudentInfoLine(label: 'Lý do / Mục đích', value: recordedReason),
+        StudentInfoLine(label: 'Hình thức nhận kết quả',
+          value: r.deliveryMethod),
+        if (quantity > 0)
+          StudentInfoLine(label: 'Số lượng bản', value: '$quantity bản'),
         _highlightInfoLine(label: 'Lệ phí dự kiến', value: _money(r.totalFee), fee: true, borders: false),
         const StudentSection('Tệp đính kèm'),
-        if (r.paperFileNames.isEmpty)
-          const Text('Chưa có tệp đính kèm.',
-            style: TextStyle(fontSize: 13, color: StudentServiceUI.secondary)),
-        for (final file in r.paperFileNames.values)
-          Container(padding: const EdgeInsets.symmetric(vertical: 13),
-            decoration: const BoxDecoration(border: Border(bottom:
-              BorderSide(color: StudentServiceUI.line))),
+        if (_recordDetailLoading)
+          const Padding(padding: EdgeInsets.symmetric(vertical: 16),
             child: Row(children: [
-              const ModuleDetailIcon(name: 'procedure_attachment', size: 27),
-              const SizedBox(width: 12),
-              Expanded(child: Text(file, maxLines: 2, overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 13.5, color: StudentServiceUI.ink))),
-            ])),
-        if (r.status == OneDoorRecordStatus.supplement) ...[
+              SizedBox(width: 17, height: 17,
+                child: CircularProgressIndicator(strokeWidth: 2)),
+              SizedBox(width: 12),
+              Text('Đang tải giấy tờ đã nộp...'),
+            ]))
+        else if (_recordDetailFailed) ...[
+          const Text('Chưa tải được giấy tờ đã nộp.',
+            style: TextStyle(fontSize: 13,
+              color: StudentServiceUI.secondary)),
+          Align(alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () => _openRecord(r),
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text('Thử lại'),
+            )),
+        ] else if (r.paperFileNames.isEmpty)
+          const Text('Hồ sơ chưa có tệp đính kèm.',
+            style: TextStyle(fontSize: 13,
+              color: StudentServiceUI.secondary))
+        else ...[
+          for (final entry in r.paperFileNames.entries)
+            _submittedPaperRow(entry.key, entry.value),
+        ],
+        if (!_recordDetailLoading && !_recordDetailFailed &&
+            (_recordCanSupplement ||
+             r.status == OneDoorRecordStatus.supplement)) ...[
           const SizedBox(height: 24),
           VnuPressMotion(child: SizedBox(height: 46, child: FilledButton(
-            onPressed: () => setState(() { _page = _DoorPage.supplement;
-              _supplementFiles.clear(); _supplementNote.clear(); }),
+            onPressed: _submitting ? null : _openSupplement,
             style: FilledButton.styleFrom(overlayColor: Colors.transparent,
               backgroundColor: StudentServiceUI.green),
             child: const Text('Bổ sung hồ sơ')))),
@@ -2180,24 +3699,275 @@ class _VcoreOneDoorViewState extends State<VcoreOneDoorView> {
     );
   }
 
-  Widget _supplementPage() {
-    final r = _selectedRecord!;
-    return Column(children: [
-      Expanded(child: ListView(padding: const EdgeInsets.fromLTRB(20, 16, 20, 30),
-        children: [
-          _detailHeading('Bổ sung tài liệu', r.procedure.name),
-          _formLabel('Nội dung bổ sung'),
-          TextField(controller: _supplementNote, minLines: 3, maxLines: 6,
-            style: const TextStyle(fontSize: 14),
-            decoration: StudentServiceUI.field('Nhập nội dung cần bổ sung')),
-          const StudentSection('Giấy tờ'),
-          ...r.procedure.papers.map((paper) => _paperPicker(paper,
-              _supplementFiles, () => _pickFile(paper.id, supplement: true))),
+  Widget _supplementFieldWidget(_OneDoorSupplementField field) {
+    final controller = _supplementInputs[field.key];
+    if (controller == null) return const SizedBox.shrink();
+    final multiline = field.type.contains('textarea') ||
+        field.type.contains('multiline');
+    final numeric = field.type.contains('number') ||
+        field.type.contains('int') || field.type.contains('decimal');
+    final date = field.type.contains('date');
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _formLabel(field.label),
+        if (field.currentValue.trim().isNotEmpty) ...[
+          Text('Gi\u00e1 tr\u1ecb \u0111\u00e3 khai: ${field.currentValue}',
+            style: const TextStyle(fontSize: 12,
+              color: StudentServiceUI.secondary, height: 1.4)),
+          const SizedBox(height: 7),
         ],
-      )),
-      StudentActionBar(text: 'Gửi bổ sung', onPressed: _sendSupplement),
+        TextField(
+          controller: controller,
+          enabled: !_submitting,
+          onChanged: (_) => setState(() {
+            for (final id in _supplementGeneratedFingerprints.keys) {
+              _supplementReviewedDigests.remove(id);
+            }
+          }),
+          maxLength: multiline ? 1000 : 500,
+          minLines: multiline ? 3 : 1,
+          maxLines: multiline ? 6 : 1,
+          keyboardType: multiline ? TextInputType.multiline
+              : numeric ? TextInputType.number
+              : date ? TextInputType.datetime : TextInputType.text,
+          style: const TextStyle(fontSize: 14),
+          decoration: StudentServiceUI.field(field.hint.isNotEmpty
+              ? field.hint : 'Nh\u1eadp gi\u00e1 tr\u1ecb m\u1edbi n\u1ebfu c\u1ea7n'),
+        ),
+      ]),
+    );
+  }
+
+  // V30.1: One full-width field per row, with the original submitted value.
+  // The submission contract has no update for these fixed fields.
+  Widget _supplementReadonlyField(String label, String value) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+    decoration: const BoxDecoration(border: Border(
+      bottom: BorderSide(color: StudentServiceUI.line))),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label, style: const TextStyle(fontSize: 12,
+        fontWeight: FontWeight.w600, color: StudentServiceUI.secondary)),
+      const SizedBox(height: 5),
+      Text(value.trim().isNotEmpty ? value.trim()
+          : 'Ch\u01b0a c\u00f3 th\u00f4ng tin',
+        softWrap: true,
+        style: const TextStyle(fontSize: 14, height: 1.4,
+          color: StudentServiceUI.ink, fontWeight: FontWeight.w500)),
+    ]),
+  );
+
+  Widget _supplementRegistrationSummary() {
+    final quantity = _supplementSavedQuantity;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const StudentSection('Th\u00f4ng tin \u0111\u0103ng k\u00fd'),
+      const Padding(
+        padding: EdgeInsets.only(bottom: 8),
+        child: Text('C\u00e1c th\u00f4ng tin \u0111\u00e3 ghi nh\u1eadn khi n\u1ed9p h\u1ed3 s\u01a1. '
+          'Ph\u1ea7n n\u00e0y ch\u1ec9 \u0111\u1ec3 \u0111\u1ed1i chi\u1ebfu; n\u1ebfu c\u1ea7n '
+          '\u0111i\u1ec1u ch\u1ec9nh, h\u00e3y ghi r\u00f5 trong Ghi ch\u00fa g\u1eedi c\u00e1n b\u1ed9.',
+          style: TextStyle(fontSize: 12.4, height: 1.45,
+            color: StudentServiceUI.secondary)),
+      ),
+      Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: StudentServiceUI.line),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          if (_supplementCode.isNotEmpty)
+            _supplementReadonlyField('M\u00e3 h\u1ed3 s\u01a1', _supplementCode),
+          if (_supplementSubmittedAt.isNotEmpty)
+            _supplementReadonlyField('Ng\u00e0y n\u1ed9p', _supplementSubmittedAt),
+          _supplementReadonlyField('N\u1ed9i dung y\u00eau c\u1ea7u',
+              _supplementSavedRequest),
+          if (_supplementSavedReason.isNotEmpty)
+            _supplementReadonlyField('L\u00fd do / M\u1ee5c \u0111\u00edch',
+                _supplementSavedReason),
+          _supplementReadonlyField('H\u00ecnh th\u1ee9c nh\u1eadn k\u1ebft qu\u1ea3',
+              _supplementSavedDelivery),
+          _supplementReadonlyField('S\u1ed1 l\u01b0\u1ee3ng b\u1ea3n',
+              quantity != null && quantity > 0 ? '$quantity b\u1ea3n' : ''),
+          if (_supplementPaidAmount != null)
+            _supplementReadonlyField('S\u1ed1 ti\u1ec1n \u0111\u00e3 ghi nh\u1eadn',
+                _money(_supplementPaidAmount!)),
+        ]),
+      ),
     ]);
   }
+
+  Widget _supplementPage() {
+    final record = _selectedRecord!;
+    return Column(children: [
+      Expanded(child: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 30),
+        children: [
+          _detailHeading('B\u1ed5 sung h\u1ed3 s\u01a1', record.procedure.name),
+          if (_supplementLoading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 32),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (_supplementError != null) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: Text(_supplementError!,
+                style: const TextStyle(color: StudentServiceUI.caution)),
+            ),
+            Align(alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: _openSupplement,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Th\u1eed l\u1ea1i'))),
+          ] else ...[
+            if (_supplementNotices.isNotEmpty) ...[
+              const StudentSection('Y\u00eau c\u1ea7u b\u1ed5 sung'),
+              for (final notice in _supplementNotices) ...[
+                Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF9EB),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFF0E4C3)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (notice.author.isNotEmpty || notice.date.isNotEmpty)
+                        Text([
+                          if (notice.author.isNotEmpty) notice.author,
+                          if (notice.date.isNotEmpty)
+                            _supplementDate(notice.date),
+                        ].join(' \u00b7 '),
+                          style: const TextStyle(fontSize: 11.7,
+                            color: StudentServiceUI.secondary)),
+                      const SizedBox(height: 5),
+                      Text(notice.message, style: const TextStyle(
+                        fontSize: 13.5, height: 1.45,
+                        color: StudentServiceUI.ink)),
+                      if (notice.answered) ...[
+                        const SizedBox(height: 5),
+                        const Text('\u0110\u00e3 b\u1ed5 sung',
+                          style: TextStyle(fontSize: 11.5,
+                            color: StudentServiceUI.green)),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ],
+            _supplementRegistrationSummary(),
+            if (_supplementFields.isNotEmpty) ...[
+              const StudentSection('Th\u00f4ng tin c\u1ea7n c\u1eadp nh\u1eadt'),
+              const Padding(
+                padding: EdgeInsets.only(bottom: 12),
+                child: Text('Ch\u1ec9 nh\u1eadp c\u00e1c m\u1ee5c c\u1ea7n s\u1eeda. '
+                  '\u0110\u1ec3 tr\u1ed1ng n\u1ebfu mu\u1ed1n gi\u1eef nguy\u00ean gi\u00e1 tr\u1ecb \u0111\u00e3 khai.',
+                  style: TextStyle(fontSize: 12.4,
+                    color: StudentServiceUI.secondary, height: 1.4)),
+              ),
+              for (final field in _supplementFields)
+                _supplementFieldWidget(field),
+            ],
+            if (_supplementPapers.isNotEmpty) ...[
+              const StudentSection('Gi\u1ea5y t\u1edd \u0111\u00ednh k\u00e8m'),
+              const Padding(padding: EdgeInsets.only(bottom: 10),
+                child: Text('Ch\u1ec9 thay t\u1ec7p c\u1ea7n s\u1eeda. Gi\u1ea5y t\u1edd kh\u00f4ng '
+                  'ch\u1ecdn t\u1ec7p m\u1edbi v\u1eabn \u0111\u01b0\u1ee3c gi\u1eef nguy\u00ean.',
+                  style: TextStyle(fontSize: 12.4,
+                    color: StudentServiceUI.secondary, height: 1.4)),
+              ),
+              for (final paper in _supplementPapers) ...[
+                if (_supplementCurrentFiles.containsKey(paper.id))
+                  Padding(
+                    padding: const EdgeInsets.only(top: 9, bottom: 3),
+                    child: Row(children: [
+                      const Icon(Icons.history_rounded,
+                        size: 18, color: StudentServiceUI.green),
+                      const SizedBox(width: 7),
+                      Expanded(child: Text(
+                        '\u0110\u00e3 n\u1ed9p: ${_supplementCurrentFiles[paper.id]}',
+                        maxLines: 1, overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 12.3,
+                          color: StudentServiceUI.secondary))),
+                      IconButton(
+                        tooltip: 'Xem t\u1ec7p \u0111\u00e3 n\u1ed9p',
+                        onPressed: _submitting ? null : () =>
+                          _openSubmittedPaper(paper.id,
+                            _supplementCurrentFiles[paper.id]!),
+                        icon: const Icon(Icons.visibility_outlined,
+                          color: StudentServiceUI.green)),
+                    ]),
+                  ),
+                _paperPicker(paper, _supplementFiles,
+                  () => _chooseAttachmentSource(paper.id, supplement: true)),
+                if (_supplementAutoPaperIds.contains(paper.id)) ...[
+                  Align(alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: _submitting ? null
+                        : () => _regenerateSupplementWord(paper),
+                      icon: const Icon(Icons.description_outlined, size: 18),
+                      label: const Text('T\u1ea1o l\u1ea1i b\u1ea3n Word \u0111\u00e3 \u0111i\u1ec1n'),
+                    ),
+                  ),
+                ],
+                if (_supplementPaths.containsKey(paper.id))
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 5),
+                    child: Row(children: [
+                      Icon(_supplementReviewedDigests.containsKey(paper.id)
+                          ? Icons.check_circle_outline_rounded
+                          : Icons.info_outline_rounded,
+                        size: 15, color: StudentServiceUI.green),
+                      const SizedBox(width: 6),
+                      Expanded(child: Text(
+                        _supplementReviewedDigests.containsKey(paper.id)
+                            ? '\u0110\u00e3 ki\u1ec3m tra t\u1ec7p m\u1edbi'
+                            : 'M\u1edf t\u1ec7p v\u00e0 x\u00e1c nh\u1eadn tr\u01b0\u1edbc khi g\u1eedi',
+                        style: const TextStyle(fontSize: 11.7,
+                          color: StudentServiceUI.secondary)),
+                      ),
+                    ]),
+                  ),
+              ],
+            ],
+            const StudentSection('Ghi ch\u00fa g\u1eedi c\u00e1n b\u1ed9'),
+            TextField(
+              controller: _supplementNote,
+              maxLength: 1000,
+              minLines: 3,
+              maxLines: 6,
+              enabled: !_submitting,
+              style: const TextStyle(fontSize: 14),
+              decoration: StudentServiceUI.field('Kh\u00f4ng b\u1eaft bu\u1ed9c'),
+            ),
+            if (_supplementChangedValues().isNotEmpty &&
+                _supplementAutoPaperIds.isNotEmpty &&
+                _supplementPaths.isEmpty) ...[
+              const SizedBox(height: 10),
+              const Text('Th\u00f4ng tin \u0111\u00e3 s\u1eeda kh\u00f4ng t\u1ef1 thay '
+                'n\u1ed9i dung t\u1ec7p c\u0169. N\u1ebfu c\u1ea7n s\u1eeda b\u1ea3n Word, '
+                'h\u00e3y t\u1ea1o l\u1ea1i v\u00e0 ki\u1ec3m tra tr\u01b0\u1edbc khi g\u1eedi.',
+                style: TextStyle(fontSize: 12.2,
+                  color: StudentServiceUI.secondary)),
+            ],
+          ],
+        ],
+      )),
+      if (!_supplementLoading && _supplementError == null)
+        StudentActionBar(text: _submitting ? '\u0110ang g\u1eedi...'
+            : 'G\u1eedi b\u1ed5 sung', onPressed: _sendSupplement),
+    ]);
+  }
+
+  String _supplementDate(String raw) {
+    final date = DateTime.tryParse(raw);
+    return date == null ? raw
+      : DateFormat('dd/MM/yyyy HH:mm').format(date.toLocal());
+  }
+
 }
 
 
@@ -2371,3 +4141,4 @@ class _OneDoorNumberStepperState extends State<_OneDoorNumberStepper>
     ]);
   }
 }
+

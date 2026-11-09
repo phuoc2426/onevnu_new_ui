@@ -12,11 +12,10 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:vnu_core/widgets/student_service_ui.dart';
 
-/// A single, compact preview surface for One Door attachments.
-/// IMPORTANT: The simple MicrosoftViewer renderer must never render DOCX:
-/// complex official templates cause overflowing RenderFlex and lost positions.
-/// DOCX is shown via the already-installed read-only WebView DOCX renderer;
-/// the native Office app remains the fidelity fallback for any document.
+/// Compact One Door preview surface. For official DOCX documents use the
+/// device's Word/Office print-layout renderer FIRST. The HTML-based viewer is
+/// used only when an external Word renderer is unavailable; it can reflow text.
+/// A real DOCX-to-PDF endpoint is not part of the current OpenAPI.
 class OneDoorAttachmentPreview {
   static Future<void> openInOffice(BuildContext context, String path) async {
     if (!await File(path).exists()) {
@@ -24,6 +23,44 @@ class OneDoorAttachmentPreview {
       return;
     }
     await _openOutside(context, path);
+  }
+
+  /// V26 PRINT LAYOUT: DOCX/DOC is sent to the device Office renderer first.
+  /// This preserves Word's paginated layout better than reflowing DOCX to
+  /// HTML in a narrow mobile WebView. Original bytes remain unchanged.
+  /// PDF and images use the in-app viewer. No third-party conversion upload.
+  /// If no Office app is installed, DOCX uses the existing in-app quick viewer
+  /// with its explicit layout warning (not an imaginary PDF conversion).
+  static Future<bool> openForReview(BuildContext context, {
+    required String path,
+    required String title,
+  }) async {
+    final file = File(path);
+    if (!await file.exists() || await file.length() == 0) {
+      if (context.mounted) _notice(context,
+        'Tệp trống hoặc không còn tồn tại. Hãy đính kèm lại.');
+      return false;
+    }
+    if (!context.mounted) return false;
+    final ext = path.toLowerCase().split('.').last;
+    if (<String>{'docx', 'doc', 'xls', 'xlsx'}.contains(ext)) {
+      final launched = await _launchOffice(context, path);
+      if (launched) return true;
+      if (<String>{'doc', 'xls'}.contains(ext)) {
+        _notice(context, 'Hãy cài Word/Excel hoặc chọn tệp PDF để '
+          'kiểm tra đúng bố cục.');
+        return false;
+      }
+      // Fallback is explicitly not a layout-faithful Word print preview.
+      if (!context.mounted) return false;
+      _notice(context, 'Chưa có Office trên thiết bị. '
+        'Bản xem nhanh có thể khác khổ trang gốc.');
+    }
+    if (!context.mounted) return false;
+    final result = await Navigator.of(context).push<bool>(MaterialPageRoute(
+      builder: (_) => _OneDoorPreviewPage(
+        sourcePath: path, fileName: title, extension: ext)));
+    return result == true;
   }
 
   /// Opens Android/iOS sharing targets (e.g. Zalo). The selected file remains
@@ -81,23 +118,25 @@ class OneDoorAttachmentPreview {
       return null;
     }
     if (!context.mounted) return null;
-    await Navigator.of(context).push<void>(MaterialPageRoute(
+    await Navigator.of(context).push<bool>(MaterialPageRoute(
       builder: (_) => _OneDoorPreviewPage(
         sourcePath: path, fileName: title, extension: extension)));
     return null;
   }
 
-  static Future<void> _openOutside(BuildContext context, String path) async {
+  static Future<bool> _launchOffice(BuildContext context, String path) async {
     try {
       final result = await OpenFilex.open(path);
-      if (result.type != ResultType.done && context.mounted) {
-        _notice(context, 'Không mở được bằng ứng dụng trên thiết bị: '
-          '${result.message}. Hãy thử Chia sẻ để mở bằng Word/Excel.');
-      }
+      return result.type == ResultType.done;
     } catch (_) {
-      if (context.mounted) _notice(context,
-        'Không mở được tài liệu bên ngoài. Hãy thử Chia sẻ hoặc '
-        'cài ứng dụng Word/Excel tương thích.');
+      return false;
+    }
+  }
+
+  static Future<void> _openOutside(BuildContext context, String path) async {
+    if (!await _launchOffice(context, path) && context.mounted) {
+      _notice(context, 'Không mở được trong ứng dụng trên thiết bị. '
+        'Hãy cài Microsoft Word/Excel hoặc thử chia sẻ tệp.');
     }
   }
 
@@ -114,7 +153,8 @@ const _previewInk = Color(0xFF1B2B26);
 const _previewBackground = Color(0xFFF0F3F4);
 
 /// Header intentionally contains ONLY 'Preview Docs', per UX requirement.
-PreferredSizeWidget _previewAppBar(BuildContext context) => AppBar(
+PreferredSizeWidget _previewAppBar(BuildContext context,
+    {VoidCallback? onBack}) => AppBar(
   backgroundColor: Colors.white,
   surfaceTintColor: Colors.transparent,
   foregroundColor: _previewInk,
@@ -129,7 +169,7 @@ PreferredSizeWidget _previewAppBar(BuildContext context) => AppBar(
     tooltip: 'Quay lại',
     icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
     color: _previewInk,
-    onPressed: () => Navigator.of(context).maybePop(),
+    onPressed: onBack ?? () => Navigator.of(context).maybePop(),
   ),
   bottom: const PreferredSize(
     preferredSize: Size.fromHeight(1),
@@ -137,10 +177,9 @@ PreferredSizeWidget _previewAppBar(BuildContext context) => AppBar(
   ),
 );
 
-/// Documents keep their original bytes. Preview is not a converted upload.
-/// PDF: native PDFView. DOCX: WebView read-only DOCX renderer (avoids Flutter
-/// RenderFlex overflow). XLSX: wide horizontally scrollable fallback; always
-/// offer opening in the dedicated Office app to verify complex formatting.
+/// Documents keep their original bytes. This preview never converts uploads.
+/// DOCX is opened in Office first by openForReview(); this page is a fallback.
+/// PDFView renders print pages, images support zoom, XLSX uses a wide canvas.
 class _OneDoorPreviewPage extends StatefulWidget {
   const _OneDoorPreviewPage({
     required this.sourcePath,
@@ -157,6 +196,16 @@ class _OneDoorPreviewPage extends StatefulWidget {
 
 class _OneDoorPreviewPageState extends State<_OneDoorPreviewPage> {
   Future<Uint8List>? _xlsxBytes;
+  bool _rendered = false;
+  bool _failed = false;
+
+  void _markRendered() {
+    _rendered = true;
+  }
+
+  void _closeReview() {
+    Navigator.of(context).pop<bool>(_rendered && !_failed);
+  }
 
   @override
   void initState() {
@@ -254,6 +303,7 @@ class _OneDoorPreviewPageState extends State<_OneDoorPreviewPage> {
         }
         // Excel is a grid; give it a sheet-width canvas, then scroll sideways.
         // This is not used for DOCX (which previously overflowed on mobile).
+        _markRendered();
         return SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: SizedBox(
@@ -287,32 +337,72 @@ class _OneDoorPreviewPageState extends State<_OneDoorPreviewPage> {
   Widget _document() => switch (widget.extension) {
     'pdf' => PDFView(
       filePath: widget.sourcePath,
-      onError: (error) => OneDoorAttachmentPreview._notice(context,
-        'Không xem được PDF: $error'),
+      onRender: (_) => _markRendered(),
+      onError: (error) {
+        _failed = true;
+        OneDoorAttachmentPreview._notice(context,
+          'Không xem được PDF: $error');
+      },
+      onPageError: (page, error) {
+        _failed = true;
+        OneDoorAttachmentPreview._notice(context,
+          'Không xem được trang $page: $error');
+      },
     ),
     'jpg' || 'jpeg' || 'png' => Center(child: InteractiveViewer(
       minScale: 0.5, maxScale: 5,
-      child: Image.file(File(widget.sourcePath), fit: BoxFit.contain),
+      child: Image.file(File(widget.sourcePath), fit: BoxFit.contain,
+        frameBuilder: (context, child, frame, wasLoadedSynchronously) {
+          if (wasLoadedSynchronously || frame != null) _markRendered();
+          return child;
+        },
+        errorBuilder: (context, error, stackTrace) {
+          _failed = true;
+          return const Center(child: Text('Không hiển thị được ảnh.'));
+        }),
     )),
-    'docx' => ClipRect(child: DocxViewerWidget(
-      key: ValueKey<String>(widget.sourcePath),
-      filePath: widget.sourcePath,
-      config: DocxViewerConfig(isReadOnly: true),
-    )),
+    'docx' => ClipRect(child: Builder(builder: (context) {
+      // The HTML renderer has no reliable complete-document callback.
+      // Fallback: user must still explicitly confirm after opening.
+      _markRendered();
+      return DocxViewerWidget(
+        key: ValueKey<String>(widget.sourcePath),
+        filePath: widget.sourcePath,
+        config: DocxViewerConfig(isReadOnly: true),
+      );
+    })),
     'xlsx' => _excelPreview(),
     _ => _legacyPreview(),
   };
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) => WillPopScope(
+    onWillPop: () async {
+      _closeReview();
+      return false;
+    },
+    child: Scaffold(
     backgroundColor: _previewBackground,
-    appBar: _previewAppBar(context),
+    appBar: _previewAppBar(context, onBack: _closeReview),
     body: SafeArea(top: false, child: Column(children: [
       _fileToolbar(),
       _accuracyNote(),
       Expanded(child: _document()),
+      Container(color: Colors.white,
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+        child: SizedBox(width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: _closeReview,
+            icon: const Icon(Icons.check_circle_outline_rounded),
+            label: const Text('Đóng xem trước'),
+            style: FilledButton.styleFrom(
+              backgroundColor: StudentServiceUI.green,
+              minimumSize: const Size.fromHeight(46)),
+          ),
+        ),
+      ),
     ])),
-  );
+  ));
 }
 
 /// The optional DOCX editor saves as a *new* file, not the source template.

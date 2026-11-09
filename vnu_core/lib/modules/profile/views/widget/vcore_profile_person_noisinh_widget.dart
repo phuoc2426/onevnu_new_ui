@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:vnu_core/common/app_text_styles.dart';
 import 'package:vnu_core/common/space_widget.dart';
+import 'package:vnu_core/common/utils.dart';
 
 import '../../controllers/vcore_profile_person_info_controller.dart';
 import 'vcore_profile_dropdownfield_widget.dart';
@@ -38,7 +39,7 @@ class VcoreProfilePersonNoisinhWidget extends StatelessWidget {
 
                           controller.listQuanHuyenNoiSinh =
                               controller.listQuanHuyenQueQuan;
-                          item?.idNoiSinhQuanHuyen = item.idQueQuanQuanHuyen;
+                          item?.idNoiSinhQuanHuyen = '';
 
                           item?.noiSinhPhuongXa = item.queQuanPhuongXa;
                         },
@@ -48,7 +49,8 @@ class VcoreProfilePersonNoisinhWidget extends StatelessWidget {
                       padding: const EdgeInsets.only(bottom: 20),
                       child: Row(
                         children: [
-                          const Icon(Icons.place_outlined, size: 20, color: Color(0xFF466FFF)),
+                          svgAsset(
+                              'assets/images/ic_profile_info_location.svg'),
                           spaceWidth(10),
                           Text(
                             'Lấy thông tin theo quê quán',
@@ -92,6 +94,7 @@ class VcoreProfilePersonNoisinhWidget extends StatelessWidget {
                                 //reset
                                 item?.idNoiSinhTinhThanhPho = "";
                                 item?.idNoiSinhQuanHuyen = "";
+                                item?.noiSinhPhuongXa = "";
                               },
                             );
                           },
@@ -128,8 +131,7 @@ class VcoreProfilePersonNoisinhWidget extends StatelessWidget {
                                 item?.idNoiSinhTinhThanhPho = obj?.id;
                                 //reset
                                 item?.idNoiSinhQuanHuyen = "";
-
-                                controller.refreshQuanHuyenNoiSinh();
+                                item?.noiSinhPhuongXa = "";
                               },
                             );
                           },
@@ -142,48 +144,17 @@ class VcoreProfilePersonNoisinhWidget extends StatelessWidget {
                   //Quận/Huyện
                   Row(children: [
                     //
-                    Expanded(
-                      child: VcoreProfileDropdownfieldWidget(
-                        title: 'Quận/Huyện',
-                        hintText: 'Chọn Quận/Huyện',
-                        value: controller.listQuanHuyenNoiSinh
-                            .firstWhereOrNull((item) {
-                          return item.id ==
-                              controller.sinhvienEdit.value.idNoiSinhQuanHuyen;
-                        })?.ten,
-                        items: controller.listQuanHuyenNoiSinh.map(
-                          (e) {
-                            return e.ten ?? '';
-                          },
-                        ).toList(),
-                        onSelected: (value) {
-                          var obj = controller.listQuanHuyenNoiSinh
-                              .firstWhereOrNull((item) {
-                            return item.ten == value;
-                          });
-                          if (controller
-                                  .sinhvienEdit.value.idNoiSinhQuanHuyen ==
-                              obj?.id) {
-                            return;
-                          }
-                          controller.sinhvienEdit.update(
-                            (item) {
-                              item?.idNoiSinhQuanHuyen = obj?.id;
-                            },
-                          );
-                        },
-                      ),
-                    ),
-                    spaceWidth(10),
+                    
                     Expanded(
                         child: VcoreProfileTextFieldWidget(
-                      title: 'Phường/Xã/Thị trấn',
-                      hintText: 'Nhập P/X/TT',
+                      title: 'Xã/Phường/Đặc khu',
+                      hintText: 'Nhập tên xã/phường/đặc khu',
                       value: controller.sinhvienEdit.value.noiSinhPhuongXa,
                       onChange: (text) {
                         controller.sinhvienEdit.update(
                           (item) {
                             item?.noiSinhPhuongXa = text;
+                                item?.idNoiSinhQuanHuyen = '';
                           },
                         );
                       },
@@ -195,3 +166,4 @@ class VcoreProfilePersonNoisinhWidget extends StatelessWidget {
     );
   }
 }
+

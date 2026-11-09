@@ -68,42 +68,12 @@ class VcoreProfilePersonDiaChiTamTruWidget extends StatelessWidget {
 
                               // Khi đổi tỉnh/thành thì phải reset quận/huyện cũ
                               item?.diaChiTamTruQuanHuyen = "";
-                            });
-
-                            // Load lại danh sách quận/huyện theo tỉnh mới
-                            controller.refreshQuanHuyenDiaChiTamTru();
-                          },
-                        ),
-                      ),
-                      spaceWidth(10),
-                      Expanded(
-                        child: VcoreProfileDropdownfieldWidget(
-                          title: 'Quận/Huyện',
-                          hintText: 'Chọn Quận/Huyện',
-                          value: controller.listQuanHuyenDiaChiTamTru
-                              .firstWhereOrNull((item) {
-                                return item.id ==
-                                    controller
-                                        .sinhvienEdit
-                                        .value
-                                        .diaChiTamTruQuanHuyen;
-                              })
-                              ?.ten,
-                          items: controller.listQuanHuyenDiaChiTamTru.map((e) {
-                            return e.ten ?? '';
-                          }).toList(),
-                          onSelected: (value) {
-                            final obj = controller.listQuanHuyenDiaChiTamTru
-                                .firstWhereOrNull((item) {
-                                  return item.ten == value;
-                                });
-
-                            controller.sinhvienEdit.update((item) {
-                              item?.diaChiTamTruQuanHuyen = obj?.id;
+                                item?.diaChiTamTruPhuongXa = "";
                             });
                           },
                         ),
                       ),
+                      
                     ],
                   ),
                   spaceHeight(itemSpace),
@@ -114,8 +84,8 @@ class VcoreProfilePersonDiaChiTamTruWidget extends StatelessWidget {
                       //
                       Expanded(
                         child: VcoreProfileTextFieldWidget(
-                          title: 'Phường/Xã/Thị trấn',
-                          hintText: 'Nhập P/X/TT',
+                          title: 'Xã/Phường/Đặc khu',
+                          hintText: 'Nhập tên xã/phường/đặc khu',
                           value: controller
                               .sinhvienEdit
                               .value
@@ -123,6 +93,7 @@ class VcoreProfilePersonDiaChiTamTruWidget extends StatelessWidget {
                           onChange: (text) {
                             controller.sinhvienEdit.update((item) {
                               item?.diaChiTamTruPhuongXa = text;
+                                item?.diaChiTamTruQuanHuyen = '';
                             });
                           },
                           onSubmitted: (text) {},
@@ -170,3 +141,4 @@ class VcoreProfilePersonDiaChiTamTruWidget extends StatelessWidget {
     );
   }
 }
+

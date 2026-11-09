@@ -58,6 +58,7 @@ class VcoreProfilePersonQuequanWidget extends StatelessWidget {
                                 //reset
                                 item?.idQueQuanTinhThanhPho = "";
                                 item?.idQueQuanQuanHuyen = "";
+                                item?.queQuanPhuongXa = "";
                               },
                             );
                           },
@@ -94,8 +95,7 @@ class VcoreProfilePersonQuequanWidget extends StatelessWidget {
                                 item?.idQueQuanTinhThanhPho = obj?.id;
                                 //reset
                                 item?.idQueQuanQuanHuyen = "";
-
-                                controller.refreshQuanHuyenQueQuan();
+                                item?.queQuanPhuongXa = "";
                               },
                             );
                           },
@@ -109,49 +109,17 @@ class VcoreProfilePersonQuequanWidget extends StatelessWidget {
                   Row(
                     children: [
                       //
-                      Expanded(
-                        child: VcoreProfileDropdownfieldWidget(
-                          title: 'Quận/Huyện',
-                          hintText: 'Chọn Quận/Huyện',
-                          value: controller.listQuanHuyenQueQuan
-                              .firstWhereOrNull((item) {
-                            return item.id ==
-                                controller
-                                    .sinhvienEdit.value.idQueQuanQuanHuyen;
-                          })?.ten,
-                          items: controller.listQuanHuyenQueQuan.map(
-                            (e) {
-                              return e.ten ?? '';
-                            },
-                          ).toList(),
-                          onSelected: (value) {
-                            var obj = controller.listQuanHuyenQueQuan
-                                .firstWhereOrNull((item) {
-                              return item.ten == value;
-                            });
-                            if (controller
-                                    .sinhvienEdit.value.idQueQuanQuanHuyen ==
-                                obj?.id) {
-                              return;
-                            }
-                            controller.sinhvienEdit.update(
-                              (item) {
-                                item?.idQueQuanQuanHuyen = obj?.id;
-                              },
-                            );
-                          },
-                        ),
-                      ),
-                      spaceWidth(10),
+                      
                       Expanded(
                         child: VcoreProfileTextFieldWidget(
-                          title: 'Phường/Xã/Thị trấn',
-                          hintText: 'Nhập P/X/TT',
+                          title: 'Xã/Phường/Đặc khu',
+                          hintText: 'Nhập tên xã/phường/đặc khu',
                           value: controller.sinhvienEdit.value.queQuanPhuongXa,
                           onChange: (text) {
                             controller.sinhvienEdit.update(
                               (item) {
                                 item?.queQuanPhuongXa = text;
+                                item?.idQueQuanQuanHuyen = '';
                               },
                             );
                           },
@@ -169,3 +137,4 @@ class VcoreProfilePersonQuequanWidget extends StatelessWidget {
     );
   }
 }
+

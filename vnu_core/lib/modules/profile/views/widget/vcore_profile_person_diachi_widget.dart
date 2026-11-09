@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:vnu_core/common/app_text_styles.dart';
 import 'package:vnu_core/common/space_widget.dart';
+import 'package:vnu_core/common/utils.dart';
 import 'package:vnu_core/modules/profile/controllers/vcore_profile_person_info_controller.dart';
 
 import 'vcore_profile_dropdownfield_widget.dart';
@@ -39,7 +40,7 @@ class VcoreProfilePersonDiaChiLienLacWidget extends StatelessWidget {
                           controller.listQuanHuyenDiaChiLL =
                               controller.listQuanHuyenNoiOHienNay;
                           item?.idDiaChiLienLacQuanHuyen =
-                              item.idNoiOHienNayQuanHuyen;
+                              '';
 
                           item?.diaChiLienLacPhuongXa =
                               item.noiOHienNayPhuongXa;
@@ -55,7 +56,8 @@ class VcoreProfilePersonDiaChiLienLacWidget extends StatelessWidget {
                       padding: const EdgeInsets.only(bottom: 20),
                       child: Row(
                         children: [
-                          const Icon(Icons.place_outlined, size: 20, color: Color(0xFF466FFF)),
+                          svgAsset(
+                              'assets/images/ic_profile_info_location.svg'),
                           spaceWidth(10),
                           Text(
                             'Lấy thông tin theo nơi ở',
@@ -104,48 +106,13 @@ class VcoreProfilePersonDiaChiLienLacWidget extends StatelessWidget {
                                 item?.idDiaChiLienLacTinhThanhPho = obj?.id;
                                 //reset
                                 item?.idDiaChiLienLacQuanHuyen = "";
-
-                                controller.refreshQuanHuyenDiaChiLL();
+                                item?.diaChiLienLacPhuongXa = "";
                               },
                             );
                           },
                         ),
                       ),
-                      spaceWidth(10),
-
-                      Expanded(
-                        child: VcoreProfileDropdownfieldWidget(
-                          title: 'Quận/Huyện',
-                          hintText: 'Chọn Quận/Huyện',
-                          value: controller.listQuanHuyenDiaChiLL
-                              .firstWhereOrNull((item) {
-                            return item.id ==
-                                controller.sinhvienEdit.value
-                                    .idDiaChiLienLacQuanHuyen;
-                          })?.ten,
-                          items: controller.listQuanHuyenDiaChiLL.map(
-                            (e) {
-                              return e.ten ?? '';
-                            },
-                          ).toList(),
-                          onSelected: (value) {
-                            var obj = controller.listQuanHuyenDiaChiLL
-                                .firstWhereOrNull((item) {
-                              return item.ten == value;
-                            });
-                            if (controller.sinhvienEdit.value
-                                    .idDiaChiLienLacQuanHuyen ==
-                                obj?.id) {
-                              return;
-                            }
-                            controller.sinhvienEdit.update(
-                              (item) {
-                                item?.idDiaChiLienLacQuanHuyen = obj?.id;
-                              },
-                            );
-                          },
-                        ),
-                      ),
+                      
                     ],
                   ),
                   spaceHeight(itemSpace),
@@ -156,14 +123,15 @@ class VcoreProfilePersonDiaChiLienLacWidget extends StatelessWidget {
                       //
                       Expanded(
                         child: VcoreProfileTextFieldWidget(
-                          title: 'Phường/Xã/Thị trấn',
-                          hintText: 'Nhập P/X/TT',
+                          title: 'Xã/Phường/Đặc khu',
+                          hintText: 'Nhập tên xã/phường/đặc khu',
                           value: controller
                               .sinhvienEdit.value.diaChiLienLacPhuongXa,
                           onChange: (text) {
                             controller.sinhvienEdit.update(
                               (item) {
                                 item?.diaChiLienLacPhuongXa = text;
+                                item?.idDiaChiLienLacQuanHuyen = '';
                               },
                             );
                           },
@@ -214,3 +182,4 @@ class VcoreProfilePersonDiaChiLienLacWidget extends StatelessWidget {
     );
   }
 }
+
