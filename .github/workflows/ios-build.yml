@@ -14,7 +14,7 @@ permissions:
 jobs:
   build-ios:
     name: Build Signed iOS IPA
-    runs-on: [self-hosted, macOS, ARM64]
+    runs-on: [self-hosted, macOS, X64]
     
     timeout-minutes: 60
 
